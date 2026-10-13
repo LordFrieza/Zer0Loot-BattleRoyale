@@ -1,0 +1,21 @@
+{
+  "name": "zer0loot-battleroyale",
+  "version": "0.1.0",
+  "description": "Battle royale Twitch de la chaîne Zer0Loot : !join, combats automatiques, coffres de loot.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "tmi.js": "^1.8.5"
+  }
+}

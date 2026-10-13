@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mon personnage — Zer0Loot</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">ZER<span>0</span>LOOT <small>BATTLE ROYALE</small></div>
+    <div class="right">
+      <a href="/arena.html" target="_blank">Arène en direct</a>
+      <span id="who"></span>
+      <button class="secondary small" onclick="logout()">Déconnexion</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="panel queue-box" id="queue-box" style="display:none"></div>
+
+    <div class="grid2">
+      <div>
+        <div class="panel char-card">
+          <canvas id="avatar" width="200" height="200"></canvas>
+          <div class="char-name" id="char-name"></div>
+          <div class="level-badge" id="level"></div>
+          <div class="xpbar"><div id="xp-fill"></div><span id="xp-text"></span></div>
+          <div class="wallet">
+            <span title="Golds">🪙 <span id="gold"></span></span>
+            <span title="Coffres de LOOT">🎁 <span id="chests-small"></span></span>
+          </div>
+          <div class="record" id="record"></div>
+        </div>
+
+        <div class="panel" id="twitch-panel">
+          <h2>📺 Compte Twitch</h2>
+          <div id="twitch-content"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>📊 Statistiques <span class="sub">1 niveau = 1 point de compétence</span></h2>
+        <div id="skill-banner"></div>
+        <table class="stats-table" id="stats"></table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span></h2>
+      <div class="equip-grid" id="equipment"></div>
+    </div>
+
+    <div class="panel">
+      <h2>🎁 Coffres de LOOT <span class="sub">1 coffre = 3 objets aléatoires</span></h2>
+      <div class="chest-actions">
+        <span class="chest-count">🎁 × <span id="chests"></span></span>
+        <span class="spacer"></span>
+        <button class="gold" id="open-chest">Ouvrir un coffre</button>
+        <button class="secondary" id="buy-1">Acheter 1 coffre (100 🪙)</button>
+        <button class="secondary" id="buy-10">Acheter 10 coffres (1000 🪙)</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🧰 Coffre personnel <span class="sub" id="inv-count"></span></h2>
+      <div class="inv-filters" id="inv-filters"></div>
+      <div class="inventory" id="inventory"></div>
+    </div>
+
+    <div class="panel" id="loot-info">
+      <h2>🍀 Comment fonctionne la chance ?</h2>
+      <p class="muted">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
+        Avec <b>0 de chance</b>, les probabilités sont 90 % Commun, 6 % Peu commun, 3 % Rare, 0,9 % Épique et 0,1 % Légendaire.
+        Chaque point de chance <b>retire 1 %</b> aux Communs et le redistribue aux raretés supérieures
+        (+0,4 % Peu commun, +0,3 % Rare, +0,21 % Épique, +0,09 % Légendaire). La chance effective est plafonnée à
+        <b>85</b>. Les bonus % de Chance de ton équipement multiplient tes points de Chance.</p>
+      <p class="muted">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
+        Commun 1 ligne (+1 à 3 %), Peu commun 2 lignes (+4 à 6 %), Rare 3 lignes (+7 à 10 %),
+        Épique 4 lignes (+11 à 15 %), Légendaire 5 lignes (+15 à 25 %).</p>
+      <div id="loot-table"></div>
+      <div class="luck-sim">
+        <span class="muted">Simuler une chance de</span>
+        <input type="range" id="luck-sim" min="0" max="85" step="1" style="flex:1">
+        <b id="luck-sim-val" style="width:40px"></b>
+        <button class="secondary small" id="luck-reset">Ma chance</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/rules.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/fighter.js"></script>
+  <script src="/js/chest.js"></script>
+  <script src="/js/character.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arène — Zer0Loot Battle Royale</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="obs">
+  <!-- Page plein écran à utiliser comme « Source navigateur » dans OBS (1280×720 ou 1920×1080). -->
+  <div class="arena-wrap"><canvas id="arena"></canvas></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/rules.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/fighter.js"></script>
+  <script src="/js/arena.js"></script>
+  <script>new ArenaView(document.getElementById('arena'), io());</script>
+</body>
+</html>

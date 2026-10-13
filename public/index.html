@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zer0Loot Battle Royale</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">ZER<span>0</span>LOOT <small>BATTLE ROYALE</small></div>
+    <div class="right"><a href="/arena.html">Voir l'arène en direct</a></div>
+  </header>
+
+  <section class="hero">
+    <h1>ZER<span>0</span>LOOT ⚔️</h1>
+    <p>Crée ton personnage, lie ton compte Twitch et tape <b>!join</b> dans le chat de
+      <a href="https://www.twitch.tv/zer0loot" target="_blank" rel="noopener">twitch.tv/zer0loot</a>
+      quand la file est ouverte. Chaque kill rapporte du loot !</p>
+  </section>
+
+  <div class="panel auth-box">
+    <div class="tabs">
+      <button id="tab-login" class="active">Connexion</button>
+      <button id="tab-register">Créer un compte</button>
+    </div>
+    <form id="auth-form">
+      <label for="username">Pseudo</label>
+      <input id="username" autocomplete="username" required>
+      <label for="password">Mot de passe</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="error" id="error"></div>
+      <button type="submit" id="submit" style="width:100%;justify-content:center">Se connecter</button>
+    </form>
+  </div>
+
+  <div class="steps">
+    <div class="step"><b>1.</b> Crée ton compte et lie ton Twitch.</div>
+    <div class="step"><b>2.</b> Quand le streamer ouvre la file, tape <b>!join</b> dans le chat.</div>
+    <div class="step"><b>3.</b> Ton perso combat tout seul : il attaque l'ennemi le plus proche.</div>
+    <div class="step"><b>4.</b> Kills et victoires = XP, golds et coffres de LOOT à ouvrir !</div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    let mode = 'login';
+    const $ = (id) => document.getElementById(id);
+    function setMode(m) {
+      mode = m;
+      $('tab-login').classList.toggle('active', m === 'login');
+      $('tab-register').classList.toggle('active', m === 'register');
+      $('submit').textContent = m === 'login' ? 'Se connecter' : 'Créer mon personnage';
+      $('password').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+      $('error').textContent = '';
+    }
+    $('tab-login').onclick = () => setMode('login');
+    $('tab-register').onclick = () => setMode('register');
+
+    function go(me) {
+      location.href = me.role === 'admin' ? '/admin.html' : '/character.html';
+    }
+
+    $('auth-form').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await api('/api/' + mode, { username: $('username').value.trim(), password: $('password').value });
+        go(r.me);
+      } catch (err) {
+        $('error').textContent = err.message;
+      }
+    };
+
+    api('/api/me').then(go).catch(() => {});
+  </script>
+</body>
+</html>

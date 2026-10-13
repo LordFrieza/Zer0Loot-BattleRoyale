@@ -1,0 +1,91 @@
+const test = require('node:test');
+const assert = require('node:assert');
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'zl-test-'));
+const Rules = require('../shared/rules');
+const game = require('../server/game');
+
+test('table de loot : valeurs du cahier des charges', () => {
+  assert.deepStrictEqual(Rules.lootTable(0), { commun: 90, peu_commun: 6, rare: 3, epique: 0.9, legendaire: 0.1 });
+  assert.deepStrictEqual(Rules.lootTable(10), { commun: 80, peu_commun: 10, rare: 6, epique: 3, legendaire: 1 });
+});
+
+test('table de loot : total à 100 % et plafond', () => {
+  for (const luck of [0, 5, 33, 85, 500]) {
+    const sum = Object.values(Rules.lootTable(luck)).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - 100) < 1e-6, `luck ${luck} → ${sum}`);
+  }
+  assert.deepStrictEqual(Rules.lootTable(500), Rules.lootTable(Rules.LUCK_CAP));
+});
+
+test('objets : nombre de lignes et bornes selon la rareté', () => {
+  for (const rarity of Rules.RARITIES) {
+    const info = Rules.RARITY_INFO[rarity];
+    for (let i = 0; i < 200; i++) {
+      const item = game.makeItem(rarity);
+      assert.strictEqual(item.lines.length, info.lines);
+      assert.strictEqual(new Set(item.lines.map((l) => l.stat)).size, info.lines, 'stats distinctes');
+      for (const l of item.lines) assert.ok(l.value >= info.min && l.value <= info.max);
+      assert.ok(Rules.SLOTS.includes(item.slot));
+    }
+  }
+});
+
+test('lumières du coffre : blanc, vert (4), bleu (6), violet (11), orange (21)', () => {
+  const at = (n) => Rules.chestLightRarity(n);
+  assert.strictEqual(at(3), 'commun');
+  assert.strictEqual(at(4), 'peu_commun');
+  assert.strictEqual(at(6), 'rare');
+  assert.strictEqual(at(11), 'epique');
+  assert.strictEqual(at(21), 'legendaire');
+});
+
+test('ouverture : clics requis = meilleure rareté du coffre', () => {
+  const c = game.newCharacter();
+  c.chests = 50;
+  for (let i = 0; i < 50; i++) {
+    const r = game.openChest(c);
+    assert.strictEqual(r.items.length, Rules.ITEMS_PER_CHEST);
+    assert.strictEqual(r.clicks, Rules.RARITY_INFO[r.bestRarity].clicks);
+  }
+  assert.strictEqual(c.chests, 0);
+  assert.strictEqual(c.inventory.length, 150);
+});
+
+test('récompenses et niveaux', () => {
+  const c = game.newCharacter();
+  game.grant(c, Rules.REWARDS.kill);
+  assert.strictEqual(c.level, 2);
+  assert.strictEqual(c.skillPoints, 1);
+  assert.strictEqual(c.gold, 10);
+  assert.strictEqual(c.chests, 1);
+  game.grant(c, Rules.REWARDS.win); // 300 XP : 200 pour le niv. 3, reste 100
+  assert.strictEqual(c.level, 3);
+  assert.strictEqual(c.xp, 100);
+  assert.strictEqual(c.gold, 40);
+});
+
+test('achat de coffre : 100 golds', () => {
+  const c = game.newCharacter();
+  c.gold = 250;
+  game.buyChests(c, 2);
+  assert.strictEqual(c.gold, 50);
+  assert.strictEqual(c.chests, 2);
+  assert.throws(() => game.buyChests(c, 1));
+});
+
+test('équiper / retirer', () => {
+  const c = game.newCharacter();
+  const a = game.makeItem('rare', 'epee');
+  const b = game.makeItem('commun', 'epee');
+  c.inventory.push(a, b);
+  game.equip(c, a.id);
+  game.equip(c, b.id);
+  assert.strictEqual(c.equipment.epee.id, b.id);
+  assert.deepStrictEqual(c.inventory.map((i) => i.id), [a.id]);
+  game.unequip(c, 'epee');
+  assert.strictEqual(c.inventory.length, 2);
+});
