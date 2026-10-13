@@ -326,10 +326,14 @@ async function openChest() {
 const socket = io();
 socket.on('me', (m) => { me = m; render(); });
 socket.on('queue', (q) => { queue = q; if (me) renderQueue(); });
+const REWARD_LABELS = { win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille' };
+const REWARD_SOUNDS = { win: 'victory', kill: 'reward', participation: 'levelUp' };
 socket.on('reward', (r) => {
-  const label = r.type === 'win' ? '🏆 VICTOIRE !' : '⚔️ Kill !';
-  Sound.play(r.type === 'win' ? 'victory' : 'reward');
-  toast(`${label} +${r.reward.xp} XP, +${r.reward.gold} 🪙, +${r.reward.chests} 🎁`, 5000);
+  Sound.play(REWARD_SOUNDS[r.type]);
+  const gains = [`+${r.reward.xp} XP`];
+  if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
+  if (r.reward.chests) gains.push(`+${r.reward.chests} 🎁`);
+  toast(`${REWARD_LABELS[r.type]} ${gains.join(', ')}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });
 

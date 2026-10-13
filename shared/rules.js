@@ -85,6 +85,7 @@
   const REWARDS = {
     kill: { xp: 100, chests: 1, gold: 10 },
     win: { xp: 300, chests: 1, gold: 30 },
+    participation: { xp: 25, chests: 0, gold: 0 }, // chaque combattant à la fin d'une bataille
   };
   const CHEST_PRICE = 100;
   const ITEMS_PER_CHEST = 3;

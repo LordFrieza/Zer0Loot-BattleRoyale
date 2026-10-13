@@ -382,6 +382,8 @@ battle.on('end', (winner, fighters) => {
     const user = f.userId && db.state.users[f.userId];
     if (!user) continue;
     user.character.record.battles += 1;
+    const participationLevels = game.grant(user.character, Rules.REWARDS.participation);
+    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: Rules.REWARDS.participation, levels: participationLevels });
     if (f === winner) {
       const levels = game.grant(user.character, Rules.REWARDS.win);
       user.character.record.wins += 1;

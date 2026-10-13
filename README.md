@@ -76,7 +76,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   son Twitch, elle récupère tout (XP, golds, coffres, objets).
 - **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (un porteur de **bouclier** attire
   davantage l'aggro). Après 45 s, une zone se referme pour éviter les combats interminables.
-- **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds.
+- **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds ;
+  participation = 25 XP pour chaque combattant à la fin de la bataille (gagnant compris, pas si l'admin annule).
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
 - **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement) :
   - Vie : 100 PV + 10 par point
