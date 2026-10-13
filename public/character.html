@@ -20,6 +20,27 @@
   <main class="container">
     <div class="panel queue-box" id="queue-box" style="display:none"></div>
 
+    <div class="panel bet-box" id="bet-box" style="display:none">
+      <h2>🎲 Paris <span class="sub" id="bet-status"></span></h2>
+      <div id="bet-summary"></div>
+      <div class="row bet-controls" id="bet-controls">
+        <label for="bet-amount" style="margin:0">Ta mise</label>
+        <input id="bet-amount" type="number" min="1" step="1" value="10" style="width:110px">
+        <span>🪙</span>
+        <button class="secondary small" data-quick="10">10</button>
+        <button class="secondary small" data-quick="50">50</button>
+        <button class="secondary small" data-quick="half">½</button>
+        <button class="secondary small" data-quick="max">Max</button>
+        <span class="spacer"></span>
+        <span class="muted" style="font-size:13px">Choisis ensuite ton combattant ci-dessous.</span>
+      </div>
+      <div class="bet-list" id="bet-list"></div>
+      <p class="muted bet-rules">Un seul pari par bataille, sur n'importe quel combattant sauf toi. La mise est retirée tout de suite.
+        Si ton combattant gagne, tu récupères ta mise <b>+</b> une part des mises perdues, au prorata de ce que tu as misé
+        parmi les gagnants (1 gold contre 9 → 10 % du butin). Les paris ferment au lancement du combat. Si personne n'a misé
+        sur le gagnant, ou si la bataille est annulée, tout le monde est remboursé.</p>
+    </div>
+
     <div class="grid2">
       <div>
         <div class="panel char-card">

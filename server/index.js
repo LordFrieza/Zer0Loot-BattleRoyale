@@ -11,6 +11,7 @@ const db = require('./db');
 const game = require('./game');
 const twitch = require('./twitch');
 const { Battle } = require('./battle');
+const { Bets } = require('./bets');
 const Rules = require('../shared/rules');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -89,6 +90,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const battle = new Battle();
+const bets = new Bets(battle);
+
+// Paris restés en cours lors d'un arrêt du serveur : la bataille est perdue, on rembourse.
+const leftover = bets.refundAll();
+if (leftover.length) console.log(`[paris] ${leftover.length} pari(s) remboursé(s) après redémarrage`);
+
+function queueView() {
+  return { ...battle.publicQueue(), bets: bets.summary() };
+}
 
 // Derrière l'hébergeur (Railway, Render…), le HTTPS est géré par un proxy.
 app.set('trust proxy', 1);
@@ -139,7 +149,10 @@ function meView(user) {
     twitchLogin: user.twitchLogin || null,
     twitchDisplayName: user.twitchDisplayName || null,
   };
-  if (user.role === 'player') base.character = game.publicCharacter(user);
+  if (user.role === 'player') {
+    base.character = game.publicCharacter(user);
+    base.bet = bets.myBet(user.id);
+  }
   return base;
 }
 
@@ -334,7 +347,31 @@ app.post('/api/queue/join', requirePlayer, (req, res) => {
   res.json({ ok: true, joined });
 });
 
-app.get('/api/queue', (req, res) => res.json(battle.publicQueue()));
+app.get('/api/queue', (req, res) => res.json(queueView()));
+
+// ---------- Paris ----------
+
+app.post('/api/bet', requirePlayer, action((req) => {
+  const bet = bets.place(req.user, String(req.body.target || ''), req.body.amount);
+  io.emit('queue', queueView());
+  return { bet };
+}));
+
+app.post('/api/bet/cancel', requirePlayer, action((req) => {
+  bets.cancel(req.user);
+  io.emit('queue', queueView());
+}));
+
+function notifyBets(results) {
+  for (const r of results) {
+    const user = db.state.users[r.userId];
+    if (!user) continue;
+    pushMe(user);
+    io.to('user:' + user.id).emit('bet', r);
+  }
+}
+
+battle.on('cleared', () => notifyBets(bets.refundAll()));
 
 app.post('/api/admin/queue/open', requireAdmin, action((req) => {
   const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
@@ -393,9 +430,16 @@ battle.on('end', (winner, fighters) => {
   }
   db.save();
   if (winner) twitch.say(`🏆 ${winner.name} remporte le Battle Royale avec ${winner.kills} kill(s) !`);
+
+  const betResults = bets.settle(winner ? winner.key : null, winner ? winner.name : null);
+  notifyBets(betResults);
+  const br = bets.summary().lastResult;
+  if (br && !br.refund && br.winners) {
+    twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
+  }
 });
 
-battle.on('queue', (q) => io.emit('queue', q));
+battle.on('queue', () => io.emit('queue', queueView()));
 battle.on('frame', (f) => io.emit('frame', f));
 
 // ---------- Temps réel ----------
@@ -403,7 +447,7 @@ battle.on('frame', (f) => io.emit('frame', f));
 io.on('connection', (socket) => {
   const user = userFromCookie(socket.request.headers.cookie);
   if (user) socket.join('user:' + user.id);
-  socket.emit('queue', battle.publicQueue());
+  socket.emit('queue', queueView());
   socket.emit('frame', battle.frame());
 });
 

@@ -209,7 +209,8 @@
         this.title('FILE FERMÉE', 90, 64, '#fff');
         this.title('La bataille va commencer !', 170, 34, '#ffb000', '#ff7a00');
       }
-      this.title(`${n} combattant${n > 1 ? 's' : ''}`, 235, 26, '#cfc6ff');
+      const pot = q.bets && q.bets.pool ? `   ·   💰 ${q.bets.pool} golds pariés sur le site` : '';
+      this.title(`${n} combattant${n > 1 ? 's' : ''}${pot}`, 235, 26, '#cfc6ff');
 
       // Grille des inscrits
       const cols = n > 40 ? 12 : 10;
@@ -336,6 +337,13 @@
       ctx.fillStyle = f.storm && f.storm.active ? '#d49bff' : '#cfc6ff';
       const time = Math.floor(f.time);
       ctx.fillText(`⏱ ${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}${f.storm && f.storm.active ? '  ⚡ la zone se referme' : ''}`, 30, 66);
+      const bets = this.queue && this.queue.bets;
+      if (bets && bets.pool && this.queue.phase === 'battle') {
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillRect(16, 84, 230, 30);
+        ctx.fillStyle = '#ffb000';
+        ctx.fillText(`💰 ${bets.pool} golds en jeu (${bets.bettors} paris)`, 30, 105);
+      }
 
       // Kill feed
       this.feed.forEach((item, i) => {
@@ -377,6 +385,13 @@
       top.forEach((p, i) => {
         this.label(`#${p.rank}  ${p.name}  —  ${p.kills} kill(s)`, W / 2, 540 + i * 30, 18, '#ddd');
       });
+      const br = this.queue.bets && this.queue.bets.lastResult;
+      if (br) {
+        const text = br.refund
+          ? `💰 Personne n'avait parié sur le gagnant : ${br.pool} golds remboursés`
+          : `💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds !`;
+        this.label(text, W / 2, 700, 20, '#ffb000');
+      }
     }
   }
 

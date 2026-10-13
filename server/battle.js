@@ -49,6 +49,7 @@ class Battle extends EventEmitter {
   openQueue(seconds) {
     if (this.phase === 'battle') throw new Error('Une bataille est en cours');
     this.stopLoop();
+    this.emit('cleared'); // la bataille précédente n'aura pas lieu : paris remboursés
     this.participants.clear();
     this.result = null;
     this.fighters = [];
@@ -70,6 +71,7 @@ class Battle extends EventEmitter {
   reset() {
     if (this.phase === 'battle') this.stopLoop();
     clearTimeout(this.queueTimer);
+    this.emit('cleared');
     this.phase = 'idle';
     this.participants.clear();
     this.queueEndsAt = null;

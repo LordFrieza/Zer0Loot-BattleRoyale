@@ -252,3 +252,25 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 }
 .item.recycled { animation: recycled .45s forwards ease-in; }
 @keyframes recycled { to { transform: scale(.4) rotate(-12deg); opacity: 0; } }
+
+/* ---------- Paris ---------- */
+.bet-box { border: 1px solid #ffb000; background: linear-gradient(90deg, rgba(255,176,0,.10), transparent 60%), var(--panel); }
+.bet-summary { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; font-weight: 700; }
+.bet-pot { font-size: 22px; font-weight: 900; color: var(--accent2); }
+.bet-controls { margin-bottom: 12px; }
+.bet-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.bet-row {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px; font-size: 13px;
+}
+.bet-row .bet-name { font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; gap: 6px; }
+.bet-row .bet-gain { color: var(--ok); font-weight: 700; }
+.bet-row.mine { border: 2px solid var(--accent2); box-shadow: 0 0 14px rgba(255,176,0,.25); }
+.bet-row.self { opacity: .55; }
+.bet-row.winner { border: 2px solid var(--ok); }
+.bet-row .row { margin-top: 4px; }
+.bet-result { padding: 10px 14px; border-radius: 10px; background: var(--bg2); margin-bottom: 12px; font-weight: 700; }
+.bet-result.won { border-left: 4px solid var(--ok); }
+.bet-result.lost { border-left: 4px solid var(--danger); }
+.bet-result.refund { border-left: 4px solid var(--muted); }
+.bet-rules { font-size: 12px; margin: 12px 0 0; }

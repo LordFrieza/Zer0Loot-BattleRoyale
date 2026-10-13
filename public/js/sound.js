@@ -253,6 +253,21 @@
       tone(midi(96), 0.25, { type: 'triangle', vol: 0.06, delay: 0.06 });
     },
 
+    // Pari enregistré : jetons qui s'empilent.
+    bet() {
+      for (let i = 0; i < 4; i++) {
+        noise(0.04, { filter: 'bandpass', freq: 4200 + i * 300, q: 6, vol: 0.18, delay: i * 0.06 });
+        tone(midi(86 + i * 2), 0.07, { type: 'triangle', vol: 0.06, delay: i * 0.06 });
+      }
+      tone(midi(91), 0.3, { type: 'sine', vol: 0.07, delay: 0.26 });
+    },
+
+    // Pari perdu : petite descente « womp womp ».
+    betLost() {
+      [67, 66, 65].forEach((n, i) => tone(midi(n), 0.22, { type: 'triangle', vol: 0.12, delay: i * 0.22 }));
+      tone(midi(64), 0.6, { type: 'triangle', vol: 0.12, delay: 0.66, to: midi(62) });
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });

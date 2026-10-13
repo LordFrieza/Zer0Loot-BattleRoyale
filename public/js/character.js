@@ -38,6 +38,7 @@ function render() {
   renderInventory();
   renderTwitch();
   renderQueue();
+  renderBets();
   renderLoot();
 }
 
@@ -216,6 +217,107 @@ function renderTwitch() {
   if ($('dev-link')) $('dev-link').onclick = () => act('/api/twitch/link-dev', { login: $('dev-login').value });
 }
 
+// ---------- Paris ----------
+let lastBetResult = null; // résultat de mon pari pour la dernière bataille
+
+function betAmount() {
+  return Math.max(1, Math.floor(Number($('bet-amount').value) || 0));
+}
+
+// Gain estimé (en plus de la mise) si je mise `amount` sur `key`, avec les paris actuels.
+function estimateGain(key, amount) {
+  const s = queue.bets;
+  const mine = me.bet;
+  const poolOthers = s.pool - (mine ? mine.amount : 0);
+  const onTarget = (s.targets[key] ? s.targets[key].total : 0) - (mine && mine.target === key ? mine.amount : 0);
+  const lost = poolOthers - onTarget;
+  return Math.floor((lost * amount) / (onTarget + amount));
+}
+
+function renderBets() {
+  const box = $('bet-box');
+  if (queue && ['idle', 'queue', 'ready'].includes(queue.phase)) lastBetResult = null; // nouvelle bataille
+  if (!queue || !queue.bets || queue.phase === 'idle' || (queue.phase === 'ended' && !queue.bets.lastResult && !lastBetResult)) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  const s = queue.bets;
+  const open = s.open;
+  const mine = me.bet;
+  $('bet-controls').style.display = open ? '' : 'none';
+  $('bet-status').textContent = open ? 'Ouverts jusqu\'au lancement du combat' : queue.phase === 'battle' ? '🔒 Fermés : combat en cours' : 'Bataille terminée';
+
+  let summary = `<div class="bet-summary"><span class="bet-pot">💰 ${s.pool} 🪙</span><span class="muted">misés par ${s.bettors} parieur${s.bettors > 1 ? 's' : ''}</span>`;
+  if (mine) summary += `<span>Ton pari : <b class="c-legendaire">${mine.amount} 🪙</b> sur <b>${esc(mine.targetName)}</b></span>`;
+  summary += '</div>';
+  if (queue.phase === 'ended') {
+    const r = s.lastResult;
+    if (r) {
+      summary = r.refund
+        ? `<div class="bet-result refund">↩️ Personne n'avait parié sur ${esc(r.winnerName || 'le gagnant')} : les ${r.pool} 🪙 misés ont été remboursés.</div>`
+        : `<div class="bet-result won">🏆 ${esc(r.winnerName)} gagne ! ${r.winners > 1 ? r.winners + ' parieurs se partagent' : '1 parieur remporte'} ${r.distributed} 🪙 de mises perdues.</div>`;
+    } else summary = '';
+    if (lastBetResult) {
+      const b = lastBetResult;
+      const text = b.outcome === 'won' ? `💰 Ton pari sur ${esc(b.targetName)} est gagnant : +${b.payout} 🪙 (mise ${b.amount} + gain ${b.payout - b.amount}).`
+        : b.outcome === 'lost' ? `💸 Ton pari sur ${esc(b.targetName)} est perdu (−${b.amount} 🪙).`
+          : `↩️ Ton pari de ${b.amount} 🪙 t'a été remboursé.`;
+      summary += `<div class="bet-result ${b.outcome}">${text}</div>`;
+    }
+  }
+  $('bet-summary').innerHTML = summary;
+  renderBetList();
+}
+
+function renderBetList() {
+  const s = queue.bets;
+  const mine = me.bet;
+  const open = s.open;
+  if (queue.phase === 'ended') { $('bet-list').innerHTML = ''; return; }
+  if (!queue.participants.length) { $('bet-list').innerHTML = '<div class="muted">En attente des combattants… (ils s\'inscrivent avec !join)</div>'; return; }
+  const amount = betAmount();
+  $('bet-list').innerHTML = queue.participants.map((p) => {
+    const t = s.targets[p.key] || { total: 0, bettors: 0 };
+    const self = p.key === 'u' + me.id;
+    const isMine = mine && mine.target === p.key;
+    let action = '';
+    if (open) {
+      if (self) action = '<span class="muted">C\'est toi</span>';
+      else if (isMine) action = `<button class="small gold" data-bet="${p.key}">Miser ${amount} 🪙 à la place</button><button class="small secondary" data-cancel="1">Annuler</button>`;
+      else action = `<button class="small gold" data-bet="${p.key}">Parier ${amount} 🪙</button>`;
+    }
+    const gain = !self && (open || isMine) ? `<span class="bet-gain">Si victoire : +${estimateGain(p.key, isMine ? mine.amount : amount)} 🪙${isMine ? '' : ' (estimation)'}</span>` : '';
+    return `<div class="bet-row ${isMine ? 'mine' : ''} ${self ? 'self' : ''}">
+      <div class="bet-name"><span>${p.bot ? '🤖' : '⚔️'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>
+      <div class="muted">${t.total} 🪙 misés · ${t.bettors} parieur${t.bettors > 1 ? 's' : ''}${isMine ? ` · <b class="c-legendaire">ton pari : ${mine.amount} 🪙</b>` : ''}</div>
+      ${gain}
+      ${action ? `<div class="row">${action}</div>` : ''}
+    </div>`;
+  }).join('');
+  $('bet-list').querySelectorAll('[data-bet]').forEach((b) => {
+    b.onclick = async () => {
+      const r = await act('/api/bet', { target: b.dataset.bet, amount: betAmount() }, 'bet');
+      if (r) toast(`🎲 Pari enregistré : ${r.bet.amount} 🪙 sur ${r.bet.targetName}`);
+    };
+  });
+  $('bet-list').querySelectorAll('[data-cancel]').forEach((b) => {
+    b.onclick = () => act('/api/bet/cancel', {}, 'unequip');
+  });
+}
+
+$('bet-amount').addEventListener('input', () => { if (queue && queue.bets) renderBetList(); });
+document.querySelectorAll('[data-quick]').forEach((b) => {
+  b.onclick = () => {
+    const budget = me.character.gold + (me.bet ? me.bet.amount : 0);
+    const q = b.dataset.quick;
+    const v = q === 'max' ? budget : q === 'half' ? Math.floor(budget / 2) : Number(q);
+    $('bet-amount').value = Math.max(1, Math.min(v, Math.max(1, budget)));
+    renderBetList();
+  };
+});
+
+
 function renderQueue() {
   const box = $('queue-box');
   if (!queue || queue.phase === 'idle') { box.style.display = 'none'; return; }
@@ -325,9 +427,17 @@ async function openChest() {
 // Temps réel
 const socket = io();
 socket.on('me', (m) => { me = m; render(); });
-socket.on('queue', (q) => { queue = q; if (me) renderQueue(); });
+socket.on('queue', (q) => { queue = q; if (me) { renderQueue(); renderBets(); } });
 const REWARD_LABELS = { win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille' };
 const REWARD_SOUNDS = { win: 'victory', kill: 'reward', participation: 'levelUp' };
+socket.on('bet', (r) => {
+  lastBetResult = r;
+  if (r.outcome === 'won') { Sound.play('reward'); toast(`💰 Pari gagné sur ${r.targetName} ! +${r.payout} 🪙`, 6000); }
+  else if (r.outcome === 'lost') { Sound.play('betLost'); toast(`💸 Pari perdu sur ${r.targetName} (−${r.amount} 🪙)`, 6000); }
+  else toast(`↩️ Pari remboursé : +${r.amount} 🪙`, 5000);
+  renderBets();
+});
+
 socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
   const gains = [`+${r.reward.xp} XP`];

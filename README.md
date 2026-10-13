@@ -94,6 +94,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Chaque emplacement a ses stats de prédilection (ex. plastron → Vie/Défense, épée → Force, boucles → Chance).
 - **Coffres** : 3 objets par coffre, achat 100 golds, stockage illimité. Clics pour ouvrir selon la meilleure rareté :
   3 / 5 / 10 / 20 / 30. Lumières : blanc, puis vert (4ᵉ clic), bleu (6ᵉ), violet (11ᵉ), orange (21ᵉ).
+- **Paris** : dès que la file est ouverte, chaque joueur voit les combattants inscrits dans l'encart « 🎲 Paris » de sa
+  page perso et peut miser des golds sur **un** combattant (pas sur lui-même). La mise est retirée immédiatement ; le pari
+  peut être modifié ou annulé jusqu'au lancement du combat, où les paris ferment. Si le combattant choisi gagne, le parieur
+  récupère sa mise + une part des mises perdues au prorata de sa mise parmi les gagnants (1 contre 9 → 10 % / 90 %),
+  répartie en golds entiers sans perte. Si personne n'a parié sur le gagnant, si la bataille est annulée ou si le serveur
+  redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
   observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.
 - **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 1 gold par objet
@@ -126,6 +132,7 @@ Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](sh
 server/
   index.js    serveur Express + Socket.IO, routes, sessions, récompenses
   battle.js   file d'attente et simulation du combat (côté serveur, 20 ticks/s)
+  bets.js     paris sur le vainqueur (mises, répartition des gains, remboursements)
   game.js     personnages : XP, coffres, objets, équipement, liaison Twitch
   twitch.js   lecture du chat (tmi.js), bot, OAuth
   db.js       stockage JSON (data/db.json)
