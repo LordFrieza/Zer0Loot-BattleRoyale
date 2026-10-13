@@ -87,6 +87,7 @@
   };
   const CHEST_PRICE = 100;
   const ITEMS_PER_CHEST = 3;
+  const RECYCLE_GOLD = 1; // golds par objet recyclé, quelle que soit la rareté
 
   function xpToNext(level) {
     return 100 * level;
@@ -127,7 +128,7 @@
 
   return {
     STATS, STAT_INFO, RARITIES, RARITY_INFO, SLOTS, SLOT_INFO, STAT_SUFFIX, RARITY_PREFIX,
-    REWARDS, CHEST_PRICE, ITEMS_PER_CHEST, LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK,
+    REWARDS, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD, LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK,
     chestLightRarity, lootTable, xpToNext, derive, describeDerived,
   };
 });

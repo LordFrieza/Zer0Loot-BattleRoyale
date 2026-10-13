@@ -236,3 +236,19 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px
 
 body.obs { background: transparent; overflow: hidden; }
 body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100vh; aspect-ratio: auto; }
+
+/* ---------- Recyclage ---------- */
+.recycle-bar {
+  border: 1px solid var(--accent2); background: linear-gradient(90deg, rgba(255,176,0,.12), transparent);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.recycle-bar .row button { font-size: 12px; padding: 5px 10px; }
+.inventory.recycling .item { cursor: pointer; user-select: none; }
+.inventory.recycling .item .actions, .inventory.recycling .item .compare { display: none; }
+.inventory.recycling .item:not(.selected) { opacity: .55; }
+.item.selected { opacity: 1; outline: 3px solid var(--accent2); outline-offset: 2px; }
+.item.selected::after {
+  content: '♻️'; position: absolute; top: 6px; right: 8px; font-size: 18px;
+}
+.item.recycled { animation: recycled .45s forwards ease-in; }
+@keyframes recycled { to { transform: scale(.4) rotate(-12deg); opacity: 0; } }

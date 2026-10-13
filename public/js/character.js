@@ -4,6 +4,8 @@ let me = null;
 let queue = null;
 let config = null;
 let invFilter = 'all';
+let recycleMode = false;
+const selected = new Set();
 let simLuck = null;
 const opener = new ChestOpener();
 let opening = false;
@@ -109,13 +111,84 @@ function renderInventory() {
     .filter(({ item }) => invFilter === 'all' || item.slot === invFilter)
     .sort((x, y) => Rules.RARITIES.indexOf(y.item.rarity) - Rules.RARITIES.indexOf(x.item.rarity) || y.i - x.i)
     .map(({ item }) => item);
+  // Retire de la sélection les objets qui ne sont plus dans l'inventaire.
+  const ids = new Set(inv.map((i) => i.id));
+  for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
+
+  $('inventory').classList.toggle('recycling', recycleMode);
   $('inventory').innerHTML = list.length
     ? list.map((item) => itemHtml(item, `${compareHtml(item)}<div class="actions"><button class="small" data-equip="${item.id}">Équiper</button></div>`)).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
     b.onclick = () => act('/api/equip', { itemId: b.dataset.equip });
   });
+  $('inventory').querySelectorAll('.item').forEach((el) => {
+    el.classList.toggle('selected', recycleMode && selected.has(el.dataset.id));
+    el.onclick = () => {
+      if (!recycleMode) return;
+      if (selected.has(el.dataset.id)) selected.delete(el.dataset.id);
+      else selected.add(el.dataset.id);
+      el.classList.toggle('selected');
+      renderRecycleBar(list);
+    };
+  });
+  $('recycle-toggle').disabled = inv.length === 0 && !recycleMode;
+  renderRecycleBar(list);
 }
+
+// ---------- Recyclage de masse ----------
+const PLURAL = { commun: 'Communs', peu_commun: 'Peu communs', rare: 'Rares', epique: 'Épiques', legendaire: 'Légendaires' };
+
+function renderRecycleBar(visible) {
+  const bar = $('recycle-bar');
+  $('recycle-toggle').textContent = recycleMode ? '✖ Quitter le recyclage' : '♻️ Recycler';
+  if (!recycleMode) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const n = selected.size;
+  const quick = Rules.RARITIES
+    .filter((r) => visible.some((i) => i.rarity === r))
+    .map((r) => `<button class="secondary" data-select="${r}">Tous les <span class="c-${r}">${PLURAL[r]}</span></button>`)
+    .join('');
+  bar.innerHTML = `
+    <div><b>♻️ Mode recyclage</b> <span class="muted">— clique sur les objets à recycler. Chaque objet rapporte
+      ${Rules.RECYCLE_GOLD} 🪙, quelle que soit sa rareté. Les objets équipés ne sont jamais recyclés.</span></div>
+    <div class="row">
+      <button class="secondary" data-select="all">Tout sélectionner</button>${quick}
+      <button class="secondary" data-select="none">Tout désélectionner</button>
+      <span class="spacer"></span>
+      <button class="gold" id="recycle-go" ${n ? '' : 'disabled'}>Recycler ${n} objet${n > 1 ? 's' : ''} (+${n * Rules.RECYCLE_GOLD} 🪙)</button>
+    </div>`;
+  bar.querySelectorAll('[data-select]').forEach((b) => {
+    b.onclick = () => {
+      const k = b.dataset.select;
+      if (k === 'none') selected.clear();
+      else visible.filter((i) => k === 'all' || i.rarity === k).forEach((i) => selected.add(i.id));
+      renderInventory();
+    };
+  });
+  $('recycle-go').onclick = recycleSelected;
+}
+
+async function recycleSelected() {
+  const items = me.character.inventory.filter((i) => selected.has(i.id));
+  const precious = items.filter((i) => i.rarity === 'epique' || i.rarity === 'legendaire').length;
+  if (precious && !confirm(`Attention : ta sélection contient ${precious} objet(s) Épique ou Légendaire. Les recycler quand même ?`)) return;
+  document.querySelectorAll('#inventory .item.selected').forEach((el) => el.classList.add('recycled'));
+  await new Promise((r) => setTimeout(r, 400));
+  const r = await act('/api/recycle', { itemIds: [...selected] });
+  if (r) {
+    toast(`♻️ ${r.recycled} objet(s) recyclé(s) : +${r.gold} 🪙`);
+    selected.clear();
+    recycleMode = false;
+    renderInventory();
+  }
+}
+
+$('recycle-toggle').onclick = () => {
+  recycleMode = !recycleMode;
+  selected.clear();
+  renderInventory();
+};
 
 function renderTwitch() {
   const el = $('twitch-content');
@@ -128,6 +201,9 @@ function renderTwitch() {
   }
   let html = '<p class="muted">Lie ton compte Twitch pour que ton <b>!join</b> dans le chat fasse combattre ce personnage. Si tu as déjà joué sans compte, ton loot sera récupéré.</p>';
   if (config && config.twitch.oauth) html += '<a class="btn twitch" href="/auth/twitch">Se connecter avec Twitch</a>';
+  if (config && !config.twitch.oauth && !config.devLink) {
+    html += '<p class="muted">⏳ La connexion Twitch n\'est pas encore activée sur le serveur. En attendant, ton <b>!join</b> fonctionne quand même : tu récupéreras ton loot dès que tu lieras ton compte.</p>';
+  }
   if (config && config.devLink) {
     html += `<div class="row" style="margin-top:10px"><input id="dev-login" placeholder="Ton pseudo Twitch" style="flex:1">
       <button class="twitch" id="dev-link">Lier</button></div>
@@ -171,14 +247,17 @@ function renderLoot() {
   const table = Rules.lootTable(luck);
   $('luck-sim').value = Math.min(85, luck);
   $('luck-sim-val').textContent = luck;
+  const stats = me.character.lootStats || {};
+  const drawn = Rules.RARITIES.reduce((s, r) => s + (stats[r] || 0), 0);
+  const mine = (r) => (drawn ? `${stats[r] || 0} <span class="muted">(${(((stats[r] || 0) / drawn) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} %)</span>` : '—');
   $('loot-table').innerHTML = `<table class="loot-table">
-    <tr><th>Rareté</th><th>Probabilité ${simLuck == null ? '(ta chance : ' + myLuck + ')' : '(simulation)'}</th><th></th><th>Lignes</th><th>Bonus par ligne</th><th>Clics pour ouvrir</th></tr>
+    <tr><th>Rareté</th><th>Probabilité ${simLuck == null ? '(ta chance : ' + myLuck + ')' : '(simulation)'}</th><th></th><th>Lignes</th><th>Bonus par ligne</th><th>Clics pour ouvrir</th><th title="Objets réellement obtenus dans tes coffres">Tes tirages (${drawn})</th></tr>
     ${Rules.RARITIES.map((r) => {
       const info = Rules.RARITY_INFO[r];
       return `<tr><td class="c-${r}" style="font-weight:800">${info.label}</td>
         <td><b>${table[r].toLocaleString('fr-FR')} %</b></td>
         <td style="width:30%"><div class="loot-bar"><div style="width:${table[r]}%;background:${RARITY_COLORS[r]}"></div></div></td>
-        <td>${info.lines}</td><td>+${info.min} à +${info.max} %</td><td>${info.clicks}</td></tr>`;
+        <td>${info.lines}</td><td>+${info.min} à +${info.max} %</td><td>${info.clicks}</td><td>${mine(r)}</td></tr>`;
     }).join('')}
   </table>`;
 }

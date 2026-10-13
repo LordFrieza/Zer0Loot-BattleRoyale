@@ -34,9 +34,12 @@ function checkPassword(password, stored) {
   return crypto.timingSafeEqual(test, Buffer.from(hash, 'hex'));
 }
 
+const PRODUCTION = process.env.NODE_ENV === 'production';
+
 function ensureAdmin() {
   const username = process.env.ADMIN_USERNAME || 'admin';
-  const password = process.env.ADMIN_PASSWORD || 'admin';
+  // En ligne, jamais de mot de passe « admin » : un mot de passe aléatoire est généré et affiché dans les logs.
+  const password = process.env.ADMIN_PASSWORD || (PRODUCTION ? crypto.randomBytes(9).toString('base64url') : 'admin');
   let admin = Object.values(db.state.users).find((u) => u.role === 'admin');
   if (!admin) {
     const id = db.newId();
@@ -44,12 +47,13 @@ function ensureAdmin() {
     db.state.users[id] = admin;
     db.flush();
     console.log(`[admin] compte admin créé : ${username}`);
+    if (PRODUCTION && !process.env.ADMIN_PASSWORD) console.log(`[admin] mot de passe généré : ${password} (définissez ADMIN_PASSWORD pour le choisir)`);
   } else if (process.env.ADMIN_PASSWORD) {
     admin.username = username;
     admin.passwordHash = hashPassword(password);
     db.save();
   }
-  if (!process.env.ADMIN_PASSWORD) {
+  if (!process.env.ADMIN_PASSWORD && !PRODUCTION) {
     console.log('[admin] ⚠️  mot de passe admin par défaut (admin/admin). Définissez ADMIN_PASSWORD en production.');
   }
 }
@@ -75,7 +79,8 @@ function createSession(res, user) {
   const token = crypto.randomBytes(32).toString('hex');
   db.state.sessions[token] = { userId: user.id, expires: Date.now() + SESSION_TTL };
   db.save();
-  res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL / 1000}`);
+  const secure = PRODUCTION ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL / 1000}${secure}`);
 }
 
 // ---------- Application ----------
@@ -85,7 +90,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 const battle = new Battle();
 
+// Derrière l'hébergeur (Railway, Render…), le HTTPS est géré par un proxy.
+app.set('trust proxy', 1);
 app.use(express.json());
+
+app.get('/healthz', (req, res) => res.json({ ok: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));
 
@@ -177,8 +186,15 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/me', requireUser, (req, res) => res.json(meView(req.user)));
 
+// Liaison « par pseudo » (sans vérification) : seulement en local, ou si ALLOW_DEV_LINK=1.
+// En ligne, elle permettrait de se faire passer pour quelqu'un d'autre et de récupérer son loot.
+function devLinkAllowed() {
+  if (process.env.ALLOW_DEV_LINK === '1') return true;
+  return !PRODUCTION && !twitch.oauthEnabled();
+}
+
 app.get('/api/config', (req, res) => {
-  res.json({ twitch: twitch.status(), devLink: !twitch.oauthEnabled() || process.env.ALLOW_DEV_LINK === '1' });
+  res.json({ twitch: twitch.status(), devLink: devLinkAllowed() });
 });
 
 // ---------- Personnage ----------
@@ -192,6 +208,8 @@ app.post('/api/chest/buy', requirePlayer, action((req) => {
 }));
 
 app.post('/api/chest/open', requirePlayer, action((req) => game.openChest(req.user.character)));
+
+app.post('/api/recycle', requirePlayer, action((req) => game.recycle(req.user.character, req.body.itemIds)));
 
 app.post('/api/equip', requirePlayer, action((req) => {
   game.equip(req.user.character, req.body.itemId);
@@ -236,7 +254,7 @@ app.get('/auth/twitch/callback', async (req, res) => {
 
 // Mode développement : liaison en tapant son pseudo (si l'OAuth Twitch n'est pas configuré).
 app.post('/api/twitch/link-dev', requirePlayer, action((req) => {
-  if (twitch.oauthEnabled() && process.env.ALLOW_DEV_LINK !== '1') throw new Error('Utilisez la connexion Twitch');
+  if (!devLinkAllowed()) throw new Error('Utilisez la connexion Twitch');
   const login = String(req.body.login || '').trim().toLowerCase();
   if (!/^[a-z0-9_]{3,25}$/.test(login)) throw new Error('Pseudo Twitch invalide');
   game.linkTwitch(req.user, login, req.body.login.trim());
@@ -398,6 +416,6 @@ setInterval(() => {
 process.on('SIGINT', () => { db.flush(); process.exit(0); });
 process.on('SIGTERM', () => { db.flush(); process.exit(0); });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Zer0Loot Battle Royale → http://localhost:${PORT}`);
 });

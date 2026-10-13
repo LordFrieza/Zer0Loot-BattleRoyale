@@ -63,7 +63,9 @@
     </div>
 
     <div class="panel">
-      <h2>🧰 Coffre personnel <span class="sub" id="inv-count"></span></h2>
+      <h2>🧰 Coffre personnel <span class="sub" id="inv-count"></span>
+        <button class="secondary small" id="recycle-toggle">♻️ Recycler</button></h2>
+      <div class="recycle-bar" id="recycle-bar" style="display:none"></div>
       <div class="inv-filters" id="inv-filters"></div>
       <div class="inventory" id="inventory"></div>
     </div>
@@ -78,6 +80,9 @@
       <p class="muted">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
         Commun 1 ligne (+1 à 3 %), Peu commun 2 lignes (+4 à 6 %), Rare 3 lignes (+7 à 10 %),
         Épique 4 lignes (+11 à 15 %), Légendaire 5 lignes (+15 à 25 %).</p>
+      <p class="muted">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
+        le hasard peut surprendre (un Légendaire dès le début, ou aucun Rare pendant longtemps) ; plus tu en ouvres, plus
+        tes résultats se rapprochent des probabilités affichées.</p>
       <div id="loot-table"></div>
       <div class="luck-sim">
         <span class="muted">Simuler une chance de</span>

@@ -89,3 +89,49 @@ test('équiper / retirer', () => {
   game.unequip(c, 'epee');
   assert.strictEqual(c.inventory.length, 2);
 });
+
+test('tirage réel conforme à la table de loot (chance 0 et 10)', () => {
+  const N = 400000;
+  for (const luck of [0, 10]) {
+    const expected = Rules.lootTable(luck);
+    const counts = Object.fromEntries(Rules.RARITIES.map((r) => [r, 0]));
+    for (let i = 0; i < N; i++) counts[game.rollRarity(luck)] += 1;
+    for (const r of Rules.RARITIES) {
+      const p = expected[r] / 100;
+      const observed = counts[r] / N;
+      const tolerance = 5 * Math.sqrt((p * (1 - p)) / N); // 5 écarts-types
+      assert.ok(Math.abs(observed - p) <= tolerance, `chance ${luck}, ${r} : ${(observed * 100).toFixed(3)} % au lieu de ${expected[r]} %`);
+    }
+  }
+});
+
+test('historique des tirages enregistré à chaque ouverture', () => {
+  const c = game.newCharacter();
+  c.chests = 10;
+  for (let i = 0; i < 10; i++) game.openChest(c);
+  const total = Object.values(c.lootStats).reduce((a, b) => a + b, 0);
+  assert.strictEqual(total, 10 * Rules.ITEMS_PER_CHEST);
+});
+
+test('recyclage : 1 gold par objet, quelle que soit la rareté', () => {
+  const c = game.newCharacter();
+  const items = ['commun', 'rare', 'legendaire'].map((r) => game.makeItem(r));
+  const kept = game.makeItem('epique');
+  c.inventory.push(...items, kept);
+  const r = game.recycle(c, items.map((i) => i.id));
+  assert.deepStrictEqual(r, { recycled: 3, gold: 3 });
+  assert.strictEqual(c.gold, 3);
+  assert.deepStrictEqual(c.inventory.map((i) => i.id), [kept.id]);
+  assert.throws(() => game.recycle(c, []));
+  assert.throws(() => game.recycle(c, ['inconnu']));
+});
+
+test('recyclage : un objet équipé ne peut pas être recyclé', () => {
+  const c = game.newCharacter();
+  const item = game.makeItem('rare', 'epee');
+  c.inventory.push(item);
+  game.equip(c, item.id);
+  assert.throws(() => game.recycle(c, [item.id]));
+  assert.strictEqual(c.equipment.epee.id, item.id);
+  assert.strictEqual(c.gold, 0);
+});

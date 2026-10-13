@@ -5,6 +5,16 @@ const crypto = require('crypto');
 const Rules = require('../shared/rules');
 const db = require('./db');
 
+function emptyLootStats() {
+  return { commun: 0, peu_commun: 0, rare: 0, epique: 0, legendaire: 0 };
+}
+
+// Anciennes sauvegardes : ajoute les champs apparus depuis.
+function upgrade(character) {
+  if (!character.lootStats) character.lootStats = emptyLootStats();
+  return character;
+}
+
 function newCharacter() {
   return {
     level: 1,
@@ -16,6 +26,7 @@ function newCharacter() {
     inventory: [],
     equipment: {},
     record: { battles: 0, kills: 0, wins: 0 },
+    lootStats: emptyLootStats(),
   };
 }
 
@@ -58,13 +69,18 @@ function allocate(character, stat) {
   character.stats[stat] += 1;
 }
 
+// Générateur cryptographique : tirages équitables et imprévisibles.
+function random() {
+  return crypto.randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
+}
+
 function rand(min, max) {
-  return min + Math.floor(Math.random() * (max - min + 1));
+  return crypto.randomInt(min, max + 1);
 }
 
 function rollRarity(luck) {
   const table = Rules.lootTable(luck);
-  let r = Math.random() * 100;
+  let r = random() * 100;
   for (const rarity of Rules.RARITIES) {
     r -= table[rarity];
     if (r < 0) return rarity;
@@ -74,7 +90,7 @@ function rollRarity(luck) {
 
 function weightedPick(weights) {
   const entries = Object.entries(weights);
-  let r = Math.random() * entries.reduce((s, [, w]) => s + w, 0);
+  let r = random() * entries.reduce((s, [, w]) => s + w, 0);
   for (const [key, w] of entries) {
     r -= w;
     if (r < 0) return key;
@@ -106,6 +122,8 @@ function openChest(character) {
   const items = [];
   for (let i = 0; i < Rules.ITEMS_PER_CHEST; i++) items.push(makeItem(rollRarity(luck)));
   character.inventory.push(...items);
+  upgrade(character);
+  for (const it of items) character.lootStats[it.rarity] += 1;
   const best = items.reduce((b, it) => Math.max(b, Rules.RARITIES.indexOf(it.rarity)), 0);
   const bestRarity = Rules.RARITIES[best];
   return { items, bestRarity, clicks: Rules.RARITY_INFO[bestRarity].clicks };
@@ -117,6 +135,18 @@ function buyChests(character, count) {
   if (character.gold < cost) throw new Error('Pas assez de golds');
   character.gold -= cost;
   character.chests += count;
+}
+
+// Recyclage : chaque objet du coffre personnel rapporte Rules.RECYCLE_GOLD, quelle que soit sa rareté.
+function recycle(character, itemIds) {
+  if (!Array.isArray(itemIds) || itemIds.length === 0) throw new Error('Aucun objet sélectionné');
+  const ids = new Set(itemIds);
+  const before = character.inventory.length;
+  character.inventory = character.inventory.filter((i) => !ids.has(i.id));
+  const count = before - character.inventory.length;
+  if (count === 0) throw new Error('Objets introuvables');
+  character.gold += count * Rules.RECYCLE_GOLD;
+  return { recycled: count, gold: count * Rules.RECYCLE_GOLD };
 }
 
 function equip(character, itemId) {
@@ -173,6 +203,9 @@ function absorbGhost(user, ghost) {
   c.record.battles += g.record.battles;
   c.record.kills += g.record.kills;
   c.record.wins += g.record.wins;
+  upgrade(c);
+  upgrade(g);
+  for (const r of Object.keys(c.lootStats)) c.lootStats[r] += g.lootStats[r];
   delete db.state.users[ghost.id];
 }
 
@@ -190,7 +223,7 @@ function linkTwitch(user, login, displayName, twitchId) {
 }
 
 function publicCharacter(user) {
-  const c = user.character;
+  const c = upgrade(user.character);
   const d = derived(c);
   return {
     ...c,
@@ -203,5 +236,5 @@ function publicCharacter(user) {
 
 module.exports = {
   newCharacter, gearBonus, derived, addXp, grant, allocate, rollRarity, makeItem,
-  openChest, buyChests, equip, unequip, getOrCreateTwitchUser, linkTwitch, publicCharacter,
+  openChest, buyChests, recycle, equip, unequip, getOrCreateTwitchUser, linkTwitch, publicCharacter,
 };

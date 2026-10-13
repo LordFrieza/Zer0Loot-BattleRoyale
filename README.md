@@ -4,7 +4,9 @@ Mini-jeu web relié au chat Twitch de [twitch.tv/zer0loot](https://www.twitch.tv
 Le streamer ouvre une file, les viewers tapent `!join`, puis leurs petits personnages s'affrontent
 automatiquement à l'écran. Chaque kill rapporte de l'XP, des golds et des coffres de LOOT.
 
-## Lancer le prototype
+> 🚀 **Mettre le jeu en ligne 24 h/24** : suis le guide pas à pas [DEPLOIEMENT.md](DEPLOIEMENT.md).
+
+## Lancer le prototype (sur ton PC)
 
 Prérequis : [Node.js](https://nodejs.org) 18 ou plus récent.
 
@@ -43,6 +45,7 @@ Dans la page admin, la section « Tests » permet :
 | `ALLOW_DEV_LINK` | — | `1` pour garder la liaison « par pseudo » même avec l'OAuth configuré |
 | `TWITCH_CHAT_DISABLED` | — | `1` pour ne pas se connecter au chat (tests hors ligne) |
 | `DATA_DIR` | `./data` | Dossier de sauvegarde (`db.json`) |
+| `NODE_ENV` | — | `production` en ligne (déjà réglé dans le `Dockerfile`) : cookies sécurisés, pas de mot de passe admin par défaut, liaison par pseudo désactivée |
 
 Exemple : `ADMIN_PASSWORD=monSuperMdp npm start`
 
@@ -58,6 +61,7 @@ Le point vert en haut de la page admin indique que la connexion au chat fonction
 3. Lance le serveur avec `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` (et `PUBLIC_URL` en ligne).
 
 Sans ces variables, la page perso propose une **liaison par pseudo** (mode test, pas de vérification).
+Cette liaison est désactivée en production (sauf `ALLOW_DEV_LINK=1`).
 
 ### Bot qui répond dans le chat (optionnel)
 
@@ -88,6 +92,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Chaque emplacement a ses stats de prédilection (ex. plastron → Vie/Défense, épée → Force, boucles → Chance).
 - **Coffres** : 3 objets par coffre, achat 100 golds, stockage illimité. Clics pour ouvrir selon la meilleure rareté :
   3 / 5 / 10 / 20 / 30. Lumières : blanc, puis vert (4ᵉ clic), bleu (6ᵉ), violet (11ᵉ), orange (21ᵉ).
+- **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
+  observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.
+- **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 1 gold par objet
+  quelle que soit sa rareté. Les objets équipés ne sont pas recyclables ; confirmation demandée pour Épique/Légendaire.
 
 Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](shared/rules.js).
 
@@ -107,5 +115,6 @@ test/            tests (npm test)
 
 ## Limites du prototype
 
+- Les tirages enregistrés dans « Tes tirages » ne comptent que les coffres ouverts depuis l'ajout de cette fonctionnalité.
 - Stockage dans un fichier JSON : très bien pour tester, à remplacer par une vraie base (SQLite/PostgreSQL) en production.
 - La liaison « par pseudo » n'est pas sécurisée : configure l'OAuth Twitch avant d'ouvrir le site au public.
