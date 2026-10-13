@@ -123,14 +123,14 @@ test('achat de coffre : 100 golds', () => {
 
 test('équiper / retirer', () => {
   const c = game.newCharacter();
-  const a = game.makeItem('rare', 'epee');
-  const b = game.makeItem('commun', 'epee');
+  const a = game.makeItem('rare', 'casque');
+  const b = game.makeItem('commun', 'casque');
   c.inventory.push(a, b);
   game.equip(c, a.id);
   game.equip(c, b.id);
-  assert.strictEqual(c.equipment.epee.id, b.id);
+  assert.strictEqual(c.equipment.casque.id, b.id);
   assert.deepStrictEqual(c.inventory.map((i) => i.id), [a.id]);
-  game.unequip(c, 'epee');
+  game.unequip(c, 'casque');
   assert.strictEqual(c.inventory.length, 2);
 });
 
@@ -157,14 +157,14 @@ test('historique des tirages enregistré à chaque ouverture', () => {
   assert.strictEqual(total, 10 * Rules.ITEMS_PER_CHEST);
 });
 
-test('recyclage : 1 gold par objet, quelle que soit la rareté', () => {
+test('recyclage : 3 golds par objet, quelle que soit la rareté', () => {
   const c = game.newCharacter();
   const items = ['commun', 'rare', 'legendaire'].map((r) => game.makeItem(r));
   const kept = game.makeItem('epique');
   c.inventory.push(...items, kept);
   const r = game.recycle(c, items.map((i) => i.id));
-  assert.deepStrictEqual(r, { recycled: 3, gold: 3 });
-  assert.strictEqual(c.gold, 3);
+  assert.deepStrictEqual(r, { recycled: 3, gold: 9 });
+  assert.strictEqual(c.gold, 9);
   assert.deepStrictEqual(c.inventory.map((i) => i.id), [kept.id]);
   assert.throws(() => game.recycle(c, []));
   assert.throws(() => game.recycle(c, ['inconnu']));
@@ -172,11 +172,11 @@ test('recyclage : 1 gold par objet, quelle que soit la rareté', () => {
 
 test('recyclage : un objet équipé ne peut pas être recyclé', () => {
   const c = game.newCharacter();
-  const item = game.makeItem('rare', 'epee');
+  const item = game.makeItem('rare', 'ceinture');
   c.inventory.push(item);
   game.equip(c, item.id);
   assert.throws(() => game.recycle(c, [item.id]));
-  assert.strictEqual(c.equipment.epee.id, item.id);
+  assert.strictEqual(c.equipment.ceinture.id, item.id);
   assert.strictEqual(c.gold, 0);
 });
 
@@ -278,4 +278,209 @@ test('paris : bataille annulée → tout le monde est remboursé', () => {
   assert.strictEqual(u.character.gold, 0);
   b.reset();
   assert.strictEqual(u.character.gold, 50);
+});
+
+
+// ---------- Classes ----------
+
+test('classes : première classe gratuite, changement à 100 golds', () => {
+  const c = game.newCharacter();
+  assert.strictEqual(c.cls, null);
+  assert.deepStrictEqual(game.chooseClass(c, 'mage'), { cost: 0, unequipped: 0 });
+  assert.throws(() => game.chooseClass(c, 'mage'), /déjà/);
+  assert.throws(() => game.chooseClass(c, 'archer'), /100 golds/);
+  assert.throws(() => game.chooseClass(c, 'ninja'), /inconnue/);
+  c.gold = 150;
+  assert.strictEqual(game.chooseClass(c, 'archer').cost, 100);
+  assert.strictEqual(c.gold, 50);
+  assert.strictEqual(c.cls, 'archer');
+});
+
+test('classes : armes réservées, objets incompatibles retirés au changement', () => {
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  const sword = game.makeItem('rare', 'arme', { kind: 'epee' });
+  const staff = game.makeItem('rare', 'arme', { kind: 'baton' });
+  const book = game.makeItem('rare', 'secondaire', { kind: 'grimoire' });
+  const helmet = game.makeItem('rare', 'casque');
+  c.inventory.push(sword, staff, book, helmet);
+  assert.throws(() => game.equip(c, sword.id), /Guerrier/);
+  game.equip(c, staff.id);
+  game.equip(c, book.id);
+  game.equip(c, helmet.id);
+  c.gold = 100;
+  assert.deepStrictEqual(game.chooseClass(c, 'guerrier'), { cost: 100, unequipped: 2 });
+  assert.deepStrictEqual(Object.keys(c.equipment), ['casque']);
+  game.equip(c, sword.id);
+  assert.strictEqual(c.equipment.arme.kind, 'epee');
+  const noClass = game.newCharacter();
+  noClass.inventory.push(game.makeItem('commun', 'arme', { kind: 'arc' }));
+  assert.throws(() => game.equip(noClass, noClass.inventory[0].id));
+});
+
+test('classes : anciennes épées / boucliers migrés en objets de Guerrier', () => {
+  const c = game.newCharacter();
+  delete c.cls;
+  delete c.migratedSlots;
+  c.inventory.push({ id: 'old1', slot: 'epee', rarity: 'rare', name: 'Lame', lines: [{ stat: 'force', value: 8 }] });
+  c.equipment.bouclier = { id: 'old2', slot: 'bouclier', rarity: 'commun', name: 'Pavois', lines: [{ stat: 'vie', value: 2 }] };
+  game.upgrade(c);
+  assert.strictEqual(c.cls, null);
+  assert.deepStrictEqual([c.inventory[0].slot, c.inventory[0].kind], ['arme', 'epee']);
+  assert.strictEqual(c.equipment.bouclier, undefined);
+  assert.deepStrictEqual([c.equipment.secondaire.slot, c.equipment.secondaire.kind], ['secondaire', 'bouclier']);
+});
+
+test('classes : bonus de stats', () => {
+  assert.strictEqual(Rules.derive({}, {}, 'guerrier').maxHp, 130);
+  assert.strictEqual(Rules.derive({}, {}, 'mage').maxHp, 85);
+  assert.strictEqual(Rules.derive({}, {}, 'mage').damage, 12.5);
+  assert.ok(Math.abs(Rules.derive({}, {}, 'assassin').crit - 0.11) < 1e-9);
+  assert.ok(Math.abs(Rules.derive({}, {}, 'mage').cooldown - 1.35) < 1e-9);
+  assert.ok(Math.abs(Rules.derive({}, {}, 'archer').precision - 0.20) < 1e-9);
+});
+
+test('nouvelles stats : valeurs de base, points, plafonds', () => {
+  const d0 = Rules.derive({});
+  assert.strictEqual(d0.cooldown, 1);
+  assert.strictEqual(d0.lifesteal, 0.02);
+  assert.strictEqual(d0.precision, 0.05);
+  assert.strictEqual(d0.thorns, 0.02);
+  const d = Rules.derive({ vitesse_attaque: 10, vol_de_vie: 10, precision: 10, epines: 10 });
+  assert.ok(Math.abs(d.cooldown - 1 / 1.5) < 1e-9);
+  assert.ok(Math.abs(d.lifesteal - 0.17) < 1e-9);
+  assert.ok(Math.abs(d.precision - 0.35) < 1e-9);
+  assert.ok(Math.abs(d.thorns - 0.22) < 1e-9);
+  const max = Rules.derive({ vitesse_attaque: 999, vol_de_vie: 999, precision: 999, epines: 999 });
+  assert.deepStrictEqual([max.cooldown, max.lifesteal, max.precision, max.thorns], [0.4, 0.4, 0.8, 0.5]);
+  for (const stat of Rules.STATS) assert.ok(Rules.describeDerived(stat, d));
+});
+
+test('coffres : une arme sur deux environ est pour sa classe', () => {
+  let own = 0;
+  const N = 4000;
+  for (let i = 0; i < N; i++) if (game.makeItem('commun', 'arme', { cls: 'mage' }).kind === 'baton') own += 1;
+  // 50 % pour sa classe + 50 % × 1/5 au hasard = 60 %
+  assert.ok(Math.abs(own / N - 0.6) < 0.04, `${own / N}`);
+});
+
+// ---------- Forge ----------
+
+test('forge : fusion de 3 objets de même rareté', () => {
+  const c = game.newCharacter();
+  game.chooseClass(c, 'archer');
+  const items = [0, 1, 2].map(() => game.makeItem('rare'));
+  const other = game.makeItem('commun');
+  c.inventory.push(...items, other);
+  assert.throws(() => game.fuse(c, [items[0].id, items[1].id]), /exactement 3/);
+  assert.throws(() => game.fuse(c, [items[0].id, items[1].id, other.id]), /même rareté/);
+  assert.throws(() => game.fuse(c, [items[0].id, items[1].id, 'x']), /introuvables/);
+  const r = game.fuse(c, items.map((i) => i.id));
+  assert.ok(['rare', 'epique'].includes(r.item.rarity));
+  assert.strictEqual(r.upgraded, r.item.rarity === 'epique');
+  assert.strictEqual(r.chance, 20);
+  assert.deepStrictEqual(c.inventory.map((i) => i.id).sort(), [other.id, r.item.id].sort());
+  if (r.item.kind) assert.strictEqual(Rules.itemClass(r.item), 'archer');
+});
+
+test('forge : taux d\'amélioration selon la rareté et la chance', () => {
+  assert.strictEqual(Rules.fuseUpgradeChance('commun', 0), 40);
+  assert.strictEqual(Rules.fuseUpgradeChance('epique', 20), 20);
+  assert.strictEqual(Rules.fuseUpgradeChance('rare', 999), 45);
+  assert.strictEqual(Rules.fuseUpgradeChance('legendaire', 85), 0);
+  const c = game.newCharacter();
+  let up = 0;
+  const N = 3000;
+  for (let i = 0; i < N; i++) {
+    const items = [0, 1, 2].map(() => game.makeItem('commun'));
+    c.inventory = items;
+    if (game.fuse(c, items.map((x) => x.id)).upgraded) up += 1;
+  }
+  assert.ok(Math.abs(up / N - 0.4) < 0.04, `${up / N}`);
+  c.inventory = [0, 1, 2].map(() => game.makeItem('legendaire'));
+  const r = game.fuse(c, c.inventory.map((x) => x.id));
+  assert.strictEqual(r.item.rarity, 'legendaire');
+  assert.strictEqual(r.upgraded, false);
+});
+
+test('forge : relance d\'une ligne', () => {
+  const c = game.newCharacter();
+  const item = game.makeItem('epique', 'gants');
+  c.inventory.push(item);
+  assert.throws(() => game.reroll(c, item.id, 0), /80 golds/);
+  c.gold = 200;
+  assert.throws(() => game.reroll(c, item.id, 9), /Ligne/);
+  const before = item.lines.map((l) => l.stat);
+  const r = game.reroll(c, item.id, 2);
+  assert.strictEqual(c.gold, 120);
+  assert.ok(!before.includes(r.line.stat), 'nouvelle stat différente de toutes les lignes');
+  assert.strictEqual(new Set(item.lines.map((l) => l.stat)).size, 4);
+  assert.ok(r.line.value >= 11 && r.line.value <= 15);
+  // Fonctionne aussi sur un objet équipé
+  game.equip(c, item.id);
+  game.reroll(c, item.id, 0);
+  assert.strictEqual(c.gold, 40);
+});
+
+// ---------- Combat : nouvelles mécaniques ----------
+
+function testBattle(fighters) {
+  const { Battle } = require('../server/battle');
+  const b = new Battle();
+  b.openQueue(60);
+  clearTimeout(b.queueTimer);
+  for (const f of fighters) b.join(Object.assign({ level: 1, look: {} }, f));
+  b.start();
+  b.stopLoop();
+  return b;
+}
+const base = (o = {}) => Object.assign({ maxHp: 1000, damage: 100, reduction: 0, speed: 0, dodge: 0, crit: 0, cooldown: 1, lifesteal: 0, precision: 0, thorns: 0 }, o);
+
+test('combat : vol de vie, épines, précision', () => {
+  const b = testBattle([
+    { key: 'a', name: 'A', stats: base({ lifesteal: 0.5, precision: 1 }) },
+    { key: 'b', name: 'B', stats: base({ thorns: 0.5, dodge: 1 }) },
+  ]);
+  const [a, t] = b.fighters;
+  a.hp = 500;
+  b.attack(a, t);
+  const hit = b.events.find((e) => e.t === 'hit');
+  assert.ok(hit, 'précision 100 % : jamais esquivé');
+  // a reçoit 50 % des dégâts en vol de vie puis 50 % en épines : il revient à 500
+  const thorns = b.events.find((e) => e.t === 'thorns');
+  assert.strictEqual(thorns.dmg, Math.round(hit.dmg * 0.5));
+  assert.ok(Math.abs(a.hp - (500 + hit.dmg * 0.5 - thorns.dmg)) < 1e-9);
+});
+
+test('combat : explosion du mage', () => {
+  const b = testBattle([
+    { key: 'm', name: 'M', cls: 'mage', stats: base() },
+    { key: 't', name: 'T', stats: base() },
+    { key: 'n', name: 'N', stats: base() },
+    { key: 'far', name: 'F', stats: base() },
+  ]);
+  const [m, t, n, far] = b.fighters;
+  Object.assign(t, { x: 500, y: 300 });
+  Object.assign(n, { x: 540, y: 300 });
+  Object.assign(far, { x: 900, y: 300 });
+  b.attack(m, t);
+  const hits = b.events.filter((e) => e.t === 'hit');
+  assert.deepStrictEqual(hits.map((h) => h.to).sort(), ['n', 't']);
+  assert.ok(b.events.some((e) => e.t === 'aoe'));
+});
+
+test('combat : premier kill, double kill, massacre', () => {
+  const fighters = [{ key: 'k', name: 'K', userId: null, stats: base({ damage: 1e6 }) }];
+  for (let i = 0; i < 6; i++) fighters.push({ key: 'v' + i, name: 'V' + i, stats: base() });
+  const b = testBattle(fighters);
+  const streaks = [];
+  b.on('streak', (f, kind) => streaks.push(kind));
+  const [k, ...victims] = b.fighters;
+  b.time = 1; b.attack(k, victims[0]);
+  b.time = 3; b.attack(k, victims[1]);
+  b.time = 4; b.attack(k, victims[2]);
+  b.time = 30; b.attack(k, victims[3]);
+  b.time = 60; b.attack(k, victims[4]);
+  assert.deepStrictEqual(streaks, ['firstblood', 'double', 'triple', 'massacre']);
+  assert.strictEqual(k.kills, 5);
 });

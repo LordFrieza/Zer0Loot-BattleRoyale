@@ -8,6 +8,7 @@ let recycleMode = false;
 const selected = new Set();
 let simLuck = null;
 const opener = new ChestOpener();
+const forge = new ForgeAnimator();
 Sound.bindToggle($('sound-toggle'));
 let opening = false;
 
@@ -22,6 +23,11 @@ function render() {
   const c = me.character;
   $('who').textContent = me.username;
   $('char-name').textContent = me.twitchDisplayName || me.username;
+  window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
+  const ci = c.cls && Rules.CLASS_INFO[c.cls];
+  $('class-badge').innerHTML = ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '<span class="muted">Sans classe</span>';
+  $('change-class').textContent = c.cls ? `🔄 Changer de classe (${Rules.CLASS_CHANGE_PRICE} 🪙)` : '🎭 Choisir ma classe';
+  if (!c.cls && !classModalShown) { classModalShown = true; openClassModal(); }
   $('level').textContent = 'Niveau ' + c.level;
   $('xp-fill').style.width = (c.xp / c.xpToNext) * 100 + '%';
   $('xp-text').textContent = `${c.xp} / ${c.xpToNext} XP`;
@@ -40,6 +46,20 @@ function render() {
   renderQueue();
   renderBets();
   renderLoot();
+  renderForge();
+}
+
+// Bonus / malus de la classe sur une stat (affiché à côté des bonus d'équipement).
+function classMod(stat) {
+  const ci = Rules.CLASS_INFO[me.character.cls];
+  if (!ci) return '';
+  const flatKey = { critique: 'crit', precision: 'precision' }[stat];
+  const parts = [];
+  if (ci.bonus[stat]) parts.push(`${ci.bonus[stat] > 0 ? '+' : ''}${ci.bonus[stat]}%`);
+  if (flatKey && ci.flat[flatKey]) parts.push(`+${Math.round(ci.flat[flatKey] * 100)} pts`);
+  if (!parts.length) return '';
+  const cls = (ci.bonus[stat] || 0) < 0 ? 'down' : 'up';
+  return `<div class="${cls}" style="font-size:12px">${parts.join(' ')} ${ci.icon} classe</div>`;
 }
 
 function renderStats() {
@@ -54,7 +74,7 @@ function renderStats() {
       <td class="stat-name">${info.icon} ${info.label}</td>
       <td class="stat-desc">${info.desc}</td>
       <td class="stat-pts">${c.stats[s]}</td>
-      <td class="stat-gear">${gear ? '+' + gear + '% équip.' : ''}</td>
+      <td class="stat-gear">${gear ? '+' + gear + '% équip.' : ''}${classMod(s)}</td>
       <td class="stat-value">${Rules.describeDerived(s, c.derived)}</td>
       <td>${c.skillPoints > 0 ? `<button class="plus" data-stat="${s}" title="Ajouter un point">+</button>` : ''}</td>
     </tr>`;
@@ -66,13 +86,16 @@ function renderStats() {
 
 function renderEquipment() {
   const eq = me.character.equipment;
+  const ci = Rules.CLASS_INFO[me.character.cls];
   $('equipment').innerHTML = Rules.SLOTS.map((slot) => {
     const info = Rules.SLOT_INFO[slot];
     const item = eq[slot];
-    if (!item) return `<div class="slot"><div class="slot-label">${info.icon} ${info.label}</div><div class="muted" style="margin-top:8px">Vide</div></div>`;
+    const kind = ci && (slot === 'arme' ? Rules.KINDS[ci.weapon] : slot === 'secondaire' ? Rules.KINDS[ci.offhand] : null);
+    const label = kind ? `${kind.icon} ${info.label} · ${kind.label}` : `${info.icon} ${info.label}`;
+    if (!item) return `<div class="slot"><div class="slot-label">${label}</div><div class="muted" style="margin-top:8px">Vide</div></div>`;
     const lines = item.lines.map((l) => `+${l.value}% ${Rules.STAT_INFO[l.stat].label}`).join('<br>');
     return `<div class="slot filled rarity-${item.rarity}" data-slot="${slot}">
-      <div class="slot-label">${info.icon} ${info.label}</div>
+      <div class="slot-label">${label}</div>
       <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}</div>`;
   }).join('');
   $('equipment').querySelectorAll('.slot.filled').forEach((el) => {
@@ -120,7 +143,13 @@ function renderInventory() {
 
   $('inventory').classList.toggle('recycling', recycleMode);
   $('inventory').innerHTML = list.length
-    ? list.map((item) => itemHtml(item, `${compareHtml(item)}<div class="actions"><button class="small" data-equip="${item.id}">Équiper</button></div>`)).join('')
+    ? list.map((item) => {
+      const ok = Rules.canEquip(item, me.character.cls);
+      const btn = ok
+        ? `<button class="small" data-equip="${item.id}">Équiper</button>`
+        : `<button class="small secondary" disabled title="Change de classe ou passe-le à la forge">🔒 ${Rules.CLASS_INFO[Rules.itemClass(item)].label} uniquement</button>`;
+      return itemHtml(item, `${ok ? compareHtml(item) : ''}<div class="actions">${btn}</div>`, me.character.cls);
+    }).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
     b.onclick = () => act('/api/equip', { itemId: b.dataset.equip }, 'equip');
@@ -138,6 +167,190 @@ function renderInventory() {
   $('recycle-toggle').disabled = inv.length === 0 && !recycleMode;
   renderRecycleBar(list);
 }
+
+// ---------- Classes ----------
+let classModalShown = false;
+
+function openClassModal() {
+  const c = me.character;
+  const first = !c.cls;
+  $('class-modal-title').textContent = first ? '🎭 Choisis ta classe' : '🔄 Changer de classe';
+  $('class-modal-sub').innerHTML = first
+    ? 'Bienvenue ! Ta classe change tes stats de base, ta façon de combattre et les armes que tu peux équiper. Le premier choix est <b>gratuit</b>.'
+    : `Changer de classe coûte <b>${Rules.CLASS_CHANGE_PRICE} 🪙</b> (tu en as ${c.gold}). Ton arme et ton objet secondaire retournent dans ton coffre personnel s'ils ne conviennent pas à ta nouvelle classe.`;
+  $('class-modal-close').style.display = first ? 'none' : '';
+  $('class-grid').innerHTML = Rules.CLASSES.map((cls) => {
+    const ci = Rules.CLASS_INFO[cls];
+    const w1 = Rules.KINDS[ci.weapon];
+    const w2 = Rules.KINDS[ci.offhand];
+    return `<div class="class-card ${c.cls === cls ? 'current' : ''}" data-cls="${cls}" style="--c:${ci.color}">
+      <canvas width="120" height="110" data-preview="${cls}"></canvas>
+      <h3>${ci.icon} ${ci.label}</h3>
+      <p>${ci.desc}</p>
+      <ul>${ci.perks.map((x) => `<li>${x}</li>`).join('')}</ul>
+      <div class="weapons">${w1.icon} ${w1.label} · ${w2.icon} ${w2.label}</div>
+      <button class="small ${c.cls === cls ? 'secondary' : 'gold'}" ${c.cls === cls ? 'disabled' : ''}>${c.cls === cls ? 'Ta classe' : first ? 'Choisir' : `Choisir (${Rules.CLASS_CHANGE_PRICE} 🪙)`}</button>
+    </div>`;
+  }).join('');
+  $('class-grid').querySelectorAll('canvas[data-preview]').forEach((cv) => {
+    const g = cv.getContext('2d');
+    drawFighter(g, 60, 70, { name: me.twitchDisplayName || me.username, cls: cv.dataset.preview, look: {} }, { scale: 2.2, swing: 0.3 });
+  });
+  $('class-grid').querySelectorAll('.class-card button:not([disabled])').forEach((b) => {
+    b.onclick = async () => {
+      const cls = b.closest('.class-card').dataset.cls;
+      const r = await act('/api/class', { cls }, 'victory');
+      if (r) {
+        $('class-modal').classList.remove('open');
+        toast(`${Rules.CLASS_INFO[cls].icon} Tu es maintenant ${Rules.CLASS_INFO[cls].label} !${r.unequipped ? ` (${r.unequipped} objet(s) retiré(s))` : ''}`, 5000);
+      }
+    };
+  });
+  $('class-modal').classList.add('open');
+}
+
+$('change-class').onclick = openClassModal;
+$('class-modal-close').onclick = () => $('class-modal').classList.remove('open');
+
+// ---------- Forge ----------
+const fuseSel = [];
+let fuseFilter = 'all';
+let rerollItemId = null;
+
+function allItems() {
+  const c = me.character;
+  return Object.values(c.equipment).filter(Boolean).map((i) => ({ item: i, equipped: true }))
+    .concat(c.inventory.map((i) => ({ item: i, equipped: false })));
+}
+
+function renderForge() {
+  const c = me.character;
+  const inv = c.inventory;
+  // Retire de la fusion les objets qui ne sont plus dans le coffre.
+  for (let i = fuseSel.length - 1; i >= 0; i--) if (!inv.some((x) => x.id === fuseSel[i])) fuseSel.splice(i, 1);
+  const chosen = fuseSel.map((id) => inv.find((x) => x.id === id));
+  const rarity = chosen[0] && chosen[0].rarity;
+
+  $('fuse-slots').innerHTML = [0, 1, 2].map((i) => {
+    const it = chosen[i];
+    if (!it) return '<div class="fuse-slot">Emplacement vide</div>';
+    return `<div class="fuse-slot filled rarity-${it.rarity}" data-unfuse="${it.id}" title="Retirer">
+      <div><div class="c-${it.rarity}" style="font-weight:800">${itemType(it).icon} ${esc(it.name)}</div>
+      <div class="muted">${Rules.RARITY_INFO[it.rarity].label}</div></div></div>`;
+  }).join('');
+  $('fuse-slots').querySelectorAll('[data-unfuse]').forEach((el) => {
+    el.onclick = () => { fuseSel.splice(fuseSel.indexOf(el.dataset.unfuse), 1); renderForge(); };
+  });
+
+  if (rarity) {
+    const chance = Rules.fuseUpgradeChance(rarity, c.derived.luck);
+    const next = Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1];
+    $('fuse-info').innerHTML = next
+      ? `🎲 <b>${Math.round(chance * 10) / 10} %</b> de chances d'obtenir un objet <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span>
+         <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${Math.round((chance - Rules.FUSE_UPGRADE[rarity]) * 10) / 10} % grâce à ta chance)</span>`
+      : '🎲 Légendaire : tu obtiendras un nouvel objet <span class="c-legendaire">Légendaire</span>.';
+  } else {
+    $('fuse-info').innerHTML = '<span class="muted">Choisis 3 objets de même rareté ci-dessous.</span>';
+  }
+  $('fuse-go').disabled = fuseSel.length !== Rules.FUSE_COUNT;
+
+  // Filtres par rareté + liste des objets du coffre
+  const counts = Object.fromEntries(Rules.RARITIES.map((r) => [r, inv.filter((i) => i.rarity === r).length]));
+  $('fuse-filters').innerHTML = [['all', 'Toutes']].concat(Rules.RARITIES.map((r) => [r, Rules.RARITY_INFO[r].label]))
+    .map(([k, label]) => `<button class="${fuseFilter === k ? 'active' : ''}" data-ff="${k}">${label}${k === 'all' ? '' : ` (${counts[k]})`}</button>`).join('');
+  $('fuse-filters').querySelectorAll('[data-ff]').forEach((b) => { b.onclick = () => { fuseFilter = b.dataset.ff; renderForge(); }; });
+  const pickable = inv
+    .filter((i) => !fuseSel.includes(i.id) && (fuseFilter === 'all' || i.rarity === fuseFilter))
+    .sort((a, b) => Rules.RARITIES.indexOf(a.rarity) - Rules.RARITIES.indexOf(b.rarity));
+  $('fuse-pick').innerHTML = pickable.length
+    ? pickable.map((i) => {
+      const off = (rarity && i.rarity !== rarity) || fuseSel.length >= Rules.FUSE_COUNT;
+      return `<span class="pick-chip rarity-${i.rarity} ${off ? 'disabled' : ''}" data-fuse="${i.id}" title="${esc(i.lines.map((l) => `+${l.value}% ${Rules.STAT_INFO[l.stat].label}`).join(', '))}">
+        ${itemType(i).icon} <span class="c-${i.rarity}">${esc(i.name)}</span></span>`;
+    }).join('')
+    : '<span class="muted">Aucun objet disponible.</span>';
+  $('fuse-pick').querySelectorAll('[data-fuse]:not(.disabled)').forEach((el) => {
+    el.onclick = () => { fuseSel.push(el.dataset.fuse); Sound.play('chestHit', 3); renderForge(); };
+  });
+
+  // Relance de ligne
+  $('reroll-prices').innerHTML = 'Prix : ' + Rules.RARITIES.map((r) => `<span class="c-${r}">${Rules.RARITY_INFO[r].label} ${Rules.REROLL_PRICE[r]} 🪙</span>`).join(' · ');
+  const items = allItems().sort((a, b) => (b.equipped - a.equipped) || Rules.RARITIES.indexOf(b.item.rarity) - Rules.RARITIES.indexOf(a.item.rarity));
+  if (!items.some((x) => x.item.id === rerollItemId)) rerollItemId = items[0] ? items[0].item.id : null;
+  $('reroll-item').innerHTML = items.length
+    ? items.map(({ item, equipped }) => `<option value="${item.id}" ${item.id === rerollItemId ? 'selected' : ''}>${equipped ? '✅ Équipé · ' : ''}${itemType(item).icon} ${esc(item.name)} (${Rules.RARITY_INFO[item.rarity].label})</option>`).join('')
+    : '<option>Aucun objet</option>';
+  renderRerollPreview();
+}
+
+function renderRerollPreview(flashIndex) {
+  const entry = allItems().find((x) => x.item.id === rerollItemId);
+  if (!entry) { $('reroll-preview').innerHTML = ''; return; }
+  const item = entry.item;
+  const price = Rules.REROLL_PRICE[item.rarity];
+  const poor = me.character.gold < price;
+  $('reroll-preview').innerHTML = item.lines.map((l, i) => `
+    <div class="reroll-line ${i === flashIndex ? 'flash' : ''}">
+      <span>${Rules.STAT_INFO[l.stat].icon} <b>+${l.value}%</b> ${Rules.STAT_INFO[l.stat].label}</span>
+      <span class="spacer"></span>
+      <button class="small gold" data-reroll="${i}" ${poor ? 'disabled' : ''}>🎲 Relancer (${price} 🪙)</button>
+    </div>`).join('');
+  $('reroll-preview').querySelectorAll('[data-reroll]').forEach((b) => {
+    b.onclick = async () => {
+      const index = Number(b.dataset.reroll);
+      try {
+        const r = await api('/api/forge/reroll', { itemId: item.id, line: index });
+        Sound.play('reroll');
+        toast(`🎲 ${Rules.STAT_INFO[r.old.stat].label} +${r.old.value}% → ${Rules.STAT_INFO[r.line.stat].label} +${r.line.value}%`, 4500);
+        me = await api('/api/me');
+        render();
+        renderRerollPreview(index);
+      } catch (err) {
+        toast('⚠️ ' + err.message);
+      }
+    };
+  });
+}
+
+$('reroll-item').onchange = (e) => { rerollItemId = e.target.value; renderRerollPreview(); };
+$('fuse-clear').onclick = () => { fuseSel.length = 0; renderForge(); };
+$('fuse-go').onclick = async () => {
+  const inputs = fuseSel.map((id) => me.character.inventory.find((x) => x.id === id));
+  if (inputs.some((i) => i.rarity === 'epique' || i.rarity === 'legendaire')
+    && !confirm('Ces objets vont être détruits définitivement. Continuer ?')) return;
+  let r;
+  opening = true; // évite d'afficher le résultat derrière l'animation
+  try {
+    r = await api('/api/forge/fuse', { itemIds: [...fuseSel] });
+    me = await api('/api/me');
+  } catch (err) {
+    opening = false;
+    toast('⚠️ ' + err.message);
+    return;
+  }
+  fuseSel.length = 0;
+  forge.play(inputs, r, me.character.cls, () => { opening = false; render(); });
+};
+
+// ---------- Règles des combats ----------
+(function renderCombatInfo() {
+  const R = Rules.REWARDS;
+  const row = (label, r, note = '') => `<tr><td><b>${label}</b>${note ? `<div class="muted" style="font-size:12px">${note}</div>` : ''}</td>
+    <td>${r.xp ? '+' + r.xp + ' XP' : '—'}</td><td>${r.gold ? '+' + r.gold + ' 🪙' : '—'}</td><td>${r.chests ? '+' + r.chests + ' 🎁' : '—'}</td></tr>`;
+  $('rewards-table').innerHTML = '<tr><th>Action</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
+    + row('⚔️ Kill', R.kill)
+    + row('🏆 Victoire', R.win, 'Dernier survivant')
+    + row('🎖️ Participation', R.participation, 'Chaque combattant, à la fin de la bataille')
+    + row('🩸 Premier kill', R.firstblood, 'Le tout premier kill de la bataille')
+    + row('⚡ Double kill', R.double, `2 kills d'affilée en moins de ${Rules.STREAK_WINDOW} s`)
+    + row('💀 Massacre', R.massacre, `${Rules.MASSACRE_KILLS} kills dans la même bataille`);
+  $('streak-rules').innerHTML = `Les bonus de séries s'ajoutent aux récompenses normales du kill et sont annoncés en grand sur le stream
+    (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus).`;
+  $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
+    const ci = Rules.CLASS_INFO[cls];
+    return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b><br>${ci.perks.join(' · ')}</div>`;
+  }).join('');
+})();
 
 // ---------- Recyclage de masse ----------
 const PLURAL = { commun: 'Communs', peu_commun: 'Peu communs', rare: 'Rares', epique: 'Épiques', legendaire: 'Légendaires' };
@@ -289,7 +502,7 @@ function renderBetList() {
     }
     const gain = !self && (open || isMine) ? `<span class="bet-gain">Si victoire : +${estimateGain(p.key, isMine ? mine.amount : amount)} 🪙${isMine ? '' : ' (estimation)'}</span>` : '';
     return `<div class="bet-row ${isMine ? 'mine' : ''} ${self ? 'self' : ''}">
-      <div class="bet-name"><span>${p.bot ? '🤖' : '⚔️'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>
+      <div class="bet-name"><span>${p.bot ? '🤖' : ''}${p.cls ? Rules.CLASS_INFO[p.cls].icon : '⚔️'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>
       <div class="muted">${t.total} 🪙 misés · ${t.bettors} parieur${t.bettors > 1 ? 's' : ''}${isMine ? ` · <b class="c-legendaire">ton pari : ${mine.amount} 🪙</b>` : ''}</div>
       ${gain}
       ${action ? `<div class="row">${action}</div>` : ''}
@@ -415,7 +628,7 @@ async function openChest() {
     if (me) {
       const look = {};
       for (const [slot, item] of Object.entries(me.character.equipment)) if (item) look[slot] = item.rarity;
-      drawFighter(ctx, 100, 118, { name: me.twitchDisplayName || me.username, look }, {
+      drawFighter(ctx, 100, 118, { name: me.twitchDisplayName || me.username, cls: me.character.cls, look }, {
         scale: 3.4, bob: Math.sin(t / 400) * 3, swing: (Math.sin(t / 700) + 1) * 0.15,
       });
     }
@@ -428,8 +641,11 @@ async function openChest() {
 const socket = io();
 socket.on('me', (m) => { me = m; render(); });
 socket.on('queue', (q) => { queue = q; if (me) { renderQueue(); renderBets(); } });
-const REWARD_LABELS = { win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille' };
-const REWARD_SOUNDS = { win: 'victory', kill: 'reward', participation: 'levelUp' };
+const REWARD_LABELS = {
+  win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',
+  firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
+};
+const REWARD_SOUNDS = { win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward' };
 socket.on('bet', (r) => {
   lastBetResult = r;
   if (r.outcome === 'won') { Sound.play('reward'); toast(`💰 Pari gagné sur ${r.targetName} ! +${r.payout} 🪙`, 6000); }

@@ -268,6 +268,64 @@
       tone(midi(64), 0.6, { type: 'triangle', vol: 0.12, delay: 0.66, to: midi(62) });
     },
 
+    // Tir : corde d'arc ou boule de feu.
+    shoot(kind) {
+      if (kind === 'fire') {
+        noise(0.25, { filter: 'bandpass', freq: 600, sweep: 2500, q: 1.2, vol: 0.12, attack: 0.03 });
+      } else {
+        tone(220, 0.12, { type: 'triangle', vol: 0.08, to: 140 });
+        noise(0.08, { filter: 'highpass', freq: 3000, vol: 0.06 });
+      }
+    },
+
+    // Explosion de la boule de feu.
+    blast() {
+      noise(0.35, { freq: 1200, sweep: 150, vol: 0.25 });
+      tone(90, 0.3, { vol: 0.2, to: 40 });
+    },
+
+    // Annonces de séries de kills.
+    streak(kind) {
+      const c = ctx;
+      if (kind === 'firstblood') {
+        fanfare([[62, 0, 0.6], [69, 0.7, 2]], 0.13, 0.13);
+        timpani(c.currentTime + 0.05, 55, 0.6);
+      } else if (kind === 'double') {
+        fanfare([[67, 0, 0.5], [67, 0.6, 0.5], [74, 1.2, 2]], 0.11, 0.13);
+      } else if (kind === 'triple') {
+        fanfare([[67, 0, 0.4], [71, 0.5, 0.4], [74, 1, 0.4], [79, 1.5, 2]], 0.1, 0.13);
+      } else {
+        fanfare([[60, 0, 0.5], [63, 0.6, 0.5], [67, 1.2, 0.5], [72, 1.8, 3]], 0.12, 0.15);
+        fanfare([[48, 0, 4.8]], 0.12, 0.08);
+        crash(c.currentTime + 0.05 + 1.8 * 0.12, 0.25);
+      }
+    },
+
+    // Forge : coup de marteau sur l'enclume.
+    anvil(i = 0) {
+      noise(0.05, { filter: 'highpass', freq: 2500, vol: 0.3 });
+      tone(midi(88 + (i % 3)), 0.5, { type: 'triangle', vol: 0.14 });
+      tone(midi(100 + (i % 3)), 0.35, { type: 'sine', vol: 0.06 });
+      tone(120, 0.12, { type: 'square', vol: 0.06, to: 60 });
+    },
+
+    // Forge : l'objet sort du feu (fanfare plus grande s'il a gagné une rareté).
+    forgeResult(upgraded, rarity) {
+      noise(0.6, { filter: 'bandpass', freq: 500, sweep: 3500, q: 1, vol: 0.18, attack: 0.2 });
+      if (upgraded) {
+        sounds.chestBurst(rarity);
+      } else {
+        [0, 4, 7].forEach((st, i) => tone(midi(72 + st), 0.3, { type: 'triangle', vol: 0.1, delay: 0.3 + i * 0.07 }));
+      }
+    },
+
+    // Forge : relance d'une ligne.
+    reroll() {
+      for (let i = 0; i < 6; i++) tone(midi(76 + i * 2), 0.08, { type: 'square', vol: 0.04, delay: i * 0.04 });
+      tone(midi(91), 0.35, { type: 'triangle', vol: 0.1, delay: 0.26 });
+      noise(0.15, { filter: 'highpass', freq: 5000, vol: 0.1, delay: 0.26 });
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });

@@ -3,18 +3,15 @@
  * puis diffusée en temps réel à l'écran de combat.
  */
 const EventEmitter = require('events');
-const { CRIT_MULTIPLIER } = require('../shared/rules');
+const Rules = require('../shared/rules');
 
 const ARENA = { w: 1280, h: 720 };
 const TICK_MS = 50;
 const RADIUS = 16;
-const ATTACK_RANGE = RADIUS * 2 + 8;
-const ATTACK_COOLDOWN = 1.0;
 const STORM_START = 45;
 const STORM_DURATION = 60;
 const STORM_MIN_RADIUS = 70;
 const STORM_DPS = 0.05; // fraction de la vie max par seconde
-const SHIELD_TAUNT = 0.75; // un porteur de bouclier « paraît » plus proche : il attire l'aggro
 const MAX_DURATION = 300;
 
 class Battle extends EventEmitter {
@@ -36,7 +33,7 @@ class Battle extends EventEmitter {
       phase: this.phase,
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
-        key: p.key, name: p.name, bot: !!p.bot, level: p.level, look: p.look,
+        key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look,
       })),
       result: this.result,
     };
@@ -101,28 +98,49 @@ class Battle extends EventEmitter {
 
     const list = [...this.participants.values()].map((p) => (refresh ? refresh(p) : p));
     const positions = spawnPositions(list.length);
-    this.fighters = list.map((p, i) => ({
-      key: p.key,
-      userId: p.userId || null,
-      name: p.name,
-      look: p.look,
-      level: p.level,
-      x: positions[i].x,
-      y: positions[i].y,
-      hp: p.stats.maxHp,
-      maxHp: p.stats.maxHp,
-      damage: p.stats.damage,
-      reduction: p.stats.reduction,
-      speed: p.stats.speed,
-      dodge: p.stats.dodge,
-      crit: p.stats.crit || 0,
-      shield: !!(p.look && p.look.bouclier),
-      cd: Math.random() * 0.5,
-      targetKey: null,
-      alive: true,
-      kills: 0,
-      diedAt: null,
-    }));
+    this.fighters = list.map((p, i) => {
+      const combat = Rules.classInfo(p.cls).combat;
+      const s = p.stats;
+      return {
+        key: p.key,
+        userId: p.userId || null,
+        name: p.name,
+        cls: p.cls || null,
+        look: p.look,
+        level: p.level,
+        x: positions[i].x,
+        y: positions[i].y,
+        hp: s.maxHp,
+        maxHp: s.maxHp,
+        damage: s.damage,
+        reduction: s.reduction,
+        speed: s.speed,
+        dodge: s.dodge,
+        crit: s.crit || 0,
+        cooldown: s.cooldown || Rules.BASE_ATTACK_COOLDOWN,
+        lifesteal: s.lifesteal || 0,
+        precision: s.precision || 0,
+        thorns: s.thorns || 0,
+        // Comportement de classe
+        range: combat.range || 40,
+        taunt: combat.taunt || 1,
+        kite: combat.kite || 0,
+        hunter: !!combat.hunter,
+        regen: combat.regen || 0,
+        projectile: combat.projectile || null,
+        aoeRadius: combat.aoeRadius || 0,
+        aoeRatio: combat.aoeRatio || 0,
+        cd: Math.random() * 0.5,
+        targetKey: null,
+        alive: true,
+        kills: 0,
+        chain: 0,
+        lastKillAt: -Infinity,
+        healAcc: 0,
+        diedAt: null,
+      };
+    });
+    this.firstBlood = false;
     this.time = 0;
     this.events = [];
     this.result = null;
@@ -151,12 +169,19 @@ class Battle extends EventEmitter {
 
     for (const f of alive) {
       if (!f.alive) continue;
-      // Aggro : l'ennemi le plus proche (les boucliers attirent davantage).
+      // Régénération (Prêtre)
+      if (f.regen) this.heal(f, f.maxHp * f.regen * dt);
+
+      /*
+       * Aggro : l'ennemi le plus proche ; un Guerrier « paraît » plus proche (il attire l'aggro).
+       * L'Assassin, lui, traque l'ennemi qui a le moins de vie (en préférant les plus proches).
+       */
       let best = null;
       let bestScore = Infinity;
       for (const o of alive) {
         if (o === f || !o.alive) continue;
-        const score = Math.hypot(o.x - f.x, o.y - f.y) * (o.shield ? SHIELD_TAUNT : 1);
+        const d = Math.hypot(o.x - f.x, o.y - f.y);
+        const score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
         if (score < bestScore) { bestScore = score; best = o; }
       }
       if (!best) continue;
@@ -167,12 +192,18 @@ class Battle extends EventEmitter {
       const dist = Math.hypot(dx, dy) || 1;
       f.cd -= dt;
 
-      if (dist > ATTACK_RANGE) {
-        const step = Math.min(f.speed * dt, dist - ATTACK_RANGE + 1);
+      if (dist > f.range) {
+        const step = Math.min(f.speed * dt, dist - f.range + 1);
         f.x += (dx / dist) * step;
         f.y += (dy / dist) * step;
-      } else if (f.cd <= 0) {
-        f.cd = ATTACK_COOLDOWN;
+      } else if (f.kite && dist < f.kite) {
+        // Archer : recule quand l'ennemi est trop près.
+        const step = f.speed * 0.8 * dt;
+        f.x -= (dx / dist) * step;
+        f.y -= (dy / dist) * step;
+      }
+      if (dist <= f.range && f.cd <= 0) {
+        f.cd = f.cooldown;
         this.attack(f, best);
       }
     }
@@ -212,7 +243,14 @@ class Battle extends EventEmitter {
       }
     }
 
-    const remaining = this.fighters.filter((f) => f.alive);
+    let remaining = this.fighters.filter((f) => f.alive);
+    if (remaining.length === 0 && this.fighters.length) {
+      // Morts simultanées (ex. épines) : le dernier tombé est déclaré vainqueur.
+      const last = [...this.fighters].sort((a, b) => b.diedAt - a.diedAt)[0];
+      last.alive = true;
+      last.hp = 1;
+      remaining = [last];
+    }
     if (remaining.length <= 1 || this.time > MAX_DURATION) {
       const winner = remaining.length === 1
         ? remaining[0]
@@ -225,19 +263,59 @@ class Battle extends EventEmitter {
   }
 
   attack(attacker, target) {
-    if (Math.random() < target.dodge) {
-      this.events.push({ t: 'dodge', from: attacker.key, to: target.key });
+    const proj = attacker.projectile || undefined;
+    // La précision de l'attaquant réduit l'esquive de la cible.
+    if (Math.random() < target.dodge * (1 - attacker.precision)) {
+      this.events.push({ t: 'dodge', from: attacker.key, to: target.key, proj });
       return;
     }
     const crit = Math.random() < attacker.crit;
-    const raw = attacker.damage * (0.85 + Math.random() * 0.3) * (crit ? CRIT_MULTIPLIER : 1);
+    const raw = attacker.damage * (0.85 + Math.random() * 0.3) * (crit ? Rules.CRIT_MULTIPLIER : 1);
+    const tx = target.x;
+    const ty = target.y;
+    this.hit(attacker, target, raw, { crit, proj });
+    // Mage : explosion autour de la cible.
+    if (attacker.aoeRadius) {
+      this.events.push({ t: 'aoe', from: attacker.key, x: Math.round(tx), y: Math.round(ty), r: attacker.aoeRadius });
+      for (const o of this.fighters) {
+        if (!o.alive || o === target || o === attacker) continue;
+        if (Math.hypot(o.x - tx, o.y - ty) <= attacker.aoeRadius) {
+          this.hit(attacker, o, raw * attacker.aoeRatio, { crit, splash: true });
+        }
+      }
+    }
+  }
+
+  // Applique des dégâts (après défense), puis vol de vie et épines.
+  hit(attacker, target, raw, opts = {}) {
+    if (!target.alive) return;
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction)));
     target.hp -= dmg;
-    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit });
+    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit: !!opts.crit, proj: opts.proj, splash: opts.splash || undefined });
+    if (attacker.lifesteal && attacker.alive) this.heal(attacker, dmg * attacker.lifesteal);
     if (target.hp <= 0) this.kill(attacker, target);
+    // Épines : une partie des dégâts reçus est renvoyée à l'attaquant.
+    const reflected = Math.round(dmg * target.thorns);
+    if (reflected >= 1 && attacker.alive) {
+      attacker.hp -= reflected;
+      this.events.push({ t: 'thorns', from: target.key, to: attacker.key, dmg: reflected });
+      if (attacker.hp <= 0) this.kill(target, attacker);
+    }
+  }
+
+  heal(f, amount) {
+    if (!f.alive || amount <= 0) return;
+    const before = f.hp;
+    f.hp = Math.min(f.maxHp, f.hp + amount);
+    f.healAcc += f.hp - before;
+    if (f.healAcc >= 4) {
+      this.events.push({ t: 'heal', to: f.key, amount: Math.round(f.healAcc) });
+      f.healAcc = 0;
+    }
   }
 
   kill(killer, victim) {
+    if (!victim.alive) return;
     victim.alive = false;
     victim.hp = 0;
     victim.diedAt = this.time;
@@ -245,7 +323,22 @@ class Battle extends EventEmitter {
     if (killer) {
       killer.kills += 1;
       this.emit('kill', killer, victim);
+      // Séries : premier kill, double / triple kill (enchaînés en moins de STREAK_WINDOW s), massacre.
+      if (!this.firstBlood) {
+        this.firstBlood = true;
+        this.streak(killer, 'firstblood');
+      }
+      killer.chain = this.time - killer.lastKillAt <= Rules.STREAK_WINDOW ? killer.chain + 1 : 1;
+      killer.lastKillAt = this.time;
+      if (killer.chain === 2) this.streak(killer, 'double');
+      else if (killer.chain === 3) this.streak(killer, 'triple');
+      if (killer.kills === Rules.MASSACRE_KILLS) this.streak(killer, 'massacre');
     }
+  }
+
+  streak(fighter, kind) {
+    this.events.push({ t: 'streak', kind, to: fighter.key });
+    this.emit('streak', fighter, kind);
   }
 
   finish(winner) {
@@ -273,7 +366,7 @@ class Battle extends EventEmitter {
       arena: ARENA,
       storm: this.phase === 'battle' ? this.storm() : null,
       fighters: this.fighters.map((f) => ({
-        key: f.key, name: f.name, look: f.look, level: f.level,
+        key: f.key, name: f.name, cls: f.cls, look: f.look, level: f.level,
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
         alive: f.alive, kills: f.kills, target: f.targetKey,

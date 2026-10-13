@@ -274,3 +274,68 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .bet-result.lost { border-left: 4px solid var(--danger); }
 .bet-result.refund { border-left: 4px solid var(--muted); }
 .bet-rules { font-size: 12px; margin: 12px 0 0; }
+
+/* ---------- Classes ---------- */
+.class-badge { font-weight: 800; margin-top: 4px; }
+.cls-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--panel2); margin-left: 4px; }
+.cls-tag.locked { background: rgba(255,77,109,.18); color: #ff8fa3; }
+.modal { position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center; background: rgba(5,3,12,.82); padding: 20px; }
+.modal.open { display: flex; }
+.modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: auto; }
+.modal-box h2 { margin: 0 0 4px; }
+.class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.class-card { background: var(--bg2); border: 2px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; transition: transform .12s, border-color .12s; }
+.class-card:hover { transform: translateY(-3px); border-color: var(--c); }
+.class-card.current { border-color: var(--c); box-shadow: 0 0 16px color-mix(in srgb, var(--c) 40%, transparent); }
+.class-card canvas { display: block; margin: 0 auto; }
+.class-card h3 { margin: 4px 0; color: var(--c); }
+.class-card p { font-size: 12px; color: var(--muted); min-height: 48px; }
+.class-card ul { text-align: left; font-size: 12px; padding-left: 16px; margin: 6px 0 10px; }
+.class-card .weapons { font-size: 12px; margin-bottom: 8px; }
+
+/* ---------- Forge ---------- */
+.forge-box { border: 1px solid #ff7a1f; background: linear-gradient(135deg, rgba(255,90,20,.10), transparent 55%), var(--panel); }
+.forge-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .forge-grid { grid-template-columns: 1fr; } }
+.forge-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.forge-card h3 { margin: 0 0 8px; }
+.forge-card p { font-size: 13px; }
+.fuse-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.fuse-slot { min-height: 74px; border: 2px dashed var(--border); border-radius: 10px; display: grid; place-items: center; font-size: 12px; color: var(--muted); padding: 6px; text-align: center; cursor: pointer; }
+.fuse-slot.filled { border-style: solid; color: var(--text); }
+.fuse-info { font-weight: 700; margin-bottom: 10px; min-height: 22px; }
+.forge-pick { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow: auto; }
+.pick-chip { font-size: 12px; padding: 5px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); cursor: pointer; }
+.pick-chip:hover { filter: brightness(1.2); }
+.pick-chip.disabled { opacity: .35; cursor: not-allowed; }
+#reroll-item { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 10px; }
+.reroll-line { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #2c2547; }
+.reroll-line .spacer { flex: 1; }
+.reroll-line.flash { animation: lineFlash 1s; }
+@keyframes lineFlash { 0% { background: rgba(255,176,0,.5); } 100% { background: transparent; } }
+
+/* Animation de forge */
+.forge-overlay { position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(60,20,5,.92), rgba(0,0,0,.97)); overflow: hidden; }
+.forge-overlay.open { display: flex; }
+.forge-stage { position: relative; width: 420px; height: 320px; }
+.forge-anvil { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); width: 260px; filter: drop-shadow(0 0 var(--fg, 6px) var(--glow, #ff7a1f)); transition: filter .2s; }
+.forge-hammer { position: absolute; left: 58%; bottom: 150px; width: 120px; transform-origin: 90% 90%; transform: rotate(-35deg); }
+.forge-hammer.strike { animation: strike .32s ease-in; }
+@keyframes strike { 0% { transform: rotate(-35deg); } 55% { transform: rotate(18deg); } 100% { transform: rotate(-35deg); } }
+.forge-item { position: absolute; width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center; font-size: 30px; background: var(--panel); border: 2px solid; transition: transform .6s cubic-bezier(.5,0,.75,0), opacity .6s; }
+.forge-msg { font-size: 30px; font-weight: 900; margin-top: 10px; min-height: 40px; text-align: center; text-shadow: 0 0 20px var(--glow, #ff7a1f); }
+.forge-result { margin-top: 10px; display: none; }
+.forge-result.show { display: block; animation: cardIn .6s forwards cubic-bezier(.2,1.4,.4,1); }
+.forge-result .item { width: 260px; opacity: 1; transform: none; background: var(--panel); }
+.forge-actions { display: none; gap: 10px; margin-top: 14px; }
+.forge-actions.show { display: flex; }
+
+/* ---------- Règles des combats ---------- */
+.combat-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .combat-info-grid { grid-template-columns: 1fr; } }
+#combat-info h3 { margin: 6px 0 8px; }
+.rules-list { padding-left: 18px; font-size: 14px; }
+.rules-list li { margin-bottom: 6px; }
+.class-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.class-summary > div { background: var(--bg2); border-left: 3px solid var(--c); border-radius: 8px; padding: 10px; font-size: 13px; }
+.class-summary b { color: var(--c); }

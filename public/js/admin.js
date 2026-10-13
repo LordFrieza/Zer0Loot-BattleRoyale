@@ -41,7 +41,7 @@ function render() {
   $('simulate').disabled = q.phase !== 'queue';
   $('count').textContent = q.participants.length;
   $('plist').innerHTML = q.participants.length
-    ? q.participants.map((p) => `<div><span>${p.bot ? '🤖' : '👤'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>`).join('')
+    ? q.participants.map((p) => `<div><span>${p.bot ? '🤖' : '👤'} ${p.cls ? Rules.CLASS_INFO[p.cls].icon + ' ' : ''}${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>`).join('')
     : '<span class="muted">Personne pour l\'instant.</span>';
 }
 

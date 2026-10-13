@@ -74,24 +74,50 @@ de la file, confirme les `!join` et annonce le vainqueur.
   À la fin du compteur la file se ferme et l'admin lance la bataille quand il veut (2 combattants minimum).
 - **Viewers sans compte** : un `!join` crée un personnage rattaché au pseudo Twitch. Quand la personne crée un compte et lie
   son Twitch, elle récupère tout (XP, golds, coffres, objets).
-- **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (un porteur de **bouclier** attire
-  davantage l'aggro). Après 45 s, une zone se referme pour éviter les combats interminables.
+- **Classes** : à la première visite, le joueur choisit sa classe (gratuit), puis peut en changer pour 100 golds.
+  | Classe | Combat | Bonus / malus | Arme · secondaire |
+  |---|---|---|---|
+  | ⚔️ Guerrier | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
+  | 🏹 Archer | À distance (230 px), recule si un ennemi approche | +15 pts Précision, −10 % Vie, −15 % Dégâts | Arc · Carquois |
+  | 🔮 Mage | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +25 % Dégâts, −15 % Vie, attaque 35 % plus lente | Bâton · Grimoire |
+  | 🗡️ Assassin | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, −15 % Vie | Dagues · Dague de parade |
+  | ✨ Prêtre | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
+
+  Les armes et objets secondaires sont **réservés à leur classe**. Dans les coffres, ils sont pour ta classe 1 fois sur 2
+  (sinon une classe au hasard). En changeant de classe, les objets incompatibles retournent dans le coffre personnel.
+  Les anciennes épées / anciens boucliers (d'avant les classes) sont devenus des objets de Guerrier.
+- **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (sauf l'Assassin).
+  Après 45 s, une zone se referme pour éviter les combats interminables.
 - **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds ;
   participation = 25 XP pour chaque combattant à la fin de la bataille (gagnant compris, pas si l'admin annule).
+- **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +1 coffre ;
+  double kill (2 kills d'affilée en moins de 8 s) = +1 coffre ; triple kill = annonce seulement ;
+  massacre (5 kills dans la bataille) = +2 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
-- **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement) :
+- **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement et de classe) :
   - Vie : 100 PV + 10 par point
   - Force : 10 dégâts + 2 par point
   - Défense : armure 5 + 3 par point → réduction des dégâts `armure / (armure + 100)`
   - Vitesse : 60 px/s + 5 par point (plafond 220)
   - Esquive : 5 + 3 par point → chance d'esquive `valeur / (valeur + 100)`, plafond 60 %
   - Critique : 1 % + 2 % par point, plafond 60 % ; un coup critique inflige le double de dégâts
+  - Vitesse d'attaque : 1 attaque / s, +5 % par point, plafond ×2,5
+  - Vol de vie : 2 % + 1,5 % par point des dégâts infligés rendus en vie, plafond 40 %
+  - Précision : 5 % + 3 % par point → réduit d'autant l'esquive de la cible, plafond 80 %
+  - Épines : 2 % + 2 % par point des dégâts reçus renvoyés à l'attaquant, plafond 50 %
   - Chance : points × bonus d'équipement → modifie la table de loot
 - **Table de loot** : chance 0 → 90 / 6 / 3 / 0,9 / 0,1 % ; chance 10 → 80 / 10 / 6 / 3 / 1 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.
-- **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, épée, bouclier).
+- **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).
   Commun 1 ligne (+1–3 %), Peu commun 2 (+4–6 %), Rare 3 (+7–10 %), Épique 4 (+11–15 %), Légendaire 5 (+15–25 %).
-  Chaque emplacement a ses stats de prédilection (ex. plastron → Vie/Défense, épée → Force, boucles → Chance).
+  Chaque emplacement / type d'arme a ses stats de prédilection (ex. plastron → Vie/Défense/Épines, arc → Précision,
+  dagues → Critique/Vitesse d'attaque, boucles → Chance).
+- **Forge** :
+  - Fusion : 3 objets de même rareté → 1 nouvel objet, toujours équipable par ta classe. Chance de monter d'une rareté :
+    40 % (Commun), 30 % (Peu commun), 20 % (Rare), 10 % (Épique), + 0,5 % par point de chance effective (max +25 %).
+    Sinon, nouvel objet de même rareté. 3 Légendaires → un nouveau Légendaire.
+  - Relance : remplace une ligne d'un objet (équipé ou non) par une autre stat au hasard, absente de l'objet.
+    Prix : 10 / 20 / 40 / 80 / 150 golds selon la rareté.
 - **Coffres** : 3 objets par coffre, achat 100 golds, stockage illimité. Clics pour ouvrir selon la meilleure rareté :
   3 / 5 / 10 / 20 / 30. Lumières : blanc, puis vert (4ᵉ clic), bleu (6ᵉ), violet (11ᵉ), orange (21ᵉ).
 - **Paris** : dès que la file est ouverte, chaque joueur voit les combattants inscrits dans l'encart « 🎲 Paris » de sa
@@ -102,7 +128,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
   observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.
-- **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 1 gold par objet
+- **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 3 golds par objet
   quelle que soit sa rareté. Les objets équipés ne sont pas recyclables ; confirmation demandée pour Épique/Légendaire.
 
 ## Sons

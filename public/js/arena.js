@@ -7,6 +7,11 @@
   const H = 720;
   const FIGHTER_SCALE = 1.25;
 
+  function classIcon(cls) {
+    const ci = window.Rules && Rules.CLASS_INFO[cls];
+    return ci ? ci.icon + ' ' : '';
+  }
+
   class ArenaView {
     constructor(canvas, socket) {
       this.canvas = canvas;
@@ -19,6 +24,10 @@
       this.floaters = [];
       this.feed = [];
       this.sparks = [];
+      this.projectiles = []; // flèches et boules de feu
+      this.blasts = []; // explosions du mage
+      this.announces = []; // « PREMIER KILL ! », « DOUBLE KILL ! »…
+      this.lastShotSound = 0;
       this.last = performance.now();
       this.bg = this.makeBackground();
       this.lastHitSound = 0;
@@ -94,6 +103,7 @@
     onFrame(f) {
       if (f.phase === 'battle' && (!this.frame || this.frame.phase !== 'battle')) {
         this.disp.clear(); this.feed = []; this.floaters = []; this.sparks = [];
+        this.projectiles = []; this.blasts = []; this.announces = [];
       }
       this.frame = f;
       const byKey = new Map(f.fighters.map((x) => [x.key, x]));
@@ -111,7 +121,29 @@
           if (now - this.lastHitSound > 90) { this.lastHitSound = now; Sound.play('hit'); }
         }
         if (window.Sound && e.t === 'kill') Sound.play('kill');
-        if (e.t === 'hit' && to) {
+        // Projectiles (archer, mage) : purement visuels, les dégâts sont déjà calculés.
+        if ((e.t === 'hit' || e.t === 'dodge') && e.proj && from && to) {
+          this.projectiles.push({ x0: from.x, y0: from.y - 12, x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' ? 0.25 : 0.16, kind: e.proj });
+          const now = performance.now();
+          if (window.Sound && now - this.lastShotSound > 110) { this.lastShotSound = now; Sound.play('shoot', e.proj); }
+        }
+        if (e.t === 'aoe') {
+          this.blasts.push({ x: e.x, y: e.y - 8, r: e.r, life: 0.5 });
+          if (window.Sound) Sound.play('blast');
+        } else if (e.t === 'heal' && to) {
+          this.floaters.push({ x: to.x + 14, y: to.y - 40, text: '+' + e.amount, color: '#5dff8a', life: 0.9, size: 15 });
+        } else if (e.t === 'thorns' && to) {
+          this.floaters.push({ x: to.x - 14, y: to.y - 50, text: '🌵-' + e.dmg, color: '#d38bff', life: 0.9, size: 15 });
+        } else if (e.t === 'streak' && to) {
+          const info = Rules.STREAK_INFO[e.kind];
+          this.announces.push({ text: info.label, sub: to.name, color: info.color, life: 2.4, age: 0 });
+          this.spark(to.x, to.y - 10, info.color, 40);
+          if (window.Sound) Sound.play('streak', e.kind);
+        }
+        if (e.t === 'hit' && to && e.splash) {
+          dTo.flash = 1;
+          this.floaters.push({ x: to.x + (Math.random() * 16 - 8), y: to.y - 60, text: '-' + e.dmg, color: '#ff9a4a', life: 0.9, size: 16 });
+        } else if (e.t === 'hit' && to) {
           dTo.flash = 1;
           if (dFrom) dFrom.swing = 1;
           if (e.crit) {
@@ -225,7 +257,7 @@
         const x = cellW * (col + 1);
         const y = 310 + row * cellH;
         drawFighter(this.ctx, x, y, p, { scale, bob: Math.sin(t / 300 + i) * 2 });
-        this.label(p.name, x, y + 32 * scale, 13, '#fff');
+        this.label(classIcon(p.cls) + p.name, x, y + 32 * scale, 13, '#fff');
       });
     }
 
@@ -301,7 +333,7 @@
         ctx.fillRect(d.x - bw / 2 - 1, d.y - 49, bw + 2, 7);
         ctx.fillStyle = ratio > 0.5 ? '#3ddc5a' : ratio > 0.25 ? '#ffb000' : '#ff4d6d';
         ctx.fillRect(d.x - bw / 2, d.y - 48, bw * ratio, 5);
-        this.label(fi.name + (fi.kills ? ` ⚔${fi.kills}` : ''), d.x, d.y - 58, 12, '#fff');
+        this.label(classIcon(fi.cls) + fi.name + (fi.kills ? ` ⚔${fi.kills}` : ''), d.x, d.y - 58, 12, '#fff');
       }
 
       // Étincelles
@@ -315,6 +347,50 @@
       }
       ctx.restore();
       this.sparks = this.sparks.filter((s) => s.life > 0);
+
+      // Projectiles
+      for (const p of this.projectiles) {
+        p.t += dt;
+        const k = Math.min(1, p.t / p.dur);
+        const x = p.x0 + (p.x1 - p.x0) * k;
+        const y = p.y0 + (p.y1 - p.y0) * k - Math.sin(k * Math.PI) * (p.kind === 'arrow' ? 18 : 8);
+        const ang = Math.atan2(p.y1 - p.y0, p.x1 - p.x0);
+        ctx.save();
+        ctx.translate(x, y);
+        if (p.kind === 'arrow') {
+          ctx.rotate(ang);
+          ctx.fillStyle = '#e8d7b0';
+          ctx.fillRect(-10, -1, 16, 2);
+          ctx.fillStyle = '#d0d0e0';
+          ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(4, -3); ctx.lineTo(4, 3); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ff6b4a';
+          ctx.fillRect(-12, -2.5, 4, 5);
+        } else {
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 11);
+          g.addColorStop(0, '#fff6b0'); g.addColorStop(0.4, '#ff9a1f'); g.addColorStop(1, 'rgba(255,60,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        if (p.kind === 'fire' && Math.random() < 0.6) this.sparks.push({ x, y, vx: (Math.random() - 0.5) * 40, vy: -20, life: 0.3, color: '#ff7a1f' });
+      }
+      this.projectiles = this.projectiles.filter((p) => p.t < p.dur);
+
+      // Explosions
+      for (const b of this.blasts) {
+        b.life -= dt;
+        const k = 1 - b.life / 0.5;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = Math.max(0, b.life * 2);
+        const g = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, b.r * (0.5 + k * 0.6));
+        g.addColorStop(0, 'rgba(255,240,180,.9)'); g.addColorStop(0.5, 'rgba(255,120,20,.6)'); g.addColorStop(1, 'rgba(255,40,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.5 + k * 0.6), 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      this.blasts = this.blasts.filter((b) => b.life > 0);
 
       // Textes flottants
       for (const fl of this.floaters) {
@@ -360,6 +436,26 @@
       });
       ctx.globalAlpha = 1;
       this.feed = this.feed.filter((x) => x.life > 0);
+      this.drawAnnounces(dt);
+    }
+
+    // Annonces de séries (une à la fois, au centre en haut).
+    drawAnnounces(dt) {
+      const a = this.announces[0];
+      if (!a) return;
+      a.age += dt;
+      a.life -= dt;
+      const pop = a.age < 0.18 ? 0.6 + (a.age / 0.18) * 0.6 : 1.2 - Math.min(0.2, (a.age - 0.18) * 1.2);
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, a.life * 2));
+      ctx.translate(W / 2, 140);
+      ctx.scale(pop, pop);
+      ctx.translate(-W / 2, -140);
+      this.title(a.text, 130, 64, a.color, a.color);
+      this.title(a.sub, 190, 30, '#ffffff');
+      ctx.restore();
+      if (a.life <= 0) this.announces.shift();
     }
 
     drawResult(t) {

@@ -271,7 +271,7 @@
         this.stage.style.display = 'none';
         this.lid.style.transition = '';
         this.counter.textContent = '';
-        this.revealEl.innerHTML = items.map((it) => itemHtml(it)).join('');
+        this.revealEl.innerHTML = items.map((it) => itemHtml(it, '', window.ZL_CLASS)).join('');
         this.revealEl.classList.add('show');
         const cards = [...this.revealEl.children];
         cards.forEach((card, i) => {
@@ -295,4 +295,5 @@
   }
 
   window.ChestOpener = ChestOpener;
+  window.ZLParticles = Particles;
 })();

@@ -224,6 +224,14 @@ app.post('/api/chest/open', requirePlayer, action((req) => game.openChest(req.us
 
 app.post('/api/recycle', requirePlayer, action((req) => game.recycle(req.user.character, req.body.itemIds)));
 
+// ---------- Classe & forge ----------
+
+app.post('/api/class', requirePlayer, action((req) => game.chooseClass(req.user.character, String(req.body.cls || ''))));
+
+app.post('/api/forge/fuse', requirePlayer, action((req) => game.fuse(req.user.character, req.body.itemIds)));
+
+app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
+
 app.post('/api/equip', requirePlayer, action((req) => {
   game.equip(req.user.character, req.body.itemId);
 }));
@@ -293,6 +301,7 @@ function participantFromUser(user) {
     userId: user.id,
     name: user.twitchDisplayName || user.username,
     level: user.character.level,
+    cls: user.character.cls || null,
     stats: game.derived(user.character),
     look: lookOf(user),
   };
@@ -315,12 +324,14 @@ function makeBot() {
   for (const slot of Rules.SLOTS) {
     if (Math.random() < 0.4) look[slot] = game.rollRarity(10);
   }
+  const cls = Rules.CLASSES[Math.floor(Math.random() * Rules.CLASSES.length)];
   return {
     key: 'bot' + botCount,
     bot: true,
     name: BOT_NAMES[botCount % BOT_NAMES.length] + '_' + botCount,
     level,
-    stats: Rules.derive(points, {}),
+    cls,
+    stats: Rules.derive(points, {}, cls),
     look,
   };
 }
@@ -412,6 +423,17 @@ battle.on('kill', (killer) => {
   db.save();
   pushMe(user);
   io.to('user:' + user.id).emit('reward', { type: 'kill', reward: Rules.REWARDS.kill, levels });
+});
+
+// Séries de kills : coffres bonus (premier kill, double kill, massacre).
+battle.on('streak', (fighter, kind) => {
+  const reward = Rules.REWARDS[kind];
+  const user = fighter.userId && db.state.users[fighter.userId];
+  if (!user || !reward || !(reward.chests || reward.gold || reward.xp)) return;
+  const levels = game.grant(user.character, reward);
+  db.save();
+  pushMe(user);
+  io.to('user:' + user.id).emit('reward', { type: kind, reward, levels });
 });
 
 battle.on('end', (winner, fighters) => {

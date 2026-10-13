@@ -27,15 +27,30 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function itemHtml(item, extra = '') {
+// Icône + libellé d'un objet (« 🏹 Arc », « ⛑️ Casque »).
+function itemType(item) {
+  const kind = item.kind && Rules.KINDS[item.kind];
+  return kind ? { icon: kind.icon, label: kind.label } : { icon: Rules.SLOT_INFO[item.slot].icon, label: Rules.SLOT_INFO[item.slot].label };
+}
+
+// Étiquette de classe pour les armes / objets secondaires (rouge si la classe du joueur ne peut pas l'équiper).
+function classTag(item, playerCls) {
+  const cls = Rules.itemClass(item);
+  if (!cls) return '';
+  const ci = Rules.CLASS_INFO[cls];
+  const locked = playerCls !== undefined && cls !== playerCls;
+  return `<span class="cls-tag ${locked ? 'locked' : ''}" title="Réservé à la classe ${ci.label}">${locked ? '🔒' : ci.icon} ${ci.label}</span>`;
+}
+
+function itemHtml(item, extra = '', playerCls) {
   const r = Rules.RARITY_INFO[item.rarity];
-  const slot = Rules.SLOT_INFO[item.slot];
+  const type = itemType(item);
   const lines = item.lines
     .map((l) => `<li>+${l.value}% ${Rules.STAT_INFO[l.stat].label}</li>`)
     .join('');
   return `<div class="item rarity-${item.rarity}" data-id="${item.id}">
-    <div class="item-name c-${item.rarity}">${slot.icon} ${esc(item.name)}</div>
-    <div class="item-meta">${slot.label} · <span class="c-${item.rarity}">${r.label}</span></div>
+    <div class="item-name c-${item.rarity}">${type.icon} ${esc(item.name)}</div>
+    <div class="item-meta">${type.label} · <span class="c-${item.rarity}">${r.label}</span>${classTag(item, playerCls)}</div>
     <ul>${lines}</ul>${extra}
   </div>`;
 }

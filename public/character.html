@@ -46,6 +46,7 @@
         <div class="panel char-card">
           <canvas id="avatar" width="200" height="200"></canvas>
           <div class="char-name" id="char-name"></div>
+          <div class="class-badge" id="class-badge"></div>
           <div class="level-badge" id="level"></div>
           <div class="xpbar"><div id="xp-fill"></div><span id="xp-text"></span></div>
           <div class="wallet">
@@ -53,6 +54,7 @@
             <span title="Coffres de LOOT">🎁 <span id="chests-small"></span></span>
           </div>
           <div class="record" id="record"></div>
+          <button class="secondary small" id="change-class" style="margin-top:10px">🔄 Changer de classe (100 🪙)</button>
         </div>
 
         <div class="panel" id="twitch-panel">
@@ -92,6 +94,54 @@
       <div class="inventory" id="inventory"></div>
     </div>
 
+    <div class="panel forge-box" id="forge">
+      <h2>🔥 La Forge <span class="sub">Fusionne ou améliore tes objets</span></h2>
+      <div class="forge-grid">
+        <div class="forge-card">
+          <h3>⚒️ Fusion</h3>
+          <p class="muted">Détruis <b>3 objets de même rareté</b> pour forger un nouvel objet, toujours équipable par ta classe.
+            Il a une chance de <b>monter d'une rareté</b> (plus ta Chance est haute, plus c'est probable) ; sinon tu obtiens
+            un nouvel objet de la même rareté.</p>
+          <div class="fuse-slots" id="fuse-slots"></div>
+          <div class="fuse-info" id="fuse-info"></div>
+          <div class="row"><button class="gold" id="fuse-go">🔨 Forger !</button><button class="secondary small" id="fuse-clear">Vider</button></div>
+          <div class="inv-filters" id="fuse-filters" style="margin-top:12px"></div>
+          <div class="forge-pick" id="fuse-pick"></div>
+        </div>
+        <div class="forge-card">
+          <h3>🎲 Relance de ligne</h3>
+          <p class="muted">Choisis un objet (équipé ou dans ton coffre), puis la ligne à relancer : elle est remplacée par
+            <b>une autre stat au hasard</b> (jamais une stat déjà présente sur l'objet), avec une nouvelle valeur.</p>
+          <p class="muted" id="reroll-prices"></p>
+          <select id="reroll-item"></select>
+          <div id="reroll-preview"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="combat-info">
+      <h2>⚔️ Règles des combats</h2>
+      <div class="combat-info-grid">
+        <div>
+          <h3>🏆 Récompenses</h3>
+          <table class="loot-table" id="rewards-table"></table>
+          <p class="muted" id="streak-rules"></p>
+        </div>
+        <div>
+          <h3>🧭 Déroulement</h3>
+          <ul class="muted rules-list">
+            <li>Les combattants apparaissent à des places aléatoires et attaquent l'ennemi le plus proche
+              (le <b>Guerrier</b> attire l'aggro, l'<b>Assassin</b> traque le plus faible).</li>
+            <li>Après 45 secondes, une <b>zone</b> se referme et blesse ceux qui restent dehors.</li>
+            <li>Le dernier survivant remporte la <b>Victoire Royale</b>.</li>
+            <li>Toutes les stats et leurs effets sont détaillés dans le tableau <b>Statistiques</b>.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>🎭 Les classes</h3>
+      <div class="class-summary" id="class-summary"></div>
+    </div>
+
     <div class="panel" id="loot-info">
       <h2>🍀 Comment fonctionne la chance ?</h2>
       <p class="muted">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
@@ -115,12 +165,22 @@
     </div>
   </main>
 
+  <div class="modal" id="class-modal">
+    <div class="modal-box">
+      <h2 id="class-modal-title">Choisis ta classe</h2>
+      <p class="muted" id="class-modal-sub"></p>
+      <div class="class-grid" id="class-grid"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="secondary" id="class-modal-close">Fermer</button></div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/fighter.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/chest.js"></script>
+  <script src="/js/forge.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>
