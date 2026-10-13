@@ -7,69 +7,12 @@
     commun: '#ffffff', peu_commun: '#3ddc5a', rare: '#3b8bff', epique: '#b14dff', legendaire: '#ff9a1f',
   };
 
-  // ---------- Sons (WebAudio, aucun fichier requis) ----------
-  let audio = null;
-  let muted = false;
-  try { muted = localStorage.getItem('zl_muted') === '1'; } catch (e) { /* stockage indisponible */ }
-
-  function ac() {
-    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
-    return audio;
-  }
-
-  function tone(freq, dur, type = 'sine', vol = 0.2, slide = 0, delay = 0) {
-    if (muted) return;
-    const ctx = ac();
-    const t = ctx.currentTime + delay;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
-    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
-    gain.gain.setValueAtTime(vol, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + dur);
-  }
-
-  function noise(dur, vol = 0.25) {
-    if (muted) return;
-    const ctx = ac();
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 2;
-    const src = ctx.createBufferSource();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1800;
-    gain.gain.value = vol;
-    src.buffer = buf;
-    src.connect(filter).connect(gain).connect(ctx.destination);
-    src.start();
-  }
-
+  // Sons : voir js/sound.js
   const sfx = {
-    hit(n) {
-      noise(0.08, 0.2);
-      tone(110 + n * 9, 0.12, 'square', 0.07, -40);
-    },
-    tier(rarity) {
-      const base = { commun: 523, peu_commun: 587, rare: 659, epique: 784, legendaire: 880 }[rarity];
-      [0, 4, 7, 12].forEach((st, i) => tone(base * 2 ** (st / 12), 0.35, 'triangle', 0.12, 0, i * 0.06));
-    },
-    burst(rarity) {
-      noise(0.6, 0.45);
-      tone(70, 0.6, 'sine', 0.4, -40);
-      const notes = rarity === 'legendaire' ? [0, 4, 7, 11, 14, 19] : rarity === 'epique' ? [0, 4, 7, 12, 16] : [0, 4, 7, 12];
-      notes.forEach((st, i) => tone(523 * 2 ** (st / 12), 0.6, 'triangle', 0.13, 0, 0.15 + i * 0.08));
-    },
-    card(rarity) {
-      const idx = Rules.RARITIES.indexOf(rarity);
-      tone(660 + idx * 120, 0.25, 'sine', 0.12);
-      if (idx >= 3) tone(1320 + idx * 120, 0.4, 'triangle', 0.08, 0, 0.08);
-    },
+    hit: (n) => Sound.play('chestHit', n),
+    tier: (r) => Sound.play('chestTier', r),
+    burst: (r) => Sound.play('chestBurst', r),
+    card: (r) => Sound.play('chestCard', r),
   };
 
   // ---------- Particules ----------
@@ -212,14 +155,7 @@
       this.chestEl.addEventListener('pointerdown', (e) => { e.preventDefault(); this.click(); });
       el.querySelector('.close').onclick = () => this.close();
       el.querySelector('.next').onclick = () => this.onNext && this.onNext();
-      const muteBtn = el.querySelector('.mute');
-      const renderMute = () => { muteBtn.textContent = muted ? '🔇 Son coupé' : '🔊 Son'; };
-      renderMute();
-      muteBtn.onclick = () => {
-        muted = !muted;
-        try { localStorage.setItem('zl_muted', muted ? '1' : '0'); } catch (e) { /* ignore */ }
-        renderMute();
-      };
+      Sound.bindToggle(el.querySelector('.mute'));
       document.addEventListener('keydown', (e) => {
         if (!this.el.classList.contains('open')) return;
         if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (this.result && !this.done) this.click(); }

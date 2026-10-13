@@ -8,6 +8,7 @@ let recycleMode = false;
 const selected = new Set();
 let simLuck = null;
 const opener = new ChestOpener();
+Sound.bindToggle($('sound-toggle'));
 let opening = false;
 
 async function refresh() {
@@ -57,7 +58,7 @@ function renderStats() {
     </tr>`;
   }).join('');
   $('stats').querySelectorAll('.plus').forEach((b) => {
-    b.onclick = () => act('/api/stats/allocate', { stat: b.dataset.stat });
+    b.onclick = () => act('/api/stats/allocate', { stat: b.dataset.stat }, 'levelUp');
   });
 }
 
@@ -73,7 +74,7 @@ function renderEquipment() {
       <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}</div>`;
   }).join('');
   $('equipment').querySelectorAll('.slot.filled').forEach((el) => {
-    el.onclick = () => act('/api/unequip', { slot: el.dataset.slot });
+    el.onclick = () => act('/api/unequip', { slot: el.dataset.slot }, 'unequip');
   });
 }
 
@@ -120,7 +121,7 @@ function renderInventory() {
     ? list.map((item) => itemHtml(item, `${compareHtml(item)}<div class="actions"><button class="small" data-equip="${item.id}">Équiper</button></div>`)).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
-    b.onclick = () => act('/api/equip', { itemId: b.dataset.equip });
+    b.onclick = () => act('/api/equip', { itemId: b.dataset.equip }, 'equip');
   });
   $('inventory').querySelectorAll('.item').forEach((el) => {
     el.classList.toggle('selected', recycleMode && selected.has(el.dataset.id));
@@ -174,6 +175,7 @@ async function recycleSelected() {
   const precious = items.filter((i) => i.rarity === 'epique' || i.rarity === 'legendaire').length;
   if (precious && !confirm(`Attention : ta sélection contient ${precious} objet(s) Épique ou Légendaire. Les recycler quand même ?`)) return;
   document.querySelectorAll('#inventory .item.selected').forEach((el) => el.classList.add('recycled'));
+  Sound.play('recycle', items.length);
   await new Promise((r) => setTimeout(r, 400));
   const r = await act('/api/recycle', { itemIds: [...selected] });
   if (r) {
@@ -223,7 +225,7 @@ function renderQueue() {
     box.innerHTML = `<div class="row"><b style="font-size:18px">⚔️ La file est ouverte !</b>
       <span class="countdown" id="cd"></span><span class="muted">${n} combattant(s) inscrit(s)</span><span class="spacer"></span>
       ${inQueue ? '<b class="up">✅ Tu es inscrit !</b>' : '<span class="muted">Tape <b>!join</b> sur le stream ou</span> <button id="join">Rejoindre</button>'}</div>`;
-    if ($('join')) $('join').onclick = () => act('/api/queue/join', {});
+    if ($('join')) $('join').onclick = () => act('/api/queue/join', {}, 'join');
     tickCountdown();
   } else if (queue.phase === 'ready') {
     box.innerHTML = `<b>⏳ File fermée — ${n} combattant(s). Le streamer va lancer la bataille !</b> ${inQueue ? '<span class="up">Tu en fais partie.</span>' : ''}`;
@@ -265,9 +267,11 @@ function renderLoot() {
 $('luck-sim').oninput = (e) => { simLuck = Number(e.target.value); renderLoot(); };
 $('luck-reset').onclick = () => { simLuck = null; renderLoot(); };
 
-async function act(url, body) {
+// Appelle l'API ; si l'action réussit, joue le son indiqué.
+async function act(url, body, sound) {
   try {
     const r = await api(url, body);
+    if (sound) Sound.play(sound);
     await refresh();
     return r;
   } catch (err) {
@@ -276,8 +280,8 @@ async function act(url, body) {
   }
 }
 
-$('buy-1').onclick = () => act('/api/chest/buy', { count: 1 });
-$('buy-10').onclick = () => act('/api/chest/buy', { count: 10 });
+$('buy-1').onclick = () => act('/api/chest/buy', { count: 1 }, 'buy');
+$('buy-10').onclick = () => act('/api/chest/buy', { count: 10 }, 'buy');
 $('open-chest').onclick = openChest;
 
 async function openChest() {
@@ -291,6 +295,7 @@ async function openChest() {
     toast('⚠️ ' + err.message);
     return;
   }
+  Sound.play('chestAppear');
   opener.show(result, {
     remaining: me.character.chests,
     onNext: openChest,
@@ -322,6 +327,7 @@ socket.on('me', (m) => { me = m; render(); });
 socket.on('queue', (q) => { queue = q; if (me) renderQueue(); });
 socket.on('reward', (r) => {
   const label = r.type === 'win' ? '🏆 VICTOIRE !' : '⚔️ Kill !';
+  Sound.play(r.type === 'win' ? 'victory' : 'reward');
   toast(`${label} +${r.reward.xp} XP, +${r.reward.gold} 🪙, +${r.reward.chests} 🎁`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });

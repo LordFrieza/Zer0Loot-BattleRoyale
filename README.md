@@ -97,6 +97,25 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 1 gold par objet
   quelle que soit sa rareté. Les objets équipés ne sont pas recyclables ; confirmation demandée pour Épique/Légendaire.
 
+## Sons
+
+Tous les sons sont **synthétisés dans le navigateur** ([`public/js/sound.js`](public/js/sound.js)) : aucun fichier audio,
+aucun droit d'auteur. Un bouton **🔊 Son** (page perso, page admin, ouverture de coffre) coupe ou remet le son ;
+le choix est mémorisé.
+
+| Moment | Son |
+|---|---|
+| Ouverture de la file / inscription d'un viewer | Cor d'appel / petit « pop » |
+| Début de bataille | Clairon médiéval + timbales, puis musique de marche épique en boucle |
+| Coups, kills | Cliquetis discrets, impact |
+| Victoire | Fanfare triomphale + roulement + cymbale |
+| Équiper / déséquiper | Cliquetis métallique montant / son sourd descendant |
+| Ouvrir un coffre / acheter un coffre | Souffle magique / « ka-ching » + pièces |
+| Recycler | Broyage + pluie de pièces |
+| Point de compétence, récompense reçue | Petit arpège / pièces |
+
+Dans OBS, le son de l'arène passe par la source navigateur `/arena.html` (cocher « Contrôler l'audio via OBS »).
+
 Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](shared/rules.js).
 
 ## Structure

@@ -9,11 +9,21 @@
 <body class="obs">
   <!-- Page plein écran à utiliser comme « Source navigateur » dans OBS (1280×720 ou 1920×1080). -->
   <div class="arena-wrap"><canvas id="arena"></canvas></div>
+  <!-- Visible seulement si le navigateur bloque le son (dans OBS, le son démarre tout seul). -->
+  <button id="sound-unlock" class="secondary small" style="position:fixed;right:12px;bottom:12px;display:none">🔇 Cliquer pour activer le son</button>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/fighter.js"></script>
+  <script src="/js/sound.js"></script>
   <script src="/js/arena.js"></script>
-  <script>new ArenaView(document.getElementById('arena'), io());</script>
+  <script>
+    new ArenaView(document.getElementById('arena'), io());
+    const unlockBtn = document.getElementById('sound-unlock');
+    const refreshUnlock = () => { unlockBtn.style.display = Sound.blocked && !Sound.muted ? '' : 'none'; };
+    unlockBtn.onclick = () => setTimeout(refreshUnlock, 100);
+    Sound.onStateChange(refreshUnlock);
+    setTimeout(refreshUnlock, 500);
+  </script>
 </body>
 </html>

@@ -21,7 +21,8 @@
       this.sparks = [];
       this.last = performance.now();
       this.bg = this.makeBackground();
-      socket.on('queue', (q) => { this.queue = q; });
+      this.lastHitSound = 0;
+      socket.on('queue', (q) => this.onQueue(q));
       socket.on('frame', (f) => this.onFrame(f));
       requestAnimationFrame((t) => this.loop(t));
     }
@@ -66,6 +67,30 @@
       return c;
     }
 
+    // Sons liés aux changements de phase (clairons, musique, inscriptions).
+    onQueue(q) {
+      const prev = this.queue;
+      this.queue = q;
+      if (!window.Sound) return;
+      if (!prev) {
+        // Page ouverte en plein combat : on lance directement la musique.
+        if (q.phase === 'battle') Sound.music.start();
+        return;
+      }
+      if (q.phase === 'battle' && prev.phase !== 'battle') {
+        const fanfare = Sound.play('battleStart');
+        Sound.music.start(Math.max(0, fanfare - 0.25));
+      } else if (prev.phase === 'battle' && q.phase !== 'battle') {
+        Sound.music.stop();
+        if (q.phase === 'ended') setTimeout(() => Sound.play('victory'), 350);
+      }
+      if (q.phase === 'queue' && prev.phase !== 'queue') Sound.play('queueOpen');
+      else if (q.phase === 'queue' && q.participants.length > prev.participants.length) {
+        const now = performance.now();
+        if (now - (this.lastJoinSound || 0) > 120) { this.lastJoinSound = now; Sound.play('join'); }
+      }
+    }
+
     onFrame(f) {
       if (f.phase === 'battle' && (!this.frame || this.frame.phase !== 'battle')) {
         this.disp.clear(); this.feed = []; this.floaters = []; this.sparks = [];
@@ -80,6 +105,11 @@
         const from = byKey.get(e.from);
         const dTo = this.disp.get(e.to);
         const dFrom = this.disp.get(e.from);
+        if (window.Sound && (e.t === 'hit' || e.t === 'dodge')) {
+          const now = performance.now();
+          if (now - this.lastHitSound > 90) { this.lastHitSound = now; Sound.play('hit'); }
+        }
+        if (window.Sound && e.t === 'kill') Sound.play('kill');
         if (e.t === 'hit' && to) {
           dTo.flash = 1;
           if (dFrom) dFrom.swing = 1;
