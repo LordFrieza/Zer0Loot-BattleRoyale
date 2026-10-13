@@ -12,6 +12,8 @@ function emptyLootStats() {
 // Anciennes sauvegardes : ajoute les champs apparus depuis.
 function upgrade(character) {
   if (!character.lootStats) character.lootStats = emptyLootStats();
+  // Stats ajoutées après la création du personnage (ex. Critique).
+  character.stats = Object.assign(Rules.emptyStats(), character.stats);
   return character;
 }
 
@@ -20,7 +22,7 @@ function newCharacter() {
     level: 1,
     xp: 0,
     skillPoints: 0,
-    stats: { vie: 0, force: 0, defense: 0, vitesse: 0, esquive: 0, chance: 0 },
+    stats: Rules.emptyStats(),
     gold: 0,
     chests: 0,
     inventory: [],
@@ -31,7 +33,7 @@ function newCharacter() {
 }
 
 function gearBonus(character) {
-  const pct = { vie: 0, force: 0, defense: 0, vitesse: 0, esquive: 0, chance: 0 };
+  const pct = Rules.emptyStats();
   for (const item of Object.values(character.equipment)) {
     if (!item) continue;
     for (const line of item.lines) pct[line.stat] += line.value;
@@ -40,6 +42,7 @@ function gearBonus(character) {
 }
 
 function derived(character) {
+  upgrade(character);
   return Rules.derive(character.stats, gearBonus(character));
 }
 
@@ -65,6 +68,7 @@ function grant(character, reward) {
 function allocate(character, stat) {
   if (!Rules.STATS.includes(stat)) throw new Error('Stat inconnue');
   if (character.skillPoints <= 0) throw new Error('Aucun point de compétence disponible');
+  upgrade(character);
   character.skillPoints -= 1;
   character.stats[stat] += 1;
 }

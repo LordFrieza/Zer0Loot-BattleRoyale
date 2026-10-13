@@ -105,7 +105,8 @@
         const from = byKey.get(e.from);
         const dTo = this.disp.get(e.to);
         const dFrom = this.disp.get(e.from);
-        if (window.Sound && (e.t === 'hit' || e.t === 'dodge')) {
+        if (window.Sound && e.crit) Sound.play('crit');
+        else if (window.Sound && (e.t === 'hit' || e.t === 'dodge')) {
           const now = performance.now();
           if (now - this.lastHitSound > 90) { this.lastHitSound = now; Sound.play('hit'); }
         }
@@ -113,8 +114,13 @@
         if (e.t === 'hit' && to) {
           dTo.flash = 1;
           if (dFrom) dFrom.swing = 1;
-          this.floaters.push({ x: to.x + (Math.random() * 16 - 8), y: to.y - 66, text: '-' + e.dmg, color: '#ffdf5e', life: 1, size: 22 });
-          this.spark(to.x, to.y - 10, '#ffcf6a', 6);
+          if (e.crit) {
+            this.floaters.push({ x: to.x + (Math.random() * 16 - 8), y: to.y - 70, text: 'CRIT -' + e.dmg + ' !', color: '#ff5a3c', life: 1.3, size: 30 });
+            this.spark(to.x, to.y - 10, '#ff7a3c', 22);
+          } else {
+            this.floaters.push({ x: to.x + (Math.random() * 16 - 8), y: to.y - 66, text: '-' + e.dmg, color: '#ffdf5e', life: 1, size: 22 });
+            this.spark(to.x, to.y - 10, '#ffcf6a', 6);
+          }
         } else if (e.t === 'dodge' && to) {
           if (dFrom) dFrom.swing = 1;
           this.floaters.push({ x: to.x, y: to.y - 44, text: 'ESQUIVE', color: '#7fd8ff', life: 1, size: 16 });

@@ -55,17 +55,61 @@ test('ouverture : clics requis = meilleure rareté du coffre', () => {
   assert.strictEqual(c.inventory.length, 150);
 });
 
+test('courbe d\'XP : 300, 500, 700, 900…', () => {
+  assert.deepStrictEqual([1, 2, 3, 4].map(Rules.xpToNext), [300, 500, 700, 900]);
+});
+
 test('récompenses et niveaux', () => {
   const c = game.newCharacter();
-  game.grant(c, Rules.REWARDS.kill);
-  assert.strictEqual(c.level, 2);
-  assert.strictEqual(c.skillPoints, 1);
+  game.grant(c, Rules.REWARDS.kill); // 100 / 300
+  assert.strictEqual(c.level, 1);
+  assert.strictEqual(c.xp, 100);
   assert.strictEqual(c.gold, 10);
   assert.strictEqual(c.chests, 1);
-  game.grant(c, Rules.REWARDS.win); // 300 XP : 200 pour le niv. 3, reste 100
-  assert.strictEqual(c.level, 3);
+  game.grant(c, Rules.REWARDS.win); // 400 XP : 300 pour le niv. 2, reste 100
+  assert.strictEqual(c.level, 2);
   assert.strictEqual(c.xp, 100);
+  assert.strictEqual(c.skillPoints, 1);
   assert.strictEqual(c.gold, 40);
+  game.addXp(c, 400 + 700); // niv. 3 (500) puis niv. 4 (700)
+  assert.strictEqual(c.level, 4);
+  assert.strictEqual(c.xp, 0);
+  assert.strictEqual(c.skillPoints, 3);
+});
+
+test('critique : 1 % de base, +2 % par point, bonus d\'équipement, plafond', () => {
+  assert.strictEqual(Rules.derive({}).crit, 0.01);
+  assert.strictEqual(Rules.derive({ critique: 10 }).crit, 0.21);
+  assert.ok(Math.abs(Rules.derive({ critique: 10 }, { critique: 20 }).crit - 0.252) < 1e-9);
+  assert.strictEqual(Rules.derive({ critique: 500 }).crit, Rules.CRIT_CAP / 100);
+});
+
+test('critique : anciens persos sans la stat', () => {
+  const c = game.newCharacter();
+  delete c.stats.critique;
+  c.skillPoints = 1;
+  assert.strictEqual(game.derived(c).crit, 0.01);
+  game.allocate(c, 'critique');
+  assert.strictEqual(c.stats.critique, 1);
+});
+
+test('combat : les critiques doublent les dégâts', () => {
+  const { Battle } = require('../server/battle');
+  const stats = (crit) => ({ maxHp: 1e9, damage: 100, reduction: 0, speed: 0, dodge: 0, crit });
+  const b = new Battle();
+  b.openQueue(60);
+  b.join({ key: 'a', name: 'A', level: 1, stats: stats(1), look: {} });
+  b.join({ key: 'b', name: 'B', level: 1, stats: stats(0), look: {} });
+  b.start();
+  b.stopLoop();
+  clearTimeout(b.queueTimer);
+  const [a, bb] = b.fighters;
+  const hits = [];
+  for (let i = 0; i < 200; i++) { b.events = []; b.attack(a, bb); b.attack(bb, a); hits.push(...b.events); }
+  const fromA = hits.filter((e) => e.from === 'a');
+  const fromB = hits.filter((e) => e.from === 'b');
+  assert.ok(fromA.every((e) => e.crit && e.dmg >= 170 && e.dmg <= 230));
+  assert.ok(fromB.every((e) => !e.crit && e.dmg >= 85 && e.dmg <= 115));
 });
 
 test('achat de coffre : 100 golds', () => {

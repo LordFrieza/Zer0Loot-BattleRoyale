@@ -295,8 +295,9 @@ const BOT_NAMES = ['Gobelin', 'Squelette', 'Slime', 'Orc', 'Bandit', 'Loup', 'Ko
 function makeBot() {
   botCount += 1;
   const level = 1 + Math.floor(Math.random() * 6);
-  const points = { vie: 0, force: 0, defense: 0, vitesse: 0, esquive: 0, chance: 0 };
-  for (let i = 0; i < level - 1; i++) points[Rules.STATS[Math.floor(Math.random() * 5)]] += 1;
+  const points = Rules.emptyStats();
+  const combatStats = Rules.STATS.filter((s) => s !== 'chance');
+  for (let i = 0; i < level - 1; i++) points[combatStats[Math.floor(Math.random() * combatStats.length)]] += 1;
   const look = {};
   for (const slot of Rules.SLOTS) {
     if (Math.random() < 0.4) look[slot] = game.rollRarity(10);

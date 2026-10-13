@@ -25,6 +25,7 @@ function render() {
   $('level').textContent = 'Niveau ' + c.level;
   $('xp-fill').style.width = (c.xp / c.xpToNext) * 100 + '%';
   $('xp-text').textContent = `${c.xp} / ${c.xpToNext} XP`;
+  $('xp-text').parentElement.title = `Niveau ${c.level + 1} à ${c.xpToNext} XP. Chaque niveau demande ${Rules.XP_STEP} XP de plus que le précédent.`;
   $('gold').textContent = c.gold;
   $('chests-small').textContent = c.chests;
   $('chests').textContent = c.chests;

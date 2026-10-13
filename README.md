@@ -77,13 +77,14 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (un porteur de **bouclier** attire
   davantage l'aggro). Après 45 s, une zone se referme pour éviter les combats interminables.
 - **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds.
-- **Niveaux** : il faut `100 × niveau` XP pour passer au niveau suivant ; chaque niveau donne 1 point de compétence.
+- **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
 - **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement) :
   - Vie : 100 PV + 10 par point
   - Force : 10 dégâts + 2 par point
   - Défense : armure 5 + 3 par point → réduction des dégâts `armure / (armure + 100)`
   - Vitesse : 60 px/s + 5 par point (plafond 220)
   - Esquive : 5 + 3 par point → chance d'esquive `valeur / (valeur + 100)`, plafond 60 %
+  - Critique : 1 % + 2 % par point, plafond 60 % ; un coup critique inflige le double de dégâts
   - Chance : points × bonus d'équipement → modifie la table de loot
 - **Table de loot** : chance 0 → 90 / 6 / 3 / 0,9 / 0,1 % ; chance 10 → 80 / 10 / 6 / 3 / 1 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.

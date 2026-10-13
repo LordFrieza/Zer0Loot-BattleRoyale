@@ -6,7 +6,7 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Rules = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  const STATS = ['vie', 'force', 'defense', 'vitesse', 'esquive', 'chance'];
+  const STATS = ['vie', 'force', 'defense', 'vitesse', 'esquive', 'critique', 'chance'];
 
   const STAT_INFO = {
     vie: { label: 'Vie', icon: '❤️', desc: 'Augmente la vie maximum du personnage.' },
@@ -14,6 +14,7 @@
     defense: { label: 'Défense', icon: '🛡️', desc: 'Réduit les dégâts subis.' },
     vitesse: { label: 'Vitesse', icon: '💨', desc: 'Augmente la vitesse de déplacement sur le champ de bataille.' },
     esquive: { label: 'Esquive', icon: '🌀', desc: 'Augmente les chances d\'esquiver complètement une attaque.' },
+    critique: { label: 'Critique', icon: '💥', desc: 'Chance de porter un coup critique qui inflige le double de dégâts.' },
     chance: { label: 'Chance', icon: '🍀', desc: 'Augmente les chances d\'obtenir des raretés supérieures dans les coffres.' },
   };
 
@@ -61,19 +62,19 @@
   const SLOTS = ['casque', 'plastron', 'gants', 'ceinture', 'pantalon', 'boucles', 'epee', 'bouclier'];
 
   const SLOT_INFO = {
-    casque: { label: 'Casque', icon: '⛑️', names: ['Heaume', 'Casque', 'Capuche', 'Couronne'], weights: { vie: 3, defense: 3, esquive: 1, chance: 1, force: 1, vitesse: 1 } },
-    plastron: { label: 'Plastron', icon: '🦺', names: ['Plastron', 'Cuirasse', 'Cotte de mailles', 'Brigandine'], weights: { vie: 4, defense: 4, force: 1, vitesse: 1, esquive: 1, chance: 1 } },
-    gants: { label: 'Gants', icon: '🧤', names: ['Gantelets', 'Gants', 'Mitaines', 'Poignes'], weights: { force: 4, esquive: 2, vitesse: 1, chance: 1, vie: 1, defense: 1 } },
-    ceinture: { label: 'Ceinture', icon: '🎗️', names: ['Ceinture', 'Ceinturon', 'Sangle', 'Écharpe'], weights: { vie: 3, vitesse: 2, defense: 2, force: 1, esquive: 1, chance: 1 } },
-    pantalon: { label: 'Pantalon', icon: '👖', names: ['Jambières', 'Pantalon', 'Cuissardes', 'Grègues'], weights: { defense: 3, vitesse: 3, esquive: 2, vie: 1, force: 1, chance: 1 } },
-    boucles: { label: 'Boucles d\'oreilles', icon: '💎', names: ['Boucles', 'Anneaux', 'Pendants', 'Clous'], weights: { chance: 5, esquive: 3, vitesse: 1, vie: 1, force: 1, defense: 1 } },
-    epee: { label: 'Épée', icon: '🗡️', names: ['Épée', 'Lame', 'Sabre', 'Glaive'], weights: { force: 5, vitesse: 2, chance: 1, esquive: 1, vie: 1, defense: 1 } },
-    bouclier: { label: 'Bouclier', icon: '🛡️', names: ['Bouclier', 'Pavois', 'Rondache', 'Égide'], weights: { defense: 5, vie: 3, esquive: 1, force: 1, vitesse: 1, chance: 1 } },
+    casque: { label: 'Casque', icon: '⛑️', names: ['Heaume', 'Casque', 'Capuche', 'Couronne'], weights: { critique: 1, vie: 3, defense: 3, esquive: 1, chance: 1, force: 1, vitesse: 1 } },
+    plastron: { label: 'Plastron', icon: '🦺', names: ['Plastron', 'Cuirasse', 'Cotte de mailles', 'Brigandine'], weights: { critique: 1, vie: 4, defense: 4, force: 1, vitesse: 1, esquive: 1, chance: 1 } },
+    gants: { label: 'Gants', icon: '🧤', names: ['Gantelets', 'Gants', 'Mitaines', 'Poignes'], weights: { critique: 3, force: 4, esquive: 2, vitesse: 1, chance: 1, vie: 1, defense: 1 } },
+    ceinture: { label: 'Ceinture', icon: '🎗️', names: ['Ceinture', 'Ceinturon', 'Sangle', 'Écharpe'], weights: { critique: 1, vie: 3, vitesse: 2, defense: 2, force: 1, esquive: 1, chance: 1 } },
+    pantalon: { label: 'Pantalon', icon: '👖', names: ['Jambières', 'Pantalon', 'Cuissardes', 'Grègues'], weights: { critique: 1, defense: 3, vitesse: 3, esquive: 2, vie: 1, force: 1, chance: 1 } },
+    boucles: { label: 'Boucles d\'oreilles', icon: '💎', names: ['Boucles', 'Anneaux', 'Pendants', 'Clous'], weights: { critique: 2, chance: 5, esquive: 3, vitesse: 1, vie: 1, force: 1, defense: 1 } },
+    epee: { label: 'Épée', icon: '🗡️', names: ['Épée', 'Lame', 'Sabre', 'Glaive'], weights: { critique: 3, force: 5, vitesse: 2, chance: 1, esquive: 1, vie: 1, defense: 1 } },
+    bouclier: { label: 'Bouclier', icon: '🛡️', names: ['Bouclier', 'Pavois', 'Rondache', 'Égide'], weights: { critique: 1, defense: 5, vie: 3, esquive: 1, force: 1, vitesse: 1, chance: 1 } },
   };
 
   const STAT_SUFFIX = {
     vie: 'de Vitalité', force: 'du Colosse', defense: 'du Rempart',
-    vitesse: 'du Vent', esquive: 'de l\'Ombre', chance: 'du Trèfle',
+    vitesse: 'du Vent', esquive: 'de l\'Ombre', critique: 'du Bourreau', chance: 'du Trèfle',
   };
 
   const RARITY_PREFIX = {
@@ -89,8 +90,24 @@
   const ITEMS_PER_CHEST = 3;
   const RECYCLE_GOLD = 1; // golds par objet recyclé, quelle que soit la rareté
 
+  /*
+   * XP pour passer au niveau suivant : 300, 500, 700, 900… (+200 à chaque niveau).
+   * Un kill rapporte 100 XP et une victoire 300 XP.
+   */
+  const XP_BASE = 300;
+  const XP_STEP = 200;
   function xpToNext(level) {
-    return 100 * level;
+    return XP_BASE + XP_STEP * (level - 1);
+  }
+
+  // Coup critique : 1 % de base, +2 % par point, multiplié par les bonus d'équipement, plafonné.
+  const CRIT_BASE = 1;
+  const CRIT_PER_POINT = 2;
+  const CRIT_CAP = 60;
+  const CRIT_MULTIPLIER = 2;
+
+  function emptyStats() {
+    return Object.fromEntries(STATS.map((s) => [s, 0]));
   }
 
   /*
@@ -98,8 +115,8 @@
    * Les % d'équipement multiplient la valeur de la stat.
    */
   function derive(points, gearPct) {
-    const p = Object.assign({ vie: 0, force: 0, defense: 0, vitesse: 0, esquive: 0, chance: 0 }, points);
-    const g = Object.assign({ vie: 0, force: 0, defense: 0, vitesse: 0, esquive: 0, chance: 0 }, gearPct);
+    const p = Object.assign(emptyStats(), points);
+    const g = Object.assign(emptyStats(), gearPct);
     const mult = (s) => 1 + g[s] / 100;
 
     const maxHp = Math.round((100 + 10 * p.vie) * mult('vie'));
@@ -109,9 +126,10 @@
     const speed = Math.min(220, (60 + 5 * p.vitesse) * mult('vitesse'));
     const dodgeRating = (5 + 3 * p.esquive) * mult('esquive');
     const dodge = Math.min(0.6, dodgeRating / (dodgeRating + 100));
+    const crit = Math.min(CRIT_CAP, (CRIT_BASE + CRIT_PER_POINT * p.critique) * mult('critique')) / 100;
     const luck = Math.round(p.chance * mult('chance') * 10) / 10;
 
-    return { maxHp, damage, armor, reduction, speed, dodge, luck };
+    return { maxHp, damage, armor, reduction, speed, dodge, crit, luck };
   }
 
   function describeDerived(stat, d) {
@@ -121,6 +139,7 @@
       case 'defense': return '−' + Math.round(d.reduction * 1000) / 10 + ' % dégâts subis';
       case 'vitesse': return Math.round(d.speed) + ' px/s';
       case 'esquive': return Math.round(d.dodge * 1000) / 10 + ' % d\'esquive';
+      case 'critique': return Math.round(d.crit * 1000) / 10 + ' % de critiques (×' + CRIT_MULTIPLIER + ')';
       case 'chance': return d.luck + ' chance effective';
       default: return '';
     }
@@ -129,6 +148,7 @@
   return {
     STATS, STAT_INFO, RARITIES, RARITY_INFO, SLOTS, SLOT_INFO, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD, LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK,
-    chestLightRarity, lootTable, xpToNext, derive, describeDerived,
+    XP_BASE, XP_STEP, CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
+    chestLightRarity, lootTable, xpToNext, emptyStats, derive, describeDerived,
   };
 });

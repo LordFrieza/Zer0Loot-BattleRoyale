@@ -3,6 +3,7 @@
  * puis diffusée en temps réel à l'écran de combat.
  */
 const EventEmitter = require('events');
+const { CRIT_MULTIPLIER } = require('../shared/rules');
 
 const ARENA = { w: 1280, h: 720 };
 const TICK_MS = 50;
@@ -112,6 +113,7 @@ class Battle extends EventEmitter {
       reduction: p.stats.reduction,
       speed: p.stats.speed,
       dodge: p.stats.dodge,
+      crit: p.stats.crit || 0,
       shield: !!(p.look && p.look.bouclier),
       cd: Math.random() * 0.5,
       targetKey: null,
@@ -225,10 +227,11 @@ class Battle extends EventEmitter {
       this.events.push({ t: 'dodge', from: attacker.key, to: target.key });
       return;
     }
-    const raw = attacker.damage * (0.85 + Math.random() * 0.3);
+    const crit = Math.random() < attacker.crit;
+    const raw = attacker.damage * (0.85 + Math.random() * 0.3) * (crit ? CRIT_MULTIPLIER : 1);
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction)));
     target.hp -= dmg;
-    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg });
+    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit });
     if (target.hp <= 0) this.kill(attacker, target);
   }
 

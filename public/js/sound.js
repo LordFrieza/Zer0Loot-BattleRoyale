@@ -245,6 +245,14 @@
       tone(900 + Math.random() * 400, 0.08, { type: 'square', vol: 0.025, to: 500 });
     },
 
+    // Coup critique : impact lourd + éclat métallique.
+    crit() {
+      noise(0.18, { filter: 'bandpass', freq: 1800, q: 1.5, vol: 0.28 });
+      tone(160, 0.22, { type: 'square', vol: 0.12, to: 55 });
+      tone(midi(91), 0.2, { type: 'triangle', vol: 0.08, delay: 0.02 });
+      tone(midi(96), 0.25, { type: 'triangle', vol: 0.06, delay: 0.06 });
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });
