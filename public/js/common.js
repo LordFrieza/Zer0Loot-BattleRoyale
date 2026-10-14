@@ -46,7 +46,7 @@ function itemHtml(item, extra = '', playerCls) {
   const r = Rules.RARITY_INFO[item.rarity];
   const type = itemType(item);
   const lines = item.lines
-    .map((l) => `<li>+${l.value}% ${Rules.STAT_INFO[l.stat].label}</li>`)
+    .map((l) => `<li>${Rules.formatLine(l.stat, l.value)}</li>`)
     .join('');
   return `<div class="item rarity-${item.rarity}" data-id="${item.id}">
     <div class="item-name c-${item.rarity}">${type.icon} ${esc(item.name)}</div>

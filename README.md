@@ -105,7 +105,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Vol de vie : 2 % + 1,5 % par point des dégâts infligés rendus en vie, plafond 40 %
   - Précision : 5 % + 3 % par point → réduit d'autant l'esquive de la cible, plafond 80 %
   - Épines : 2 % + 2 % par point des dégâts reçus renvoyés à l'attaquant, plafond 50 %
-  - Chance : points × bonus d'équipement → modifie la table de loot
+  - Chance : points + bonus d'équipement (les lignes de Chance des objets s'ajoutent en points) → table de loot et forge
 - **Table de loot** : chance 0 → 90 / 6 / 3 / 0,9 / 0,1 % ; chance 10 → 80 / 10 / 6 / 3 / 1 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.
 - **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).

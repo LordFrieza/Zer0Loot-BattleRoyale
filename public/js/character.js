@@ -74,7 +74,7 @@ function renderStats() {
       <td class="stat-name">${info.icon} ${info.label}</td>
       <td class="stat-desc">${info.desc}</td>
       <td class="stat-pts">${c.stats[s]}</td>
-      <td class="stat-gear">${gear ? '+' + gear + '% équip.' : ''}${classMod(s)}</td>
+      <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}</td>
       <td class="stat-value">${Rules.describeDerived(s, c.derived)}</td>
       <td>${c.skillPoints > 0 ? `<button class="plus" data-stat="${s}" title="Ajouter un point">+</button>` : ''}</td>
     </tr>`;
@@ -93,7 +93,7 @@ function renderEquipment() {
     const kind = ci && (slot === 'arme' ? Rules.KINDS[ci.weapon] : slot === 'secondaire' ? Rules.KINDS[ci.offhand] : null);
     const label = kind ? `${kind.icon} ${info.label} · ${kind.label}` : `${info.icon} ${info.label}`;
     if (!item) return `<div class="slot"><div class="slot-label">${label}</div><div class="muted" style="margin-top:8px">Vide</div></div>`;
-    const lines = item.lines.map((l) => `+${l.value}% ${Rules.STAT_INFO[l.stat].label}`).join('<br>');
+    const lines = item.lines.map((l) => Rules.formatLine(l.stat, l.value)).join('<br>');
     return `<div class="slot filled rarity-${item.rarity}" data-slot="${slot}">
       <div class="slot-label">${label}</div>
       <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}</div>`;
@@ -117,7 +117,7 @@ function compareHtml(item) {
   const parts = Rules.STATS
     .map((s) => ({ s, d: (a[s] || 0) - (b[s] || 0) }))
     .filter((x) => x.d !== 0)
-    .map((x) => `<span class="${x.d > 0 ? 'up' : 'down'}">${x.d > 0 ? '+' : ''}${x.d}% ${Rules.STAT_INFO[x.s].label}</span>`);
+    .map((x) => `<span class="${x.d > 0 ? 'up' : 'down'}">${Rules.formatLine(x.s, x.d)}</span>`);
   return `<div class="compare">vs équipé : ${parts.join(', ') || 'identique'}</div>`;
 }
 
@@ -223,6 +223,8 @@ function allItems() {
     .concat(c.inventory.map((i) => ({ item: i, equipped: false })));
 }
 
+const fr = (x) => (Math.round(x * 10) / 10).toLocaleString('fr-FR');
+
 function renderForge() {
   const c = me.character;
   const inv = c.inventory;
@@ -246,8 +248,8 @@ function renderForge() {
     const chance = Rules.fuseUpgradeChance(rarity, c.derived.luck);
     const next = Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1];
     $('fuse-info').innerHTML = next
-      ? `🎲 <b>${Math.round(chance * 10) / 10} %</b> de chances d'obtenir un objet <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span>
-         <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${Math.round((chance - Rules.FUSE_UPGRADE[rarity]) * 10) / 10} % grâce à ta chance)</span>`
+      ? `🎲 <b>${fr(chance)} %</b> de chances d'obtenir un objet <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span>
+         <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${fr(chance - Rules.FUSE_UPGRADE[rarity])} % grâce à ta chance : ${Rules.FUSE_LUCK_BONUS.toLocaleString('fr-FR')} % par point)</span>`
       : '🎲 Légendaire : tu obtiendras un nouvel objet <span class="c-legendaire">Légendaire</span>.';
   } else {
     $('fuse-info').innerHTML = '<span class="muted">Choisis 3 objets de même rareté ci-dessous.</span>';
@@ -265,7 +267,7 @@ function renderForge() {
   $('fuse-pick').innerHTML = pickable.length
     ? pickable.map((i) => {
       const off = (rarity && i.rarity !== rarity) || fuseSel.length >= Rules.FUSE_COUNT;
-      return `<span class="pick-chip rarity-${i.rarity} ${off ? 'disabled' : ''}" data-fuse="${i.id}" title="${esc(i.lines.map((l) => `+${l.value}% ${Rules.STAT_INFO[l.stat].label}`).join(', '))}">
+      return `<span class="pick-chip rarity-${i.rarity} ${off ? 'disabled' : ''}" data-fuse="${i.id}" title="${esc(i.lines.map((l) => Rules.formatLine(l.stat, l.value)).join(', '))}">
         ${itemType(i).icon} <span class="c-${i.rarity}">${esc(i.name)}</span></span>`;
     }).join('')
     : '<span class="muted">Aucun objet disponible.</span>';
@@ -291,7 +293,7 @@ function renderRerollPreview(flashIndex) {
   const poor = me.character.gold < price;
   $('reroll-preview').innerHTML = item.lines.map((l, i) => `
     <div class="reroll-line ${i === flashIndex ? 'flash' : ''}">
-      <span>${Rules.STAT_INFO[l.stat].icon} <b>+${l.value}%</b> ${Rules.STAT_INFO[l.stat].label}</span>
+      <span>${Rules.STAT_INFO[l.stat].icon} <b>+${l.value}${Rules.statUnit(l.stat)}</b> ${Rules.STAT_INFO[l.stat].label}</span>
       <span class="spacer"></span>
       <button class="small gold" data-reroll="${i}" ${poor ? 'disabled' : ''}>🎲 Relancer (${price} 🪙)</button>
     </div>`).join('');
@@ -301,7 +303,7 @@ function renderRerollPreview(flashIndex) {
       try {
         const r = await api('/api/forge/reroll', { itemId: item.id, line: index });
         Sound.play('reroll');
-        toast(`🎲 ${Rules.STAT_INFO[r.old.stat].label} +${r.old.value}% → ${Rules.STAT_INFO[r.line.stat].label} +${r.line.value}%`, 4500);
+        toast(`🎲 ${Rules.formatLine(r.old.stat, r.old.value)} → ${Rules.formatLine(r.line.stat, r.line.value)}`, 4500);
         me = await api('/api/me');
         render();
         renderRerollPreview(index);

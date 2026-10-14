@@ -484,3 +484,19 @@ test('combat : premier kill, double kill, massacre', () => {
   assert.deepStrictEqual(streaks, ['firstblood', 'double', 'triple', 'massacre']);
   assert.strictEqual(k.kills, 5);
 });
+
+test('chance : les bonus d\'équipement s\'ajoutent (même avec 0 point)', () => {
+  assert.strictEqual(Rules.derive({ chance: 0 }, { chance: 1 }).luck, 1);
+  assert.strictEqual(Rules.derive({ chance: 5 }, { chance: 10 }).luck, 15);
+  assert.strictEqual(Rules.formatLine('chance', 3), '+3 Chance');
+  assert.strictEqual(Rules.formatLine('vie', 8), '+8% Vie');
+  // Effet réel : table de loot et forge
+  const c = game.newCharacter();
+  const ring = game.makeItem('commun', 'boucles');
+  ring.lines = [{ stat: 'chance', value: 3 }];
+  c.inventory.push(ring);
+  game.equip(c, ring.id);
+  assert.strictEqual(game.derived(c).luck, 3);
+  assert.strictEqual(game.publicCharacter({ character: c }).lootTable.commun, 87);
+  assert.strictEqual(Rules.fuseUpgradeChance('commun', game.derived(c).luck), 41.5);
+});

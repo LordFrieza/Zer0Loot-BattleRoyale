@@ -275,12 +275,23 @@
     const precision = Math.min(0.8, ((5 + 3 * p.precision) * mult('precision')) / 100 + (flat.precision || 0));
     // Épines : 2 % de base, +2 % par point des dégâts reçus renvoyés, plafond 50 %.
     const thorns = Math.min(0.5, ((2 + 2 * p.epines) * mult('epines')) / 100);
-    const luck = Math.round(p.chance * mult('chance') * 10) / 10;
+    // Chance : les bonus d'équipement s'AJOUTENT aux points (une stat sans valeur de base ne peut pas être multipliée).
+    const luck = Math.round((p.chance + g.chance) * 10) / 10;
 
     return { maxHp, damage, armor, reduction, speed, dodge, crit, attackSpeed, cooldown, lifesteal, precision, thorns, luck };
   }
 
   const pct = (x) => Math.round(x * 1000) / 10 + ' %';
+
+  // Unité d'un bonus d'objet : « % » pour toutes les stats sauf la Chance (bonus en points).
+  function statUnit(stat) {
+    return stat === 'chance' ? '' : '%';
+  }
+
+  // « +8% Vie », « +3 Chance »
+  function formatLine(stat, value) {
+    return `${value >= 0 ? '+' : ''}${value}${statUnit(stat)} ${STAT_INFO[stat].label}`;
+  }
 
   function describeDerived(stat, d) {
     switch (stat) {
@@ -307,6 +318,6 @@
     LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
-    xpToNext, emptyStats, derive, describeDerived,
+    xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
   };
 });
