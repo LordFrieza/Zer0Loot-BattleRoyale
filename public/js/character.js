@@ -47,6 +47,17 @@ function render() {
   renderBets();
   renderLoot();
   renderForge();
+  renderSets();
+  renderAchievements();
+  $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
+  $('sub-info').innerHTML = `💜 Chaque <b>abonnement</b> à la chaîne (sub, resub ou sub offert) rapporte <b>${Rules.SUB_REWARD_GOLD} golds</b>
+    à celui qui s'abonne ou qui offre le sub.${me.twitchLogin ? '' : ' Lie ton compte Twitch pour les recevoir ici (sinon ils t\'attendent jusqu\'à la liaison).'}`;
+}
+
+// Points bonus des panoplies sur une stat.
+function setMod(stat) {
+  const pts = me.character.sets.points[stat];
+  return pts ? `<div class="up" style="font-size:12px">+${pts} pts 🧩 panoplie</div>` : '';
 }
 
 // Bonus / malus de la classe sur une stat (affiché à côté des bonus d'équipement).
@@ -72,9 +83,9 @@ function renderStats() {
     const gear = c.gear[s];
     return `<tr>
       <td class="stat-name">${info.icon} ${info.label}</td>
-      <td class="stat-desc">${info.desc}</td>
+      <td class="stat-desc help">${info.desc}</td>
       <td class="stat-pts">${c.stats[s]}</td>
-      <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}</td>
+      <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}</td>
       <td class="stat-value">${Rules.describeDerived(s, c.derived)}</td>
       <td>${c.skillPoints > 0 ? `<button class="plus" data-stat="${s}" title="Ajouter un point">+</button>` : ''}</td>
     </tr>`;
@@ -348,11 +359,116 @@ $('fuse-go').onclick = async () => {
     + row('💀 Massacre', R.massacre, `${Rules.MASSACRE_KILLS} kills dans la même bataille`);
   $('streak-rules').innerHTML = `Les bonus de séries s'ajoutent aux récompenses normales du kill et sont annoncés en grand sur le stream
     (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus).`;
+  $('events-help').innerHTML = Object.values(Rules.BATTLE_EVENTS).map((ev) => `<div style="--c:${ev.color}"><b>${ev.icon} ${ev.label}</b><br>${ev.desc}</div>`).join('');
   $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
     const ci = Rules.CLASS_INFO[cls];
     return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b><br>${ci.perks.join(' · ')}</div>`;
   }).join('');
 })();
+
+// ---------- Panoplies ----------
+function renderSets() {
+  const info = me.character.sets;
+  $('sets-active').innerHTML = info.sets.map(({ key, pieces, tier, next }) => {
+    const set = Rules.SETS[key];
+    const stats = set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ');
+    const now = tier ? `<b>+${tier.points}</b> pts en ${stats}` : `<span class="muted">aucun bonus</span>`;
+    const nxt = next ? ` · <span class="muted">${next.pieces} pièces : +${next.points}</span>` : '';
+    return `<div class="set-chip ${tier ? '' : 'inactive'}" style="--c:${set.color}">${set.icon} <b>${esc(set.label)}</b> ${pieces} pièce${pieces > 1 ? 's' : ''} → ${now}${nxt}</div>`;
+  }).join('');
+}
+
+(function renderSetsHelp() {
+  $('set-tiers').textContent = Rules.SET_TIERS.map((t) => `${t.pieces} pièces = +${t.points} pts`).join(', ');
+  $('sets-help').innerHTML = Object.values(Rules.SETS).map((set) => `<div style="--c:${set.color}">${set.icon} <b style="color:${set.color}">${esc(set.label)}</b><br>
+    ${set.stats.map((st) => `${Rules.STAT_INFO[st].icon} ${Rules.STAT_INFO[st].label}`).join(' + ')}</div>`).join('');
+})();
+
+// ---------- Succès ----------
+let achFilter = 'next';
+let knownDone = null; // succès déjà terminés (pour annoncer les nouveaux)
+
+function renderAchievements() {
+  const c = me.character;
+  const list = Rules.ACHIEVEMENTS.map((a) => ({ a, st: Rules.achievementState(c, a) }));
+  const done = list.filter((x) => x.st.done);
+  const claimable = done.filter((x) => !x.st.claimed);
+
+  // Annonce des succès qui viennent d'être terminés.
+  const doneIds = new Set(done.map((x) => x.a.id));
+  if (knownDone) {
+    for (const x of done) {
+      if (!knownDone.has(x.a.id)) {
+        toast(`🏅 Succès débloqué : ${x.a.name} ! (+${x.a.gold} 🪙 à récupérer)`, 6000);
+        Sound.play('levelUp');
+      }
+    }
+  }
+  knownDone = doneIds;
+
+  $('ach-count').textContent = `${done.length} / ${list.length} terminés`;
+  $('ach-summary').innerHTML = (claimable.length
+    ? `<span class="c-legendaire">🎁 ${claimable.length} récompense${claimable.length > 1 ? 's' : ''} à récupérer</span>`
+    : '<span class="muted">Aucune récompense en attente</span>')
+    + `<span class="spacer"></span><span>Titre : <b class="char-title">${c.titleName ? '« ' + esc(c.titleName) + ' »' : 'aucun'}</b></span>`
+    + (c.title ? ' <button class="secondary small" id="title-clear">Retirer le titre</button>' : '');
+  if ($('title-clear')) $('title-clear').onclick = () => act('/api/title', { id: null }, 'unequip');
+
+  const filters = [['next', 'À suivre'], ['claim', 'À récupérer'], ['progress', 'En cours'], ['done', 'Terminés'], ['all', 'Tous']];
+  // « À suivre » : les récompenses à récupérer + le prochain palier non terminé de chaque série.
+  const nextIds = new Set();
+  const seen = new Set();
+  for (const { a, st } of list) {
+    if (st.done && !st.claimed) nextIds.add(a.id);
+    if (!st.done && !seen.has(a.metric)) { seen.add(a.metric); nextIds.add(a.id); }
+  }
+  $('ach-filters').innerHTML = filters.map(([k, l]) => `<button class="${achFilter === k ? 'active' : ''}" data-af="${k}">${l}</button>`).join('');
+  $('ach-filters').querySelectorAll('[data-af]').forEach((b) => { b.onclick = () => { achFilter = b.dataset.af; renderAchievements(); }; });
+
+  const shown = list.filter(({ a, st }) => achFilter === 'all'
+    || (achFilter === 'next' && nextIds.has(a.id))
+    || (achFilter === 'claim' && st.done && !st.claimed)
+    || (achFilter === 'progress' && !st.done)
+    || (achFilter === 'done' && st.done))
+    .sort((x, y) => (y.st.done && !y.st.claimed) - (x.st.done && !x.st.claimed));
+  $('ach-grid').innerHTML = shown.map(({ a, st }) => {
+    const pctDone = Math.round((st.value / a.goal) * 100);
+    const actions = [];
+    if (st.done && !st.claimed) actions.push(`<button class="small gold" data-claim="${a.id}">Récupérer ${a.gold} 🪙</button>`);
+    if (st.claimed) actions.push(`<span class="up">✅ ${a.gold} 🪙 récupérés</span>`);
+    if (st.done) {
+      actions.push(c.title === a.id
+        ? '<span class="tag">🏷️ Titre porté</span>'
+        : `<button class="small secondary" data-title="${a.id}">🏷️ Porter le titre</button>`);
+    }
+    return `<div class="ach ${st.done ? 'done' : ''} ${st.done && !st.claimed ? 'claimable' : ''}">
+      <div class="ach-name"><span>${st.done ? '🏅' : '🔒'} ${esc(a.name)}</span><span class="muted">${a.gold} 🪙</span></div>
+      <div class="muted">${esc(a.desc)}</div>
+      <div class="bar"><div style="width:${pctDone}%"></div></div>
+      <div class="muted" style="font-size:12px">${st.value} / ${a.goal}</div>
+      ${actions.length ? `<div class="row">${actions.join('')}</div>` : ''}
+    </div>`;
+  }).join('') || '<span class="muted">Aucun succès dans cette catégorie.</span>';
+  $('ach-grid').querySelectorAll('[data-claim]').forEach((b) => {
+    b.onclick = async () => {
+      const r = await act('/api/achievements/claim', { id: b.dataset.claim }, 'buy');
+      if (r) toast(`🏅 +${r.gold} 🪙 récupérés !`);
+    };
+  });
+  $('ach-grid').querySelectorAll('[data-title]').forEach((b) => {
+    b.onclick = async () => {
+      const r = await act('/api/title', { id: b.dataset.title }, 'equip');
+      if (r) toast(`🏷️ Nouveau titre : « ${Rules.achievementById(b.dataset.title).name} »`);
+    };
+  });
+}
+
+// ---------- Classements ----------
+async function loadLeaderboard(data) {
+  try {
+    renderLeaderboard($('leaderboard'), data || await api('/api/leaderboard'), me && me.id);
+  } catch (e) { /* ignore */ }
+}
 
 // ---------- Recyclage de masse ----------
 const PLURAL = { commun: 'Communs', peu_commun: 'Peu communs', rare: 'Rares', epique: 'Épiques', legendaire: 'Légendaires' };
@@ -548,7 +664,8 @@ function renderQueue() {
   } else if (queue.phase === 'ready') {
     box.innerHTML = `<b>⏳ File fermée — ${n} combattant(s). Le streamer va lancer la bataille !</b> ${inQueue ? '<span class="up">Tu en fais partie.</span>' : ''}`;
   } else if (queue.phase === 'battle') {
-    box.innerHTML = `<b>🔥 Bataille en cours !</b> <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
+    const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
+    box.innerHTML = `<b>🔥 Bataille en cours !</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
   } else if (queue.phase === 'ended' && queue.result) {
     const w = queue.result.winner;
     box.innerHTML = `<b>🏆 ${w ? esc(w.name) + ' remporte la bataille (' + w.kills + ' kill(s)) !' : 'Bataille terminée.'}</b>`;
@@ -646,8 +763,13 @@ socket.on('queue', (q) => { queue = q; if (me) { renderQueue(); renderBets(); } 
 const REWARD_LABELS = {
   win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
+  sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
 };
-const REWARD_SOUNDS = { win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward' };
+const REWARD_SOUNDS = {
+  win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
+};
+socket.on('leaderboard', (data) => loadLeaderboard(data));
+socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
 socket.on('bet', (r) => {
   lastBetResult = r;
   if (r.outcome === 'won') { Sound.play('reward'); toast(`💰 Pari gagné sur ${r.targetName} ! +${r.payout} 🪙`, 6000); }
@@ -673,6 +795,7 @@ socket.on('reward', (r) => {
     location.href = '/';
     return;
   }
+  loadLeaderboard();
   const params = new URLSearchParams(location.search);
   if (params.get('twitch') === 'ok') toast('✅ Compte Twitch lié !');
   if (params.get('twitch') === 'error') toast('⚠️ Liaison Twitch échouée' + (params.get('msg') ? ' : ' + params.get('msg') : ''));

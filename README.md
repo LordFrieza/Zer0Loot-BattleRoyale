@@ -126,6 +126,21 @@ de la file, confirme les `!join` et annonce le vainqueur.
   récupère sa mise + une part des mises perdues au prorata de sa mise parmi les gagnants (1 contre 9 → 10 % / 90 %),
   répartie en golds entiers sans perte. Si personne n'a parié sur le gagnant, si la bataille est annulée ou si le serveur
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
+- **Panoplies** : 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à 2 stats.
+  Équiper 2 / 4 / 6 / 8 pièces d'une même panoplie donne +2 / +4 / +7 / +10 points dans ces 2 stats (comme des points de
+  compétence). Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces
+  d'une même panoplie donne une pièce de cette panoplie.
+- **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
+  Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
+  près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
+- **Succès** : 35 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris,
+  panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
+  porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
+- **Classements** : top 10 victoires, kills et batailles jouées, avec podium pour le top 3 (page perso et page admin).
+- **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
+  (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
+- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP, bannissement (déconnexion
+  immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
   observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.
 - **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 3 golds par objet

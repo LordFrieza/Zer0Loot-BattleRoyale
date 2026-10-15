@@ -48,6 +48,13 @@
         </div>
 
         <div class="panel">
+          <h2>🎪 Événement de bataille</h2>
+          <p class="muted" style="font-size:13px;margin-top:0">Choisis l'événement de la <b>prochaine</b> bataille. Il sera annoncé au lancement, puis remis à « Aucun ».</p>
+          <div class="event-btns" id="event-btns"></div>
+          <p class="muted" style="font-size:13px" id="event-desc"></p>
+        </div>
+
+        <div class="panel">
           <h2>👥 Inscrits <span class="sub" id="count"></span></h2>
           <div class="plist" id="plist"></div>
         </div>
@@ -63,8 +70,27 @@
             <input id="sim-login" placeholder="pseudo_twitch" style="flex:1">
             <button class="secondary" id="simulate">Simuler !join</button>
           </div>
+          <div class="row" style="margin-top:10px">
+            <input id="sim-sub" placeholder="pseudo_twitch" style="flex:1">
+            <button class="secondary" id="simulate-sub">Simuler un sub 💜</button>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div class="panel" id="players-panel">
+      <h2>🧑‍🤝‍🧑 Joueurs <span class="sub" id="players-count"></span><button class="secondary small" id="players-refresh">↻ Actualiser</button></h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="players-search" placeholder="Rechercher un joueur (pseudo ou Twitch)…" style="flex:1">
+      </div>
+      <div class="players-wrap">
+        <table class="players-table" id="players"></table>
+      </div>
+    </div>
+
+    <div class="panel" id="leaderboard-panel">
+      <h2>🏆 Classements <span class="sub">Top 10 des joueurs</span></h2>
+      <div id="leaderboard"></div>
     </div>
   </main>
 
@@ -74,6 +100,7 @@
   <script src="/js/fighter.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/arena.js"></script>
+  <script src="/js/leaderboard.js"></script>
   <script src="/js/admin.js"></script>
 </body>
 </html>

@@ -13,11 +13,24 @@ const STORM_DURATION = 60;
 const STORM_MIN_RADIUS = 70;
 const STORM_DPS = 0.05; // fraction de la vie max par seconde
 const MAX_DURATION = 300;
+// Événements de bataille
+const FAST_SPEED_MULT = 5;
+const FOG_EVERY = 3; // une nouvelle nappe de brouillard toutes les 3 s
+const FOG_MAX = 3;
+const FOG_LIFE = 9;
+const FOG_SEE_RANGE = 80; // dans le brouillard, on n'est ciblable que de près
+const METEOR_EVERY = 1.1;
+const METEOR_FALL = 1.4; // délai entre l'alerte au sol et l'impact
+const METEOR_RADIUS = 70;
+const METEOR_DAMAGE = { flat: 12, ratio: 0.15 }; // 12 + 15 % de la vie max, ignore la défense
 
 class Battle extends EventEmitter {
   constructor() {
     super();
     this.phase = 'idle'; // idle | queue | ready | battle | ended
+    this.event = null; // événement de la bataille en cours (voir Rules.BATTLE_EVENTS)
+    this.fogs = [];
+    this.meteors = [];
     this.participants = new Map();
     this.queueEndsAt = null;
     this.queueTimer = null;
@@ -33,8 +46,10 @@ class Battle extends EventEmitter {
       phase: this.phase,
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
-        key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look,
+        key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, title: p.title || null,
       })),
+      // L'événement n'est révélé qu'au lancement de la bataille.
+      event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
       result: this.result,
     };
   }
@@ -48,6 +63,7 @@ class Battle extends EventEmitter {
     this.stopLoop();
     this.emit('cleared'); // la bataille précédente n'aura pas lieu : paris remboursés
     this.participants.clear();
+    this.event = null;
     this.result = null;
     this.fighters = [];
     this.phase = 'queue';
@@ -69,6 +85,7 @@ class Battle extends EventEmitter {
     if (this.phase === 'battle') this.stopLoop();
     clearTimeout(this.queueTimer);
     this.emit('cleared');
+    this.event = null;
     this.phase = 'idle';
     this.participants.clear();
     this.queueEndsAt = null;
@@ -90,7 +107,7 @@ class Battle extends EventEmitter {
     return true;
   }
 
-  start(refresh) {
+  start(refresh, event = null) {
     if (this.phase !== 'queue' && this.phase !== 'ready') throw new Error('Aucune file ouverte');
     if (this.participants.size < 2) throw new Error('Il faut au moins 2 combattants');
     clearTimeout(this.queueTimer);
@@ -105,6 +122,7 @@ class Battle extends EventEmitter {
         key: p.key,
         userId: p.userId || null,
         name: p.name,
+        title: p.title || null,
         cls: p.cls || null,
         look: p.look,
         level: p.level,
@@ -114,7 +132,7 @@ class Battle extends EventEmitter {
         maxHp: s.maxHp,
         damage: s.damage,
         reduction: s.reduction,
-        speed: s.speed,
+        speed: s.speed * (event === 'fast' ? FAST_SPEED_MULT : 1),
         dodge: s.dodge,
         crit: s.crit || 0,
         cooldown: s.cooldown || Rules.BASE_ATTACK_COOLDOWN,
@@ -141,6 +159,11 @@ class Battle extends EventEmitter {
       };
     });
     this.firstBlood = false;
+    this.event = event;
+    this.fogs = [];
+    this.meteors = [];
+    this.nextFog = 0;
+    this.nextMeteor = 2;
     this.time = 0;
     this.events = [];
     this.result = null;
@@ -167,6 +190,8 @@ class Battle extends EventEmitter {
     const alive = this.fighters.filter((f) => f.alive);
     const storm = this.storm();
 
+    this.updateEvent(dt, alive);
+
     for (const f of alive) {
       if (!f.alive) continue;
       // Régénération (Prêtre)
@@ -178,12 +203,18 @@ class Battle extends EventEmitter {
        */
       let best = null;
       let bestScore = Infinity;
+      let fallback = null;
+      let fallbackScore = Infinity;
       for (const o of alive) {
         if (o === f || !o.alive) continue;
         const d = Math.hypot(o.x - f.x, o.y - f.y);
         const score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
+        if (score < fallbackScore) { fallbackScore = score; fallback = o; }
+        // Brouillard : un ennemi caché n'est visible que de près.
+        if (d > FOG_SEE_RANGE && this.inFog(o)) continue;
         if (score < bestScore) { bestScore = score; best = o; }
       }
+      best = best || fallback;
       if (!best) continue;
       f.targetKey = best.key;
 
@@ -260,6 +291,57 @@ class Battle extends EventEmitter {
 
     this.emit('frame', this.frame());
     this.events = [];
+  }
+
+  // ---------- Événements ----------
+
+  inFog(f) {
+    return this.fogs.some((z) => z.a > 0.35 && Math.hypot(f.x - z.x, f.y - z.y) < z.r);
+  }
+
+  updateEvent(dt, alive) {
+    if (this.event === 'fog') {
+      this.nextFog -= dt;
+      if (this.nextFog <= 0 && this.fogs.length < FOG_MAX) {
+        this.nextFog = FOG_EVERY;
+        this.fogs.push({ x: 100 + Math.random() * (ARENA.w - 200), y: 90 + Math.random() * (ARENA.h - 180), r: 130 + Math.random() * 90, age: 0 });
+      }
+      for (const z of this.fogs) {
+        z.age += dt;
+        // apparition 1 s, disparition progressive sur les 3 dernières secondes
+        z.a = Math.max(0, Math.min(1, z.age / 1, (FOG_LIFE - z.age) / 3));
+      }
+      this.fogs = this.fogs.filter((z) => z.age < FOG_LIFE);
+    } else if (this.event === 'meteors') {
+      this.nextMeteor -= dt;
+      if (this.nextMeteor <= 0) {
+        this.nextMeteor = METEOR_EVERY;
+        // Souvent près d'un combattant (plus spectaculaire), sinon au hasard.
+        const near = alive.length && Math.random() < 0.6 ? alive[Math.floor(Math.random() * alive.length)] : null;
+        const x = near ? near.x + (Math.random() - 0.5) * 120 : 80 + Math.random() * (ARENA.w - 160);
+        const y = near ? near.y + (Math.random() - 0.5) * 120 : 80 + Math.random() * (ARENA.h - 160);
+        this.meteors.push({ x: Math.max(30, Math.min(ARENA.w - 30, x)), y: Math.max(30, Math.min(ARENA.h - 30, y)), r: METEOR_RADIUS, t: METEOR_FALL });
+      }
+      for (const m of this.meteors) {
+        m.t -= dt;
+        if (m.t <= 0) this.meteorImpact(m);
+      }
+      this.meteors = this.meteors.filter((m) => m.t > 0);
+    }
+  }
+
+  meteorImpact(m) {
+    this.events.push({ t: 'meteor', x: Math.round(m.x), y: Math.round(m.y), r: m.r });
+    for (const f of this.fighters) {
+      if (!f.alive || Math.hypot(f.x - m.x, f.y - m.y) > m.r) continue;
+      const dmg = Math.round(METEOR_DAMAGE.flat + f.maxHp * METEOR_DAMAGE.ratio);
+      const aliveCount = this.fighters.filter((x) => x.alive).length;
+      // Comme la zone, un météore ne peut pas tuer le dernier survivant.
+      if (f.hp - dmg <= 0 && aliveCount <= 1) continue;
+      f.hp -= dmg;
+      this.events.push({ t: 'hit', from: null, to: f.key, dmg, meteor: true });
+      if (f.hp <= 0) this.kill(null, f);
+    }
   }
 
   attack(attacker, target) {
@@ -365,8 +447,11 @@ class Battle extends EventEmitter {
       time: Math.round(this.time * 100) / 100,
       arena: ARENA,
       storm: this.phase === 'battle' ? this.storm() : null,
+      event: this.event || null,
+      fogs: (this.fogs || []).map((z) => ({ x: Math.round(z.x), y: Math.round(z.y), r: Math.round(z.r), a: Math.round(z.a * 100) / 100 })),
+      meteors: (this.meteors || []).map((m) => ({ x: Math.round(m.x), y: Math.round(m.y), r: m.r, p: Math.round((1 - m.t / METEOR_FALL) * 100) / 100 })),
       fighters: this.fighters.map((f) => ({
-        key: f.key, name: f.name, cls: f.cls, look: f.look, level: f.level,
+        key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, level: f.level, hidden: this.event === 'fog' && f.alive && this.inFog(f),
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
         alive: f.alive, kills: f.kills, target: f.targetKey,

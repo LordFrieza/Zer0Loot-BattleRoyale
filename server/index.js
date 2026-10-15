@@ -73,7 +73,8 @@ function userFromCookie(header) {
   const token = parseCookies(header)[COOKIE];
   const session = token && db.state.sessions[token];
   if (!session || session.expires < Date.now()) return null;
-  return db.state.users[session.userId] || null;
+  const user = db.state.users[session.userId];
+  return user && !user.banned ? user : null;
 }
 
 function createSession(res, user) {
@@ -185,6 +186,7 @@ app.post('/api/login', (req, res) => {
   if (!user || !checkPassword(String(password || ''), user.passwordHash)) {
     return res.status(400).json({ error: 'Identifiants incorrects' });
   }
+  if (user.banned) return res.status(403).json({ error: 'Ce compte a été banni' });
   createSession(res, user);
   res.json({ ok: true, me: meView(user) });
 });
@@ -302,6 +304,7 @@ function participantFromUser(user) {
     name: user.twitchDisplayName || user.username,
     level: user.character.level,
     cls: user.character.cls || null,
+    title: game.titleOf(user.character),
     stats: game.derived(user.character),
     look: lookOf(user),
   };
@@ -339,8 +342,26 @@ function makeBot() {
 function joinFromTwitch(login, displayName) {
   if (battle.phase !== 'queue') return { ok: false, reason: 'closed' };
   const user = game.getOrCreateTwitchUser(login, displayName);
+  if (user.banned) return { ok: false, reason: 'banned', user };
   const joined = battle.join(participantFromUser(user));
   return { ok: joined, user };
+}
+
+// ---------- Abonnements Twitch : 300 golds pour celui qui s'abonne / offre l'abonnement ----------
+
+function rewardSub(login, displayName, kind) {
+  const user = game.getOrCreateTwitchUser(login, displayName);
+  if (user.banned) return null;
+  const reward = { xp: 0, chests: 0, gold: Rules.SUB_REWARD_GOLD };
+  game.grant(user.character, reward);
+  game.bump(user.character, 'subs');
+  db.save();
+  pushMe(user);
+  io.to('user:' + user.id).emit('reward', { type: 'sub', reward, levels: 0 });
+  const what = kind === 'gift' ? 'ton sub offert' : 'ton abonnement';
+  twitch.say(`💜 Merci @${displayName} pour ${what} ! +${Rules.SUB_REWARD_GOLD} golds sur ton perso Zer0Loot.`);
+  console.log(`[twitch] sub (${kind}) de ${login} : +${Rules.SUB_REWARD_GOLD} golds`);
+  return user;
 }
 
 twitch.startChat((command, from) => {
@@ -350,7 +371,7 @@ twitch.startChat((command, from) => {
     const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
     twitch.say(`@${from.displayName} rejoint la bataille ⚔️${hint}`);
   }
-});
+}, (sub) => rewardSub(sub.login, sub.displayName, sub.kind));
 
 app.post('/api/queue/join', requirePlayer, (req, res) => {
   if (battle.phase !== 'queue') return res.status(400).json({ error: 'La file n\'est pas ouverte' });
@@ -377,6 +398,7 @@ function notifyBets(results) {
   for (const r of results) {
     const user = db.state.users[r.userId];
     if (!user) continue;
+    if (r.outcome === 'won') game.bump(user.character, 'betsWon');
     pushMe(user);
     io.to('user:' + user.id).emit('bet', r);
   }
@@ -406,30 +428,56 @@ app.post('/api/admin/queue/simulate', requireAdmin, action((req) => {
   return { joined: r.ok };
 }));
 
+// Événement de la prochaine bataille, choisi par l'admin (« random » = tiré au lancement).
+let pendingEvent = null;
+
+app.get('/api/admin/state', requireAdmin, (req, res) => res.json({ pendingEvent }));
+
+app.post('/api/admin/event', requireAdmin, action((req) => {
+  const ev = req.body.event || null;
+  if (ev !== null && ev !== 'random' && !Rules.BATTLE_EVENTS[ev]) throw new Error('Événement inconnu');
+  pendingEvent = ev;
+  return { pendingEvent };
+}));
+
 app.post('/api/admin/battle/start', requireAdmin, action(() => {
-  battle.start(refreshParticipant);
-  twitch.say('🔥 Que le combat commence !');
+  const keys = Object.keys(Rules.BATTLE_EVENTS);
+  const ev = pendingEvent === 'random' ? keys[Math.floor(Math.random() * keys.length)] : pendingEvent;
+  battle.start(refreshParticipant, ev);
+  pendingEvent = null; // un événement ne vaut que pour une bataille
+  const info = ev && Rules.BATTLE_EVENTS[ev];
+  twitch.say(info ? `🔥 Que le combat commence ! Événement : ${info.icon} ${info.label} !` : '🔥 Que le combat commence !');
+  return { event: ev, pendingEvent };
 }));
 
 app.post('/api/admin/battle/reset', requireAdmin, action(() => battle.reset()));
 
 // ---------- Récompenses ----------
 
+// Événement « Loot double » : XP, golds et coffres ×2 pendant la bataille.
+function scaled(reward) {
+  const m = battle.event === 'double' ? 2 : 1;
+  return { xp: reward.xp * m, gold: reward.gold * m, chests: reward.chests * m };
+}
+
 battle.on('kill', (killer) => {
   const user = killer.userId && db.state.users[killer.userId];
   if (!user) return;
-  const levels = game.grant(user.character, Rules.REWARDS.kill);
+  const reward = scaled(Rules.REWARDS.kill);
+  const levels = game.grant(user.character, reward);
   user.character.record.kills += 1;
   db.save();
   pushMe(user);
-  io.to('user:' + user.id).emit('reward', { type: 'kill', reward: Rules.REWARDS.kill, levels });
+  io.to('user:' + user.id).emit('reward', { type: 'kill', reward, levels });
 });
 
 // Séries de kills : coffres bonus (premier kill, double kill, massacre).
 battle.on('streak', (fighter, kind) => {
-  const reward = Rules.REWARDS[kind];
   const user = fighter.userId && db.state.users[fighter.userId];
-  if (!user || !reward || !(reward.chests || reward.gold || reward.xp)) return;
+  if (!user) return;
+  if (kind !== 'triple') game.bump(user.character, kind);
+  const reward = Rules.REWARDS[kind] && scaled(Rules.REWARDS[kind]);
+  if (!reward || !(reward.chests || reward.gold || reward.xp)) { db.save(); pushMe(user); return; }
   const levels = game.grant(user.character, reward);
   db.save();
   pushMe(user);
@@ -441,12 +489,14 @@ battle.on('end', (winner, fighters) => {
     const user = f.userId && db.state.users[f.userId];
     if (!user) continue;
     user.character.record.battles += 1;
-    const participationLevels = game.grant(user.character, Rules.REWARDS.participation);
-    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: Rules.REWARDS.participation, levels: participationLevels });
+    const participation = scaled(Rules.REWARDS.participation);
+    const participationLevels = game.grant(user.character, participation);
+    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (f === winner) {
-      const levels = game.grant(user.character, Rules.REWARDS.win);
+      const win = scaled(Rules.REWARDS.win);
+      const levels = game.grant(user.character, win);
       user.character.record.wins += 1;
-      io.to('user:' + user.id).emit('reward', { type: 'win', reward: Rules.REWARDS.win, levels });
+      io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels });
     }
     pushMe(user);
   }
@@ -459,7 +509,111 @@ battle.on('end', (winner, fighters) => {
   if (br && !br.refund && br.winners) {
     twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
   }
+  db.save();
+  io.emit('leaderboard', leaderboard());
 });
+
+// ---------- Classements ----------
+
+const BOARD_SIZE = 10;
+
+function players() {
+  return Object.values(db.state.users).filter((u) => u.role === 'player' && u.character);
+}
+
+function leaderboard() {
+  const list = players().filter((u) => !u.banned).map((u) => ({
+    id: u.id,
+    name: u.twitchDisplayName || u.username,
+    cls: u.character.cls || null,
+    level: u.character.level,
+    title: game.titleOf(u.character),
+    wins: u.character.record.wins,
+    kills: u.character.record.kills,
+    battles: u.character.record.battles,
+  }));
+  const top = (key) => list.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key] || b.level - a.level).slice(0, BOARD_SIZE)
+    .map((p) => ({ ...p, value: p[key] }));
+  return { wins: top('wins'), kills: top('kills'), battles: top('battles') };
+}
+
+app.get('/api/leaderboard', (req, res) => res.json(leaderboard()));
+
+// ---------- Succès & titres ----------
+
+app.post('/api/achievements/claim', requirePlayer, action((req) => game.claimAchievement(req.user.character, String(req.body.id || ''))));
+
+app.post('/api/title', requirePlayer, action((req) => {
+  game.setTitle(req.user.character, req.body.id || null);
+  io.emit('leaderboard', leaderboard());
+}));
+
+// ---------- Outils admin : joueurs ----------
+
+app.get('/api/admin/players', requireAdmin, (req, res) => {
+  res.json(players().map((u) => {
+    game.upgrade(u.character);
+    return {
+      id: u.id,
+      name: u.twitchDisplayName || u.username,
+      username: u.username,
+      twitch: u.twitchLogin || null,
+      ghost: !!u.ghost,
+      banned: !!u.banned,
+      cls: u.character.cls,
+      level: u.character.level,
+      gold: u.character.gold,
+      chests: u.character.chests,
+      record: u.character.record,
+      title: game.titleOf(u.character),
+    };
+  }));
+});
+
+function adminTarget(req) {
+  const user = db.state.users[req.params.id];
+  if (!user || user.role !== 'player' || !user.character) throw new Error('Joueur introuvable');
+  return user;
+}
+
+app.post('/api/admin/players/:id/give', requireAdmin, action((req) => {
+  const user = adminTarget(req);
+  const r = game.adminGive(user.character, req.body || {});
+  pushMe(user);
+  io.to('user:' + user.id).emit('reward', { type: 'gift', reward: r.reward, levels: r.levels });
+  return r;
+}));
+
+app.post('/api/admin/players/:id/ban', requireAdmin, action((req) => {
+  const user = adminTarget(req);
+  user.banned = !!req.body.banned;
+  if (user.banned) {
+    // Déconnexion immédiate et retrait de la file en cours.
+    for (const [token, sess] of Object.entries(db.state.sessions)) if (sess.userId === user.id) delete db.state.sessions[token];
+    io.to('user:' + user.id).emit('banned');
+    if (battle.phase === 'queue' || battle.phase === 'ready') {
+      // Son pari et les paris placés sur lui sont remboursés.
+      for (const b of Object.values(bets.list)) {
+        const bettor = db.state.users[b.userId];
+        if (bettor && (b.userId === user.id || b.target === 'u' + user.id)) {
+          bets.cancel(bettor);
+          pushMe(bettor);
+          io.to('user:' + bettor.id).emit('bet', { ...b, payout: b.amount, outcome: 'refund' });
+        }
+      }
+      battle.participants.delete('u' + user.id);
+      battle.changed();
+    }
+  }
+  io.emit('leaderboard', leaderboard());
+  return { banned: user.banned };
+}));
+
+app.post('/api/admin/simulate-sub', requireAdmin, action((req) => {
+  const login = String(req.body.login || '').trim();
+  if (!/^[A-Za-z0-9_]{3,25}$/.test(login)) throw new Error('Pseudo Twitch invalide');
+  if (!rewardSub(login.toLowerCase(), login, 'sub')) throw new Error('Ce joueur est banni');
+}));
 
 battle.on('queue', () => io.emit('queue', queueView()));
 battle.on('frame', (f) => io.emit('frame', f));

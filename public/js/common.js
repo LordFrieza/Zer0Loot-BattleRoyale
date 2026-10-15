@@ -42,6 +42,12 @@ function classTag(item, playerCls) {
   return `<span class="cls-tag ${locked ? 'locked' : ''}" title="Réservé à la classe ${ci.label}">${locked ? '🔒' : ci.icon} ${ci.label}</span>`;
 }
 
+// Étiquette de panoplie (« 🧛 Nosferatu »).
+function setTag(item) {
+  const set = item.set && Rules.SETS[item.set];
+  return set ? `<span class="set-tag" style="--c:${set.color}" title="Panoplie ${esc(set.label)}">${set.icon} ${esc(set.label)}</span>` : '';
+}
+
 function itemHtml(item, extra = '', playerCls) {
   const r = Rules.RARITY_INFO[item.rarity];
   const type = itemType(item);
@@ -50,7 +56,7 @@ function itemHtml(item, extra = '', playerCls) {
     .join('');
   return `<div class="item rarity-${item.rarity}" data-id="${item.id}">
     <div class="item-name c-${item.rarity}">${type.icon} ${esc(item.name)}</div>
-    <div class="item-meta">${type.label} · <span class="c-${item.rarity}">${r.label}</span>${classTag(item, playerCls)}</div>
+    <div class="item-meta">${type.label} · <span class="c-${item.rarity}">${r.label}</span>${classTag(item, playerCls)}${setTag(item)}</div>
     <ul>${lines}</ul>${extra}
   </div>`;
 }
@@ -64,3 +70,30 @@ function formatCountdown(ms) {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
+
+/*
+ * Boutons « ? » : chaque panneau qui contient un bouton .help-btn cache ses éléments .help
+ * (longues explications) tant qu'on ne clique pas dessus. Le choix est mémorisé par panneau.
+ */
+function initHelp(root = document) {
+  root.querySelectorAll('.help-btn').forEach((btn) => {
+    if (btn.dataset.ready) return;
+    btn.dataset.ready = '1';
+    const panel = btn.closest('.panel');
+    const key = 'zl_help_' + (panel.id || btn.dataset.help || 'x');
+    let open = false;
+    try { open = localStorage.getItem(key) === '1'; } catch (e) { /* stockage indisponible */ }
+    const apply = () => {
+      panel.classList.toggle('help-open', open);
+      btn.classList.toggle('active', open);
+      btn.title = open ? 'Masquer les explications' : 'Afficher les explications';
+    };
+    apply();
+    btn.addEventListener('click', () => {
+      open = !open;
+      try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) { /* ignore */ }
+      apply();
+    });
+  });
+}
+document.addEventListener('DOMContentLoaded', () => initHelp());

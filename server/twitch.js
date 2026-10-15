@@ -15,7 +15,7 @@ const BOT_OAUTH = process.env.TWITCH_BOT_OAUTH || '';
 let client = null;
 let connected = false;
 
-function startChat(onCommand) {
+function startChat(onCommand, onSub) {
   if (process.env.TWITCH_CHAT_DISABLED === '1') {
     console.log('[twitch] lecture du chat désactivée (TWITCH_CHAT_DISABLED=1)');
     return;
@@ -41,6 +41,17 @@ function startChat(onCommand) {
     const command = text.split(/\s+/)[0];
     onCommand(command, { login: tags.username, displayName: tags['display-name'] || tags.username, id: tags['user-id'] });
   });
+  // Abonnements : la récompense va à celui qui s'abonne, ou à celui qui offre l'abonnement.
+  const subscriber = (username, userstate) => ({
+    login: ((userstate && userstate.login) || username || '').toLowerCase(),
+    displayName: (userstate && userstate['display-name']) || username,
+  });
+  if (onSub) {
+    client.on('subscription', (channel, username, method, message, userstate) => onSub({ ...subscriber(username, userstate), kind: 'sub' }));
+    client.on('resub', (channel, username, months, message, userstate) => onSub({ ...subscriber(username, userstate), kind: 'resub' }));
+    // Un « sub offert » arrive une fois par abonnement offert (y compris pour les lots) : 300 golds chacun au donateur.
+    client.on('subgift', (channel, username, streakMonths, recipient, methods, userstate) => onSub({ ...subscriber(username, userstate), kind: 'gift' }));
+  }
   client.connect().catch((err) => console.log('[twitch] connexion au chat impossible :', err.message || err));
 }
 

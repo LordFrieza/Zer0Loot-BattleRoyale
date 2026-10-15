@@ -326,6 +326,28 @@
       noise(0.15, { filter: 'highpass', freq: 5000, vol: 0.1, delay: 0.26 });
     },
 
+    // Annonce d'un événement de bataille : gong + motif selon l'événement.
+    eventStart(kind) {
+      const c = ctx;
+      timpani(c.currentTime + 0.02, 41, 0.9);
+      tone(110, 2.2, { type: 'sine', vol: 0.25, to: 98 });
+      tone(165, 1.8, { type: 'triangle', vol: 0.08 });
+      const motifs = {
+        double: [[72, 0, 0.4], [76, 0.5, 0.4], [79, 1, 0.4], [84, 1.5, 2]],
+        fog: [[57, 0, 1.2], [60, 1.3, 1.2], [56, 2.6, 2]],
+        fast: [[76, 0, 0.25], [79, 0.3, 0.25], [83, 0.6, 0.25], [88, 0.9, 1.5]],
+        meteors: [[52, 0, 0.8], [55, 0.9, 0.8], [58, 1.8, 2]],
+      };
+      fanfare(motifs[kind] || motifs.double, 0.14, 0.12, 0.3);
+    },
+
+    // Impact de météore.
+    meteor() {
+      noise(0.7, { freq: 900, sweep: 90, vol: 0.4 });
+      tone(70, 0.6, { vol: 0.35, to: 28 });
+      noise(0.25, { filter: 'highpass', freq: 3000, vol: 0.12, delay: 0.05 });
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });

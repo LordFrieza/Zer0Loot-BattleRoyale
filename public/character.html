@@ -21,7 +21,7 @@
     <div class="panel queue-box" id="queue-box" style="display:none"></div>
 
     <div class="panel bet-box" id="bet-box" style="display:none">
-      <h2>🎲 Paris <span class="sub" id="bet-status"></span></h2>
+      <h2>🎲 Paris <span class="sub" id="bet-status"></span><button class="help-btn" type="button">?</button></h2>
       <div id="bet-summary"></div>
       <div class="row bet-controls" id="bet-controls">
         <label for="bet-amount" style="margin:0">Ta mise</label>
@@ -35,7 +35,7 @@
         <span class="muted" style="font-size:13px">Choisis ensuite ton combattant ci-dessous.</span>
       </div>
       <div class="bet-list" id="bet-list"></div>
-      <p class="muted bet-rules">Un seul pari par bataille, sur n'importe quel combattant sauf toi. La mise est retirée tout de suite.
+      <p class="muted bet-rules help">Un seul pari par bataille, sur n'importe quel combattant sauf toi. La mise est retirée tout de suite.
         Si ton combattant gagne, tu récupères ta mise <b>+</b> une part des mises perdues, au prorata de ce que tu as misé
         parmi les gagnants (1 gold contre 9 → 10 % du butin). Les paris ferment au lancement du combat. Si personne n'a misé
         sur le gagnant, ou si la bataille est annulée, tout le monde est remboursé.</p>
@@ -46,6 +46,7 @@
         <div class="panel char-card">
           <canvas id="avatar" width="200" height="200"></canvas>
           <div class="char-name" id="char-name"></div>
+          <div class="char-title" id="char-title"></div>
           <div class="class-badge" id="class-badge"></div>
           <div class="level-badge" id="level"></div>
           <div class="xpbar"><div id="xp-fill"></div><span id="xp-text"></span></div>
@@ -60,19 +61,29 @@
         <div class="panel" id="twitch-panel">
           <h2>📺 Compte Twitch</h2>
           <div id="twitch-content"></div>
+          <p class="sub-info" id="sub-info"></p>
         </div>
       </div>
 
       <div class="panel">
-        <h2>📊 Statistiques <span class="sub">1 niveau = 1 point de compétence</span></h2>
+        <h2>📊 Statistiques <span class="sub">1 niveau = 1 point de compétence</span><button class="help-btn" type="button">?</button></h2>
         <div id="skill-banner"></div>
         <table class="stats-table" id="stats"></table>
       </div>
     </div>
 
-    <div class="panel">
-      <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span></h2>
+    <div class="panel" id="equipment-panel">
+      <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span><button class="help-btn" type="button">?</button></h2>
       <div class="equip-grid" id="equipment"></div>
+      <div class="sets-active" id="sets-active"></div>
+      <div class="help">
+        <h3>🧩 Les panoplies</h3>
+        <p class="muted">Certains objets appartiennent à une <b>panoplie</b> (étiquette colorée sur l'objet). Équipe au moins
+          <b>2 pièces de la même panoplie</b> pour gagner des points bonus dans ses deux stats, comme des points de compétence.
+          Plus tu en équipes, plus le bonus grandit : <span id="set-tiers"></span>. Les objets de panoplie sont plus fréquents
+          dans les hautes raretés, et <b>fusionner 3 pièces d'une même panoplie</b> à la forge donne une pièce de cette panoplie.</p>
+        <div class="sets-help" id="sets-help"></div>
+      </div>
     </div>
 
     <div class="panel">
@@ -95,13 +106,13 @@
     </div>
 
     <div class="panel forge-box" id="forge">
-      <h2>🔥 La Forge <span class="sub">Fusionne ou améliore tes objets</span></h2>
+      <h2>🔥 La Forge <span class="sub">Fusionne ou améliore tes objets</span><button class="help-btn" type="button">?</button></h2>
       <div class="forge-grid">
         <div class="forge-card">
           <h3>⚒️ Fusion</h3>
-          <p class="muted">Détruis <b>3 objets de même rareté</b> pour forger un nouvel objet, toujours équipable par ta classe.
+          <p class="muted help">Détruis <b>3 objets de même rareté</b> pour forger un nouvel objet, toujours équipable par ta classe.
             Il a une chance de <b>monter d'une rareté</b> (plus ta Chance est haute, plus c'est probable) ; sinon tu obtiens
-            un nouvel objet de la même rareté.</p>
+            un nouvel objet de la même rareté. Si les 3 objets sont de la <b>même panoplie</b>, le nouvel objet en fait partie.</p>
           <div class="fuse-slots" id="fuse-slots"></div>
           <div class="fuse-info" id="fuse-info"></div>
           <div class="row"><button class="gold" id="fuse-go">🔨 Forger !</button><button class="secondary small" id="fuse-clear">Vider</button></div>
@@ -110,7 +121,7 @@
         </div>
         <div class="forge-card">
           <h3>🎲 Relance de ligne</h3>
-          <p class="muted">Choisis un objet (équipé ou dans ton coffre), puis la ligne à relancer : elle est remplacée par
+          <p class="muted help">Choisis un objet (équipé ou dans ton coffre), puis la ligne à relancer : elle est remplacée par
             <b>une autre stat au hasard</b> (jamais une stat déjà présente sur l'objet), avec une nouvelle valeur.</p>
           <p class="muted" id="reroll-prices"></p>
           <select id="reroll-item"></select>
@@ -119,8 +130,23 @@
       </div>
     </div>
 
+    <div class="panel" id="achievements">
+      <h2>🏅 Succès <span class="sub" id="ach-count"></span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Chaque succès terminé te permet de <b>récupérer des golds</b> (plus il est difficile, plus il rapporte)
+        et de <b>porter son nom comme titre</b> : il s'affiche sous ton pseudo pendant les batailles et dans les classements.</p>
+      <div class="ach-summary" id="ach-summary"></div>
+      <div class="inv-filters" id="ach-filters"></div>
+      <div class="ach-grid" id="ach-grid"></div>
+    </div>
+
+    <div class="panel" id="leaderboard-panel">
+      <h2>🏆 Classements <span class="sub">Top 10 des joueurs</span></h2>
+      <div id="leaderboard"></div>
+    </div>
+
     <div class="panel" id="combat-info">
-      <h2>⚔️ Règles des combats</h2>
+      <h2>⚔️ Règles des combats <span class="sub">Récompenses, séries, événements et classes</span><button class="help-btn" type="button">?</button></h2>
+      <div class="help">
       <div class="combat-info-grid">
         <div>
           <h3>🏆 Récompenses</h3>
@@ -138,21 +164,25 @@
           </ul>
         </div>
       </div>
+      <h3>🎪 Événements de bataille</h3>
+      <p class="muted">Le streamer peut lancer une bataille avec un événement spécial, annoncé au début du combat :</p>
+      <div class="class-summary" id="events-help"></div>
       <h3>🎭 Les classes</h3>
       <div class="class-summary" id="class-summary"></div>
+      </div>
     </div>
 
     <div class="panel" id="loot-info">
-      <h2>🍀 Comment fonctionne la chance ?</h2>
-      <p class="muted">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
+      <h2>🍀 Comment fonctionne la chance ?<button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
         Avec <b>0 de chance</b>, les probabilités sont 90 % Commun, 6 % Peu commun, 3 % Rare, 0,9 % Épique et 0,1 % Légendaire.
         Chaque point de chance <b>retire 1 %</b> aux Communs et le redistribue aux raretés supérieures
         (+0,4 % Peu commun, +0,3 % Rare, +0,21 % Épique, +0,09 % Légendaire). La chance effective est plafonnée à
         <b>85</b>. Les bonus de Chance de ton équipement <b>s'ajoutent</b> à tes points (un objet « +3 Chance » = +3 de chance effective).</p>
-      <p class="muted">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
+      <p class="muted help">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
         Commun 1 ligne (+1 à 3 %), Peu commun 2 lignes (+4 à 6 %), Rare 3 lignes (+7 à 10 %),
         Épique 4 lignes (+11 à 15 %), Légendaire 5 lignes (+15 à 25 %).</p>
-      <p class="muted">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
+      <p class="muted help">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
         le hasard peut surprendre (un Légendaire dès le début, ou aucun Rare pendant longtemps) ; plus tu en ouvres, plus
         tes résultats se rapprochent des probabilités affichées.</p>
       <div id="loot-table"></div>
@@ -181,6 +211,7 @@
   <script src="/js/sound.js"></script>
   <script src="/js/chest.js"></script>
   <script src="/js/forge.js"></script>
+  <script src="/js/leaderboard.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

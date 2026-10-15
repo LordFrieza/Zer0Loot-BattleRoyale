@@ -89,6 +89,11 @@
       if (q.phase === 'battle' && prev.phase !== 'battle') {
         const fanfare = Sound.play('battleStart');
         Sound.music.start(Math.max(0, fanfare - 0.25));
+        const ev = q.event && Rules.BATTLE_EVENTS[q.event];
+        if (ev) {
+          this.announces.push({ text: `${ev.icon} ${ev.label.toUpperCase()} !`, sub: ev.desc, subSize: 20, color: ev.color, life: 4, age: 0 });
+          setTimeout(() => Sound.play('eventStart', q.event), Math.max(0, fanfare * 1000 - 200));
+        }
       } else if (prev.phase === 'battle' && q.phase !== 'battle') {
         Sound.music.stop();
         if (q.phase === 'ended') setTimeout(() => Sound.play('victory'), 350);
@@ -103,7 +108,8 @@
     onFrame(f) {
       if (f.phase === 'battle' && (!this.frame || this.frame.phase !== 'battle')) {
         this.disp.clear(); this.feed = []; this.floaters = []; this.sparks = [];
-        this.projectiles = []; this.blasts = []; this.announces = [];
+        // (les annonces ne sont pas effacées : celle de l'événement arrive juste avant cette image)
+        this.projectiles = []; this.blasts = [];
       }
       this.frame = f;
       const byKey = new Map(f.fighters.map((x) => [x.key, x]));
@@ -134,6 +140,12 @@
           this.floaters.push({ x: to.x + 14, y: to.y - 40, text: '+' + e.amount, color: '#5dff8a', life: 0.9, size: 15 });
         } else if (e.t === 'thorns' && to) {
           this.floaters.push({ x: to.x - 14, y: to.y - 50, text: '🌵-' + e.dmg, color: '#d38bff', life: 0.9, size: 15 });
+        } else if (e.t === 'meteor') {
+          this.blasts.push({ x: e.x, y: e.y, r: e.r * 1.3, life: 0.5 });
+          this.spark(e.x, e.y, '#ff6b2a', 40);
+          this.shake = 0.35;
+          const now = performance.now();
+          if (window.Sound && now - (this.lastMeteorSound || 0) > 150) { this.lastMeteorSound = now; Sound.play('meteor'); }
         } else if (e.t === 'streak' && to) {
           const info = Rules.STREAK_INFO[e.kind];
           this.announces.push({ text: info.label, sub: to.name, color: info.color, life: 2.4, age: 0 });
@@ -187,6 +199,10 @@
 
     draw(dt, t) {
       const ctx = this.ctx;
+      // Tremblement de l'écran (impact de météore)
+      this.shake = Math.max(0, (this.shake || 0) - dt);
+      ctx.save();
+      if (this.shake > 0) ctx.translate((Math.random() - 0.5) * 14 * this.shake, (Math.random() - 0.5) * 14 * this.shake);
       ctx.drawImage(this.bg, 0, 0);
       const phase = (this.queue && this.queue.phase) || 'idle';
 
@@ -198,6 +214,7 @@
       } else {
         this.drawIdle(t);
       }
+      ctx.restore();
     }
 
     title(text, y, size, color = '#fff', glow = '#9146ff') {
@@ -258,6 +275,7 @@
         const y = 310 + row * cellH;
         drawFighter(this.ctx, x, y, p, { scale, bob: Math.sin(t / 300 + i) * 2 });
         this.label(classIcon(p.cls) + p.name, x, y + 32 * scale, 13, '#fff');
+        if (p.title) this.label(p.title, x, y + 32 * scale + 14, 11, '#ffcf5a');
       });
     }
 
@@ -297,6 +315,20 @@
       const k = Math.min(1, dt * 14);
       const byKey = new Map(f.fighters.map((x) => [x.key, x]));
       const order = [...f.fighters].sort((a, b) => a.y - b.y);
+      const labels = [];
+
+      // Météores : zone d'impact au sol qui se remplit
+      for (const m of f.meteors || []) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,80,30,${0.5 + Math.sin(t / 60) * 0.3})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = `rgba(255,60,20,${0.12 + m.p * 0.25})`;
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r * m.p, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
 
       // Morts d'abord (au sol)
       for (const fi of order) {
@@ -326,14 +358,53 @@
         const lunge = swing * 6 * d.facing;
         drawFighter(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob });
 
-        // Pseudo + barre de vie
+        // Pseudo, titre et barre de vie (dessinés après le brouillard ; cachés dedans)
+        if (!fi.hidden) labels.push({ fi, x: d.x, y: d.y });
+      }
+
+      // Météores en chute
+      for (const m of f.meteors || []) {
+        const k2 = 1 - m.p;
+        const mx = m.x + 260 * k2;
+        const my = m.y - 520 * k2;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(mx, my, 2, mx, my, 22);
+        g.addColorStop(0, '#fff3b0'); g.addColorStop(0.4, '#ff8a1f'); g.addColorStop(1, 'rgba(255,40,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(mx, my, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,140,40,.45)';
+        ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 60, my - 120); ctx.stroke();
+        ctx.restore();
+      }
+
+      // Brouillard
+      for (const z of f.fogs || []) {
+        ctx.save();
+        for (let i = 0; i < 4; i++) {
+          const ox = Math.sin(t / 1300 + i * 1.7) * z.r * 0.18;
+          const oy = Math.cos(t / 1700 + i * 2.3) * z.r * 0.14;
+          const g = ctx.createRadialGradient(z.x + ox, z.y + oy, 4, z.x + ox, z.y + oy, z.r * (0.75 + i * 0.12));
+          g.addColorStop(0, `rgba(215,222,232,${0.55 * z.a})`);
+          g.addColorStop(0.6, `rgba(190,200,215,${0.35 * z.a})`);
+          g.addColorStop(1, 'rgba(180,190,205,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(z.x + ox, z.y + oy, z.r * (0.75 + i * 0.12), 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      for (const { fi, x, y } of labels) {
         const bw = 40;
         const ratio = fi.hp / fi.maxHp;
         ctx.fillStyle = 'rgba(0,0,0,.7)';
-        ctx.fillRect(d.x - bw / 2 - 1, d.y - 49, bw + 2, 7);
+        ctx.fillRect(x - bw / 2 - 1, y - 49, bw + 2, 7);
         ctx.fillStyle = ratio > 0.5 ? '#3ddc5a' : ratio > 0.25 ? '#ffb000' : '#ff4d6d';
-        ctx.fillRect(d.x - bw / 2, d.y - 48, bw * ratio, 5);
-        this.label(classIcon(fi.cls) + fi.name + (fi.kills ? ` ⚔${fi.kills}` : ''), d.x, d.y - 58, 12, '#fff');
+        ctx.fillRect(x - bw / 2, y - 48, bw * ratio, 5);
+        const nameY = fi.title ? y - 67 : y - 58;
+        this.label(classIcon(fi.cls) + fi.name + (fi.kills ? ` ⚔${fi.kills}` : ''), x, nameY, 12, '#fff');
+        if (fi.title) this.label(fi.title, x, y - 56, 10, '#ffcf5a');
       }
 
       // Étincelles
@@ -413,12 +484,21 @@
       ctx.fillStyle = f.storm && f.storm.active ? '#d49bff' : '#cfc6ff';
       const time = Math.floor(f.time);
       ctx.fillText(`⏱ ${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}${f.storm && f.storm.active ? '  ⚡ la zone se referme' : ''}`, 30, 66);
+      let hudY = 84;
+      const ev = f.event && Rules.BATTLE_EVENTS[f.event];
+      if (ev) {
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillRect(16, hudY, 230, 30);
+        ctx.fillStyle = ev.color;
+        ctx.fillText(`${ev.icon} ${ev.label}`, 30, hudY + 21);
+        hudY += 34;
+      }
       const bets = this.queue && this.queue.bets;
       if (bets && bets.pool && this.queue.phase === 'battle') {
         ctx.fillStyle = 'rgba(0,0,0,.55)';
-        ctx.fillRect(16, 84, 230, 30);
+        ctx.fillRect(16, hudY, 230, 30);
         ctx.fillStyle = '#ffb000';
-        ctx.fillText(`💰 ${bets.pool} golds en jeu (${bets.bettors} paris)`, 30, 105);
+        ctx.fillText(`💰 ${bets.pool} golds en jeu (${bets.bettors} paris)`, 30, hudY + 21);
       }
 
       // Kill feed
@@ -453,7 +533,7 @@
       ctx.scale(pop, pop);
       ctx.translate(-W / 2, -140);
       this.title(a.text, 130, 64, a.color, a.color);
-      this.title(a.sub, 190, 30, '#ffffff');
+      this.title(a.sub, 190, a.subSize || 30, '#ffffff');
       ctx.restore();
       if (a.life <= 0) this.announces.shift();
     }

@@ -24,6 +24,16 @@ function upgrade(character) {
   // Stats ajoutées après la création du personnage (Critique, Vitesse d'attaque…).
   character.stats = Object.assign(Rules.emptyStats(), character.stats);
   if (character.cls === undefined) character.cls = null;
+  if (!character.counters) {
+    // Compteurs des succès : on reprend ce qui est connu des anciennes sauvegardes.
+    const looted = Object.values(character.lootStats).reduce((a, b) => a + b, 0);
+    character.counters = Object.fromEntries(Rules.COUNTERS.map((k) => [k, 0]));
+    character.counters.chests = Math.floor(looted / Rules.ITEMS_PER_CHEST);
+    character.counters.legendary = character.lootStats.legendaire || 0;
+  }
+  for (const k of Rules.COUNTERS) if (character.counters[k] == null) character.counters[k] = 0;
+  if (!character.claimed) character.claimed = [];
+  if (character.title === undefined) character.title = null;
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -52,6 +62,9 @@ function newCharacter() {
     equipment: {},
     record: { battles: 0, kills: 0, wins: 0 },
     lootStats: emptyLootStats(),
+    counters: Object.fromEntries(Rules.COUNTERS.map((k) => [k, 0])), // pour les succès
+    claimed: [], // succès dont la récompense a été récupérée
+    title: null, // id du succès affiché comme titre
   };
 }
 
@@ -66,7 +79,10 @@ function gearBonus(character) {
 
 function derived(character) {
   upgrade(character);
-  return Rules.derive(character.stats, gearBonus(character), character.cls);
+  // Les panoplies donnent des points bonus, qui s'ajoutent aux points de compétence.
+  const setPoints = Rules.setBonus(character.equipment).points;
+  const points = Object.fromEntries(Rules.STATS.map((st) => [st, (character.stats[st] || 0) + setPoints[st]]));
+  return Rules.derive(points, gearBonus(character), character.cls);
 }
 
 function addXp(character, amount) {
@@ -144,6 +160,9 @@ function makeItem(rarity, slot, opts = {}) {
   const info = Rules.RARITY_INFO[rarity];
   const item = { id: crypto.randomUUID(), slot, rarity, lines: [] };
   if (kind) item.kind = kind;
+  // Panoplie : imposée (fusion de 3 pièces de la même panoplie) ou tirée au hasard selon la rareté.
+  const set = opts.set !== undefined ? opts.set : random() < Rules.SET_DROP_CHANCE[rarity] ? pick(Object.keys(Rules.SETS)) : null;
+  if (set) item.set = set;
   const weights = Object.assign({}, Rules.itemWeights(item));
   for (let i = 0; i < info.lines; i++) {
     const stat = weightedPick(weights);
@@ -156,7 +175,14 @@ function makeItem(rarity, slot, opts = {}) {
 }
 
 function itemName(item) {
-  return [item.base, Rules.RARITY_PREFIX[item.rarity], Rules.STAT_SUFFIX[item.lines[0].stat]].filter(Boolean).join(' ');
+  const suffix = item.set ? Rules.SETS[item.set].of : Rules.STAT_SUFFIX[item.lines[0].stat];
+  return [item.base, Rules.RARITY_PREFIX[item.rarity], suffix].filter(Boolean).join(' ');
+}
+
+// Incrémente un compteur de succès.
+function bump(character, key, n = 1) {
+  upgrade(character);
+  character.counters[key] = (character.counters[key] || 0) + n;
 }
 
 function openChest(character) {
@@ -168,6 +194,8 @@ function openChest(character) {
   character.inventory.push(...items);
   upgrade(character);
   for (const it of items) character.lootStats[it.rarity] += 1;
+  bump(character, 'chests');
+  bump(character, 'legendary', items.filter((it) => it.rarity === 'legendaire').length);
   const best = items.reduce((b, it) => Math.max(b, Rules.RARITIES.indexOf(it.rarity)), 0);
   const bestRarity = Rules.RARITIES[best];
   return { items, bestRarity, clicks: Rules.RARITY_INFO[bestRarity].clicks };
@@ -190,6 +218,7 @@ function recycle(character, itemIds) {
   const count = before - character.inventory.length;
   if (count === 0) throw new Error('Objets introuvables');
   character.gold += count * Rules.RECYCLE_GOLD;
+  bump(character, 'recycled', count);
   return { recycled: count, gold: count * Rules.RECYCLE_GOLD };
 }
 
@@ -248,8 +277,12 @@ function fuse(character, itemIds) {
   const upgraded = random() * 100 < chance;
   const resultRarity = upgraded ? Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1] : rarity;
   character.inventory = character.inventory.filter((i) => !ids.includes(i.id));
-  const item = makeItem(resultRarity, null, { cls: character.cls, ownChance: 1 });
+  // 3 pièces de la même panoplie → le résultat fait partie de cette panoplie.
+  const sameSet = items[0].set && items.every((i) => i.set === items[0].set) ? items[0].set : undefined;
+  const item = makeItem(resultRarity, null, { cls: character.cls, ownChance: 1, set: sameSet });
   character.inventory.push(item);
+  bump(character, 'fused');
+  if (item.rarity === 'legendaire') bump(character, 'legendary');
   return { item, upgraded, chance, from: rarity };
 }
 
@@ -280,7 +313,46 @@ function reroll(character, itemId, lineIndex) {
   const line = { stat: weightedPick(weights), value: rand(info.min, info.max) };
   item.lines[index] = line;
   if (index === 0 && item.base) item.name = itemName(item);
+  bump(character, 'rerolled');
   return { item, line, old, price };
+}
+
+// ---------- Succès & titres ----------
+
+function claimAchievement(character, id) {
+  upgrade(character);
+  const a = Rules.achievementById(id);
+  if (!a) throw new Error('Succès inconnu');
+  const st = Rules.achievementState(character, a);
+  if (!st.done) throw new Error('Succès pas encore terminé');
+  if (st.claimed) throw new Error('Récompense déjà récupérée');
+  character.claimed.push(id);
+  character.gold += a.gold;
+  return { gold: a.gold };
+}
+
+// Titre affiché sous le pseudo : le nom d'un succès terminé (null pour aucun).
+function setTitle(character, id) {
+  upgrade(character);
+  if (id === null || id === '') { character.title = null; return; }
+  const a = Rules.achievementById(id);
+  if (!a || !Rules.achievementState(character, a).done) throw new Error('Termine ce succès pour porter ce titre');
+  character.title = id;
+}
+
+function titleOf(character) {
+  const a = character && character.title && Rules.achievementById(character.title);
+  return a ? a.name : null;
+}
+
+// ---------- Admin ----------
+
+function adminGive(character, { gold = 0, chests = 0, xp = 0 }) {
+  const clean = (v) => Math.max(0, Math.min(1e7, Math.floor(Number(v) || 0)));
+  const reward = { gold: clean(gold), chests: clean(chests), xp: clean(xp) };
+  if (!reward.gold && !reward.chests && !reward.xp) throw new Error('Rien à donner');
+  const levels = grant(character, reward);
+  return { reward, levels };
 }
 
 function unequip(character, slot) {
@@ -332,6 +404,7 @@ function absorbGhost(user, ghost) {
   upgrade(c);
   upgrade(g);
   for (const r of Object.keys(c.lootStats)) c.lootStats[r] += g.lootStats[r];
+  for (const k of Rules.COUNTERS) c.counters[k] += g.counters[k] || 0;
   delete db.state.users[ghost.id];
 }
 
@@ -353,6 +426,8 @@ function publicCharacter(user) {
   const d = derived(c);
   return {
     ...c,
+    titleName: titleOf(c),
+    sets: Rules.setBonus(c.equipment),
     classInfo: c.cls ? Rules.CLASS_INFO[c.cls] : null,
     xpToNext: Rules.xpToNext(c.level),
     gear: gearBonus(c),
@@ -364,5 +439,6 @@ function publicCharacter(user) {
 module.exports = {
   newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, rollRarity, makeItem,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
+  bump, claimAchievement, setTitle, titleOf, adminGive,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
 };

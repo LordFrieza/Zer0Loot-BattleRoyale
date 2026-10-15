@@ -500,3 +500,125 @@ test('chance : les bonus d\'équipement s\'ajoutent (même avec 0 point)', () =>
   assert.strictEqual(game.publicCharacter({ character: c }).lootTable.commun, 87);
   assert.strictEqual(Rules.fuseUpgradeChance('commun', game.derived(c).luck), 41.5);
 });
+
+// ---------- Panoplies ----------
+
+test('panoplies : paliers 2 / 4 / 6 / 8 pièces', () => {
+  const eq = (n, set = 'nosferatu') => Object.fromEntries(Array.from({ length: n }, (_, i) => ['s' + i, { set }]));
+  assert.strictEqual(Rules.setBonus(eq(1)).points.force, 0);
+  assert.strictEqual(Rules.setBonus(eq(2)).points.force, 2);
+  assert.strictEqual(Rules.setBonus(eq(3)).points.vol_de_vie, 2);
+  assert.strictEqual(Rules.setBonus(eq(4)).points.force, 4);
+  assert.strictEqual(Rules.setBonus(eq(6)).points.force, 7);
+  assert.strictEqual(Rules.setBonus(eq(8)).points.force, 10);
+  const mixed = Rules.setBonus({ a: { set: 'lynx' }, b: { set: 'lynx' }, c: { set: 'bastion' } });
+  assert.deepStrictEqual([mixed.points.precision, mixed.points.critique, mixed.points.defense], [2, 2, 0]);
+});
+
+test('panoplies : le bonus s\'ajoute aux stats du personnage', () => {
+  const c = game.newCharacter();
+  const base = game.derived(c).damage;
+  for (const slot of ['casque', 'gants']) {
+    const it = game.makeItem('commun', slot, { set: 'nosferatu' });
+    it.lines = [{ stat: 'vie', value: 1 }];
+    c.inventory.push(it);
+    game.equip(c, it.id);
+  }
+  assert.strictEqual(game.derived(c).damage, base + 2 * 2); // +2 points de Force = +4 dégâts
+  assert.ok(/de Nosferatu$/.test(c.equipment.casque.name));
+});
+
+test('panoplies : taux d\'apparition et fusion de 3 pièces identiques', () => {
+  let n = 0;
+  for (let i = 0; i < 5000; i++) if (game.makeItem('legendaire').set) n += 1;
+  assert.ok(Math.abs(n / 5000 - Rules.SET_DROP_CHANCE.legendaire) < 0.03, `${n / 5000}`);
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  for (let k = 0; k < 20; k++) {
+    c.inventory = [0, 1, 2].map(() => game.makeItem('rare', null, { set: 'ouragan' }));
+    assert.strictEqual(game.fuse(c, c.inventory.map((i) => i.id)).item.set, 'ouragan');
+  }
+});
+
+// ---------- Succès ----------
+
+test('succès : progression, récupération, titre', () => {
+  const c = game.newCharacter();
+  const a = Rules.achievementById('chests1');
+  assert.deepStrictEqual(Rules.achievementState(c, a), { value: 0, done: false, claimed: false });
+  assert.throws(() => game.claimAchievement(c, 'chests1'), /pas encore/);
+  assert.throws(() => game.setTitle(c, 'chests1'), /Termine/);
+  c.chests = 1;
+  game.openChest(c);
+  assert.strictEqual(Rules.achievementState(c, a).done, true);
+  assert.deepStrictEqual(game.claimAchievement(c, 'chests1'), { gold: a.gold });
+  assert.strictEqual(c.gold, a.gold);
+  assert.throws(() => game.claimAchievement(c, 'chests1'), /déjà/);
+  game.setTitle(c, 'chests1');
+  assert.strictEqual(game.titleOf(c), 'Curieux');
+  game.setTitle(c, null);
+  assert.strictEqual(game.titleOf(c), null);
+});
+
+test('succès : compteurs (recyclage, forge, relance, légendaires) et reprise des anciennes sauvegardes', () => {
+  const c = game.newCharacter();
+  c.gold = 1000;
+  c.inventory = [0, 1, 2, 3].map(() => game.makeItem('commun'));
+  game.recycle(c, [c.inventory[3].id]);
+  game.fuse(c, c.inventory.map((i) => i.id));
+  game.reroll(c, c.inventory[0].id, 0);
+  assert.deepStrictEqual([c.counters.recycled, c.counters.fused, c.counters.rerolled], [1, 1, 1]);
+  const old = game.newCharacter();
+  delete old.counters; delete old.claimed; delete old.title;
+  old.lootStats = { commun: 25, peu_commun: 3, rare: 1, epique: 0, legendaire: 1 };
+  game.upgrade(old);
+  assert.deepStrictEqual([old.counters.chests, old.counters.legendary, old.claimed.length, old.title], [10, 1, 0, null]);
+});
+
+test('admin : don de golds, coffres et XP', () => {
+  const c = game.newCharacter();
+  const r = game.adminGive(c, { gold: 50, chests: 2, xp: 300 });
+  assert.deepStrictEqual([c.gold, c.chests, c.level, r.levels], [50, 2, 2, 1]);
+  assert.throws(() => game.adminGive(c, { gold: -5 }), /Rien/);
+});
+
+// ---------- Événements de bataille ----------
+
+test('événements : zone rapide (×5) et météores', () => {
+  const b = testBattle([
+    { key: 'a', name: 'A', stats: base({ speed: 60 }) },
+    { key: 'b', name: 'B', stats: base({ speed: 60 }) },
+  ]);
+  assert.strictEqual(b.fighters[0].speed, 60);
+  const { Battle } = require('../server/battle');
+  const fast = new Battle();
+  fast.openQueue(60); clearTimeout(fast.queueTimer);
+  fast.join({ key: 'a', name: 'A', level: 1, look: {}, stats: base({ speed: 60 }) });
+  fast.join({ key: 'b', name: 'B', level: 1, look: {}, stats: base({ speed: 60 }) });
+  fast.start(null, 'fast'); fast.stopLoop();
+  assert.strictEqual(fast.fighters[0].speed, 300);
+  assert.strictEqual(fast.publicQueue().event, 'fast');
+  // Météore : 12 + 15 % de la vie max, sans tuer le dernier survivant
+  const [a, t] = b.fighters;
+  Object.assign(a, { x: 100, y: 100 }); Object.assign(t, { x: 900, y: 600 });
+  b.meteorImpact({ x: 100, y: 100, r: 70 });
+  assert.strictEqual(a.hp, 1000 - (12 + 150));
+  assert.strictEqual(t.hp, 1000);
+});
+
+test('événements : brouillard, on ne cible un ennemi caché que de près', () => {
+  const { Battle } = require('../server/battle');
+  const b = new Battle();
+  b.openQueue(60); clearTimeout(b.queueTimer);
+  for (const k of ['a', 'near', 'hidden']) b.join({ key: k, name: k, level: 1, look: {}, stats: base({ speed: 0, damage: 0 }) });
+  b.start(null, 'fog'); b.stopLoop();
+  const [a, near, hidden] = b.fighters;
+  Object.assign(a, { x: 300, y: 300 }); Object.assign(hidden, { x: 400, y: 300 }); Object.assign(near, { x: 600, y: 300 });
+  b.fogs = [{ x: 400, y: 300, r: 60, age: 5, a: 1 }];
+  b.nextFog = 99;
+  b.tick(0.05);
+  assert.strictEqual(a.targetKey, 'near'); // le plus proche est caché dans le brouillard
+  b.fogs = [];
+  b.tick(0.05);
+  assert.strictEqual(a.targetKey, 'hidden');
+});

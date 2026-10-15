@@ -224,6 +224,117 @@
   // Relance d'une ligne : prix en golds selon la rareté de l'objet.
   const REROLL_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
 
+  // ---------- Panoplies ----------
+  /*
+   * Un objet peut appartenir à une panoplie. Équiper plusieurs pièces de la même panoplie donne
+   * des points bonus (comme des points de compétence) dans ses deux stats.
+   */
+  const SETS = {
+    nosferatu: { label: 'Nosferatu', icon: '🧛', of: 'de Nosferatu', color: '#e0405f', stats: ['vol_de_vie', 'force'] },
+    bastion: { label: 'Bastion', icon: '🏰', of: 'du Bastion', color: '#9aa4b8', stats: ['defense', 'vie'] },
+    ouragan: { label: 'Ouragan', icon: '🌪️', of: 'de l\'Ouragan', color: '#5fd3ff', stats: ['vitesse_attaque', 'vitesse'] },
+    lynx: { label: 'Œil de Lynx', icon: '🦅', of: 'de l\'Œil de Lynx', color: '#ffd23f', stats: ['precision', 'critique'] },
+    fortune: { label: 'Fortune', icon: '🍀', of: 'de Fortune', color: '#3ddc5a', stats: ['chance', 'esquive'] },
+    ronces: { label: 'Ronces', icon: '🌹', of: 'des Ronces', color: '#b14dff', stats: ['epines', 'vie'] },
+  };
+  // Paliers : nombre de pièces équipées → points bonus dans CHAQUE stat de la panoplie.
+  const SET_TIERS = [{ pieces: 2, points: 2 }, { pieces: 4, points: 4 }, { pieces: 6, points: 7 }, { pieces: 8, points: 10 }];
+  // Chance qu'un objet tiré (coffre / forge) appartienne à une panoplie, selon sa rareté.
+  const SET_DROP_CHANCE = { commun: 0.05, peu_commun: 0.08, rare: 0.12, epique: 0.18, legendaire: 0.25 };
+
+  function setTier(pieces) {
+    let tier = null;
+    for (const t of SET_TIERS) if (pieces >= t.pieces) tier = t;
+    return tier;
+  }
+
+  // Bonus des panoplies pour un équipement : { points: {stat: n}, sets: [{ key, pieces, tier, next }] }
+  function setBonus(equipment) {
+    const counts = {};
+    for (const item of Object.values(equipment || {})) if (item && item.set && SETS[item.set]) counts[item.set] = (counts[item.set] || 0) + 1;
+    const points = emptyStats();
+    const sets = [];
+    for (const [key, pieces] of Object.entries(counts)) {
+      const tier = setTier(pieces);
+      if (tier) for (const st of SETS[key].stats) points[st] += tier.points;
+      sets.push({ key, pieces, tier, next: SET_TIERS.find((t) => t.pieces > pieces) || null });
+    }
+    sets.sort((a, b) => b.pieces - a.pieces);
+    return { points, sets };
+  }
+
+  // ---------- Succès ----------
+  /*
+   * metric : compteur suivi (voir achievementValue). Le nom du succès devient un titre affichable.
+   */
+  const ACHIEVEMENTS = [
+    { id: 'battles1', metric: 'battles', goal: 1, name: 'Recrue', desc: 'Participer à 1 bataille', gold: 10 },
+    { id: 'battles10', metric: 'battles', goal: 10, name: 'Habitué de l\'arène', desc: 'Participer à 10 batailles', gold: 50 },
+    { id: 'battles100', metric: 'battles', goal: 100, name: 'Vétéran', desc: 'Participer à 100 batailles', gold: 300 },
+    { id: 'battles500', metric: 'battles', goal: 500, name: 'Légende de l\'arène', desc: 'Participer à 500 batailles', gold: 1000 },
+    { id: 'kills1', metric: 'kills', goal: 1, name: 'Premier sang', desc: 'Faire 1 kill', gold: 10 },
+    { id: 'kills10', metric: 'kills', goal: 10, name: 'Chasseur', desc: 'Faire 10 kills', gold: 50 },
+    { id: 'kills100', metric: 'kills', goal: 100, name: 'Tueur', desc: 'Faire 100 kills', gold: 300 },
+    { id: 'kills500', metric: 'kills', goal: 500, name: 'Faucheuse', desc: 'Faire 500 kills', gold: 1000 },
+    { id: 'wins1', metric: 'wins', goal: 1, name: 'Champion', desc: 'Remporter 1 bataille', gold: 50 },
+    { id: 'wins10', metric: 'wins', goal: 10, name: 'Conquérant', desc: 'Remporter 10 batailles', gold: 300 },
+    { id: 'wins50', metric: 'wins', goal: 50, name: 'Invaincu', desc: 'Remporter 50 batailles', gold: 1000 },
+    { id: 'firstblood1', metric: 'firstblood', goal: 1, name: 'Prompt', desc: 'Faire le premier kill d\'une bataille', gold: 30 },
+    { id: 'double5', metric: 'double', goal: 5, name: 'Enchaîneur', desc: 'Réussir 5 double kills', gold: 100 },
+    { id: 'massacre1', metric: 'massacre', goal: 1, name: 'Massacreur', desc: 'Réussir 1 massacre (5 kills dans une bataille)', gold: 150 },
+    { id: 'level5', metric: 'level', goal: 5, name: 'Aguerri', desc: 'Atteindre le niveau 5', gold: 50 },
+    { id: 'level10', metric: 'level', goal: 10, name: 'Héros', desc: 'Atteindre le niveau 10', gold: 200 },
+    { id: 'level25', metric: 'level', goal: 25, name: 'Mythe', desc: 'Atteindre le niveau 25', gold: 1000 },
+    { id: 'chests1', metric: 'chests', goal: 1, name: 'Curieux', desc: 'Ouvrir 1 coffre', gold: 10 },
+    { id: 'chests25', metric: 'chests', goal: 25, name: 'Pilleur', desc: 'Ouvrir 25 coffres', gold: 100 },
+    { id: 'chests100', metric: 'chests', goal: 100, name: 'Collectionneur', desc: 'Ouvrir 100 coffres', gold: 300 },
+    { id: 'chests500', metric: 'chests', goal: 500, name: 'Roi du loot', desc: 'Ouvrir 500 coffres', gold: 1000 },
+    { id: 'legendary1', metric: 'legendary', goal: 1, name: 'Élu des dieux', desc: 'Obtenir 1 objet Légendaire (coffre ou forge)', gold: 200 },
+    { id: 'legendary10', metric: 'legendary', goal: 10, name: 'Divin', desc: 'Obtenir 10 objets Légendaires', gold: 1000 },
+    { id: 'recycled10', metric: 'recycled', goal: 10, name: 'Recycleur', desc: 'Recycler 10 objets', gold: 20 },
+    { id: 'recycled100', metric: 'recycled', goal: 100, name: 'Écolo', desc: 'Recycler 100 objets', gold: 100 },
+    { id: 'recycled500', metric: 'recycled', goal: 500, name: 'Broyeur', desc: 'Recycler 500 objets', gold: 300 },
+    { id: 'fused1', metric: 'fused', goal: 1, name: 'Apprenti forgeron', desc: 'Fusionner 1 fois à la forge', gold: 20 },
+    { id: 'fused25', metric: 'fused', goal: 25, name: 'Forgeron', desc: 'Fusionner 25 fois à la forge', gold: 150 },
+    { id: 'fused100', metric: 'fused', goal: 100, name: 'Maître forgeron', desc: 'Fusionner 100 fois à la forge', gold: 500 },
+    { id: 'rerolled10', metric: 'rerolled', goal: 10, name: 'Alchimiste', desc: 'Relancer 10 lignes à la forge', gold: 100 },
+    { id: 'betsWon1', metric: 'betsWon', goal: 1, name: 'Parieur', desc: 'Gagner 1 pari', gold: 20 },
+    { id: 'betsWon10', metric: 'betsWon', goal: 10, name: 'Bookmaker', desc: 'Gagner 10 paris', gold: 150 },
+    { id: 'betsWon50', metric: 'betsWon', goal: 50, name: 'Oracle', desc: 'Gagner 50 paris', gold: 500 },
+    { id: 'sets2', metric: 'setPieces', goal: 2, name: 'Assorti', desc: 'Équiper 2 pièces d\'une même panoplie', gold: 50 },
+    { id: 'sets6', metric: 'setPieces', goal: 6, name: 'Tiré à quatre épingles', desc: 'Équiper 6 pièces d\'une même panoplie', gold: 500 },
+  ];
+  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs'];
+
+  function achievementValue(character, metric) {
+    if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
+    if (metric === 'level') return character.level || 1;
+    if (metric === 'setPieces') return Math.max(0, ...setBonus(character.equipment).sets.map((x) => x.pieces));
+    return (character.counters && character.counters[metric]) || 0;
+  }
+
+  function achievementState(character, a) {
+    const value = achievementValue(character, a.metric);
+    const done = value >= a.goal;
+    const claimed = !!(character.claimed && character.claimed.includes(a.id));
+    return { value: Math.min(value, a.goal), done, claimed };
+  }
+
+  function achievementById(id) {
+    return ACHIEVEMENTS.find((a) => a.id === id) || null;
+  }
+
+  // ---------- Événements de bataille (choisis par l'admin) ----------
+  const BATTLE_EVENTS = {
+    double: { label: 'Loot double', icon: '💰', color: '#ffb000', desc: 'Toute l\'XP, les golds et les coffres gagnés pendant la bataille sont doublés.' },
+    fog: { label: 'Brouillard', icon: '🌫️', color: '#cfd8e3', desc: 'Des nappes de brouillard apparaissent et disparaissent : on ne peut y être ciblé que de très près.' },
+    fast: { label: 'Zone rapide', icon: '⚡', color: '#5fd3ff', desc: 'Tous les combattants se déplacent 5 fois plus vite.' },
+    meteors: { label: 'Pluie de météores', icon: '☄️', color: '#ff6b2a', desc: 'Des météores de feu s\'écrasent au hasard sur l\'arène et font très mal.' },
+  };
+
+  // ---------- Twitch ----------
+  const SUB_REWARD_GOLD = 300; // par abonnement (sub, resub ou sub offert : au donateur)
+
   // ---------- Progression ----------
   /*
    * XP pour passer au niveau suivant : 300, 500, 700, 900… (+200 à chaque niveau).
@@ -319,5 +430,8 @@
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
+    SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
+    ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
+    BATTLE_EVENTS, SUB_REWARD_GOLD,
   };
 });
