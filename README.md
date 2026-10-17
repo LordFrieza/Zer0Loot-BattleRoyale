@@ -77,11 +77,11 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Classes** : à la première visite, le joueur choisit sa classe (gratuit), puis peut en changer pour 100 golds.
   | Classe | Combat | Bonus / malus | Arme · secondaire |
   |---|---|---|---|
-  | ⚔️ Guerrier | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
-  | 🏹 Archer | À distance (230 px), recule si un ennemi approche | +15 pts Précision, −10 % Vie, −15 % Dégâts | Arc · Carquois |
-  | 🔮 Mage | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +25 % Dégâts, −15 % Vie, attaque 35 % plus lente | Bâton · Grimoire |
-  | 🗡️ Assassin | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, −15 % Vie | Dagues · Dague de parade |
-  | ✨ Prêtre | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
+  | ⚔️ Guerriloot (guerrier) | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
+  | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche | +15 pts Précision, −10 % Vie, −15 % Dégâts | Arc · Carquois |
+  | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +25 % Dégâts, −15 % Vie, attaque 35 % plus lente | Bâton · Grimoire |
+  | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, −15 % Vie | Dagues · Dague de parade |
+  | ✨ Saint-Loot (prêtre) | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
 
   Les armes et objets secondaires sont **réservés à leur classe**. Dans les coffres, ils sont pour ta classe 1 fois sur 2
   (sinon une classe au hasard). En changeant de classe, les objets incompatibles retournent dans le coffre personnel.
@@ -126,6 +126,15 @@ de la file, confirme les `!join` et annonce le vainqueur.
   récupère sa mise + une part des mises perdues au prorata de sa mise parmi les gagnants (1 contre 9 → 10 % / 90 %),
   répartie en golds entiers sans perte. Si personne n'a parié sur le gagnant, si la bataille est annulée ou si le serveur
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
+- **Apparence** (onglet Personnage, gratuit) : couleur du personnage (15 teintes ou automatique selon le pseudo),
+  7 styles d'yeux, 5 de sourcils, 8 de bouches. Visible sur la fiche, dans l'arène et dans les aperçus.
+- **Boutique** (onglet Boutique) : 25 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
+  chapeaux, capes, chaussures, accessoires de visage, auras animées. Essayage sur l'aperçu avant achat ; un article
+  acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence du casque** (le casque reste équipé et ses
+  bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10 articles).
+- **Page perso en onglets** : Personnage (fiche, caractéristiques, apparence, équipement), Inventaire (coffres,
+  coffre personnel, forge), Boutique, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir,
+  succès à récupérer. Lien direct possible (`/character.html#boutique`).
 - **Panoplies** : 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à 2 stats.
   Équiper 2 / 4 / 6 / 8 pièces d'une même panoplie donne +2 / +4 / +7 / +10 points dans ces 2 stats (comme des points de
   compétence). Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces

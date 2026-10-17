@@ -35,7 +35,7 @@
   const CLASSES = ['guerrier', 'archer', 'mage', 'assassin', 'pretre'];
   const CLASS_INFO = {
     guerrier: {
-      label: 'Guerrier', icon: '⚔️', color: '#ff6b4a',
+      label: 'Guerriloot', role: 'Guerrier', icon: '⚔️', color: '#ff6b4a',
       desc: 'Robuste combattant au corps à corps. Il attire l\'attention des ennemis sur lui.',
       perks: ['+30 % Vie', '+25 % Défense', 'Attire l\'aggro des ennemis proches'],
       weapon: 'epee', offhand: 'bouclier',
@@ -43,7 +43,7 @@
       combat: { range: 40, taunt: 0.7 },
     },
     archer: {
-      label: 'Archer', icon: '🏹', color: '#3ddc5a',
+      label: 'Archiloot', role: 'Archer', icon: '🏹', color: '#3ddc5a',
       desc: 'Tire de loin et recule quand un ennemi s\'approche trop près.',
       perks: ['Attaque à distance', 'Recule face aux ennemis proches', '+15 % Précision', '−10 % Vie', '−15 % Dégâts'],
       weapon: 'arc', offhand: 'carquois',
@@ -51,7 +51,7 @@
       combat: { range: 230, kite: 110, projectile: 'arrow' },
     },
     mage: {
-      label: 'Mage', icon: '🔮', color: '#b14dff',
+      label: 'Magiloot', role: 'Mage', icon: '🔮', color: '#b14dff',
       desc: 'Lance des boules de feu qui explosent et touchent aussi les ennemis autour de la cible.',
       perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+25 % Dégâts', '−15 % Vie', 'Attaque 35 % plus lente'],
       weapon: 'baton', offhand: 'grimoire',
@@ -59,7 +59,7 @@
       combat: { range: 170, projectile: 'fire', aoeRadius: 75, aoeRatio: 0.6, cooldownMult: 1.35 },
     },
     assassin: {
-      label: 'Assassin', icon: '🗡️', color: '#ffd23f',
+      label: 'Lootassin', role: 'Assassin', icon: '🗡️', color: '#ffd23f',
       desc: 'Rapide et mortel : il traque l\'ennemi le plus affaibli du champ de bataille.',
       perks: ['Cible l\'ennemi le plus faible', '+10 % Critique', '+25 % Vitesse d\'attaque', '−15 % Vie'],
       weapon: 'dagues', offhand: 'dague',
@@ -67,7 +67,7 @@
       combat: { range: 36, hunter: true },
     },
     pretre: {
-      label: 'Prêtre', icon: '✨', color: '#5fd3ff',
+      label: 'Saint-Loot', role: 'Prêtre', icon: '✨', color: '#5fd3ff',
       desc: 'Combattant béni qui régénère sa vie tout au long du combat.',
       perks: ['Régénère 1,5 % de sa vie par seconde', '+10 % Vie', '+10 % Défense', '−10 % Dégâts'],
       weapon: 'masse', offhand: 'relique',
@@ -76,7 +76,7 @@
     },
   };
   // Personnage sans classe (viewer qui a tapé !join sans compte) : combattant neutre.
-  const NO_CLASS = { label: 'Vagabond', icon: '🧳', bonus: {}, flat: {}, combat: { range: 40 } };
+  const NO_CLASS = { label: 'Vagaloot', role: 'Vagabond', icon: '🧳', bonus: {}, flat: {}, combat: { range: 40 } };
 
   function classInfo(cls) {
     return CLASS_INFO[cls] || NO_CLASS;
@@ -302,6 +302,8 @@
     { id: 'betsWon10', metric: 'betsWon', goal: 10, name: 'Bookmaker', desc: 'Gagner 10 paris', gold: 150 },
     { id: 'betsWon50', metric: 'betsWon', goal: 50, name: 'Oracle', desc: 'Gagner 50 paris', gold: 500 },
     { id: 'sets2', metric: 'setPieces', goal: 2, name: 'Assorti', desc: 'Équiper 2 pièces d\'une même panoplie', gold: 50 },
+    { id: 'cosmetics1', metric: 'cosmetics', goal: 1, name: 'Coquet', desc: 'Acheter 1 article à la boutique', gold: 20 },
+    { id: 'cosmetics10', metric: 'cosmetics', goal: 10, name: 'Icône de mode', desc: 'Posséder 10 articles de la boutique', gold: 300 },
     { id: 'sets6', metric: 'setPieces', goal: 6, name: 'Tiré à quatre épingles', desc: 'Équiper 6 pièces d\'une même panoplie', gold: 500 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs'];
@@ -309,6 +311,7 @@
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
     if (metric === 'level') return character.level || 1;
+    if (metric === 'cosmetics') return (character.owned || []).length;
     if (metric === 'setPieces') return Math.max(0, ...setBonus(character.equipment).sets.map((x) => x.pieces));
     return (character.counters && character.counters[metric]) || 0;
   }
@@ -330,6 +333,84 @@
     fog: { label: 'Brouillard', icon: '🌫️', color: '#cfd8e3', desc: 'Des nappes de brouillard apparaissent et disparaissent : on ne peut y être ciblé que de très près.' },
     fast: { label: 'Zone rapide', icon: '⚡', color: '#5fd3ff', desc: 'Tous les combattants se déplacent 5 fois plus vite.' },
     meteors: { label: 'Pluie de météores', icon: '☄️', color: '#ff6b2a', desc: 'Des météores de feu s\'écrasent au hasard sur l\'arène et font très mal.' },
+  };
+
+  // ---------- Apparence (gratuite) ----------
+  const APPEARANCE = {
+    color: {
+      label: 'Couleur',
+      options: {
+        violet: { label: 'Violet', hex: '#a77bdb' }, rose: { label: 'Rose', hex: '#f08cb4' }, rouge: { label: 'Rouge', hex: '#e8665a' },
+        orange: { label: 'Orange', hex: '#f0a050' }, jaune: { label: 'Jaune', hex: '#e8d060' }, vert: { label: 'Vert', hex: '#7ccf6a' },
+        menthe: { label: 'Menthe', hex: '#6fd6b4' }, cyan: { label: 'Cyan', hex: '#62c8e0' }, bleu: { label: 'Bleu', hex: '#6c8ee8' },
+        peau1: { label: 'Clair', hex: '#f5d3b8' }, peau2: { label: 'Hâlé', hex: '#d9a47a' }, peau3: { label: 'Mat', hex: '#a8714a' },
+        peau4: { label: 'Foncé', hex: '#6e4630' }, gris: { label: 'Gris', hex: '#a4a8b4' }, zombie: { label: 'Zombie', hex: '#9cbf7a' },
+      },
+    },
+    eyes: {
+      label: 'Yeux',
+      options: {
+        points: { label: 'Points' }, ronds: { label: 'Ronds' }, malicieux: { label: 'Malicieux' }, endormis: { label: 'Endormis' },
+        colere: { label: 'En colère' }, etoiles: { label: 'Étoiles' }, croix: { label: 'K.O.' },
+      },
+    },
+    brows: {
+      label: 'Sourcils',
+      options: { aucun: { label: 'Aucun' }, droits: { label: 'Droits' }, fronces: { label: 'Froncés' }, inquiets: { label: 'Inquiets' }, epais: { label: 'Épais' } },
+    },
+    mouth: {
+      label: 'Bouche',
+      options: {
+        aucune: { label: 'Aucune' }, sourire: { label: 'Sourire' }, grand: { label: 'Grand sourire' }, neutre: { label: 'Neutre' },
+        surprise: { label: 'Surprise' }, grimace: { label: 'Grimace' }, langue: { label: 'Langue' }, crocs: { label: 'Crocs' },
+      },
+    },
+  };
+  const DEFAULT_LOOK = { color: null, eyes: 'points', brows: 'aucun', mouth: 'aucune', hat: null, cape: null, shoes: null, aura: null, face: null };
+
+  // ---------- Boutique de cosmétiques (achetés avec des golds, purement visuels) ----------
+  /*
+   * Un chapeau remplace l'affichage du casque (et un masque celui des yeux couverts) : les stats de
+   * l'équipement restent actives, seul le visuel change.
+   */
+  const COSMETIC_SLOTS = {
+    hat: { label: 'Chapeau', plural: 'Chapeaux', icon: '🎩', note: 'Remplace l\'apparence du casque' },
+    cape: { label: 'Cape', plural: 'Capes', icon: '🧣' },
+    shoes: { label: 'Chaussures', plural: 'Chaussures', icon: '👢' },
+    face: { label: 'Accessoire', plural: 'Accessoires', icon: '🕶️' },
+    aura: { label: 'Aura', plural: 'Auras', icon: '✨' },
+  };
+  const COSMETICS = {
+    // Chapeaux
+    sorcier: { slot: 'hat', label: 'Chapeau de sorcier', price: 300, color: '#5b3fd1' },
+    pirate: { slot: 'hat', label: 'Tricorne de pirate', price: 350, color: '#2b2233' },
+    haut_de_forme: { slot: 'hat', label: 'Haut-de-forme', price: 400, color: '#1c1a24' },
+    viking: { slot: 'hat', label: 'Casque à cornes', price: 450, color: '#9aa0b5' },
+    couronne: { slot: 'hat', label: 'Couronne royale', price: 1200, color: '#ffc93a' },
+    aureole: { slot: 'hat', label: 'Auréole', price: 900, color: '#fff3a0' },
+    chat: { slot: 'hat', label: 'Oreilles de chat', price: 250, color: '#f08cb4' },
+    // Capes
+    cape_rouge: { slot: 'cape', label: 'Cape écarlate', price: 300, color: '#c8323c' },
+    cape_bleue: { slot: 'cape', label: 'Cape azur', price: 300, color: '#2f63c8' },
+    cape_noire: { slot: 'cape', label: 'Cape de l\'ombre', price: 450, color: '#1a1622' },
+    cape_royale: { slot: 'cape', label: 'Cape royale', price: 800, color: '#7a2fc0', trim: '#ffc93a' },
+    // Chaussures
+    bottes: { slot: 'shoes', label: 'Bottes de cuir', price: 150, color: '#6b4426' },
+    baskets: { slot: 'shoes', label: 'Baskets', price: 200, color: '#f2f2f2', trim: '#e8434f' },
+    dorees: { slot: 'shoes', label: 'Bottes dorées', price: 600, color: '#ffc93a' },
+    flammes: { slot: 'shoes', label: 'Bottes de feu', price: 700, color: '#ff6b2a', trim: '#ffd23f' },
+    // Accessoires de visage
+    lunettes: { slot: 'face', label: 'Lunettes de soleil', price: 200, color: '#111' },
+    monocle: { slot: 'face', label: 'Monocle', price: 250, color: '#ffc93a' },
+    bandeau: { slot: 'face', label: 'Bandeau de pirate', price: 200, color: '#111' },
+    moustache: { slot: 'face', label: 'Moustache', price: 150, color: '#4a2e1c' },
+    masque: { slot: 'face', label: 'Masque de ninja', price: 350, color: '#22202c' },
+    // Auras
+    aura_feu: { slot: 'aura', label: 'Aura de feu', price: 1000, color: '#ff6b2a' },
+    aura_glace: { slot: 'aura', label: 'Aura de glace', price: 1000, color: '#7fd8ff' },
+    aura_foudre: { slot: 'aura', label: 'Aura de foudre', price: 1200, color: '#ffe14a' },
+    aura_ombre: { slot: 'aura', label: 'Aura de l\'ombre', price: 1200, color: '#8a4dff' },
+    aura_arcenciel: { slot: 'aura', label: 'Aura arc-en-ciel', price: 2000, color: '#ff5fd2' },
   };
 
   // ---------- Twitch ----------
@@ -432,6 +513,6 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, SUB_REWARD_GOLD,
+    BATTLE_EVENTS, SUB_REWARD_GOLD, APPEARANCE, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
   };
 });

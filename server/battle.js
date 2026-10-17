@@ -46,7 +46,7 @@ class Battle extends EventEmitter {
       phase: this.phase,
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
-        key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, title: p.title || null,
+        key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, app: p.app || null, title: p.title || null,
       })),
       // L'événement n'est révélé qu'au lancement de la bataille.
       event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
@@ -123,6 +123,7 @@ class Battle extends EventEmitter {
         userId: p.userId || null,
         name: p.name,
         title: p.title || null,
+        app: p.app || null,
         cls: p.cls || null,
         look: p.look,
         level: p.level,
@@ -451,7 +452,7 @@ class Battle extends EventEmitter {
       fogs: (this.fogs || []).map((z) => ({ x: Math.round(z.x), y: Math.round(z.y), r: Math.round(z.r), a: Math.round(z.a * 100) / 100 })),
       meteors: (this.meteors || []).map((m) => ({ x: Math.round(m.x), y: Math.round(m.y), r: m.r, p: Math.round((1 - m.t / METEOR_FALL) * 100) / 100 })),
       fighters: this.fighters.map((f) => ({
-        key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, level: f.level, hidden: this.event === 'fog' && f.alive && this.inFog(f),
+        key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, app: f.app, level: f.level, hidden: this.event === 'fog' && f.alive && this.inFog(f),
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
         alive: f.alive, kills: f.kills, target: f.targetKey,

@@ -234,6 +234,12 @@ app.post('/api/forge/fuse', requirePlayer, action((req) => game.fuse(req.user.ch
 
 app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
 
+app.post('/api/look', requirePlayer, action((req) => {
+  game.setLook(req.user.character, String(req.body.part || ''), req.body.value === null || req.body.value === undefined ? null : String(req.body.value));
+}));
+
+app.post('/api/shop/buy', requirePlayer, action((req) => game.buyCosmetic(req.user.character, String(req.body.id || ''))));
+
 app.post('/api/equip', requirePlayer, action((req) => {
   game.equip(req.user.character, req.body.itemId);
 }));
@@ -305,6 +311,7 @@ function participantFromUser(user) {
     level: user.character.level,
     cls: user.character.cls || null,
     title: game.titleOf(user.character),
+    app: { ...user.character.look },
     stats: game.derived(user.character),
     look: lookOf(user),
   };
@@ -328,7 +335,13 @@ function makeBot() {
     if (Math.random() < 0.4) look[slot] = game.rollRarity(10);
   }
   const cls = Rules.CLASSES[Math.floor(Math.random() * Rules.CLASSES.length)];
+  // Apparence aléatoire (et parfois un cosmétique) pour varier les bots
+  const anyOf = (obj) => { const k = Object.keys(obj); return k[Math.floor(Math.random() * k.length)]; };
+  const app = { ...Rules.DEFAULT_LOOK };
+  for (const part of Object.keys(Rules.APPEARANCE)) app[part] = anyOf(Rules.APPEARANCE[part].options);
+  if (Math.random() < 0.35) { const id = anyOf(Rules.COSMETICS); app[Rules.COSMETICS[id].slot] = id; }
   return {
+    app,
     key: 'bot' + botCount,
     bot: true,
     name: BOT_NAMES[botCount % BOT_NAMES.length] + '_' + botCount,

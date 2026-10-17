@@ -49,6 +49,9 @@ function render() {
   renderForge();
   renderSets();
   renderAchievements();
+  renderAppearance();
+  renderShop();
+  renderBadges();
   $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
   $('sub-info').innerHTML = `💜 Chaque <b>abonnement</b> à la chaîne (sub, resub ou sub offert) rapporte <b>${Rules.SUB_REWARD_GOLD} golds</b>
     à celui qui s'abonne ou qui offre le sub.${me.twitchLogin ? '' : ' Lie ton compte Twitch pour les recevoir ici (sinon ils t\'attendent jusqu\'à la liaison).'}`;
@@ -197,6 +200,7 @@ function openClassModal() {
     return `<div class="class-card ${c.cls === cls ? 'current' : ''}" data-cls="${cls}" style="--c:${ci.color}">
       <canvas width="120" height="110" data-preview="${cls}"></canvas>
       <h3>${ci.icon} ${ci.label}</h3>
+      <div class="role">${/^[aeiouéèêh]/i.test(ci.role) ? 'l\'' : 'le '}${ci.role.toLowerCase()}</div>
       <p>${ci.desc}</p>
       <ul>${ci.perks.map((x) => `<li>${x}</li>`).join('')}</ul>
       <div class="weapons">${w1.icon} ${w1.label} · ${w2.icon} ${w2.label}</div>
@@ -205,7 +209,7 @@ function openClassModal() {
   }).join('');
   $('class-grid').querySelectorAll('canvas[data-preview]').forEach((cv) => {
     const g = cv.getContext('2d');
-    drawFighter(g, 60, 70, { name: me.twitchDisplayName || me.username, cls: cv.dataset.preview, look: {} }, { scale: 2.2, swing: 0.3 });
+    drawFighter(g, 60, 70, { name: me.twitchDisplayName || me.username, cls: cv.dataset.preview, look: {}, app: me.character.look }, { scale: 2.2, swing: 0.3 });
   });
   $('class-grid').querySelectorAll('.class-card button:not([disabled])').forEach((b) => {
     b.onclick = async () => {
@@ -349,7 +353,7 @@ $('fuse-go').onclick = async () => {
 (function renderCombatInfo() {
   const R = Rules.REWARDS;
   const row = (label, r, note = '') => `<tr><td><b>${label}</b>${note ? `<div class="muted" style="font-size:12px">${note}</div>` : ''}</td>
-    <td>${r.xp ? '+' + r.xp + ' XP' : '—'}</td><td>${r.gold ? '+' + r.gold + ' 🪙' : '—'}</td><td>${r.chests ? '+' + r.chests + ' 🎁' : '—'}</td></tr>`;
+    <td>${r.xp ? '+' + r.xp + ' XP' : '—'}</td><td>${r.gold ? '+' + r.gold + ' 🪙' : '—'}</td><td>${r.chests ? '+' + r.chests + ' <i class="ico-chest"></i>' : '—'}</td></tr>`;
   $('rewards-table').innerHTML = '<tr><th>Action</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
     + row('⚔️ Kill', R.kill)
     + row('🏆 Victoire', R.win, 'Dernier survivant')
@@ -362,9 +366,119 @@ $('fuse-go').onclick = async () => {
   $('events-help').innerHTML = Object.values(Rules.BATTLE_EVENTS).map((ev) => `<div style="--c:${ev.color}"><b>${ev.icon} ${ev.label}</b><br>${ev.desc}</div>`).join('');
   $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
     const ci = Rules.CLASS_INFO[cls];
-    return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b><br>${ci.perks.join(' · ')}</div>`;
+    return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b> <span class="muted">(${ci.role.toLowerCase()})</span><br>${ci.perks.join(' · ')}</div>`;
   }).join('');
 })();
+
+// ---------- Onglets ----------
+const TABS = ['perso', 'inventaire', 'boutique', 'succes', 'classements', 'regles'];
+
+function showTab(name) {
+  if (!TABS.includes(name)) name = 'perso';
+  document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === name));
+  document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  try { localStorage.setItem('zl_tab', name); } catch (e) { /* ignore */ }
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+}
+
+document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => {
+  b.onclick = () => { showTab(b.dataset.tab); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+});
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+showTab(location.hash.slice(1) || (() => { try { return localStorage.getItem('zl_tab'); } catch (e) { return null; } })() || 'perso');
+
+// Pastilles sur les onglets : points à répartir, coffres à ouvrir, succès à récupérer.
+function renderBadges() {
+  const c = me.character;
+  const claim = Rules.ACHIEVEMENTS.filter((a) => { const st = Rules.achievementState(c, a); return st.done && !st.claimed; }).length;
+  const set = (tab, n) => {
+    const el = document.querySelector(`[data-badge="${tab}"]`);
+    el.textContent = n || '';
+    el.classList.toggle('on', n > 0);
+  };
+  set('perso', c.skillPoints);
+  set('inventaire', c.chests);
+  set('succes', claim);
+}
+
+// ---------- Apparence ----------
+function renderAppearance() {
+  const look = me.character.look;
+  const rows = Object.entries(Rules.APPEARANCE).map(([part, def]) => {
+    let opts;
+    if (part === 'color') {
+      opts = `<button class="swatch auto ${look.color ? '' : 'active'}" data-part="color" data-value="" title="Automatique (selon ton pseudo)"></button>`
+        + Object.entries(def.options).map(([k, o]) => `<button class="swatch ${look.color === k ? 'active' : ''}" style="background:${o.hex}" data-part="color" data-value="${k}" title="${o.label}"></button>`).join('');
+    } else {
+      opts = Object.entries(def.options).map(([k, o]) => `<button class="chip ${look[part] === k ? 'active' : ''}" data-part="${part}" data-value="${k}">${o.label}</button>`).join('');
+    }
+    return `<div class="app-row"><div class="app-label">${def.label}</div><div class="chips">${opts}</div></div>`;
+  });
+  // Cosmétiques possédés
+  const owned = me.character.owned;
+  rows.push(Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
+    const mine = owned.filter((id) => Rules.COSMETICS[id].slot === slot);
+    const opts = mine.length
+      ? `<button class="chip ${look[slot] ? '' : 'active'}" data-part="${slot}" data-value="">Aucun</button>`
+        + mine.map((id) => `<button class="chip ${look[slot] === id ? 'active' : ''}" data-part="${slot}" data-value="${id}">${Rules.COSMETICS[id].label}</button>`).join('')
+      : '<span class="muted" style="font-size:13px">Rien pour l\'instant — <a href="#boutique">voir la boutique</a></span>';
+    return `<div class="app-row"><div class="app-label">${def.icon} ${def.label}${def.note ? ` <span style="text-transform:none;letter-spacing:0">(${def.note.toLowerCase()})</span>` : ''}</div><div class="chips">${opts}</div></div>`;
+  }).join(''));
+  $('app-options').innerHTML = rows.join('');
+  $('app-options').querySelectorAll('[data-part]').forEach((b) => {
+    b.onclick = () => act('/api/look', { part: b.dataset.part, value: b.dataset.value || null }, 'equip');
+  });
+}
+
+// ---------- Boutique ----------
+let trying = null; // cosmétique essayé sur l'aperçu de la boutique
+
+function renderShop() {
+  const c = me.character;
+  $('shop-gold').textContent = c.gold;
+  const t = trying && Rules.COSMETICS[trying];
+  $('shop-try').innerHTML = t ? `Essai : <b>${esc(t.label)}</b>` : 'Clique sur un article pour l\'essayer';
+  $('shop-list').innerHTML = Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
+    const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot).sort((a, b) => a[1].price - b[1].price);
+    return `<div class="shop-cat"><h3>${def.icon} ${def.plural}</h3><div class="shop-grid">${items.map(([id, it]) => {
+      const owned = c.owned.includes(id);
+      const worn = c.look[slot] === id;
+      let btn;
+      if (worn) btn = `<button class="small secondary" data-wear="${slot}" data-value="">✓ Porté · retirer</button>`;
+      else if (owned) btn = `<button class="small" data-wear="${slot}" data-value="${id}">Porter</button>`;
+      else btn = `<button class="small gold" data-buy="${id}" ${c.gold < it.price ? 'disabled' : ''}>Acheter</button>`;
+      return `<div class="shop-item ${owned ? 'owned' : ''} ${trying === id ? 'trying' : ''}" data-try="${id}">
+        <canvas width="110" height="100" data-shopcv="${id}"></canvas>
+        <div class="shop-name">${esc(it.label)}</div>
+        <div class="shop-price">${owned ? '<span class="up">Possédé</span>' : `${it.price} 🪙`}</div>
+        ${btn}
+      </div>`;
+    }).join('')}</div></div>`;
+  }).join('');
+  $('shop-list').querySelectorAll('canvas[data-shopcv]').forEach((cv) => {
+    const id = cv.dataset.shopcv;
+    drawFighter(cv.getContext('2d'), 55, 62, myFighter({ [Rules.COSMETICS[id].slot]: id }), { scale: 1.9 });
+  });
+  $('shop-list').querySelectorAll('[data-try]').forEach((el) => {
+    el.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      trying = trying === el.dataset.try ? null : el.dataset.try;
+      Sound.play('chestHit', 2);
+      renderShop();
+    };
+  });
+  $('shop-list').querySelectorAll('[data-buy]').forEach((b) => {
+    b.onclick = async () => {
+      const it = Rules.COSMETICS[b.dataset.buy];
+      if (!confirm(`Acheter « ${it.label} » pour ${it.price} golds ?`)) return;
+      const r = await act('/api/shop/buy', { id: b.dataset.buy }, 'buy');
+      if (r) { trying = null; toast(`🛍️ ${it.label} acheté et porté !`); }
+    };
+  });
+  $('shop-list').querySelectorAll('[data-wear]').forEach((b) => {
+    b.onclick = () => act('/api/look', { part: b.dataset.wear, value: b.dataset.value || null }, 'equip');
+  });
+}
 
 // ---------- Panoplies ----------
 function renderSets() {
@@ -408,7 +522,7 @@ function renderAchievements() {
 
   $('ach-count').textContent = `${done.length} / ${list.length} terminés`;
   $('ach-summary').innerHTML = (claimable.length
-    ? `<span class="c-legendaire">🎁 ${claimable.length} récompense${claimable.length > 1 ? 's' : ''} à récupérer</span>`
+    ? `<span class="c-legendaire">🏅 ${claimable.length} récompense${claimable.length > 1 ? 's' : ''} à récupérer</span>`
     : '<span class="muted">Aucune récompense en attente</span>')
     + `<span class="spacer"></span><span>Titre : <b class="char-title">${c.titleName ? '« ' + esc(c.titleName) + ' »' : 'aucun'}</b></span>`
     + (c.title ? ' <button class="secondary small" id="title-clear">Retirer le titre</button>' : '');
@@ -739,17 +853,27 @@ async function openChest() {
 }
 
 // Aperçu animé du personnage.
-(function animateAvatar() {
-  const canvas = $('avatar');
-  const ctx = canvas.getContext('2d');
+// Aperçus animés du personnage (fiche, apparence, boutique avec essayage).
+function myFighter(appOverride) {
+  const look = {};
+  for (const [slot, item] of Object.entries(me.character.equipment)) if (item) look[slot] = item.rarity;
+  return { name: me.twitchDisplayName || me.username, cls: me.character.cls, look, app: { ...me.character.look, ...appOverride } };
+}
+
+(function animatePreviews() {
+  const views = [
+    { canvas: $('avatar'), x: 100, y: 118, scale: 3.4 },
+    { canvas: $('app-preview'), x: 110, y: 135, scale: 3.6 },
+    { canvas: $('shop-preview'), x: 120, y: 145, scale: 3.8, shop: true },
+  ];
   function frame(t) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (me) {
-      const look = {};
-      for (const [slot, item] of Object.entries(me.character.equipment)) if (item) look[slot] = item.rarity;
-      drawFighter(ctx, 100, 118, { name: me.twitchDisplayName || me.username, cls: me.character.cls, look }, {
-        scale: 3.4, bob: Math.sin(t / 400) * 3, swing: (Math.sin(t / 700) + 1) * 0.15,
-      });
+    for (const v of views) {
+      if (!v.canvas.offsetParent) continue; // onglet masqué
+      const ctx = v.canvas.getContext('2d');
+      ctx.clearRect(0, 0, v.canvas.width, v.canvas.height);
+      if (!me) continue;
+      const f = myFighter(v.shop && trying ? { [Rules.COSMETICS[trying].slot]: trying } : {});
+      drawFighter(ctx, v.x, v.y, f, { scale: v.scale, bob: Math.sin(t / 400) * 3, swing: (Math.sin(t / 700) + 1) * 0.15 });
     }
     requestAnimationFrame(frame);
   }
@@ -782,7 +906,7 @@ socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
   const gains = [`+${r.reward.xp} XP`];
   if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
-  if (r.reward.chests) gains.push(`+${r.reward.chests} 🎁`);
+  if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
   toast(`${REWARD_LABELS[r.type]} ${gains.join(', ')}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });

@@ -41,6 +41,16 @@
         sur le gagnant, ou si la bataille est annulée, tout le monde est remboursé.</p>
     </div>
 
+    <nav class="tabs-nav" id="tabs-nav">
+      <button data-tab="perso">🧙 Personnage <span class="tab-badge" data-badge="perso"></span></button>
+      <button data-tab="inventaire"><i class="ico-chest"></i> Inventaire <span class="tab-badge" data-badge="inventaire"></span></button>
+      <button data-tab="boutique">🛍️ Boutique</button>
+      <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
+      <button data-tab="classements">🏆 Classements</button>
+      <button data-tab="regles">📖 Règles</button>
+    </nav>
+
+    <section class="tab" data-tab="perso">
     <div class="grid2">
       <div>
         <div class="panel char-card">
@@ -52,7 +62,7 @@
           <div class="xpbar"><div id="xp-fill"></div><span id="xp-text"></span></div>
           <div class="wallet">
             <span title="Golds">🪙 <span id="gold"></span></span>
-            <span title="Coffres de LOOT">🎁 <span id="chests-small"></span></span>
+            <span title="Coffres de LOOT"><i class="ico-chest"></i> <span id="chests-small"></span></span>
           </div>
           <div class="record" id="record"></div>
           <button class="secondary small" id="change-class" style="margin-top:10px">🔄 Changer de classe (100 🪙)</button>
@@ -66,9 +76,17 @@
       </div>
 
       <div class="panel">
-        <h2>📊 Statistiques <span class="sub">1 niveau = 1 point de compétence</span><button class="help-btn" type="button">?</button></h2>
+        <h2>📊 Caractéristiques <span class="sub">1 niveau = 1 point de compétence</span><button class="help-btn" type="button">?</button></h2>
         <div id="skill-banner"></div>
         <table class="stats-table" id="stats"></table>
+      </div>
+    </div>
+
+    <div class="panel" id="appearance">
+      <h2>🎨 Apparence <span class="sub">Gratuit · visible en bataille</span></h2>
+      <div class="app-layout">
+        <div class="app-preview"><canvas id="app-preview" width="220" height="230"></canvas></div>
+        <div class="app-options" id="app-options"></div>
       </div>
     </div>
 
@@ -86,10 +104,13 @@
       </div>
     </div>
 
+    </section>
+
+    <section class="tab" data-tab="inventaire">
     <div class="panel">
-      <h2>🎁 Coffres de LOOT <span class="sub">1 coffre = 3 objets aléatoires</span></h2>
+      <h2><i class="ico-chest"></i> Coffres de LOOT <span class="sub">1 coffre = 3 objets aléatoires</span></h2>
       <div class="chest-actions">
-        <span class="chest-count">🎁 × <span id="chests"></span></span>
+        <span class="chest-count"><i class="ico-chest big"></i> × <span id="chests"></span></span>
         <span class="spacer"></span>
         <button class="gold" id="open-chest">Ouvrir un coffre</button>
         <button class="secondary" id="buy-1">Acheter 1 coffre (100 🪙)</button>
@@ -130,6 +151,27 @@
       </div>
     </div>
 
+    </section>
+
+    <section class="tab" data-tab="boutique">
+    <div class="panel" id="shop">
+      <h2>🛍️ Boutique <span class="sub">Cosmétiques purement visuels, payés en golds</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Les cosmétiques ne changent pas tes stats : ils changent seulement ton look en bataille. Un
+        <b>chapeau remplace l'apparence de ton casque</b> (le casque reste équipé et ses bonus restent actifs). Clique sur un
+        article pour l'<b>essayer</b> sur l'aperçu avant de l'acheter. Une fois acheté, il est à toi pour toujours : tu peux le
+        porter ou le retirer gratuitement (ici ou dans l'onglet Personnage).</p>
+      <div class="shop-layout">
+        <div class="shop-side">
+          <canvas id="shop-preview" width="240" height="250"></canvas>
+          <div id="shop-try" class="muted"></div>
+          <div class="wallet-line">🪙 <b id="shop-gold"></b> golds</div>
+        </div>
+        <div id="shop-list"></div>
+      </div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="succes">
     <div class="panel" id="achievements">
       <h2>🏅 Succès <span class="sub" id="ach-count"></span><button class="help-btn" type="button">?</button></h2>
       <p class="muted help">Chaque succès terminé te permet de <b>récupérer des golds</b> (plus il est difficile, plus il rapporte)
@@ -139,14 +181,20 @@
       <div class="ach-grid" id="ach-grid"></div>
     </div>
 
+    </section>
+
+    <section class="tab" data-tab="classements">
     <div class="panel" id="leaderboard-panel">
       <h2>🏆 Classements <span class="sub">Top 10 des joueurs</span></h2>
       <div id="leaderboard"></div>
     </div>
 
+    </section>
+
+    <section class="tab" data-tab="regles">
     <div class="panel" id="combat-info">
-      <h2>⚔️ Règles des combats <span class="sub">Récompenses, séries, événements et classes</span><button class="help-btn" type="button">?</button></h2>
-      <div class="help">
+      <h2>⚔️ Règles des combats <span class="sub">Récompenses, séries, événements et classes</span></h2>
+      <div>
       <div class="combat-info-grid">
         <div>
           <h3>🏆 Récompenses</h3>
@@ -157,10 +205,10 @@
           <h3>🧭 Déroulement</h3>
           <ul class="muted rules-list">
             <li>Les combattants apparaissent à des places aléatoires et attaquent l'ennemi le plus proche
-              (le <b>Guerrier</b> attire l'aggro, l'<b>Assassin</b> traque le plus faible).</li>
+              (le <b>Guerriloot</b> attire l'aggro, le <b>Lootassin</b> traque le plus faible).</li>
             <li>Après 45 secondes, une <b>zone</b> se referme et blesse ceux qui restent dehors.</li>
             <li>Le dernier survivant remporte la <b>Victoire Royale</b>.</li>
-            <li>Toutes les stats et leurs effets sont détaillés dans le tableau <b>Statistiques</b>.</li>
+            <li>Toutes les stats et leurs effets sont détaillés dans le tableau <b>Caractéristiques</b> (onglet Personnage).</li>
           </ul>
         </div>
       </div>
@@ -173,16 +221,16 @@
     </div>
 
     <div class="panel" id="loot-info">
-      <h2>🍀 Comment fonctionne la chance ?<button class="help-btn" type="button">?</button></h2>
-      <p class="muted help">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
+      <h2>🍀 Comment fonctionne la chance ?</h2>
+      <p class="muted">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
         Avec <b>0 de chance</b>, les probabilités sont 90 % Commun, 6 % Peu commun, 3 % Rare, 0,9 % Épique et 0,1 % Légendaire.
         Chaque point de chance <b>retire 1 %</b> aux Communs et le redistribue aux raretés supérieures
         (+0,4 % Peu commun, +0,3 % Rare, +0,21 % Épique, +0,09 % Légendaire). La chance effective est plafonnée à
         <b>85</b>. Les bonus de Chance de ton équipement <b>s'ajoutent</b> à tes points (un objet « +3 Chance » = +3 de chance effective).</p>
-      <p class="muted help">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
+      <p class="muted">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
         Commun 1 ligne (+1 à 3 %), Peu commun 2 lignes (+4 à 6 %), Rare 3 lignes (+7 à 10 %),
         Épique 4 lignes (+11 à 15 %), Légendaire 5 lignes (+15 à 25 %).</p>
-      <p class="muted help">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
+      <p class="muted">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
         le hasard peut surprendre (un Légendaire dès le début, ou aucun Rare pendant longtemps) ; plus tu en ouvres, plus
         tes résultats se rapprochent des probabilités affichées.</p>
       <div id="loot-table"></div>
@@ -193,6 +241,7 @@
         <button class="secondary small" id="luck-reset">Ma chance</button>
       </div>
     </div>
+    </section>
   </main>
 
   <div class="modal" id="class-modal">

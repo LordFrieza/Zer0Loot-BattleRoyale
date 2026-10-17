@@ -33,6 +33,8 @@ function upgrade(character) {
   }
   for (const k of Rules.COUNTERS) if (character.counters[k] == null) character.counters[k] = 0;
   if (!character.claimed) character.claimed = [];
+  character.look = Object.assign({}, Rules.DEFAULT_LOOK, character.look);
+  if (!character.owned) character.owned = []; // cosmétiques achetés
   if (character.title === undefined) character.title = null;
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
@@ -65,6 +67,8 @@ function newCharacter() {
     counters: Object.fromEntries(Rules.COUNTERS.map((k) => [k, 0])), // pour les succès
     claimed: [], // succès dont la récompense a été récupérée
     title: null, // id du succès affiché comme titre
+    look: { ...Rules.DEFAULT_LOOK }, // apparence : couleur, yeux, sourcils, bouche + cosmétiques portés
+    owned: [], // cosmétiques achetés à la boutique
   };
 }
 
@@ -228,7 +232,8 @@ function equip(character, itemId) {
   if (idx < 0) throw new Error('Objet introuvable');
   const item = character.inventory[idx];
   if (!Rules.canEquip(item, character.cls)) {
-    throw new Error(`Réservé à la classe ${Rules.CLASS_INFO[Rules.itemClass(item)].label}`);
+    const ci = Rules.CLASS_INFO[Rules.itemClass(item)];
+    throw new Error(`Réservé à la classe ${ci.label} (${ci.role})`);
   }
   character.inventory.splice(idx, 1);
   const previous = character.equipment[item.slot];
@@ -345,6 +350,38 @@ function titleOf(character) {
   return a ? a.name : null;
 }
 
+// ---------- Apparence & boutique ----------
+
+// Change une partie de l'apparence. Les parties gratuites prennent une option du catalogue ;
+// les cosmétiques doivent avoir été achetés (null pour les retirer).
+function setLook(character, part, value) {
+  upgrade(character);
+  if (Rules.APPEARANCE[part]) {
+    if (!(part === 'color' && value === null) && !Rules.APPEARANCE[part].options[value]) throw new Error('Option inconnue');
+  } else if (Rules.COSMETIC_SLOTS[part]) {
+    if (value !== null) {
+      const item = Rules.COSMETICS[value];
+      if (!item || item.slot !== part) throw new Error('Cosmétique inconnu');
+      if (!character.owned.includes(value)) throw new Error('Achète d\'abord cet article à la boutique');
+    }
+  } else {
+    throw new Error('Partie inconnue');
+  }
+  character.look[part] = value;
+}
+
+function buyCosmetic(character, id) {
+  upgrade(character);
+  const item = Rules.COSMETICS[id];
+  if (!item) throw new Error('Article inconnu');
+  if (character.owned.includes(id)) throw new Error('Tu possèdes déjà cet article');
+  if (character.gold < item.price) throw new Error(`Il te faut ${item.price} golds`);
+  character.gold -= item.price;
+  character.owned.push(id);
+  character.look[item.slot] = id; // porté directement après l'achat
+  return { price: item.price };
+}
+
 // ---------- Admin ----------
 
 function adminGive(character, { gold = 0, chests = 0, xp = 0 }) {
@@ -439,6 +476,6 @@ function publicCharacter(user) {
 module.exports = {
   newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, rollRarity, makeItem,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
-  bump, claimAchievement, setTitle, titleOf, adminGive,
+  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
 };

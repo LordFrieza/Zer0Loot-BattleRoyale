@@ -91,13 +91,13 @@ function renderPlayers() {
     .filter((p) => !q || p.name.toLowerCase().includes(q) || (p.twitch || '').includes(q) || p.username.toLowerCase().includes(q))
     .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
   $('players-count').textContent = `${playersList.length} joueur(s)`;
-  $('players').innerHTML = `<tr><th>Joueur</th><th>Classe</th><th>Niv.</th><th>🪙</th><th>🎁</th><th>V / K / B</th><th>Donner</th><th></th></tr>`
+  $('players').innerHTML = `<tr><th>Joueur</th><th>Classe</th><th>Niv.</th><th>🪙</th><th><i class="ico-chest"></i></th><th>V / K / B</th><th>Donner</th><th></th></tr>`
     + list.map((p) => {
       const ci = p.cls && Rules.CLASS_INFO[p.cls];
       return `<tr class="${p.banned ? 'banned' : ''}" data-id="${p.id}">
         <td><b>${esc(p.name)}</b>${p.twitch ? ` <span class="muted">@${esc(p.twitch)}</span>` : ''}${p.ghost ? '<span class="tag">sans compte</span>' : ''}${p.banned ? '<span class="tag red">banni</span>' : ''}
           ${p.title ? `<div class="muted" style="font-size:11px">« ${esc(p.title)} »</div>` : ''}</td>
-        <td>${ci ? ci.icon + ' ' + ci.label : '—'}</td>
+        <td>${ci ? `${ci.icon} ${ci.label} <span class="muted">(${ci.role})</span>` : '—'}</td>
         <td>${p.level}</td><td>${p.gold}</td><td>${p.chests}</td>
         <td>${p.record.wins} / ${p.record.kills} / ${p.record.battles}</td>
         <td><div class="row" style="gap:4px;flex-wrap:nowrap">
