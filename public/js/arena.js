@@ -30,50 +30,101 @@
       this.lastShotSound = 0;
       this.last = performance.now();
       this.bg = this.makeBackground();
+      this.loadImages();
       this.lastHitSound = 0;
       socket.on('queue', (q) => this.onQueue(q));
       socket.on('frame', (f) => this.onFrame(f));
       requestAnimationFrame((t) => this.loop(t));
     }
 
+    // Sol de l'arène : parquet Zer0Loot assombri, grille néon, emblème au centre et cadre lumineux.
+    // Dessiné une première fois sans images, puis redessiné quand le fond et le logo sont chargés.
     makeBackground() {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
       const g = c.getContext('2d');
       const grad = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.7);
-      grad.addColorStop(0, '#2b3a2a');
-      grad.addColorStop(1, '#141b16');
+      grad.addColorStop(0, '#241650');
+      grad.addColorStop(1, '#0a0620');
       g.fillStyle = grad;
       g.fillRect(0, 0, W, H);
-      // dalles
-      g.strokeStyle = 'rgba(255,255,255,.035)';
-      for (let x = 0; x < W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
-      for (let y = 0; y < H; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-      // touffes d'herbe et cailloux pseudo-aléatoires
-      let seed = 7;
-      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      for (let i = 0; i < 260; i++) {
-        const x = rnd() * W;
-        const y = rnd() * H;
-        if (rnd() < 0.7) {
-          g.strokeStyle = `rgba(120,${160 + rnd() * 60},90,.35)`;
-          g.beginPath();
-          g.moveTo(x, y); g.lineTo(x - 3, y - 7);
-          g.moveTo(x, y); g.lineTo(x + 1, y - 9);
-          g.moveTo(x, y); g.lineTo(x + 4, y - 6);
-          g.stroke();
-        } else {
-          g.fillStyle = 'rgba(0,0,0,.25)';
-          g.beginPath(); g.ellipse(x, y, 4 + rnd() * 5, 3 + rnd() * 3, 0, 0, Math.PI * 2); g.fill();
-        }
+      if (this.floorImg) {
+        // « cover » : l'image (3:1) est agrandie pour couvrir tout le 16:9
+        const k = Math.max(W / this.floorImg.width, H / this.floorImg.height);
+        const iw = this.floorImg.width * k;
+        const ih = this.floorImg.height * k;
+        g.drawImage(this.floorImg, (W - iw) / 2, (H - ih) / 2, iw, ih);
+        g.fillStyle = 'rgba(10, 6, 32, .5)';
+        g.fillRect(0, 0, W, H);
+      }
+      // grille néon
+      g.strokeStyle = 'rgba(41, 231, 255, .06)';
+      g.lineWidth = 1;
+      for (let x = 0; x < W; x += 64) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); }
+      for (let y = 0; y < H; y += 64) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); }
+      // cercle central et emblème
+      g.save();
+      g.shadowColor = '#ff3fd8';
+      g.shadowBlur = 18;
+      g.strokeStyle = 'rgba(255, 63, 216, .28)';
+      g.lineWidth = 3;
+      g.beginPath(); g.arc(W / 2, H / 2, 190, 0, Math.PI * 2); g.stroke();
+      g.strokeStyle = 'rgba(41, 231, 255, .16)';
+      g.lineWidth = 2;
+      g.beginPath(); g.arc(W / 2, H / 2, 205, 0, Math.PI * 2); g.stroke();
+      g.restore();
+      if (this.logoImg) {
+        const lh = 260;
+        const lw = lh * this.logoImg.width / this.logoImg.height;
+        g.globalAlpha = 0.13;
+        g.drawImage(this.logoImg, W / 2 - lw / 2, H / 2 - lh / 2, lw, lh);
+        g.globalAlpha = 1;
       }
       // vignette
       const v = g.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.75);
       v.addColorStop(0, 'rgba(0,0,0,0)');
-      v.addColorStop(1, 'rgba(0,0,0,.65)');
+      v.addColorStop(1, 'rgba(0,0,0,.6)');
       g.fillStyle = v;
       g.fillRect(0, 0, W, H);
+      // cadre néon
+      g.save();
+      const frame = g.createLinearGradient(0, 0, W, H);
+      frame.addColorStop(0, '#29e7ff');
+      frame.addColorStop(0.5, '#b83cff');
+      frame.addColorStop(1, '#ff3fd8');
+      g.strokeStyle = frame;
+      g.shadowColor = '#b83cff';
+      g.shadowBlur = 16;
+      g.lineWidth = 4;
+      g.strokeRect(4, 4, W - 8, H - 8);
+      g.restore();
       return c;
+    }
+
+    loadImages() {
+      const load = (src, key) => {
+        const img = new Image();
+        img.onload = () => { this[key] = img; this.bg = this.makeBackground(); };
+        img.src = src;
+      };
+      load('/img/fond.webp', 'floorImg');
+      load('/img/logo.png', 'logoImg');
+      // La police des titres doit être demandée explicitement pour être utilisable dans le canvas.
+      if (document.fonts) document.fonts.load('900 40px Orbitron').catch(() => {});
+    }
+
+    // Logo Zer0Loot centré horizontalement sur x, de hauteur h.
+    drawLogo(x, y, h, alpha = 1, blur = 30) {
+      if (!this.logoImg) return false;
+      const ctx = this.ctx;
+      const w = h * this.logoImg.width / this.logoImg.height;
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.shadowColor = 'rgba(184, 60, 255, .8)';
+      ctx.shadowBlur = blur;
+      ctx.drawImage(this.logoImg, x - w / 2, y - h / 2, w, h);
+      ctx.restore();
+      return true;
     }
 
     // Sons liés aux changements de phase (clairons, musique, inscriptions).
@@ -217,10 +268,17 @@
       ctx.restore();
     }
 
-    title(text, y, size, color = '#fff', glow = '#9146ff') {
+    // Grand titre néon centré ; la taille est réduite si le texte dépasse maxW.
+    title(text, y, size, color = '#fff', glow = '#b83cff', maxW = W - 80) {
       const ctx = this.ctx;
       ctx.save();
-      ctx.font = `900 ${size}px "Segoe UI", system-ui, sans-serif`;
+      const font = (px) => `900 ${px}px Orbitron, "Segoe UI", system-ui, sans-serif`;
+      ctx.font = font(size);
+      const width = ctx.measureText(text).width;
+      if (width > maxW) {
+        size = Math.floor(size * maxW / width);
+        ctx.font = font(size);
+      }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = glow;
@@ -234,10 +292,12 @@
     }
 
     drawIdle(t) {
-      this.title('ZER0LOOT', H / 2 - 70, 110, '#fff');
-      this.title('BATTLE ROYALE', H / 2 + 20, 48, '#ffb000', '#ff7a00');
+      // Même place et même taille que l'emblème du sol, qu'il recouvre exactement.
+      if (!this.drawLogo(W / 2, H / 2, 260, 1, 30 + Math.sin(t / 600) * 14)) this.title('ZER0LOOT', H / 2, 110, '#fff');
+      this.ctx.globalAlpha = Math.random() < 0.015 ? 0.5 : 1; // petit grésillement de néon
+      this.title('BATTLE ROYALE', H / 2 + 185, 46, '#fff', '#ff3fd8');
       this.ctx.globalAlpha = 0.6 + Math.sin(t / 500) * 0.3;
-      this.title('En attente du prochain combat…', H / 2 + 100, 26, '#cfc6ff');
+      this.title('En attente du prochain combat…', H / 2 + 245, 24, '#cfc6ff', '#29e7ff');
       this.ctx.globalAlpha = 1;
     }
 
@@ -250,14 +310,15 @@
         this.ctx.translate(W / 2, 90);
         this.ctx.scale(pulse, pulse);
         this.ctx.translate(-W / 2, -90);
-        this.title('TAPEZ !join DANS LE CHAT', 90, 64, '#fff');
+        this.title('TAPEZ !join DANS LE CHAT', 90, 60, '#fff', '#b83cff', W - 360);
         this.ctx.restore();
         const left = q.queueEndsAt ? q.queueEndsAt - Date.now() : 0;
-        this.title(formatCountdown(left), 175, 56, left < 10000 ? '#ff4d6d' : '#ffb000', '#ff7a00');
+        this.title(formatCountdown(left), 175, 56, left < 10000 ? '#ff4d6d' : '#ffc21a', left < 10000 ? '#ff4d6d' : '#ff9a00');
       } else {
-        this.title('FILE FERMÉE', 90, 64, '#fff');
-        this.title('La bataille va commencer !', 170, 34, '#ffb000', '#ff7a00');
+        this.title('FILE FERMÉE', 90, 60, '#fff', '#b83cff', W - 360);
+        this.title('La bataille va commencer !', 170, 32, '#ffc21a', '#ff9a00');
       }
+      this.drawLogo(100, 80, 110);
       const pot = q.bets && q.bets.pool ? `   ·   💰 ${q.bets.pool} golds pariés sur le site` : '';
       this.title(`${n} combattant${n > 1 ? 's' : ''}${pot}`, 235, 26, '#cfc6ff');
 
@@ -299,12 +360,14 @@
       // Zone qui rétrécit
       if (f.storm && f.storm.active) {
         ctx.save();
-        ctx.fillStyle = 'rgba(120, 40, 200, 0.28)';
+        ctx.fillStyle = 'rgba(255, 30, 110, 0.22)';
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.arc(f.storm.x, f.storm.y, f.storm.r, 0, Math.PI * 2, true);
         ctx.fill('evenodd');
-        ctx.strokeStyle = `rgba(200, 120, 255, ${0.6 + Math.sin(t / 150) * 0.3})`;
+        ctx.strokeStyle = `rgba(255, 90, 170, ${0.6 + Math.sin(t / 150) * 0.3})`;
+        ctx.shadowColor = '#ff3fd8';
+        ctx.shadowBlur = 16;
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(f.storm.x, f.storm.y, f.storm.r, 0, Math.PI * 2);
@@ -474,30 +537,27 @@
 
       // HUD
       const alive = f.fighters.filter((x) => x.alive).length;
-      ctx.fillStyle = 'rgba(0,0,0,.55)';
-      ctx.fillRect(16, 16, 230, 64);
+      this.hudBox(16, 16, 230, 64, '#29e7ff');
       ctx.textAlign = 'left';
       ctx.font = '900 26px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = '#fff';
       ctx.fillText(`👥 ${alive} en vie`, 30, 38);
       ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
-      ctx.fillStyle = f.storm && f.storm.active ? '#d49bff' : '#cfc6ff';
+      ctx.fillStyle = f.storm && f.storm.active ? '#ff8fc8' : '#cfc6ff';
       const time = Math.floor(f.time);
       ctx.fillText(`⏱ ${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}${f.storm && f.storm.active ? '  ⚡ la zone se referme' : ''}`, 30, 66);
       let hudY = 84;
       const ev = f.event && Rules.BATTLE_EVENTS[f.event];
       if (ev) {
-        ctx.fillStyle = 'rgba(0,0,0,.55)';
-        ctx.fillRect(16, hudY, 230, 30);
+        this.hudBox(16, hudY, 230, 30, ev.color);
         ctx.fillStyle = ev.color;
         ctx.fillText(`${ev.icon} ${ev.label}`, 30, hudY + 21);
         hudY += 34;
       }
       const bets = this.queue && this.queue.bets;
       if (bets && bets.pool && this.queue.phase === 'battle') {
-        ctx.fillStyle = 'rgba(0,0,0,.55)';
-        ctx.fillRect(16, hudY, 230, 30);
-        ctx.fillStyle = '#ffb000';
+        this.hudBox(16, hudY, 230, 30, '#ffc21a');
+        ctx.fillStyle = '#ffc21a';
         ctx.fillText(`💰 ${bets.pool} golds en jeu (${bets.bettors} paris)`, 30, hudY + 21);
       }
 
@@ -508,15 +568,29 @@
         ctx.globalAlpha = a;
         ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
         const w = ctx.measureText(item.text).width + 24;
-        ctx.fillStyle = 'rgba(0,0,0,.6)';
-        ctx.fillRect(W - w - 16, 16 + i * 30, w, 26);
+        this.hudBox(W - w - 16, 16 + i * 30, w, 26, '#ff3fd8');
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'right';
         ctx.fillText(item.text, W - 28, 30 + i * 30);
       });
       ctx.globalAlpha = 1;
       this.feed = this.feed.filter((x) => x.life > 0);
-      this.drawAnnounces(dt);
+      // Pas d'annonce par-dessus l'écran de victoire.
+      if (this.queue && this.queue.phase === 'ended') this.announces = [];
+      else this.drawAnnounces(dt);
+    }
+
+    // Cadre du HUD : fond sombre avec une barre néon à gauche.
+    hudBox(x, y, w, h, color) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 5, 28, .72)';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.fillRect(x, y, 3, h);
+      ctx.restore();
     }
 
     // Annonces de séries (une à la fois, au centre en haut).
@@ -550,9 +624,9 @@
         ctx.translate(W / 2, 150);
         ctx.scale(s, s);
         ctx.translate(-W / 2, -150);
-        this.title('🏆 VICTOIRE ROYALE 🏆', 150, 60, '#ffb000', '#ff7a00');
+        this.title('🏆 VICTOIRE ROYALE 🏆', 150, 56, '#ffc21a', '#ff9a00');
         ctx.restore();
-        this.title(r.winner.name, 240, 70, '#fff');
+        this.title(r.winner.name, 240, 64, '#fff', '#ff3fd8');
         this.title(`${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
         const fighter = this.frame && this.frame.fighters.find((f) => f.key === r.winner.key);
         if (fighter) drawFighter(ctx, W / 2, 420, fighter, { scale: 3, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
