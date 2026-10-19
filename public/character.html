@@ -90,20 +90,6 @@
       </div>
     </div>
 
-    <div class="panel" id="equipment-panel">
-      <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span><button class="help-btn" type="button">?</button></h2>
-      <div class="equip-grid" id="equipment"></div>
-      <div class="sets-active" id="sets-active"></div>
-      <div class="help">
-        <h3>🧩 Les panoplies</h3>
-        <p class="muted">Certains objets appartiennent à une <b>panoplie</b> (étiquette colorée sur l'objet). Équipe au moins
-          <b>2 pièces de la même panoplie</b> pour gagner des points bonus dans ses deux stats, comme des points de compétence.
-          Plus tu en équipes, plus le bonus grandit : <span id="set-tiers"></span>. Les objets de panoplie sont plus fréquents
-          dans les hautes raretés, et <b>fusionner 3 pièces d'une même panoplie</b> à la forge donne une pièce de cette panoplie.</p>
-        <div class="sets-help" id="sets-help"></div>
-      </div>
-    </div>
-
     </section>
 
     <section class="tab" data-tab="inventaire">
@@ -118,12 +104,27 @@
       </div>
     </div>
 
+    <div class="panel" id="equipment-panel">
+      <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span><button class="help-btn" type="button">?</button></h2>
+      <div class="equip-grid" id="equipment"></div>
+      <div class="sets-active" id="sets-active"></div>
+      <div class="help">
+        <h3>🧩 Les panoplies</h3>
+        <p class="muted">Certains objets appartiennent à une <b>panoplie</b> (étiquette colorée sur l'objet). Équipe au moins
+          <b>2 pièces de la même panoplie</b> pour gagner des points bonus dans ses deux stats, comme des points de compétence.
+          Plus tu en équipes, plus le bonus grandit (points dans <b>chacune</b> des deux stats de la panoplie) : <span id="set-tiers"></span>. Les objets de panoplie sont plus fréquents
+          dans les hautes raretés, et <b>fusionner 3 pièces d'une même panoplie</b> à la forge donne une pièce de cette panoplie.</p>
+        <div class="sets-help" id="sets-help"></div>
+      </div>
+    </div>
+
     <div class="panel">
       <h2>🧰 Coffre personnel <span class="sub" id="inv-count"></span>
         <button class="secondary small" id="recycle-toggle">♻️ Recycler</button></h2>
       <div class="recycle-bar" id="recycle-bar" style="display:none"></div>
       <div class="inv-filters" id="inv-filters"></div>
       <div class="inventory" id="inventory"></div>
+      <div class="pager" id="inv-pager"></div>
     </div>
 
     <div class="panel forge-box" id="forge">

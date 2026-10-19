@@ -304,7 +304,7 @@ test('classes : armes réservées, objets incompatibles retirés au changement',
   const book = game.makeItem('rare', 'secondaire', { kind: 'grimoire' });
   const helmet = game.makeItem('rare', 'casque');
   c.inventory.push(sword, staff, book, helmet);
-  assert.throws(() => game.equip(c, sword.id), /Guerrier/);
+  assert.throws(() => game.equip(c, sword.id), /Guerriloot/);
   game.equip(c, staff.id);
   game.equip(c, book.id);
   game.equip(c, helmet.id);

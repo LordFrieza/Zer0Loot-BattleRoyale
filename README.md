@@ -132,9 +132,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
   chapeaux, capes, chaussures, accessoires de visage, auras animées. Essayage sur l'aperçu avant achat ; un article
   acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence du casque** (le casque reste équipé et ses
   bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10 articles).
-- **Page perso en onglets** : Personnage (fiche, caractéristiques, apparence, équipement), Inventaire (coffres,
-  coffre personnel, forge), Boutique, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir,
+- **Page perso en onglets** : Personnage (fiche, caractéristiques, apparence), Inventaire (coffres, équipement,
+  coffre personnel paginé par 20 objets, forge), Boutique, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir,
   succès à récupérer. Lien direct possible (`/character.html#boutique`).
+- **Thème du site** : bouton « 🎨 Thème » dans la barre du haut pour basculer entre le style « Moderne » et le style
+  « Taverne » (en essai : bois, laiton, parchemin, police Cinzel). Mémorisé par navigateur ; `?theme=taverne` dans
+  l'adresse force le thème.
 - **Panoplies** : 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à 2 stats.
   Équiper 2 / 4 / 6 / 8 pièces d'une même panoplie donne +2 / +4 / +7 / +10 points dans ces 2 stats (comme des points de
   compétence). Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces

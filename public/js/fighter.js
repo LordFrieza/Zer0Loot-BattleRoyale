@@ -421,6 +421,31 @@
     }
   }
 
+  /*
+   * Casque : un dôme posé sur le haut du crâne, qui s'arrête au-dessus des sourcils
+   * (les yeux et sourcils choisis dans l'apparence restent visibles).
+   */
+  function drawHelmet(ctx, color) {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-11, -22.6);
+    ctx.quadraticCurveTo(-11, -32.5, 0, -32.5);
+    ctx.quadraticCurveTo(11, -32.5, 11, -22.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // bandeau du bord
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.fillRect(-11.4, -24.4, 22.8, 2);
+    // reflet / crête
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.fillRect(-1, -31.5, 2, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.ellipse(-5, -28.5, 2.2, 3.2, -0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
   // Chapeaux (remplacent l'affichage du casque).
   function drawHat(ctx, id) {
     const c = cosmetic(id);
@@ -449,7 +474,8 @@
         ctx.fillRect(-8, -29, 16, 3);
         break;
       case 'viking':
-        ctx.beginPath(); ctx.arc(0, -17, 11, Math.PI, 0); ctx.lineTo(11, -15); ctx.lineTo(-11, -15); ctx.closePath(); ctx.fill(); ctx.stroke();
+        drawHelmet(ctx, c.color);
+        ctx.fillStyle = c.color;
         ctx.fillStyle = '#f5ead0';
         for (const d of [-1, 1]) {
           ctx.beginPath(); ctx.moveTo(9 * d, -22); ctx.quadraticCurveTo(17 * d, -26, 15 * d, -35); ctx.quadraticCurveTo(13 * d, -27, 6 * d, -25); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -569,15 +595,7 @@
     if (cosmetic(app.hat)) {
       drawHat(ctx, app.hat);
     } else if (look.casque) {
-      ctx.fillStyle = RC[look.casque];
-      ctx.beginPath();
-      ctx.arc(0, -17, 11, Math.PI, 0);
-      ctx.lineTo(11, -15);
-      ctx.lineTo(-11, -15);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.35)';
-      ctx.fillRect(-1, -27, 2, 10);
+      drawHelmet(ctx, RC[look.casque]);
     }
 
     // arme de la classe (main avant) avec mouvement d'attaque

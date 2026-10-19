@@ -284,14 +284,17 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px; max-width: 1100px; width: 100%; max-height: 92vh; overflow: auto; }
 .modal-box h2 { margin: 0 0 4px; }
 .class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
-.class-card { background: var(--bg2); border: 2px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; transition: transform .12s, border-color .12s; }
+/* Cartes de classe en colonne : le bouton « Choisir » est toujours en bas, aligné d'une carte à l'autre. */
+.class-card { background: var(--bg2); border: 2px solid var(--border); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; transition: transform .12s, border-color .12s; display: flex; flex-direction: column; align-items: center; }
 .class-card:hover { transform: translateY(-3px); border-color: var(--c); }
 .class-card.current { border-color: var(--c); box-shadow: 0 0 16px color-mix(in srgb, var(--c) 40%, transparent); }
 .class-card canvas { display: block; margin: 0 auto; }
 .class-card h3 { margin: 4px 0; color: var(--c); }
-.class-card p { font-size: 12px; color: var(--muted); min-height: 48px; }
-.class-card ul { text-align: left; font-size: 12px; padding-left: 16px; margin: 6px 0 10px; }
-.class-card .weapons { font-size: 12px; margin-bottom: 8px; }
+.class-card p { font-size: 12px; color: var(--muted); min-height: 48px; margin: 6px 0; }
+.class-card ul { text-align: left; font-size: 12px; padding-left: 16px; margin: 6px 0 10px; align-self: stretch; flex: 1; }
+.class-card .weapons { font-size: 12px; margin-bottom: 10px; }
+.class-card button { margin-top: auto; height: 34px; min-width: 130px; justify-content: center; }
+.class-card h3 { font-size: 20px; }
 
 /* ---------- Forge ---------- */
 .forge-box { border: 1px solid #ff7a1f; background: linear-gradient(135deg, rgba(255,90,20,.10), transparent 55%), var(--panel); }
@@ -351,7 +354,13 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 /* ---------- Panoplies ---------- */
 .set-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; margin-left: 4px; color: var(--c); border: 1px solid var(--c); }
 .sets-active { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-.set-chip { border: 1px solid var(--c); border-left: 4px solid var(--c); border-radius: 8px; padding: 6px 10px; font-size: 13px; background: var(--bg2); }
+.set-chip { border: 1px solid var(--c); border-left: 4px solid var(--c); border-radius: 8px; padding: 8px 12px; font-size: 13px; background: var(--bg2); display: flex; flex-direction: column; gap: 4px; min-width: 260px; }
+.set-chip .set-head { display: flex; gap: 6px; align-items: center; }
+.set-chip .set-head .muted { margin-left: auto; font-size: 12px; }
+.set-pips { display: flex; gap: 4px; }
+.set-pip { font-size: 11px; font-weight: 800; width: 22px; height: 18px; border-radius: 4px; display: grid; place-items: center; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.set-pip.on { background: var(--c); color: #111; border-color: var(--c); }
+.set-tier-list { margin: 6px 0 0; padding-left: 16px; font-size: 12px; }
 .set-chip.inactive { opacity: .6; }
 .sets-help { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 10px; }
 .sets-help > div { background: var(--bg2); border-left: 3px solid var(--c); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
@@ -455,4 +464,7 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .shop-item canvas { display: block; margin: 0 auto; }
 .shop-item .shop-name { font-weight: 800; font-size: 13px; margin: 4px 0; }
 .shop-item .shop-price { color: var(--accent2); font-weight: 800; font-size: 13px; margin-bottom: 6px; }
-.class-card .role { font-size: 12px; color: var(--muted); margin-top: -4px; }
+
+/* Pagination du coffre personnel */
+.pager { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin-top: 14px; }
+.pager .chip[disabled] { opacity: .4; cursor: default; }

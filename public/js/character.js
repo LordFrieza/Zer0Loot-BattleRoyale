@@ -135,6 +135,30 @@ function compareHtml(item) {
   return `<div class="compare">vs équipé : ${parts.join(', ') || 'identique'}</div>`;
 }
 
+const INV_PAGE_SIZE = 20;
+let invPage = 0;
+
+function renderPager(pages, total) {
+  const el = $('inv-pager');
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  const from = invPage * INV_PAGE_SIZE + 1;
+  const to = Math.min(total, (invPage + 1) * INV_PAGE_SIZE);
+  const btn = (p, label, extra = '') => `<button class="chip ${p === invPage ? 'active' : ''}" data-page="${p}" ${extra}>${label}</button>`;
+  el.innerHTML = btn(invPage - 1, '‹ Précédent', invPage === 0 ? 'disabled' : '')
+    + Array.from({ length: pages }, (_, p) => p)
+      .filter((p) => p === 0 || p === pages - 1 || Math.abs(p - invPage) <= 2)
+      .map((p, i, arr) => (i && p - arr[i - 1] > 1 ? '<span class="muted">…</span>' : '') + btn(p, p + 1)).join('')
+    + btn(invPage + 1, 'Suivant ›', invPage === pages - 1 ? 'disabled' : '')
+    + `<span class="muted" style="font-size:13px;margin-left:6px">Objets ${from} à ${to} sur ${total}</span>`;
+  el.querySelectorAll('[data-page]:not([disabled])').forEach((b) => {
+    b.onclick = () => {
+      invPage = Number(b.dataset.page);
+      renderInventory();
+      document.getElementById('inv-filters').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+  });
+}
+
 function renderInventory() {
   const inv = me.character.inventory;
   const filters = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]));
@@ -143,7 +167,7 @@ function renderInventory() {
     return `<button class="${invFilter === k ? 'active' : ''}" data-f="${k}">${label} (${n})</button>`;
   }).join('');
   $('inv-filters').querySelectorAll('button').forEach((b) => {
-    b.onclick = () => { invFilter = b.dataset.f; renderInventory(); };
+    b.onclick = () => { invFilter = b.dataset.f; invPage = 0; renderInventory(); };
   });
   $('inv-count').textContent = inv.length + ' objet(s)';
   const list = inv
@@ -155,9 +179,15 @@ function renderInventory() {
   const ids = new Set(inv.map((i) => i.id));
   for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
 
+  // Pagination : INV_PAGE_SIZE objets par page (les filtres et la sélection de recyclage portent sur toutes les pages).
+  const pages = Math.max(1, Math.ceil(list.length / INV_PAGE_SIZE));
+  invPage = Math.min(invPage, pages - 1);
+  const pageItems = list.slice(invPage * INV_PAGE_SIZE, (invPage + 1) * INV_PAGE_SIZE);
+  renderPager(pages, list.length);
+
   $('inventory').classList.toggle('recycling', recycleMode);
-  $('inventory').innerHTML = list.length
-    ? list.map((item) => {
+  $('inventory').innerHTML = pageItems.length
+    ? pageItems.map((item) => {
       const ok = Rules.canEquip(item, me.character.cls);
       const btn = ok
         ? `<button class="small" data-equip="${item.id}">Équiper</button>`
@@ -200,7 +230,6 @@ function openClassModal() {
     return `<div class="class-card ${c.cls === cls ? 'current' : ''}" data-cls="${cls}" style="--c:${ci.color}">
       <canvas width="120" height="110" data-preview="${cls}"></canvas>
       <h3>${ci.icon} ${ci.label}</h3>
-      <div class="role">${/^[aeiouéèêh]/i.test(ci.role) ? 'l\'' : 'le '}${ci.role.toLowerCase()}</div>
       <p>${ci.desc}</p>
       <ul>${ci.perks.map((x) => `<li>${x}</li>`).join('')}</ul>
       <div class="weapons">${w1.icon} ${w1.label} · ${w2.icon} ${w2.label}</div>
@@ -366,7 +395,7 @@ $('fuse-go').onclick = async () => {
   $('events-help').innerHTML = Object.values(Rules.BATTLE_EVENTS).map((ev) => `<div style="--c:${ev.color}"><b>${ev.icon} ${ev.label}</b><br>${ev.desc}</div>`).join('');
   $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
     const ci = Rules.CLASS_INFO[cls];
-    return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b> <span class="muted">(${ci.role.toLowerCase()})</span><br>${ci.perks.join(' · ')}</div>`;
+    return `<div style="--c:${ci.color}"><b>${ci.icon} ${ci.label}</b><br>${ci.perks.join(' · ')}</div>`;
   }).join('');
 })();
 
@@ -422,7 +451,7 @@ function renderAppearance() {
       ? `<button class="chip ${look[slot] ? '' : 'active'}" data-part="${slot}" data-value="">Aucun</button>`
         + mine.map((id) => `<button class="chip ${look[slot] === id ? 'active' : ''}" data-part="${slot}" data-value="${id}">${Rules.COSMETICS[id].label}</button>`).join('')
       : '<span class="muted" style="font-size:13px">Rien pour l\'instant — <a href="#boutique">voir la boutique</a></span>';
-    return `<div class="app-row"><div class="app-label">${def.icon} ${def.label}${def.note ? ` <span style="text-transform:none;letter-spacing:0">(${def.note.toLowerCase()})</span>` : ''}</div><div class="chips">${opts}</div></div>`;
+    return `<div class="app-row"><div class="app-label">${def.label}${def.note ? ` <span style="text-transform:none;letter-spacing:0">(${def.note.toLowerCase()})</span>` : ''}</div><div class="chips">${opts}</div></div>`;
   }).join(''));
   $('app-options').innerHTML = rows.join('');
   $('app-options').querySelectorAll('[data-part]').forEach((b) => {
@@ -481,21 +510,31 @@ function renderShop() {
 }
 
 // ---------- Panoplies ----------
+// « +2 Précision, +2 Critique » : le bonus d'une panoplie pour un nombre de points donné.
+function setBonusText(set, points) {
+  return set.stats.map((st) => `+${points} ${Rules.STAT_INFO[st].label}`).join(', ');
+}
+
 function renderSets() {
   const info = me.character.sets;
+  const maxPieces = Rules.SET_TIERS[Rules.SET_TIERS.length - 1].pieces;
   $('sets-active').innerHTML = info.sets.map(({ key, pieces, tier, next }) => {
     const set = Rules.SETS[key];
-    const stats = set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ');
-    const now = tier ? `<b>+${tier.points}</b> pts en ${stats}` : `<span class="muted">aucun bonus</span>`;
-    const nxt = next ? ` · <span class="muted">${next.pieces} pièces : +${next.points}</span>` : '';
-    return `<div class="set-chip ${tier ? '' : 'inactive'}" style="--c:${set.color}">${set.icon} <b>${esc(set.label)}</b> ${pieces} pièce${pieces > 1 ? 's' : ''} → ${now}${nxt}</div>`;
+    const pips = Rules.SET_TIERS.map((t) => `<span class="set-pip ${pieces >= t.pieces ? 'on' : ''}" title="${t.pieces} pièces : ${setBonusText(set, t.points)}">${t.pieces}</span>`).join('');
+    return `<div class="set-chip ${tier ? '' : 'inactive'}" style="--c:${set.color}">
+      <div class="set-head">${set.icon} <b>${esc(set.label)}</b><span class="muted">${pieces} / ${maxPieces} pièces</span></div>
+      <div class="set-pips">${pips}</div>
+      <div>Bonus actuel : ${tier ? `<b class="up">${setBonusText(set, tier.points)}</b>` : '<span class="muted">aucun (il faut 2 pièces)</span>'}</div>
+      ${next ? `<div class="muted">À ${next.pieces} pièces : ${setBonusText(set, next.points)}</div>` : '<div class="muted">Palier maximum atteint !</div>'}
+    </div>`;
   }).join('');
 }
 
 (function renderSetsHelp() {
-  $('set-tiers').textContent = Rules.SET_TIERS.map((t) => `${t.pieces} pièces = +${t.points} pts`).join(', ');
-  $('sets-help').innerHTML = Object.values(Rules.SETS).map((set) => `<div style="--c:${set.color}">${set.icon} <b style="color:${set.color}">${esc(set.label)}</b><br>
-    ${set.stats.map((st) => `${Rules.STAT_INFO[st].icon} ${Rules.STAT_INFO[st].label}`).join(' + ')}</div>`).join('');
+  $('set-tiers').textContent = Rules.SET_TIERS.map((t) => `${t.pieces} pièces = +${t.points} points`).join(', ');
+  $('sets-help').innerHTML = Object.values(Rules.SETS).map((set) => `<div style="--c:${set.color}">${set.icon} <b style="color:${set.color}">${esc(set.label)}</b>
+    <span class="muted">· ${set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ')}</span>
+    <ul class="set-tier-list">${Rules.SET_TIERS.map((t) => `<li><b>${t.pieces} pièces</b> : ${setBonusText(set, t.points)}</li>`).join('')}</ul></div>`).join('');
 })();
 
 // ---------- Succès ----------

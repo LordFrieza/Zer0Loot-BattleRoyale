@@ -1,0 +1,161 @@
+/*
+ * Thème « Taverne » (essai) : bois sombre, laiton, parchemin et lueur de bougies.
+ * Chargé par-dessus style.css quand le thème est activé (voir applyTheme dans js/common.js).
+ */
+:root {
+  --bg: #1b120b;
+  --bg2: #20150d;
+  --panel: #2c1d11;
+  --panel2: #3b2715;
+  --border: #6b4a2a;
+  --text: #f3e6c8;
+  --muted: #c2aa82;
+  --accent: #b9772a;
+  --accent2: #f2c14e;
+  --radius: 6px;
+  --brass: #d6a54a;
+  --parchment: #ecdcb4;
+  --ink: #3a2410;
+}
+
+html, body {
+  background-color: #1b120b;
+  background-image:
+    radial-gradient(ellipse at 12% -5%, rgba(255, 170, 70, .22), transparent 45%),
+    radial-gradient(ellipse at 88% 5%, rgba(255, 150, 50, .14), transparent 40%),
+    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, .6), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .32) 0 2px, transparent 2px 150px),
+    repeating-linear-gradient(0deg, rgba(255, 220, 170, .018) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, .05) 0 1px, transparent 1px 13px),
+    linear-gradient(90deg, #2a1a0f 0%, #24170d 25%, #2b1b10 50%, #23160c 75%, #2a1a0f 100%);
+  background-attachment: fixed;
+}
+
+h1, h2, h3, .logo, .tabs-nav button, .char-name, .class-card h3, .lb-board h3, .chest-count {
+  font-family: 'Cinzel', Georgia, 'Times New Roman', serif;
+}
+
+/* ---------- Barre du haut ---------- */
+.topbar {
+  background: linear-gradient(180deg, #2c1b0f, #1b110a);
+  border-bottom: 3px solid #5c3d20;
+  box-shadow: 0 2px 0 rgba(214, 165, 74, .25), 0 6px 20px rgba(0, 0, 0, .6);
+}
+.logo { letter-spacing: 2px; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 170, 60, .35); }
+.logo span { color: var(--accent2); }
+.logo small { color: var(--brass); }
+
+/* ---------- Panneaux : bois teinté, liseré de laiton et rivets ---------- */
+.panel {
+  position: relative;
+  background: linear-gradient(180deg, rgba(60, 39, 22, .97), rgba(40, 26, 15, .97));
+  border: 2px solid #5c3d20;
+  box-shadow: inset 0 0 0 1px rgba(214, 165, 74, .22), inset 0 0 40px rgba(0, 0, 0, .35), 0 10px 26px rgba(0, 0, 0, .55);
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0 0, #e2b45a 0 2.5px, #6b4a2a 3px, transparent 3.6px) top left / 10px 10px no-repeat,
+    radial-gradient(circle at 100% 0, #e2b45a 0 2.5px, #6b4a2a 3px, transparent 3.6px) top right / 10px 10px no-repeat,
+    radial-gradient(circle at 0 100%, #e2b45a 0 2.5px, #6b4a2a 3px, transparent 3.6px) bottom left / 10px 10px no-repeat,
+    radial-gradient(circle at 100% 100%, #e2b45a 0 2.5px, #6b4a2a 3px, transparent 3.6px) bottom right / 10px 10px no-repeat;
+}
+.panel h2 {
+  color: var(--accent2);
+  letter-spacing: .5px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(214, 165, 74, .28);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .6);
+}
+.panel h2 .sub { font-family: system-ui, sans-serif; letter-spacing: 0; text-shadow: none; }
+
+/* ---------- Boutons ---------- */
+button, .btn {
+  background: linear-gradient(180deg, #d39a3a, #9c6420);
+  color: #2a1600;
+  border: 1px solid rgba(242, 193, 78, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 2px 0 #4a2e12;
+  border-radius: 5px;
+}
+button.secondary, .chip, .inv-filters button, .tabs button, .event-btns button {
+  background: linear-gradient(180deg, #4a321d, #34220f);
+  color: var(--text);
+  border: 1px solid #6b4a2a;
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, .08);
+}
+button.gold { background: linear-gradient(180deg, #ffd66b, #d09a24); color: #2a1600; }
+button.danger { background: linear-gradient(180deg, #c8463a, #8a2a20); color: #fff3e0; }
+button.twitch, .btn.twitch { background: linear-gradient(180deg, #9a6bff, #6a3ccc); color: #fff; }
+.chip.active, .inv-filters button.active, .tabs button.active, .event-btns button.active {
+  background: linear-gradient(180deg, #d39a3a, #9c6420);
+  color: #2a1600;
+  border-color: var(--accent2);
+}
+.plus { background: linear-gradient(180deg, #ffd66b, #d09a24); }
+.help-btn { background: #34220f; color: var(--brass); border-color: #6b4a2a; }
+.help-btn.active { background: var(--brass); color: #2a1600; }
+
+input, select, #reroll-item {
+  background: #1d130b !important;
+  border: 1px solid #6b4a2a !important;
+  color: var(--text);
+}
+input:focus { outline: 2px solid var(--brass); }
+
+/* ---------- Onglets : panneaux de bois, l'onglet actif en parchemin ---------- */
+.tabs-nav {
+  background: linear-gradient(180deg, #2c1b0f, #20150c);
+  border: 2px solid #5c3d20;
+  box-shadow: inset 0 0 0 1px rgba(214, 165, 74, .2), 0 8px 20px rgba(0, 0, 0, .5);
+}
+.tabs-nav button { background: transparent; box-shadow: none; border: 1px solid transparent; color: #d9c39a; font-weight: 700; }
+.tabs-nav button:hover { background: rgba(214, 165, 74, .12); color: #fff3d6; }
+.tabs-nav button.active {
+  background: linear-gradient(180deg, #f3e4bf, #dcc796);
+  color: var(--ink);
+  border-color: #8a6a3a;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15), 0 2px 6px rgba(0, 0, 0, .4);
+}
+
+/* ---------- Cartes, cases, objets ---------- */
+.item, .slot, .bet-row, .forge-card, .lb-board, .ach, .shop-item, .class-card, .step, .set-chip, .sets-help > div, .class-summary > div, .fuse-slot {
+  background: linear-gradient(180deg, #24180e, #1d130b);
+}
+.slot { border-color: #5c3d20; }
+.modal-box {
+  background: linear-gradient(180deg, #33220f, #23170d);
+  border: 3px solid #6b4a2a;
+  box-shadow: inset 0 0 0 1px rgba(214, 165, 74, .3), 0 20px 60px rgba(0, 0, 0, .7);
+}
+.stats-table td, .loot-table th, .loot-table td, .players-table th, .players-table td, .lb-rest li, .reroll-line { border-color: rgba(214, 165, 74, .14); }
+
+/* ---------- Barres et badges ---------- */
+.xpbar { background: #1a110a; border-color: #6b4a2a; }
+.xpbar > div, .ach .bar > div { background: linear-gradient(90deg, #a8641c, #f2c14e); }
+.level-badge { background: linear-gradient(180deg, #d39a3a, #9c6420); color: #2a1600; }
+.queue-box { border: 2px solid var(--brass); background: linear-gradient(90deg, rgba(214, 165, 74, .2), transparent), linear-gradient(180deg, rgba(60, 39, 22, .97), rgba(40, 26, 15, .97)); }
+.sub-info { background: rgba(214, 165, 74, .1); border-left-color: var(--brass); }
+.skill-banner { background: linear-gradient(90deg, rgba(242, 193, 78, .22), transparent); }
+.tag, .cls-tag { background: #3b2715; }
+
+/* ---------- Notifications : petits parchemins ---------- */
+.toast {
+  background: linear-gradient(180deg, #f3e4bf, #dcc796);
+  color: var(--ink);
+  border: 1px solid #8a6a3a;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .55);
+}
+
+/* ---------- Accueil ---------- */
+.hero h1 { text-shadow: 0 3px 0 #000, 0 0 24px rgba(255, 170, 60, .35); }
+.hero h1 span { color: var(--accent2); }
+.tabs button { box-shadow: none; }
+
+/* ---------- Admin ---------- */
+.arena-wrap { border: 3px solid #5c3d20; box-shadow: inset 0 0 0 1px rgba(214, 165, 74, .25), 0 10px 26px rgba(0, 0, 0, .55); }
+
+/* Bouton de thème */
+.theme-toggle { white-space: nowrap; }

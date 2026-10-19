@@ -45,7 +45,10 @@ function classTag(item, playerCls) {
 // Étiquette de panoplie (« 🧛 Nosferatu »).
 function setTag(item) {
   const set = item.set && Rules.SETS[item.set];
-  return set ? `<span class="set-tag" style="--c:${set.color}" title="Panoplie ${esc(set.label)}">${set.icon} ${esc(set.label)}</span>` : '';
+  if (!set) return '';
+  const stats = set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ');
+  const tiers = Rules.SET_TIERS.map((t) => `${t.pieces} pièces : +${t.points}`).join(' · ');
+  return `<span class="set-tag" style="--c:${set.color}" title="Panoplie ${esc(set.label)} — bonus en ${stats} : ${tiers}">${set.icon} ${esc(set.label)}</span>`;
 }
 
 function itemHtml(item, extra = '', playerCls) {
@@ -97,3 +100,53 @@ function initHelp(root = document) {
   });
 }
 document.addEventListener('DOMContentLoaded', () => initHelp());
+
+/*
+ * Thème du site : « moderne » (par défaut) ou « taverne » (essai, style fantasy).
+ * Choix mémorisé dans le navigateur ; on peut aussi forcer avec ?theme=taverne dans l'adresse.
+ */
+const THEMES = { moderne: 'Moderne', taverne: 'Taverne' };
+
+function currentTheme() {
+  const fromUrl = new URLSearchParams(location.search).get('theme');
+  if (THEMES[fromUrl]) {
+    try { localStorage.setItem('zl_theme', fromUrl); } catch (e) { /* ignore */ }
+    return fromUrl;
+  }
+  try { return THEMES[localStorage.getItem('zl_theme')] ? localStorage.getItem('zl_theme') : 'moderne'; } catch (e) { return 'moderne'; }
+}
+
+function applyTheme(theme) {
+  document.getElementById('zl-theme-css')?.remove();
+  document.getElementById('zl-theme-font')?.remove();
+  document.documentElement.dataset.theme = theme;
+  if (theme === 'taverne') {
+    const font = document.createElement('link');
+    font.id = 'zl-theme-font';
+    font.rel = 'stylesheet';
+    font.href = 'https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&display=swap';
+    const css = document.createElement('link');
+    css.id = 'zl-theme-css';
+    css.rel = 'stylesheet';
+    css.href = '/css/theme-taverne.css';
+    document.head.append(font, css);
+  }
+  const btn = document.querySelector('.theme-toggle');
+  if (btn) btn.textContent = `🎨 Thème : ${THEMES[theme]}`;
+}
+
+applyTheme(currentTheme());
+document.addEventListener('DOMContentLoaded', () => {
+  const bar = document.querySelector('.topbar .right');
+  if (!bar || bar.querySelector('.theme-toggle')) return;
+  const btn = document.createElement('button');
+  btn.className = 'secondary small theme-toggle';
+  btn.title = 'Changer le style du site';
+  bar.prepend(btn);
+  btn.onclick = () => {
+    const next = document.documentElement.dataset.theme === 'taverne' ? 'moderne' : 'taverne';
+    try { localStorage.setItem('zl_theme', next); } catch (e) { /* ignore */ }
+    applyTheme(next);
+  };
+  applyTheme(currentTheme());
+});

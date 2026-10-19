@@ -233,7 +233,7 @@ function equip(character, itemId) {
   const item = character.inventory[idx];
   if (!Rules.canEquip(item, character.cls)) {
     const ci = Rules.CLASS_INFO[Rules.itemClass(item)];
-    throw new Error(`Réservé à la classe ${ci.label} (${ci.role})`);
+    throw new Error(`Réservé à la classe ${ci.label}`);
   }
   character.inventory.splice(idx, 1);
   const previous = character.equipment[item.slot];
