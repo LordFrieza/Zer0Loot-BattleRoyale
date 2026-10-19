@@ -1,0 +1,47 @@
+{
+  "enabledPlugins": {
+    "frontend-design@anthropic-plugin-directory": true,
+    "context7@anthropic-plugin-directory": true,
+    "skill-creator@anthropic-plugin-directory": true,
+    "playwright@anthropic-plugin-directory": true,
+    "superpowers@anthropic-plugin-directory": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run *)",
+      "Bash(node --test *)",
+      "Bash(node scripts/*)",
+      "Bash(timeout * npm test*)",
+      "Bash(grep *)",
+      "Bash(cat *)",
+      "Bash(sed -n *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git stash list)",
+      "Bash(ls*)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(rm -rf*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.js\"", "timeout": 120 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-done.js\"", "timeout": 120 }
+        ]
+      }
+    ]
+  }
+}

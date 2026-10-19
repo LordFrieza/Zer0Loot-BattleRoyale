@@ -64,7 +64,12 @@ function parseCookies(header) {
   const out = {};
   (header || '').split(';').forEach((part) => {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i <= 0) return;
+    const raw = part.slice(i + 1).trim();
+    // Un cookie mal encodé (%E0%A4%A…) ne doit jamais faire planter le serveur : on garde la valeur brute.
+    let value = raw;
+    try { value = decodeURIComponent(raw); } catch { /* valeur brute */ }
+    out[part.slice(0, i).trim()] = value;
   });
   return out;
 }
@@ -377,14 +382,17 @@ function rewardSub(login, displayName, kind) {
   return user;
 }
 
-twitch.startChat((command, from) => {
-  if (command !== '!join') return;
-  const r = joinFromTwitch(from.login, from.displayName);
-  if (r.ok) {
-    const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
-    twitch.say(`@${from.displayName} rejoint la bataille ⚔️${hint}`);
-  }
-}, (sub) => rewardSub(sub.login, sub.displayName, sub.kind));
+// Branché dans start() : l'import de ce module (tests) ne doit pas ouvrir de connexion au chat.
+function startTwitch() {
+  twitch.startChat((command, from) => {
+    if (command !== '!join') return;
+    const r = joinFromTwitch(from.login, from.displayName);
+    if (r.ok) {
+      const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
+      twitch.say(`@${from.displayName} rejoint la bataille ⚔️${hint}`);
+    }
+  }, (sub) => rewardSub(sub.login, sub.displayName, sub.kind));
+}
 
 app.post('/api/queue/join', requirePlayer, (req, res) => {
   if (battle.phase !== 'queue') return res.status(400).json({ error: 'La file n\'est pas ouverte' });
@@ -640,18 +648,29 @@ io.on('connection', (socket) => {
   socket.emit('frame', battle.frame());
 });
 
-setInterval(() => io.emit('twitch', twitch.status()), 5000);
+// ---------- Démarrage ----------
 
-// Nettoyage des sessions expirées.
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, s] of Object.entries(db.state.sessions)) if (s.expires < now) delete db.state.sessions[token];
-  db.save();
-}, 3600 * 1000);
+// Tout ce qui a des effets de bord permanents (port, chat Twitch, minuteurs, signaux) est ici,
+// pour que `require('./index')` reste sans effet dans les tests.
+function start(port = PORT) {
+  startTwitch();
+  setInterval(() => io.emit('twitch', twitch.status()), 5000);
 
-process.on('SIGINT', () => { db.flush(); process.exit(0); });
-process.on('SIGTERM', () => { db.flush(); process.exit(0); });
+  // Nettoyage des sessions expirées.
+  setInterval(() => {
+    const now = Date.now();
+    for (const [token, s] of Object.entries(db.state.sessions)) if (s.expires < now) delete db.state.sessions[token];
+    db.save();
+  }, 3600 * 1000);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Zer0Loot Battle Royale → http://localhost:${PORT}`);
-});
+  process.on('SIGINT', () => { db.flush(); process.exit(0); });
+  process.on('SIGTERM', () => { db.flush(); process.exit(0); });
+
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`Zer0Loot Battle Royale → http://localhost:${port}`);
+  });
+}
+
+if (require.main === module) start();
+
+module.exports = { app, server, io, battle, bets, start };
