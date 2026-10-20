@@ -429,8 +429,10 @@ battle.on('cleared', () => notifyBets(bets.refundAll()));
 
 app.post('/api/admin/queue/open', requireAdmin, action((req) => {
   const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
-  battle.openQueue(seconds);
-  twitch.say(`⚔️ La file du Battle Royale est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
+  const mode = req.body.mode || 'br';
+  battle.openQueue(seconds, mode);
+  const m = Rules.GAME_MODES[mode];
+  twitch.say(`${m.icon} La file du ${m.label} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
 }));
 
 app.post('/api/admin/queue/close', requireAdmin, action(() => battle.closeQueue()));
@@ -462,6 +464,14 @@ app.post('/api/admin/event', requireAdmin, action((req) => {
 }));
 
 app.post('/api/admin/battle/start', requireAdmin, action(() => {
+  if (battle.mode !== 'br') {
+    // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
+    battle.start(refreshParticipant, null);
+    twitch.say(battle.mode === 'boss'
+      ? `👹 ${Rules.BOSS.name} débarque ! Tous ensemble contre lui !`
+      : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
+    return { event: null, pendingEvent };
+  }
   const keys = Object.keys(Rules.BATTLE_EVENTS);
   const ev = pendingEvent === 'random' ? keys[Math.floor(Math.random() * keys.length)] : pendingEvent;
   battle.start(refreshParticipant, ev);
@@ -531,6 +541,41 @@ battle.on('end', (winner, fighters) => {
     twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
   }
   db.save();
+  io.emit('leaderboard', leaderboard());
+});
+
+/*
+ * Fin d'un mode coopératif : XP de participation pour tous, plus la récompense commune
+ * (Troll vaincu, ou palier de salle atteint dans le donjon) pour TOUS les participants, morts ou vivants.
+ */
+battle.on('coopEnd', (result, fighters) => {
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user) continue;
+    game.upgrade(user.character);
+    user.character.record.battles += 1;
+    const participation = { ...Rules.REWARDS.participation };
+    const participationLevels = game.grant(user.character, participation);
+    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
+    if (result.mode === 'boss' && result.victory) game.bump(user.character, 'bossWins');
+    if (result.mode === 'dungeon') user.character.counters.dungeonBest = Math.max(user.character.counters.dungeonBest || 0, result.room);
+    if (result.reward) {
+      const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
+      const levels = game.grant(user.character, reward);
+      io.to('user:' + user.id).emit('reward', { type: result.mode, reward, levels, room: result.room });
+    }
+    pushMe(user);
+  }
+  db.save();
+  if (result.mode === 'boss') {
+    twitch.say(result.victory
+      ? `🏆 ${Rules.BOSS.name} est vaincu ! Tous les participants gagnent ${Rules.BOSS.reward.chests} coffres, ${Rules.BOSS.reward.xp} XP et ${Rules.BOSS.reward.gold} golds !`
+      : `💀 ${Rules.BOSS.name} a écrasé tout le monde… Retentez votre chance !`);
+  } else {
+    const r = result.reward;
+    twitch.say(`🏰 Le raid s'arrête en salle ${result.room} !${r ? ` Tous les aventuriers gagnent ${[r.chests ? r.chests + ' coffre(s)' : '', r.xp + ' XP', r.gold + ' golds'].filter(Boolean).join(', ')}.` : ' Il faut atteindre la salle 5 pour une récompense.'}`);
+  }
+  notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
 });
 

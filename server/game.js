@@ -441,7 +441,10 @@ function absorbGhost(user, ghost) {
   upgrade(c);
   upgrade(g);
   for (const r of Object.keys(c.lootStats)) c.lootStats[r] += g.lootStats[r];
-  for (const k of Rules.COUNTERS) c.counters[k] += g.counters[k] || 0;
+  for (const k of Rules.COUNTERS) {
+    // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
+    c.counters[k] = k === 'dungeonBest' ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
+  }
   delete db.state.users[ghost.id];
 }
 

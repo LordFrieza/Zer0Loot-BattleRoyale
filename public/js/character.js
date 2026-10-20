@@ -399,6 +399,53 @@ $('fuse-go').onclick = async () => {
   }).join('');
 })();
 
+// ---------- Modes de jeu : Combat de Boss et Raid de Donjon ----------
+(function renderModesInfo() {
+  const B = Rules.BOSS;
+  const D = Rules.DUNGEON;
+  const pct = (x) => Math.round(x * 100) + ' %';
+  const ex = Rules.bossStats(10);
+  $('boss-intro').innerHTML = `Tout le monde s'allie contre <b>${B.name}</b>, un troll géant très résistant. Assez difficile : il faut une équipe solide !`;
+  $('boss-rules').innerHTML = [
+    `Personne ne se tape dessus : <b>tous les combattants attaquent le Troll</b>. Le <b>Guerriloot</b> attire son attention et protège les autres.`,
+    `Sa vie et ses dégâts dépendent du <b>nombre de combattants au lancement</b> : ${B.hpBase} PV + ${B.hpPerPlayer} PV par combattant (10 combattants → ${ex.maxHp.toLocaleString('fr-FR')} PV).`,
+    `Son coup de massue touche aussi les combattants proches de sa cible (${pct(B.cleaveRatio)} des dégâts).`,
+    `Toutes les ${String(B.slam.every).replace('.', ',')} s, une attaque spéciale : <b>onde de choc</b> autour de lui, puis <b>rocher</b> lancé sur le plus gros groupe. La zone rouge au sol prévient ${String(B.slam.warn).replace('.', ',')} s avant.`,
+    `Sa grosse barre de vie a <b>2 coches, à 66 % et 33 %</b> : à chaque coche franchie, il frappe <b>+${pct(B.phases[0].damageMult - 1)}</b> plus fort, attaque <b>+${pct(B.phases[0].attackSpeedMult - 1)}</b> plus vite et ses attaques spéciales reviennent plus souvent.`,
+    `Après ${Math.floor(B.enrageAt / 60)} min ${B.enrageAt % 60} s, c'est la <b>rage finale</b> : dégâts ×${B.enrageMult}.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const R = B.reward;
+  $('boss-rewards').innerHTML = `<tr><th>Résultat</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>
+    <tr><td><b>🏆 Troll vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
+      <td>+${R.xp} XP</td><td>+${R.gold} 🪙</td><td>+${R.chests} <i class="ico-chest"></i></td></tr>
+    <tr><td><b>💀 Tout le monde est tombé</b><div class="muted" style="font-size:12px">Seulement l'XP de participation</div></td>
+      <td>+${Rules.REWARDS.participation.xp} XP</td><td>—</td><td>—</td></tr>`;
+
+  const M = Rules.MONSTERS;
+  const monsters = Object.values(M).map((m) => `${m.icon} ${m.label}${m.from > 1 ? ` (dès la salle ${m.from})` : ''}`).join(', ');
+  $('dungeon-rules').innerHTML = [
+    `Les aventuriers entrent par la gauche, éliminent tous les monstres de la salle, puis sortent à droite vers la salle suivante.`,
+    `Monstres : ${monsters}. Toutes les ${Rules.ELITE.every} salles, un <b>chef 👑</b> beaucoup plus costaud les accompagne.`,
+    `À chaque salle, les monstres sont <b>plus nombreux</b> et plus forts (+${pct(D.hpPerRoom)} de vie et +${pct(D.damagePerRoom)} de dégâts par salle). Leur nombre dépend du nombre d'aventuriers au départ.`,
+    `<b>Pas de réapparition</b> : un aventurier tombé est éliminé du raid. Entre deux salles, les survivants récupèrent <b>${pct(D.healBetweenRooms)}</b> de leur vie.`,
+    `Après ${D.enrageAt} s dans la même salle, les monstres s'énervent (+${pct(D.enrageRate)} de dégâts par seconde).`,
+    `Le raid s'arrête quand tout le monde est tombé. <b>Tout le monde</b> reçoit la récompense de la salle atteinte, plus ${Rules.REWARDS.participation.xp} XP de participation.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const tiers = [5, 10, 15, 20, 25, 30].map((room) => Rules.dungeonReward(room));
+  $('dungeon-rewards').innerHTML = '<tr><th>Salle atteinte</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
+    + `<tr><td><b>Salles 1 à 4</b></td><td>+${Rules.REWARDS.participation.xp} XP <span class="muted">(participation)</span></td><td>—</td><td>—</td></tr>`
+    + tiers.map((r) => `<tr><td><b>Salle ${r.tier}${r.tier === 30 ? ' et +' : ` à ${r.tier + 4}`}</b></td><td>+${r.xp} XP</td><td>+${r.gold} 🪙</td><td>${r.chests ? '+' + r.chests + ' <i class="ico-chest"></i>' : '—'}</td></tr>`).join('')
+    + '<tr><td colspan="4" class="muted" style="font-size:12px">Puis +1 coffre et +250 XP / golds toutes les 5 salles.</td></tr>';
+
+  // Portraits
+  const bc = $('boss-portrait').getContext('2d');
+  drawMonster(bc, 72, 104, { kind: 'troll' }, { scale: 0.65, t: 0 });
+  const dc = $('dungeon-portrait').getContext('2d');
+  [['gobelin', 32], ['slime', 82], ['chauve_souris', 132], ['squelette', 185]].forEach(([kind, x], i) => {
+    drawMonster(dc, x, 62, { kind }, { scale: 1.6, facing: i % 2 ? -1 : 1, t: 400 * i });
+  });
+})();
+
 // ---------- Onglets ----------
 const TABS = ['perso', 'inventaire', 'boutique', 'succes', 'classements', 'regles'];
 
@@ -721,7 +768,9 @@ function estimateGain(key, amount) {
 function renderBets() {
   const box = $('bet-box');
   if (queue && ['idle', 'queue', 'ready'].includes(queue.phase)) lastBetResult = null; // nouvelle bataille
-  if (!queue || !queue.bets || queue.phase === 'idle' || (queue.phase === 'ended' && !queue.bets.lastResult && !lastBetResult)) {
+  // Pas de paris dans les modes coopératifs (Combat de Boss, Raid de Donjon).
+  const coop = queue && queue.mode && queue.mode !== 'br';
+  if (!queue || !queue.bets || coop || queue.phase === 'idle' || (queue.phase === 'ended' && !queue.bets.lastResult && !lastBetResult)) {
     box.style.display = 'none';
     return;
   }
@@ -818,11 +867,19 @@ function renderQueue() {
     box.innerHTML = `<b>⏳ File fermée — ${n} combattant(s). Le streamer va lancer la bataille !</b> ${inQueue ? '<span class="up">Tu en fais partie.</span>' : ''}`;
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
-    box.innerHTML = `<b>🔥 Bataille en cours !</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
+    const what = queue.mode === 'boss' ? '👹 Combat de Boss en cours !' : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
   } else if (queue.phase === 'ended' && queue.result) {
-    const w = queue.result.winner;
-    box.innerHTML = `<b>🏆 ${w ? esc(w.name) + ' remporte la bataille (' + w.kills + ' kill(s)) !' : 'Bataille terminée.'}</b>`;
+    const r = queue.result;
+    let text;
+    if (r.mode === 'boss') text = r.victory ? `🏆 ${Rules.BOSS.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${Rules.BOSS.name} a gagné… Retentez votre chance !`;
+    else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
+    else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
+    box.innerHTML = `<b>${text}</b>`;
   }
+  // Mode de jeu de la file en cours
+  const m = Rules.GAME_MODES[queue.mode];
+  if (m && queue.phase !== 'ended') box.insertAdjacentHTML('afterbegin', `<span class="mode-tag" style="--c:${m.color};margin-right:8px" title="${esc(m.desc)}">${m.icon} ${m.label}</span>`);
 }
 
 function tickCountdown() {
@@ -927,9 +984,11 @@ const REWARD_LABELS = {
   win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
+  boss: '👹 LE TROLL EST VAINCU !', dungeon: '🏰 Récompense du raid :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
+  boss: 'victory', dungeon: 'victory',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
 socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
@@ -946,7 +1005,8 @@ socket.on('reward', (r) => {
   const gains = [`+${r.reward.xp} XP`];
   if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
   if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
-  toast(`${REWARD_LABELS[r.type]} ${gains.join(', ')}`, 5000);
+  const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !` : REWARD_LABELS[r.type];
+  toast(`${label} ${gains.join(', ')}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });
 

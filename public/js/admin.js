@@ -18,7 +18,33 @@ async function run(url, body = {}) {
   }
 }
 
-$('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60) });
+// ---------- Mode de jeu ----------
+let selectedMode = 'br';
+try { if (Rules.GAME_MODES[localStorage.getItem('zl_admin_mode')]) selectedMode = localStorage.getItem('zl_admin_mode'); } catch (e) { /* ignore */ }
+
+function renderModes() {
+  $('mode-btns').innerHTML = Object.entries(Rules.GAME_MODES).map(([k, m]) =>
+    `<button class="${selectedMode === k ? 'active' : ''}" data-mode="${k}" style="--c:${m.color}">${m.icon} ${m.label}</button>`).join('');
+  $('mode-btns').querySelectorAll('[data-mode]').forEach((b) => {
+    b.onclick = () => {
+      selectedMode = b.dataset.mode;
+      try { localStorage.setItem('zl_admin_mode', selectedMode); } catch (e) { /* ignore */ }
+      renderModes();
+    };
+  });
+  const m = Rules.GAME_MODES[selectedMode];
+  let desc = `<b style="color:${m.color}">${m.icon} ${m.label}</b> — ${m.desc}`;
+  if (queue && ['queue', 'ready'].includes(queue.phase) && queue.mode !== selectedMode) {
+    desc += `<br>⚠️ La file ouverte est en mode <b>${Rules.GAME_MODES[queue.mode].label}</b> : rouvre la file pour changer de mode.`;
+  }
+  $('mode-desc').innerHTML = desc;
+  $('open').textContent = `Ouvrir la file (${m.label})`;
+  // Le bouton de lancement suit le mode de la file ouverte (ou le mode choisi s'il n'y a pas de file).
+  const live = queue && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.mode : selectedMode;
+  $('start').textContent = live === 'boss' ? '👹 LANCER LE COMBAT DE BOSS' : live === 'dungeon' ? '🏰 LANCER LE RAID' : '⚔️ LANCER LA BATAILLE';
+}
+
+$('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode });
 $('close').onclick = () => run('/api/admin/queue/close');
 $('reset').onclick = () => {
   if (queue && queue.phase === 'battle' && !confirm('Annuler la bataille en cours ? Aucune récompense de victoire ne sera donnée.')) return;
@@ -35,7 +61,9 @@ function render() {
   $('phase').textContent = PHASES[q.phase];
   $('open').disabled = q.phase === 'battle';
   $('close').disabled = q.phase !== 'queue';
-  $('start').disabled = !(q.phase === 'queue' || q.phase === 'ready') || q.participants.length < 2;
+  const mode = Rules.GAME_MODES[q.mode] || Rules.GAME_MODES.br;
+  $('start').disabled = !(q.phase === 'queue' || q.phase === 'ready') || q.participants.length < mode.minPlayers;
+  renderModes();
   $('add-bots').disabled = q.phase !== 'queue';
   $('simulate').disabled = q.phase !== 'queue';
   $('count').textContent = q.participants.length;
@@ -147,5 +175,6 @@ socket.on('leaderboard', (data) => { loadLeaderboard(data); loadPlayers(); });
 
 api('/api/admin/state').then((st) => { pendingEvent = st.pendingEvent; renderEvents(); }).catch(() => {});
 renderEvents();
+renderModes();
 loadPlayers();
 loadLeaderboard();

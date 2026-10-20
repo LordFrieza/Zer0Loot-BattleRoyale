@@ -34,6 +34,9 @@
       <div>
         <div class="panel">
           <h2>🎮 Contrôle <span class="sub"><span class="phase-tag" id="phase"></span></span></h2>
+          <label>Mode de jeu (à choisir avant d'ouvrir la file)</label>
+          <div class="mode-btns" id="mode-btns"></div>
+          <p class="muted" style="font-size:13px;margin:6px 0 0" id="mode-desc"></p>
           <label for="duration">Durée de la file (minutes)</label>
           <div class="row">
             <input id="duration" type="number" min="0.25" max="60" step="0.25" value="3" style="width:90px">
@@ -53,7 +56,8 @@
 
         <div class="panel">
           <h2>🎪 Événement de bataille</h2>
-          <p class="muted" style="font-size:13px;margin-top:0">Choisis l'événement de la <b>prochaine</b> bataille. Il sera annoncé au lancement, puis remis à « Aucun ».</p>
+          <p class="muted" style="font-size:13px;margin-top:0">Choisis l'événement de la <b>prochaine</b> bataille. Il sera annoncé au lancement, puis remis à « Aucun ».
+            <b>Battle Royale uniquement</b> : en Combat de Boss ou en Raid de Donjon, l'événement attend la prochaine bataille royale.</p>
           <div class="event-btns" id="event-btns"></div>
           <p class="muted" style="font-size:13px" id="event-desc"></p>
         </div>
@@ -102,6 +106,7 @@
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/fighter.js"></script>
+  <script src="/js/monsters.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/arena.js"></script>
   <script src="/js/leaderboard.js"></script>

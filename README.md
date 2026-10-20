@@ -135,10 +135,26 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Page perso en onglets** : Personnage (fiche, caractéristiques, apparence), Inventaire (coffres, équipement,
   coffre personnel paginé par 20 objets, forge), Boutique, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir,
   succès à récupérer. Lien direct possible (`/character.html#boutique`).
-- **Style néon / jeu vidéo** : logo Zer0Loot (barre du haut, accueil, écran d'attente et sol de l'arène), fond parquet
+- **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
+  - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre Grokk le Troll. Vie et dégâts selon le nombre
+    de combattants au lancement (200 PV + 300 PV par combattant). Coup de massue qui touche les voisins, attaques
+    spéciales annoncées au sol (onde de choc, rocher sur le plus gros groupe). Grosse barre de vie avec coches à 66 % et
+    33 % : à chaque coche, +30 % de dégâts et +35 % de vitesse d'attaque. Rage finale à 2 min 30 (dégâts ×3).
+    Victoire : **3 coffres, 500 XP et 500 golds pour TOUS les participants** (morts compris), avec explosion du Troll
+    et pluie de coffres et de golds. Défaite : XP de participation seulement.
+  - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
+    squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
+    gauche, sortie par la droite, fondu au noir et grand « SALLE X ». Pas de réapparition ; les survivants récupèrent
+    30 % de vie entre deux salles. Récompense pour tous selon la salle atteinte : 5 → 50 XP / 50 golds, 10 → 150 / 150,
+    15 → 1 coffre + 300 / 300, 20 → 2 coffres + 500 / 500, puis +1 coffre et +250 toutes les 5 salles.
+  - En coopération, les kills de monstres ne rapportent rien en eux-mêmes ; pas de paris ni d'événements de bataille.
+    Difficulté réglée par simulation (des centaines de combats) dans `shared/rules.js` (`BOSS`, `DUNGEON`, `ELITE`).
+    5 succès liés (Tueur de troll, Fléau des trolls, Explorateur, Aventurier, Seigneur du donjon).
+- **Style néon / jeu vidéo** : logo Zer0Loot (barre du haut, accueil, écrans d'attente de l'arène), fond parquet
   Zer0Loot (`public/img/fond.webp`) assombri avec halos rose / cyan, panneaux translucides à liseré néon, titres en police
   Orbitron (Google Fonts). Les images sont dans `public/img/` (logo, favicon, fond) : il suffit de les remplacer pour
-  changer l'identité visuelle.
+  changer l'identité visuelle. Le champ de bataille garde son décor de pré (herbe et cailloux) ; le donjon a sa salle de
+  pierre avec torches.
 - **Panoplies** : 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à 2 stats.
   Équiper 2 / 4 / 6 / 8 pièces d'une même panoplie donne +2 / +4 / +7 / +10 points dans ces 2 stats (comme des points de
   compétence). Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces
@@ -146,7 +162,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
-- **Succès** : 35 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris,
+- **Succès** : 42 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, boss, donjon,
   panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
 - **Classements** : top 10 victoires, kills et batailles jouées, avec podium pour le top 3 (page perso et page admin).
@@ -171,6 +187,8 @@ le choix est mémorisé.
 | Début de bataille | Clairon médiéval + timbales, puis musique de marche épique en boucle |
 | Coups, kills | Cliquetis discrets, impact |
 | Victoire | Fanfare triomphale + roulement + cymbale |
+| Combat de Boss | Rugissement du Troll (début, changements de phase), alerte et impact des attaques spéciales, explosion + pièces |
+| Raid de Donjon | Porte qui grince à chaque salle, petite fanfare de salle terminée, marche funèbre en cas d'échec |
 | Équiper / déséquiper | Cliquetis métallique montant / son sourd descendant |
 | Ouvrir un coffre / acheter un coffre | Souffle magique / « ka-ching » + pièces |
 | Recycler | Broyage + pluie de pièces |
@@ -185,7 +203,7 @@ Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](sh
 ```
 server/
   index.js    serveur Express + Socket.IO, routes, sessions, récompenses
-  battle.js   file d'attente et simulation du combat (côté serveur, 20 ticks/s)
+  battle.js   file d'attente et simulation du combat (côté serveur, 20 ticks/s) : Battle Royale, Boss, Donjon
   bets.js     paris sur le vainqueur (mises, répartition des gains, remboursements)
   game.js     personnages : XP, coffres, objets, équipement, liaison Twitch
   twitch.js   lecture du chat (tmi.js), bot, OAuth

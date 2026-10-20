@@ -348,6 +348,76 @@
       noise(0.25, { filter: 'highpass', freq: 3000, vol: 0.12, delay: 0.05 });
     },
 
+    // Rugissement du Troll (changement de phase, rage) : grondement grave qui monte puis retombe.
+    roar(big = false) {
+      const c = ctx;
+      const t = c.currentTime + 0.02;
+      const dur = big ? 1.6 : 1.1;
+      for (const [f0, det] of [[70, 0], [72, 7], [105, -5]]) {
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        const flt = c.createBiquadFilter();
+        osc.type = 'sawtooth';
+        osc.detune.value = det;
+        osc.frequency.setValueAtTime(f0, t);
+        osc.frequency.exponentialRampToValueAtTime(f0 * 1.6, t + dur * 0.35);
+        osc.frequency.exponentialRampToValueAtTime(f0 * 0.7, t + dur);
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(300, t);
+        flt.frequency.exponentialRampToValueAtTime(1100, t + dur * 0.35);
+        flt.frequency.exponentialRampToValueAtTime(250, t + dur);
+        env(g, t, big ? 0.22 : 0.16, 0.08, dur);
+        osc.connect(flt).connect(g).connect(master);
+        osc.start(t);
+        osc.stop(t + dur + 0.05);
+      }
+      noise(dur, { filter: 'bandpass', freq: 400, sweep: 200, q: 0.8, vol: 0.18, attack: 0.08 });
+      if (big) timpani(t, 41, 0.9);
+    },
+
+    // Onde de choc / rocher du Troll.
+    slam() {
+      noise(0.6, { freq: 700, sweep: 60, vol: 0.45 });
+      tone(55, 0.6, { vol: 0.4, to: 25 });
+      timpani(ctx.currentTime + 0.01, 36, 0.8);
+    },
+
+    // Alerte avant une attaque spéciale du Troll.
+    slamWarn() {
+      tone(midi(57), 0.18, { type: 'square', vol: 0.05 });
+      tone(midi(57), 0.18, { type: 'square', vol: 0.05, delay: 0.22 });
+    },
+
+    // Le Troll explose : grosse détonation puis pluie de pièces.
+    bossExplode() {
+      noise(1.4, { freq: 1500, sweep: 50, vol: 0.5 });
+      tone(60, 1.2, { vol: 0.45, to: 22 });
+      crash(ctx.currentTime + 0.05, 0.3);
+      for (let i = 0; i < 14; i++) {
+        tone(midi(86 + (i % 5) * 2), 0.12, { type: 'triangle', vol: 0.05, delay: 0.5 + i * 0.07 + Math.random() * 0.04 });
+      }
+    },
+
+    // Défaite en coopération : marche funèbre courte.
+    defeat() {
+      const t0 = fanfare([[60, 0, 1.5], [60, 1.6, 1], [60, 2.7, 0.5], [60, 3.3, 1.5], [63, 5, 1], [62, 6.1, 0.5], [62, 6.7, 1], [60, 7.8, 0.5], [60, 8.4, 1], [59, 9.5, 0.5], [60, 10.1, 3]], 0.17, 0.12);
+      timpani(t0, 36, 0.7);
+      return 13 * 0.17;
+    },
+
+    // Salle du donjon terminée.
+    roomClear() {
+      fanfare([[67, 0, 0.5], [72, 0.6, 0.5], [76, 1.2, 0.5], [79, 1.8, 2]], 0.1, 0.12);
+      timpani(ctx.currentTime + 0.05, 48, 0.5);
+    },
+
+    // Nouvelle salle : porte qui grince et coup sourd.
+    roomEnter() {
+      tone(180, 0.7, { type: 'sawtooth', vol: 0.03, to: 120, attack: 0.1 });
+      noise(0.6, { filter: 'bandpass', freq: 900, sweep: 500, q: 6, vol: 0.06, attack: 0.1 });
+      timpani(ctx.currentTime + 0.7, 41, 0.6);
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });

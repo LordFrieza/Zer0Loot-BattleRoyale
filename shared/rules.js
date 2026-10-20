@@ -305,8 +305,13 @@
     { id: 'cosmetics1', metric: 'cosmetics', goal: 1, name: 'Coquet', desc: 'Acheter 1 article à la boutique', gold: 20 },
     { id: 'cosmetics10', metric: 'cosmetics', goal: 10, name: 'Icône de mode', desc: 'Posséder 10 articles de la boutique', gold: 300 },
     { id: 'sets6', metric: 'setPieces', goal: 6, name: 'Tiré à quatre épingles', desc: 'Équiper 6 pièces d\'une même panoplie', gold: 500 },
+    { id: 'boss1', metric: 'bossWins', goal: 1, name: 'Tueur de troll', desc: 'Vaincre le Troll (Combat de Boss)', gold: 100 },
+    { id: 'boss10', metric: 'bossWins', goal: 10, name: 'Fléau des trolls', desc: 'Vaincre le Troll 10 fois', gold: 500 },
+    { id: 'dungeon5', metric: 'dungeonBest', goal: 5, name: 'Explorateur', desc: 'Atteindre la salle 5 du Raid de Donjon', gold: 50 },
+    { id: 'dungeon10', metric: 'dungeonBest', goal: 10, name: 'Aventurier', desc: 'Atteindre la salle 10 du Raid de Donjon', gold: 200 },
+    { id: 'dungeon20', metric: 'dungeonBest', goal: 20, name: 'Seigneur du donjon', desc: 'Atteindre la salle 20 du Raid de Donjon', gold: 1000 },
   ];
-  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs'];
+  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest'];
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -334,6 +339,119 @@
     fast: { label: 'Zone rapide', icon: '⚡', color: '#5fd3ff', desc: 'Tous les combattants se déplacent 5 fois plus vite.' },
     meteors: { label: 'Pluie de météores', icon: '☄️', color: '#ff6b2a', desc: 'Des météores de feu s\'écrasent au hasard sur l\'arène et font très mal.' },
   };
+
+  // ---------- Modes de jeu (choisis par l'admin avant d'ouvrir la file) ----------
+  const GAME_MODES = {
+    br: {
+      label: 'Battle Royale', icon: '⚔️', color: '#ffb000', coop: false, minPlayers: 2,
+      desc: 'Chacun pour soi : le dernier debout l\'emporte.',
+    },
+    boss: {
+      label: 'Combat de Boss', icon: '👹', color: '#7ccf6a', coop: true, minPlayers: 1,
+      desc: 'Tout le monde s\'allie contre un Troll géant. On gagne ensemble… ou on perd ensemble.',
+    },
+    dungeon: {
+      label: 'Raid de Donjon', icon: '🏰', color: '#5fd3ff', coop: true, minPlayers: 1,
+      desc: 'Salle après salle, les aventuriers affrontent des monstres de plus en plus forts. Pas de réapparition !',
+    },
+  };
+
+  /*
+   * Combat de Boss : la vie et les dégâts du Troll dépendent du nombre de combattants au lancement.
+   * À 66 % puis 33 % de vie, il passe une phase : plus de dégâts et d'attaques par seconde.
+   */
+  const BOSS = {
+    name: 'Grokk le Troll',
+    hpBase: 200,
+    hpPerPlayer: 300,
+    damageBase: 6,
+    damagePerPlayer: 0.2,
+    cooldown: 1.5, // secondes entre deux coups de massue
+    speed: 62,
+    radius: 58, // taille au sol (les combattants font 16)
+    reduction: 0.15,
+    precision: 0.2,
+    dodge: 0.02,
+    cleaveRadius: 75, // le coup de massue touche aussi les combattants proches de la cible…
+    cleaveRatio: 0.5, // … à 50 % des dégâts
+    // Attaques spéciales en alternance, annoncées au sol 1,3 s avant l'impact :
+    // onde de choc autour du Troll, puis rocher lancé sur le plus gros groupe de combattants.
+    slam: { every: 6.5, warn: 1.3, radius: 150, rockRadius: 100, ratio: 1.1 },
+    phases: [
+      { at: 0.66, damageMult: 1.3, attackSpeedMult: 1.35, label: 'LE TROLL S\'ÉNERVE !' },
+      { at: 0.33, damageMult: 1.3, attackSpeedMult: 1.35, label: 'LE TROLL EST FURIEUX !' },
+    ],
+    enrageAt: 150, // au-delà de 2 min 30, rage finale : dégâts ×3
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 }, // pour TOUS les participants si le Troll est vaincu
+  };
+
+  function bossStats(players) {
+    const n = Math.max(1, players);
+    return {
+      maxHp: Math.round(BOSS.hpBase + BOSS.hpPerPlayer * n),
+      damage: Math.round((BOSS.damageBase + BOSS.damagePerPlayer * n) * 10) / 10,
+    };
+  }
+
+  // ---------- Raid de Donjon ----------
+  const MONSTERS = {
+    gobelin: { label: 'Gobelin', icon: '👺', hp: 40, damage: 6, speed: 78, cooldown: 0.95, range: 36, radius: 13, reduction: 0.05, dodge: 0.08, from: 1 },
+    slime: { label: 'Slime', icon: '🟢', hp: 80, damage: 6, speed: 42, cooldown: 1.25, range: 34, radius: 15, reduction: 0.2, dodge: 0, from: 1 },
+    chauve_souris: { label: 'Chauve-souris', icon: '🦇', hp: 24, damage: 4, speed: 135, cooldown: 0.65, range: 30, radius: 11, reduction: 0, dodge: 0.25, from: 2 },
+    squelette: { label: 'Squelette archer', icon: '💀', hp: 42, damage: 7, speed: 55, cooldown: 1.4, range: 210, kite: 100, projectile: 'bone', radius: 13, reduction: 0.1, dodge: 0.05, from: 3 },
+  };
+  // Toutes les 5 salles, un chef bien plus costaud accompagne les monstres.
+  const ELITES = {
+    gobelin: 'Roi des gobelins', slime: 'Slime géant', chauve_souris: 'Chauve-souris vampire', squelette: 'Seigneur squelette',
+  };
+  const ELITE = { every: 5, hpMult: 5, damageMult: 1.5, scale: 1.9 };
+  const DUNGEON = {
+    countBase: 0.55, // monstres par aventurier dans la salle 1…
+    countPerRoom: 0.06, // … puis +0,06 par salle
+    hpPerRoom: 0.08, // +8 % de vie des monstres par salle
+    damagePerRoom: 0.06, // +6 % de dégâts par salle
+    healBetweenRooms: 0.3, // les survivants récupèrent 30 % de leur vie entre deux salles
+    enrageAt: 45, // au-delà de 45 s dans une salle, les monstres s'énervent…
+    enrageRate: 0.05, // … +5 % de dégâts par seconde
+    maxMonsters: 36,
+    stages: { enter: 2, clear: 1.3, exit: 2, dark: 1.8 }, // durées des transitions (s)
+  };
+
+  // Monstres d'une salle : [{ type, elite }]
+  function dungeonRoom(room, players) {
+    const n = Math.max(1, players);
+    const types = Object.keys(MONSTERS).filter((t) => MONSTERS[t].from <= room);
+    const count = Math.max(2, Math.min(DUNGEON.maxMonsters, Math.round(n * (DUNGEON.countBase + DUNGEON.countPerRoom * (room - 1)))));
+    const list = [];
+    if (room % ELITE.every === 0) list.push({ type: types[Math.floor(Math.random() * types.length)], elite: true });
+    while (list.length < count) list.push({ type: types[Math.floor(Math.random() * types.length)], elite: false });
+    return list;
+  }
+
+  function dungeonMultipliers(room) {
+    return { hp: 1 + DUNGEON.hpPerRoom * (room - 1), damage: 1 + DUNGEON.damagePerRoom * (room - 1) };
+  }
+
+  /*
+   * Récompenses selon la salle atteinte (palier de 5 en 5), pour TOUS les participants, morts ou vivants.
+   * 5 : 50 XP / 50 golds · 10 : 150 / 150 · 15 : 1 coffre, 300 / 300 · 20 : 2 coffres, 500 / 500
+   * puis +1 coffre et +250 XP / golds tous les 5 salles.
+   */
+  const DUNGEON_TIERS = [
+    { room: 5, xp: 50, gold: 50, chests: 0 },
+    { room: 10, xp: 150, gold: 150, chests: 0 },
+    { room: 15, xp: 300, gold: 300, chests: 1 },
+    { room: 20, xp: 500, gold: 500, chests: 2 },
+  ];
+  function dungeonReward(room) {
+    const tier = Math.floor(room / 5) * 5;
+    if (tier < 5) return null;
+    const known = DUNGEON_TIERS.find((t) => t.room === tier);
+    if (known) return { tier, xp: known.xp, gold: known.gold, chests: known.chests };
+    const extra = (tier - 20) / 5;
+    return { tier, xp: 500 + 250 * extra, gold: 500 + 250 * extra, chests: 2 + extra };
+  }
 
   // ---------- Apparence (gratuite) ----------
   const APPEARANCE = {
@@ -513,6 +631,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, SUB_REWARD_GOLD, APPEARANCE, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
+    BATTLE_EVENTS, GAME_MODES, BOSS, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    dungeonRoom, dungeonMultipliers, dungeonReward, SUB_REWARD_GOLD, APPEARANCE, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
   };
 });

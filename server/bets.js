@@ -53,8 +53,9 @@ class Bets {
     return state().list;
   }
 
+  // Paris uniquement en Battle Royale (il n'y a pas de gagnant unique dans les modes coopératifs).
   open() {
-    return this.battle.phase === 'queue' || this.battle.phase === 'ready';
+    return (this.battle.phase === 'queue' || this.battle.phase === 'ready') && this.battle.mode === 'br';
   }
 
   myBet(userId) {

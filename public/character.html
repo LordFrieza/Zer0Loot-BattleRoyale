@@ -198,7 +198,7 @@
 
     <section class="tab" data-tab="regles">
     <div class="panel" id="combat-info">
-      <h2>⚔️ Règles des combats <span class="sub">Récompenses, séries, événements et classes</span></h2>
+      <h2>⚔️ Battle Royale <span class="sub">Récompenses, séries, événements et classes</span></h2>
       <div>
       <div class="combat-info-grid">
         <div>
@@ -222,6 +222,32 @@
       <div class="class-summary" id="events-help"></div>
       <h3>🎭 Les classes</h3>
       <div class="class-summary" id="class-summary"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="modes-info">
+      <h2>🎮 Autres modes de jeu <span class="sub">Combat de Boss et Raid de Donjon</span></h2>
+      <p class="muted">Le streamer choisit le mode <b>avant d'ouvrir la file</b> (il est affiché dans le bandeau de la file et sur le stream).
+        Le <b>Battle Royale</b> reste le mode principal. Dans les modes coopératifs, personne ne se tape dessus : <b>on gagne ou on perd tous ensemble</b>.
+        Les kills de monstres ne rapportent rien en eux-mêmes, seule la récompense commune compte. Les paris et les événements de bataille
+        n'existent qu'en Battle Royale.</p>
+      <div class="modes-grid">
+        <div class="mode-card" style="--c:#7ccf6a">
+          <div class="mode-head"><canvas id="boss-portrait" width="150" height="150"></canvas>
+            <div><h3>👹 Combat de Boss</h3><p class="muted" id="boss-intro"></p></div></div>
+          <ul class="rules-list" id="boss-rules"></ul>
+          <h4>🎁 Récompenses</h4>
+          <table class="loot-table" id="boss-rewards"></table>
+        </div>
+        <div class="mode-card" style="--c:#5fd3ff">
+          <div class="mode-head"><canvas id="dungeon-portrait" width="230" height="110"></canvas>
+            <div><h3>🏰 Raid de Donjon</h3><p class="muted">Salle après salle, aussi loin que possible. <b>Pas de réapparition !</b></p></div></div>
+          <ul class="rules-list" id="dungeon-rules"></ul>
+          <h4>🎁 Récompenses selon la salle atteinte</h4>
+          <p class="muted" style="font-size:13px;margin:0 0 6px">Pour <b>tous</b> les participants, morts ou vivants. La salle atteinte est celle où l'équipe tombe.
+            On garde seulement le palier le plus haut (pas de cumul).</p>
+          <table class="loot-table" id="dungeon-rewards"></table>
+        </div>
       </div>
     </div>
 
@@ -262,6 +288,7 @@
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/fighter.js"></script>
+  <script src="/js/monsters.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/chest.js"></script>
   <script src="/js/forge.js"></script>
