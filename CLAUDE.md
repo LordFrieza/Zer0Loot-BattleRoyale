@@ -23,7 +23,7 @@ Développement local sans Twitch : `TWITCH_CHAT_DISABLED=1 npm start`. L'admin p
 
 - **`shared/rules.js`** est un module UMD chargé à la fois par Node (`require('../shared/rules')`) et par le navigateur (`/shared/rules.js` → global `Rules`). Il contient *toutes* les formules d'équilibrage : stats, classes, raretés, table de loot, forge, récompenses, courbe d'XP. Modifie l'équilibrage ici, et garde-le sans dépendance à Node ni au DOM. Les tests de `test/` le couvrent : mets-les à jour quand les règles changent.
 - **`server/index.js`** — routes Express (sessions par cookie `zl_session`, mots de passe scrypt, OAuth Twitch, endpoints admin) et hub Socket.IO. Il relie les autres modules : événements de bataille → récompenses (`game`) → rooms socket par utilisateur (`user:<id>`) qui émettent `me`, `reward`, `bet` ; diffusions globales `queue`, `frame`, `leaderboard`, `twitch`.
-- **`server/battle.js`** — `Battle` (EventEmitter), machine à états `idle → queue → ready → battle → ended`. Le combat est simulé **côté serveur** à pas fixe (`TICK_MS`) et diffusé en `frame` ; les clients ne font que l'affichage. La zone qui se referme et les événements (brouillard, météores, mode rapide) sont ici.
+- **`server/battle.js`** — `Battle` (EventEmitter), machine à états `idle → queue → ready → battle → ended`. Le combat est simulé **côté serveur** à pas fixe (`TICK_MS`) et diffusé en `frame` ; les clients ne font que l'affichage. La zone qui se referme et les événements (brouillard, météores, mode rapide) sont ici, ainsi que les trois **modes de jeu** (`this.mode`, choisi à l'ouverture de la file) : `br` (chacun est sa propre équipe), `boss` (équipe `heroes` contre le Troll : phases, attaques spéciales) et `dungeon` (salles successives, étapes `dark → enter → fight → clear → exit`). Le ciblage et les dégâts de zone se basent sur `team` ; la taille au sol sur `r`.
 - **`server/game.js`** — logique des personnages : progression, coffres, équipement, forge, changement de classe, et `upgrade()` qui migre les anciennes sauvegardes (ajoute-y les nouveaux champs et migrations d'objets quand la forme des données change).
 - **`server/bets.js`** — cagnotte des paris ; les mises sont retirées immédiatement et sauvegardées, les gains passent par la fonction pure `computePayouts`.
 - **`server/db.js`** — toute la base est un seul objet en mémoire (`db.state`), écrit dans `DATA_DIR/db.json` avec une écriture atomique différée. Appelle `db.save()` après chaque modification. Les clés de premier niveau inconnues (ex. `bets`) sont créées à la demande par le module propriétaire.
@@ -38,14 +38,14 @@ Un viewer sans compte obtient, via `!join`, un personnage rattaché à son pseud
 
 ## Cycle d'une partie (vue d'ensemble)
 
-1. L'admin ouvre la file (`/api/admin/queue/open`, 10 à 3600 s) → phase `queue` ; les viewers tapent `!join` (ou cliquent « Rejoindre »). Les paris sont ouverts en `queue` et `ready`.
-2. Fin du minuteur ou fermeture manuelle → `ready`. L'admin lance la bataille (≥ 2 combattants) : les stats des humains sont **recalculées au lancement** (`refreshParticipant`) → `battle`, paris fermés.
-3. Tick de 50 ms : ciblage, déplacement, attaques, zone (dès 45 s), événement éventuel ; chaque tick diffuse un `frame`. Fin quand il reste ≤ 1 combattant ou à 300 s.
-4. `kill` / `streak` / `end` déclenchent les récompenses dans `index.js` (jamais dans `battle.js`, qui ne connaît pas la base), puis règlement des paris et mise à jour des classements → `ended`.
+1. L'admin choisit le mode et ouvre la file (`/api/admin/queue/open`, 10 à 3600 s, `mode`) → phase `queue` ; les viewers tapent `!join` (ou cliquent « Rejoindre »). Les paris sont ouverts en `queue` et `ready`, en Battle Royale seulement.
+2. Fin du minuteur ou fermeture manuelle → `ready`. L'admin lance la partie (≥ 2 combattants en Battle Royale, ≥ 1 en coopération) : les stats des humains sont **recalculées au lancement** (`refreshParticipant`) → `battle`, paris fermés.
+3. Tick de 50 ms : ciblage, déplacement, attaques, zone (dès 45 s, Battle Royale), événement éventuel, attaques du Troll ou étapes du donjon ; chaque tick diffuse un `frame`. Battle Royale : fin quand il reste ≤ 1 combattant ou à 300 s ; Boss : Troll mort, tout le monde mort ou 300 s ; Donjon : tout le monde mort.
+4. `kill` / `streak` / `end` (Battle Royale) et `coopEnd` (Boss, Donjon) déclenchent les récompenses dans `index.js` (jamais dans `battle.js`, qui ne connaît pas la base), puis règlement des paris et mise à jour des classements → `ended`.
 
 ## Invariants et pièges
 
-- **Récompenses et événement `double`** : passe toujours par `scaled()` dans `index.js` ; ne crédite jamais directement `Rules.REWARDS`.
+- **Récompenses et événement `double`** : passe toujours par `scaled()` dans `index.js` ; ne crédite jamais directement `Rules.REWARDS`. Exception : les modes coopératifs (sans événement) créditent la récompense commune du résultat `coopEnd` à **tous** les participants humains, morts compris ; les kills de monstres ne rapportent rien et ne comptent pas dans le record.
 - **Bots** (`bot: true`, clé `bot<n>`) et joueurs sans `userId` ne reçoivent rien et ne sont jamais sauvegardés ; on peut pourtant parier sur eux.
 - **Clés de combattants** : `u<id>` pour un humain, `bot<n>` pour un bot ; les paris, le ciblage et les classements s'appuient dessus.
 - **Zone et météores ne peuvent pas tuer le dernier survivant** ; si tous meurent le même tick, le dernier mort ressuscite à 1 PV et gagne. Les morts de zone/météore n'ont pas de tueur (pas de XP de kill).
@@ -67,10 +67,11 @@ Un viewer sans compte obtient, via `!join`, un personnage rattaché à son pseud
 | Ajouter un champ au personnage | `newCharacter()` **et** `upgrade()` dans `server/game.js`, plus `absorbGhost` si cumulable |
 | Ajouter une commande de chat | callback de `twitch.startChat` dans `server/index.js` |
 | Ajouter un événement de bataille | `Rules.BATTLE_EVENTS`, `updateEvent()` dans `battle.js`, rendu dans `arena.js` |
+| Équilibrer le Boss ou le Donjon, ajouter un monstre | `Rules.BOSS`, `Rules.DUNGEON`, `Rules.MONSTERS`, `Rules.ELITE` ; dessin dans `public/js/monsters.js` ; rendu et transitions dans `arena.js` |
 
 ## Tests et garde-fous automatiques
 
-- Un fichier de test par domaine dans `test/` (`loot`, `chests`, `progression`, `stats`, `classes`, `battle`, `events`, `bets`, `forge`, `sets`, `achievements`, `appearance`) et `http.test.js` : tests d'intégration sur le vrai serveur Express (port aléatoire : comptes, rôles, file, paris, bans, liaison Twitch, bataille complète pilotée à la main). Runner natif de Node, aucune dépendance.
+- Un fichier de test par domaine dans `test/` (`loot`, `chests`, `progression`, `stats`, `classes`, `battle`, `events`, `modes`, `bets`, `forge`, `sets`, `achievements`, `appearance`) et `http.test.js` : tests d'intégration sur le vrai serveur Express (port aléatoire : comptes, rôles, file, paris, bans, liaison Twitch, bataille complète pilotée à la main). Runner natif de Node, aucune dépendance.
 - **Chaque fichier de test commence par `require('./helpers')`** : il isole la base dans un dossier temporaire (`DATA_DIR`) avant que `server/db.js` soit chargé, et fournit `Rules`, `game`, `db`, `Battle`, `testBattle(fighters)` (bataille dont la boucle est arrêtée, on appelle `attack()`/`tick()` à la main) et `base()` (stats neutres).
 - **Le nom de chaque test est préfixé par les identifiants de [SPECIFICATION.md](SPECIFICATION.md)** qu'il vérifie : `test('[BET-7] paris : …', …)`. Un nouveau comportement = une exigence dans la spec + un test tagué.
 - `server/index.js` n'a plus d'effet de bord à l'import : il exporte `{ app, server, io, battle, bets, start }`, et `start()` (appelé seulement par `node server/index.js`) branche le chat Twitch, les minuteurs, les signaux et `listen`. Les tests importent le module et appellent `server.listen(0)`. Toute nouvelle chose à effet permanent (minuteur, connexion externe) va dans `start()`.

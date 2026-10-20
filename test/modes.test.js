@@ -1,16 +1,14 @@
+/*
+ * Modes de jeu coopératifs : Combat de Boss et Raid de Donjon (simulation dans battle.js, valeurs dans rules.js).
+ * Les récompenses versées par index.js sont vérifiées dans http.test.js.
+ */
 const test = require('node:test');
 const assert = require('node:assert');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
-
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'zl-test-modes-'));
-const Rules = require('../shared/rules');
-const { Battle } = require('../server/battle');
+const { Rules, game, Battle, base } = require('./helpers');
 const { Bets } = require('../server/bets');
 
-// Bataille prête à être pilotée à la main (sans minuterie).
-function setup(mode, players, statsOf = () => Rules.derive({}, {}, 'guerrier')) {
+// Partie prête à être pilotée à la main (sans minuterie ni boucle).
+function coop(mode, players, statsOf = () => Rules.derive({}, {}, 'guerrier')) {
   const b = new Battle();
   b.openQueue(60, mode);
   clearTimeout(b.queueTimer);
@@ -18,104 +16,253 @@ function setup(mode, players, statsOf = () => Rules.derive({}, {}, 'guerrier')) 
   return b;
 }
 
+function started(b, event = null) {
+  b.start(null, event);
+  b.stopLoop();
+  return b;
+}
+
+// Joue la partie jusqu'au bout (au plus maxSeconds) et renvoie le résultat coopératif.
 function run(b, maxSeconds = 1200) {
   let out = null;
   b.on('coopEnd', (r) => { out = r; });
-  b.start(null, 'meteors');
-  b.stopLoop();
+  started(b, 'meteors');
   for (let i = 0; i < maxSeconds * 20 && !out; i++) b.tick(0.05);
   return out;
 }
 
-test('modes : liste et mode inconnu refusé', () => {
+// Immobilise tout le monde et empêche les attaques normales.
+function freeze(b) {
+  for (const f of b.fighters) { f.speed = 0; f.cd = 99; f.dodge = 0; }
+}
+
+// ---------- Modes ----------
+
+test('[MODE-1, MODE-2] modes : liste, mode par défaut, mode inconnu refusé, mode diffusé dans la file', () => {
   assert.deepStrictEqual(Object.keys(Rules.GAME_MODES), ['br', 'boss', 'dungeon']);
+  assert.strictEqual(Rules.GAME_MODES.br.coop, false);
+  assert.ok(Rules.GAME_MODES.boss.coop && Rules.GAME_MODES.dungeon.coop);
   const b = new Battle();
+  b.openQueue(60);
+  clearTimeout(b.queueTimer);
+  assert.strictEqual(b.publicQueue().mode, 'br');
   assert.throws(() => b.openQueue(60, 'pique-nique'), /inconnu/);
   b.openQueue(60, 'boss');
   clearTimeout(b.queueTimer);
   assert.strictEqual(b.publicQueue().mode, 'boss');
+  b.reset();
+  assert.strictEqual(b.mode, 'boss', 'le mode reste jusqu\'à la prochaine ouverture');
 });
 
-test('boss : vie et dégâts selon le nombre de combattants', () => {
-  const s1 = Rules.bossStats(1);
-  const s10 = Rules.bossStats(10);
-  assert.strictEqual(s10.maxHp, Rules.BOSS.hpBase + 10 * Rules.BOSS.hpPerPlayer);
-  assert.ok(s10.maxHp > s1.maxHp && s10.damage > s1.damage);
-});
-
-test('boss : un seul combattant suffit, personne ne se tape dessus, pas d\'événement', () => {
-  const b = setup('boss', 4);
-  b.start(null, 'meteors');
-  b.stopLoop();
-  assert.strictEqual(b.event, null, 'les événements sont réservés au Battle Royale');
-  assert.ok(b.boss && b.fighters.includes(b.boss));
-  for (let i = 0; i < 100; i++) {
-    b.tick(0.05);
-    for (const f of b.players) assert.strictEqual(f.targetKey === null || f.targetKey === 'boss', true);
+test('[MODE-3] lancement : 2 combattants en Battle Royale, 1 suffit en coopération', () => {
+  const br = new Battle();
+  br.openQueue(60, 'br');
+  clearTimeout(br.queueTimer);
+  br.join({ key: 'p0', name: 'P0', level: 1, stats: base(), look: {} });
+  assert.throws(() => br.start(), /au moins 2/);
+  for (const mode of ['boss', 'dungeon']) {
+    const b = started(coop(mode, 1));
+    assert.strictEqual(b.phase, 'battle', mode);
   }
-  const playerKeys = new Set(b.players.map((p) => p.key));
-  // Aucun coup entre combattants
-  b.on('frame', (fr) => fr.events.forEach((e) => {
-    if (e.t === 'hit' && e.from && e.to) assert.ok(!(playerKeys.has(e.from) && playerKeys.has(e.to)));
-  }));
-  for (let i = 0; i < 200; i++) b.tick(0.05);
 });
 
-test('boss : les coches de 66 % et 33 % renforcent le Troll', () => {
-  const b = setup('boss', 3);
-  b.start();
-  b.stopLoop();
+test('[MODE-4, MODE-5, BOSS-1] boss : une seule équipe contre le Troll, sans zone, événement ni récompense de kill', () => {
+  const b = started(coop('boss', 4), 'meteors');
+  assert.strictEqual(b.event, null, 'les événements sont réservés au Battle Royale');
+  const st = Rules.bossStats(4);
+  assert.strictEqual(b.boss.maxHp, 200 + 300 * 4);
+  assert.strictEqual(st.maxHp, b.boss.maxHp);
+  assert.strictEqual(b.boss.damage, 6 + 0.2 * 4);
+  assert.strictEqual(b.boss.r, 58);
+  assert.ok(b.players.every((p) => p.x <= 470), 'combattants dans la partie gauche');
+  const keys = new Set(b.players.map((p) => p.key));
+  let kills = 0;
+  b.on('kill', () => { kills += 1; });
+  b.on('streak', () => { kills += 1; });
+  b.on('frame', (fr) => {
+    assert.strictEqual(fr.storm, null, 'pas de zone');
+    for (const e of fr.events) if (e.t === 'hit' && e.from && e.to) assert.ok(!(keys.has(e.from) && keys.has(e.to)), 'pas de coup entre alliés');
+  });
+  b.time = 100; // bien après le début de la zone en Battle Royale
+  for (let i = 0; i < 300; i++) {
+    b.tick(0.05);
+    for (const f of b.players) if (f.alive && f.targetKey) assert.strictEqual(f.targetKey, 'boss');
+  }
+  b.boss.hp = 1;
+  const p = b.players.find((x) => x.alive);
+  b.kill(p, b.boss);
+  assert.strictEqual(kills, 0, 'aucune récompense de kill ni de série en coopération');
+});
+
+test('[MODE-4] boss : l\'explosion du Mage ne touche pas les alliés', () => {
+  const b = started(coop('boss', 3));
+  freeze(b);
+  const [mage, ally] = b.players;
+  Object.assign(mage, { aoeRadius: 75, aoeRatio: 0.6, crit: 0, precision: 0 });
+  Object.assign(b.boss, { x: 600, y: 360, dodge: 0 });
+  Object.assign(ally, { x: 620, y: 360 });
+  const hpAlly = ally.hp;
+  b.attack(mage, b.boss);
+  assert.ok(b.boss.hp < b.boss.maxHp);
+  assert.strictEqual(ally.hp, hpAlly);
+});
+
+test('[BOSS-2] boss : le coup de massue touche aussi les voisins de la cible', () => {
+  const b = started(coop('boss', 3));
+  freeze(b);
+  const [target, near, far] = b.players;
+  Object.assign(b.boss, { crit: 0 });
+  Object.assign(target, { x: 650, y: 360, reduction: 0 });
+  Object.assign(near, { x: 700, y: 360, reduction: 0 });
+  Object.assign(far, { x: 900, y: 360, reduction: 0 });
+  b.events = [];
+  b.attack(b.boss, target);
+  const hits = b.events.filter((e) => e.t === 'hit');
+  const main = hits.find((e) => e.to === target.key);
+  const splash = hits.find((e) => e.to === near.key);
+  assert.ok(main && splash && splash.splash);
+  assert.ok(!hits.some((e) => e.to === far.key));
+  assert.ok(Math.abs(splash.dmg - main.dmg * Rules.BOSS.cleaveRatio) <= 1);
+});
+
+test('[BOSS-3] boss : onde de choc puis rocher, annoncés avant l\'impact', () => {
+  const b = started(coop('boss', 3));
+  freeze(b);
+  const B = Rules.BOSS;
+  const [close, groupA, groupB] = b.players;
+  Object.assign(b.boss, { x: 640, y: 360 });
+  Object.assign(close, { x: 700, y: 360 }); // dans l'onde de choc
+  Object.assign(groupA, { x: 150, y: 150 });
+  Object.assign(groupB, { x: 180, y: 160 }); // le plus gros groupe
+  b.boss.slamIn = 0;
+  b.tick(0.05);
+  assert.strictEqual(b.slams.length, 1);
+  assert.strictEqual(b.slams[0].kind, 'slam');
+  assert.strictEqual(b.slams[0].r, B.slam.radius);
+  const hp = b.players.map((p) => p.hp);
+  b.tick(B.slam.warn - 0.2);
+  assert.deepStrictEqual(b.players.map((p) => p.hp), hp, 'pas de dégâts avant l\'impact');
+  b.tick(0.25);
+  assert.ok(close.hp < hp[0], 'touché par l\'onde de choc');
+  assert.strictEqual(groupA.hp, hp[1]);
+  // Attaque suivante : le rocher, sur le groupe
+  b.boss.slamIn = 0;
+  b.tick(0.05);
+  const rock = b.slams.find((s) => s.kind === 'rock');
+  assert.ok(rock && rock.r === B.slam.rockRadius);
+  assert.ok(Math.hypot(rock.x - 165, rock.y - 155) < 40, 'visé sur le groupe');
+  b.tick(B.slam.warn);
+  assert.ok(groupA.hp < hp[1] && groupB.hp < hp[2]);
+});
+
+test('[BOSS-4] boss : les coches de 66 % et 33 % renforcent le Troll', () => {
+  const b = started(coop('boss', 3));
+  freeze(b);
   const boss = b.boss;
   const cd = boss.cooldown;
+  const every = boss.slamEvery;
   boss.hp = boss.maxHp * 0.6;
   b.tick(0.05);
   assert.strictEqual(boss.phase, 1);
-  assert.ok(boss.dmgMult > 1 && boss.cooldown < cd);
+  assert.ok(Math.abs(boss.dmgMult - 1.3) < 1e-9);
+  assert.ok(Math.abs(boss.cooldown - cd / 1.35) < 1e-9);
+  assert.ok(Math.abs(boss.slamEvery - every * 0.8) < 1e-9);
   boss.hp = boss.maxHp * 0.3;
+  const frames = [];
+  b.on('frame', (f) => frames.push(...f.events));
   b.tick(0.05);
   assert.strictEqual(boss.phase, 2);
+  assert.ok(frames.some((e) => e.t === 'bossPhase' && e.phase === 2));
 });
 
-test('boss : victoire = récompense pour tous, défaite = rien', () => {
+test('[BOSS-5] boss : rage finale à 150 s', () => {
+  const b = started(coop('boss', 2));
+  freeze(b);
+  b.time = Rules.BOSS.enrageAt - 1;
+  b.tick(0.05);
+  assert.strictEqual(b.boss.enraged, false);
+  b.time = Rules.BOSS.enrageAt;
+  b.tick(0.05);
+  assert.strictEqual(b.boss.enraged, true);
+  assert.strictEqual(b.boss.dmgMult, Rules.BOSS.enrageMult);
+});
+
+test('[BOSS-6, BOSS-7, MODE-6] boss : victoire commune avec récompense, défaite sans', () => {
   const strong = () => ({ ...Rules.derive({}, {}, 'guerrier'), maxHp: 1e6, damage: 5000 });
-  const win = run(setup('boss', 3, strong));
+  const win = run(coop('boss', 3, strong));
   assert.strictEqual(win.victory, true);
   assert.deepStrictEqual(win.reward, Rules.BOSS.reward);
+  assert.deepStrictEqual(win.reward, { xp: 500, gold: 500, chests: 3 });
   assert.strictEqual(win.ranking.length, 3);
+  assert.ok(win.ranking[0].dealt >= win.ranking[2].dealt, 'classé par dégâts');
 
   const weak = () => ({ ...Rules.derive({}, {}, 'guerrier'), maxHp: 5, damage: 0.1 });
-  const lose = run(setup('boss', 3, weak));
+  const lose = run(coop('boss', 3, weak));
   assert.strictEqual(lose.victory, false);
   assert.strictEqual(lose.reward, null);
+
+  // Au-delà de 300 s : défaite
+  const b = started(coop('boss', 1));
+  freeze(b);
+  let out = null;
+  b.on('coopEnd', (r) => { out = r; });
+  b.time = 301;
+  b.tick(0.05);
+  assert.strictEqual(out.victory, false);
+  assert.strictEqual(b.phase, 'ended');
 });
 
-test('donjon : récompenses par palier de salle atteinte', () => {
+// ---------- Donjon ----------
+
+test('[DNG-8] donjon : récompenses par palier de salle atteinte', () => {
   assert.strictEqual(Rules.dungeonReward(4), null);
   assert.deepStrictEqual(Rules.dungeonReward(5), { tier: 5, xp: 50, gold: 50, chests: 0 });
   assert.deepStrictEqual(Rules.dungeonReward(12), { tier: 10, xp: 150, gold: 150, chests: 0 });
   assert.deepStrictEqual(Rules.dungeonReward(15), { tier: 15, xp: 300, gold: 300, chests: 1 });
   assert.deepStrictEqual(Rules.dungeonReward(20), { tier: 20, xp: 500, gold: 500, chests: 2 });
   assert.deepStrictEqual(Rules.dungeonReward(27), { tier: 25, xp: 750, gold: 750, chests: 3 });
+  assert.deepStrictEqual(Rules.dungeonReward(30), { tier: 30, xp: 1000, gold: 1000, chests: 4 });
 });
 
-test('donjon : salles de plus en plus peuplées, un chef toutes les 5 salles', () => {
-  const avg = (room) => {
-    let n = 0;
-    for (let i = 0; i < 50; i++) n += Rules.dungeonRoom(room, 10).length;
-    return n / 50;
-  };
-  assert.ok(avg(10) > avg(1));
-  assert.ok(Rules.dungeonRoom(5, 10).some((m) => m.elite));
+test('[DNG-1, DNG-2] donjon : nombre de monstres, types débloqués, multiplicateurs et chefs', () => {
+  for (const room of [1, 3, 10, 40]) {
+    const expected = Math.max(2, Math.min(36, Math.round(10 * (0.55 + 0.06 * (room - 1)))));
+    assert.strictEqual(Rules.dungeonRoom(room, 10).length, expected, 'salle ' + room);
+  }
+  assert.strictEqual(Rules.dungeonRoom(1, 1).length, 2, 'minimum 2 monstres');
+  for (let i = 0; i < 30; i++) {
+    assert.ok(Rules.dungeonRoom(1, 10).every((m) => ['gobelin', 'slime'].includes(m.type)));
+    assert.ok(Rules.dungeonRoom(2, 10).every((m) => m.type !== 'squelette'));
+  }
+  assert.deepStrictEqual(Rules.dungeonMultipliers(1), { hp: 1, damage: 1 });
+  const m11 = Rules.dungeonMultipliers(11);
+  assert.ok(Math.abs(m11.hp - 1.8) < 1e-9 && Math.abs(m11.damage - 1.6) < 1e-9);
+  assert.strictEqual(Rules.dungeonRoom(5, 10).filter((m) => m.elite).length, 1);
   assert.ok(!Rules.dungeonRoom(4, 10).some((m) => m.elite));
-  assert.ok(Rules.dungeonRoom(1, 10).every((m) => Rules.MONSTERS[m.type].from <= 1));
+
+  // Statistiques réelles d'un chef créé par le serveur
+  const b = started(coop('dungeon', 4));
+  b.dungeon.room = 4;
+  b.nextRoom();
+  const chief = b.monsters.find((m) => m.elite);
+  const mult = Rules.dungeonMultipliers(5);
+  const M = Rules.MONSTERS[chief.kind];
+  assert.strictEqual(chief.maxHp, Math.round(M.hp * mult.hp * 5));
+  assert.ok(Math.abs(chief.damage - M.damage * mult.damage * 1.5) < 1e-9);
+  assert.strictEqual(chief.scale, 1.9);
+  assert.strictEqual(chief.name, Rules.ELITES[chief.kind]);
 });
 
-test('donjon : les aventuriers enchaînent les salles, sans réapparition', () => {
-  const b = setup('dungeon', 6, (i) => ({ ...Rules.derive({}, {}, 'guerrier'), maxHp: 400 + i * 50, damage: 25 }));
-  const rooms = new Set();
+test('[DNG-3, DNG-4, DNG-5, DNG-7] donjon : enchaînement des salles, pas de réapparition, fin du raid', () => {
+  const b = coop('dungeon', 6, (i) => ({ ...Rules.derive({}, {}, 'guerrier'), maxHp: 400 + i * 50, damage: 25 }));
+  const stages = [];
   const deadForever = new Set();
+  let hitsDuringEnter = 0;
+  let clears = 0;
   b.on('frame', (fr) => {
-    if (fr.dungeon) rooms.add(fr.dungeon.room);
+    if (fr.dungeon && stages[stages.length - 1] !== fr.dungeon.stage) stages.push(fr.dungeon.stage);
+    if (fr.dungeon && fr.dungeon.stage === 'enter') hitsDuringEnter += fr.events.filter((e) => e.t === 'hit').length;
+    clears += fr.events.filter((e) => e.t === 'roomClear').length;
     for (const p of b.players) {
       if (!p.alive) deadForever.add(p.key);
       else assert.ok(!deadForever.has(p.key), 'un aventurier tombé ne revient pas');
@@ -124,12 +271,77 @@ test('donjon : les aventuriers enchaînent les salles, sans réapparition', () =
   const res = run(b);
   assert.ok(res, 'le raid se termine');
   assert.ok(res.room >= 2, 'au moins une salle franchie');
-  assert.ok(rooms.has(res.room) && rooms.has(1));
+  assert.strictEqual(clears, res.room - 1);
+  assert.deepStrictEqual(stages.slice(0, 7), ['dark', 'enter', 'fight', 'clear', 'exit', 'dark', 'enter']);
+  assert.strictEqual(hitsDuringEnter, 0, 'pas de combat pendant l\'entrée');
   assert.deepStrictEqual(res.reward, Rules.dungeonReward(res.room));
   assert.ok(b.players.every((p) => !p.alive));
+  assert.strictEqual(res.room, b.dungeon.room, 'salle où l\'équipe est tombée');
 });
 
-test('paris : fermés dans les modes coopératifs', () => {
+test('[DNG-3, DNG-5] donjon : durées des étapes et soins de 30 % à l\'entrée d\'une salle', () => {
+  const S = Rules.DUNGEON.stages;
+  const b = started(coop('dungeon', 2));
+  assert.strictEqual(b.dungeon.stage, 'dark');
+  let t = 0;
+  while (b.dungeon.stage === 'dark') { b.tick(0.05); t += 0.05; }
+  assert.ok(Math.abs(t - S.dark * 0.65) < 0.11, 'premier écran noir ≈ 1,2 s');
+  assert.strictEqual(b.dungeon.room, 1);
+  assert.ok(b.players.every((p) => p.x < 0), 'entrée par la gauche');
+  t = 0;
+  while (b.dungeon.stage === 'enter') { b.tick(0.05); t += 0.05; }
+  assert.ok(Math.abs(t - S.enter) < 0.11);
+  assert.ok(b.players.every((p) => p.x > 60), 'les aventuriers sont entrés');
+  // Salle vidée : pause, puis sortie à droite
+  for (const m of b.monsters) b.kill(null, m);
+  b.tick(0.05);
+  assert.strictEqual(b.dungeon.stage, 'clear');
+  const [hurt, dead] = b.players;
+  hurt.hp = 10;
+  b.kill(null, dead);
+  while (b.dungeon.stage !== 'dark') b.tick(0.05);
+  assert.ok(hurt.x > 400, 'sortie vers la droite');
+  while (b.dungeon.stage === 'dark') b.tick(0.05);
+  assert.strictEqual(b.dungeon.room, 2);
+  assert.ok(Math.abs(hurt.hp - (10 + hurt.maxHp * 0.3)) < 1e-6, '+30 % de la vie max');
+  assert.strictEqual(dead.alive, false, 'pas de réapparition');
+  // les soins ne dépassent pas le maximum
+  hurt.hp = hurt.maxHp - 1;
+  b.nextRoom();
+  assert.strictEqual(hurt.hp, hurt.maxHp);
+});
+
+test('[DNG-6] donjon : les monstres s\'énervent après 45 s dans la même salle', () => {
+  const b = started(coop('dungeon', 2));
+  b.dungeon.room = 0;
+  b.nextRoom();
+  b.setStage('fight');
+  freeze(b);
+  b.tick(0.05);
+  assert.ok(b.monsters.every((m) => m.dmgMult === 1));
+  b.time = b.dungeon.fightStart + 50;
+  b.tick(0.05);
+  assert.strictEqual(b.dungeon.enraged, true);
+  for (const m of b.monsters) assert.ok(Math.abs(m.dmgMult - (1 + 0.05 * (50.05 - 45))) < 0.01);
+});
+
+test('[ACH-1] donjon : la fusion d\'un fantôme garde la meilleure salle', () => {
+  const db = require('../server/db');
+  const ghost = game.getOrCreateTwitchUser('fantome_donjon', 'Fantome_Donjon');
+  ghost.character.counters.dungeonBest = 7;
+  ghost.character.counters.bossWins = 2;
+  const user = { id: 'acc_donjon', username: 'acc_donjon', role: 'player', character: game.newCharacter() };
+  user.character.counters.dungeonBest = 12;
+  user.character.counters.bossWins = 1;
+  db.state.users[user.id] = user;
+  game.linkTwitch(user, 'fantome_donjon', 'Fantome_Donjon');
+  assert.strictEqual(user.character.counters.dungeonBest, 12, 'maximum, pas la somme');
+  assert.strictEqual(user.character.counters.bossWins, 3, 'les victoires s\'additionnent');
+  assert.ok(Rules.ACHIEVEMENTS.some((a) => a.metric === 'bossWins') && Rules.ACHIEVEMENTS.some((a) => a.metric === 'dungeonBest'));
+  assert.strictEqual(Rules.achievementValue(user.character, 'dungeonBest'), 12);
+});
+
+test('[BET-1, MODE-5] paris : fermés dans les modes coopératifs', () => {
   for (const [mode, open] of [['br', true], ['boss', false], ['dungeon', false]]) {
     const b = new Battle();
     b.openQueue(60, mode);

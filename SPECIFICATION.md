@@ -108,7 +108,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ### 7.1 Cycle de vie
 
-- **B-1** Quand l'admin lance la bataille, le serveur doit exiger la phase `queue` ou `ready` et **au moins 2 combattants**, sinon renvoyer une erreur.
+- **B-1** Quand l'admin lance la bataille, le serveur doit exiger la phase `queue` ou `ready` et **au moins 2 combattants** (Battle Royale ; 1 suffit dans les modes coopératifs, voir MODE-3), sinon renvoyer une erreur.
 - **B-2** Quand la bataille démarre, le serveur doit placer les combattants aléatoirement dans l'arène 1280×720 avec une marge de 60 px et une distance minimale de `clamp(√(aire/n)×0,6, 40, 140)` (60 essais max), puis émettre `start`.
 - **B-3** Tant que la phase est `battle`, le serveur doit exécuter un tick toutes les 50 ms et diffuser un `frame` à chaque tick.
 - **B-4** Quand l'admin réinitialise l'arène, le serveur doit arrêter la boucle, émettre `cleared` (remboursement des paris), effacer participants/combattants/résultat et passer en `idle`.
@@ -122,7 +122,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **B-9** Si la cible est hors de portée, le combattant doit avancer vers elle à sa vitesse, sans dépasser sa portée.
 - **B-10** Si le combattant a un `kite` (Archer) et que la cible est plus proche que 110 px, alors il doit reculer à 80 % de sa vitesse.
 - **B-11** Quand la cible est à portée et que le délai de recharge est écoulé, le combattant doit attaquer ; le délai initial est aléatoire (0 à 0,5 s).
-- **B-12** Le serveur doit séparer les combattants qui se chevauchent (rayon 16 px) et les maintenir dans l'arène.
+- **B-12** Le serveur doit séparer les combattants qui se chevauchent (rayon 16 px ; plus grand pour le Troll et les chefs du donjon, qui poussent les petits plus qu'ils ne sont poussés) et les maintenir dans l'arène.
 - **B-13** Tant que le Prêtre est vivant, le serveur doit lui rendre 1,5 % de sa vie max par seconde.
 
 ### 7.3 Attaque et dégâts
@@ -156,6 +156,36 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **STK-1** Quand un combattant fait le premier kill de la bataille, le serveur doit émettre la série `firstblood`.
 - **STK-2** Quand un combattant enchaîne un 2ᵉ kill moins de 8 s après le précédent, le serveur doit émettre `double` ; au 3ᵉ enchaîné, `triple`.
 - **STK-3** Quand un combattant atteint 5 kills dans la bataille, le serveur doit émettre `massacre`.
+
+### 7.7 Modes de jeu
+
+- **MODE-1** Il doit exister trois modes : `br` (Battle Royale, mode principal, chacun pour soi), `boss` (Combat de Boss, coopératif) et `dungeon` (Raid de Donjon, coopératif).
+- **MODE-2** Quand l'admin ouvre la file, le serveur doit prendre le mode demandé (`br` par défaut), le conserver jusqu'à la prochaine ouverture et le diffuser dans l'état de la file ; si le mode est inconnu, alors l'ouverture doit être refusée.
+- **MODE-3** Quand l'admin lance la partie, le serveur doit exiger au moins 2 combattants en Battle Royale et au moins 1 en mode coopératif.
+- **MODE-4** Tant que le mode est coopératif, tous les combattants doivent former une seule équipe qui ne s'attaque pas elle-même ; un combattant ne cible que l'équipe adverse et les dégâts de zone (Mage, Troll) ne touchent que l'équipe adverse.
+- **MODE-5** Tant que le mode est coopératif, le serveur ne doit appliquer ni événement de bataille (l'événement choisi attend la prochaine bataille royale), ni zone qui se referme, ni paris, ni récompense de kill ou de série (les kills de monstres ne rapportent rien en eux-mêmes et ne comptent pas dans le record de kills).
+- **MODE-6** Quand une partie coopérative se termine, le serveur doit passer en `ended`, classer les combattants par dégâts infligés, émettre `coopEnd`, puis donner à chaque combattant humain (mort ou vivant) 25 XP de participation, +1 bataille et la récompense commune éventuelle, et diffuser `leaderboard`.
+
+### 7.8 Combat de Boss
+
+- **BOSS-1** Quand le Combat de Boss démarre, le serveur doit placer les combattants dans la partie gauche de l'arène et créer Grokk le Troll avec `200 + 300 × n` PV et `6 + 0,2 × n` dégâts (`n` = combattants au lancement), un rayon de 58 px, 15 % de réduction, 20 % de précision et 1,5 s de recharge.
+- **BOSS-2** Quand le Troll frappe sa cible, il doit aussi infliger 50 % des dégâts bruts aux autres combattants situés à moins de 75 px de la cible.
+- **BOSS-3** Le Troll doit lancer une attaque spéciale toutes les 6,5 s, annoncée au sol 1,3 s avant l'impact, en alternant l'onde de choc (rayon 150 px autour de lui) et le rocher (rayon 100 px, sur le combattant entouré du plus grand nombre d'alliés) ; l'impact inflige `dégâts × 1,1` (±10 %) à chaque combattant dans la zone.
+- **BOSS-4** Quand la vie du Troll passe sous 66 % puis sous 33 %, il doit passer une phase : dégâts ×1,3, vitesse d'attaque ×1,35, attaques spéciales 20 % plus fréquentes ; le serveur émet l'événement `bossPhase`.
+- **BOSS-5** À partir de 150 s de combat, le Troll doit entrer en rage finale : dégâts ×3.
+- **BOSS-6** Quand le Troll meurt, la partie doit se terminer par une victoire ; si tous les combattants sont morts ou que la durée dépasse 300 s, par une défaite.
+- **BOSS-7** Quand le Troll est vaincu, chaque combattant humain (mort ou vivant) doit gagner 3 coffres, 500 XP et 500 golds, et +1 au compteur `bossWins` ; en cas de défaite, seulement l'XP de participation.
+
+### 7.9 Raid de Donjon
+
+- **DNG-1** Le raid doit enchaîner des salles numérotées à partir de 1 ; une salle contient `clamp(round(n × (0,55 + 0,06 × (salle − 1))), 2, 36)` monstres (`n` = aventuriers au départ du raid), tirés parmi les types débloqués : gobelin et slime dès la salle 1, chauve-souris dès la 2, squelette archer dès la 3.
+- **DNG-2** Les monstres doivent gagner +8 % de vie et +6 % de dégâts par salle ; toutes les 5 salles, l'un d'eux doit être un chef (vie ×5, dégâts ×1,5, taille ×1,9).
+- **DNG-3** Chaque salle doit enchaîner : écran noir (1,8 s ; 1,2 s avant la première salle), entrée des aventuriers par la gauche (2 s, sans combat), combat, pause (1,3 s), sortie par la droite (2 s), puis la salle suivante.
+- **DNG-4** Quand tous les monstres d'une salle sont morts, le serveur doit émettre `roomClear` et passer à la pause.
+- **DNG-5** Un aventurier mort ne doit jamais réapparaître ; à l'entrée d'une nouvelle salle, les survivants doivent récupérer 30 % de leur vie max (sans dépasser le maximum).
+- **DNG-6** Au-delà de 45 s de combat dans une même salle, les dégâts des monstres doivent augmenter de 5 % par seconde supplémentaire.
+- **DNG-7** Quand tous les aventuriers sont morts, le raid doit se terminer ; la salle atteinte est celle où l'équipe est tombée.
+- **DNG-8** La récompense commune doit dépendre du palier de 5 salles atteint : moins de 5 → rien ; 5 → 50 XP et 50 golds ; 10 → 150 / 150 ; 15 → 1 coffre, 300 / 300 ; 20 → 2 coffres, 500 / 500 ; ensuite +1 coffre et +250 XP / golds tous les 5 salles. Le compteur `dungeonBest` doit garder la meilleure salle atteinte.
 
 ## 8. Classes
 
@@ -227,7 +257,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 14. Paris
 
-- **BET-1** Tant que la phase est `queue` ou `ready`, le serveur doit accepter les paris ; ils sont fermés dès `battle` et `ended`.
+- **BET-1** Tant que la phase est `queue` ou `ready` et que le mode est le Battle Royale, le serveur doit accepter les paris ; ils sont fermés dès `battle` et `ended`, et toujours dans les modes coopératifs.
 - **BET-2** Quand un joueur parie, le serveur doit exiger une mise entière ≥ 1, un combattant inscrit, et que ce ne soit pas lui-même.
 - **BET-3** Quand un joueur parie, le serveur doit retirer la mise immédiatement et sauvegarder ; il ne doit y avoir qu'un pari par joueur.
 - **BET-4** Quand un joueur modifie son pari, le serveur doit lui rendre l'ancienne mise avant de débiter la nouvelle (les golds disponibles incluent l'ancienne mise).
@@ -241,7 +271,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 15. Succès et titres
 
-- **ACH-1** Le serveur doit suivre les métriques `battles`, `kills`, `wins`, `level`, `cosmetics`, `setPieces` et les compteurs `chests`, `legendary`, `recycled`, `fused`, `rerolled`, `betsWon`, `firstblood`, `double`, `massacre`, `subs`.
+- **ACH-1** Le serveur doit suivre les métriques `battles`, `kills`, `wins`, `level`, `cosmetics`, `setPieces` et les compteurs `chests`, `legendary`, `recycled`, `fused`, `rerolled`, `betsWon`, `firstblood`, `double`, `massacre`, `subs`, `bossWins` et `dungeonBest` (meilleure salle du donjon ; lors de la fusion d'un fantôme, on garde le maximum au lieu d'additionner).
 - **ACH-2** Quand un succès atteint son objectif, le joueur doit pouvoir récupérer une seule fois sa récompense en golds ; sinon (non terminé ou déjà récupéré), le serveur doit refuser.
 - **ACH-3** Quand un joueur choisit un titre, le serveur doit exiger un succès terminé ; le titre est le nom du succès et s'affiche sous le pseudo et dans les classements.
 
@@ -259,7 +289,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 18. Administration
 
-- **ADM-1** L'admin doit pouvoir ouvrir/fermer la file, lancer ou réinitialiser la bataille, choisir l'événement de la prochaine bataille (aucun, aléatoire ou l'un des quatre), ajouter des bots, simuler `!join` et sub.
+- **ADM-1** L'admin doit pouvoir choisir le mode de jeu avant d'ouvrir la file, ouvrir/fermer la file, lancer ou réinitialiser la bataille, choisir l'événement de la prochaine bataille (aucun, aléatoire ou l'un des quatre), ajouter des bots, simuler `!join` et sub.
 - **ADM-2** L'admin doit pouvoir lister les joueurs (nom, pseudo, Twitch, fantôme, banni, classe, niveau, golds, coffres, record, titre).
 - **ADM-3** Quand l'admin donne des ressources à un joueur, le serveur doit l'appliquer et notifier le joueur.
 - **ADM-4** Quand l'admin bannit un joueur, le serveur doit supprimer ses sessions, lui émettre `banned`, et, si une file est en cours, le retirer des participants et rembourser son pari et les paris placés sur lui.
@@ -279,6 +309,7 @@ Ces exigences se vérifient dans un navigateur (skill `smoke-arena`) : elles son
 - **UI-2** `/character.html` doit proposer les onglets Personnage, Inventaire, Boutique, Succès, Classements et Règles, ainsi que l'inscription à la file et les paris. (vérification manuelle)
 - **UI-3** `/admin.html` doit afficher l'arène, les contrôles de file, les événements, les inscrits, les outils de test, la liste des joueurs et les classements. (vérification manuelle)
 - **UI-4** `/arena.html` doit afficher uniquement l'arène en plein écran pour une source navigateur OBS (1280×720 ou 1920×1080), avec annonces de séries et sons. (vérification manuelle)
+- **UI-6** Pour les modes coopératifs, l'arène doit afficher le mode sur l'écran de file, la grosse barre de vie du Troll avec ses coches à 66 % et 33 %, les zones d'attaque spéciale au sol, l'explosion du Troll suivie d'une pluie de coffres et de golds, la salle de donjon (dallage, torches) avec fondu au noir et grand « SALLE X », et un écran de fin commun (récompense, meilleurs dégâts) ; la page admin propose le choix du mode et l'onglet Règles explique les deux modes et leurs récompenses. (vérification manuelle)
 - **UI-5** Les pages doivent être en français, sans framework ni étape de build, les scripts étant chargés dans l'ordre des dépendances. (vérification manuelle)
 
 ## 21. Déploiement et configuration

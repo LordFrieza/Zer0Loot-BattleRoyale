@@ -311,6 +311,110 @@ test('[PRG-3, PRG-4, PRG-5, BET-1, BET-7, BET-10, B-26, LB-1] bataille complète
   assert.strictEqual(board.wins[0].name, 'pl_win');
 });
 
+test('[MODE-2, MODE-3, MODE-5, ADM-1, BET-1] modes coopératifs : choix du mode, 1 combattant, pas de paris, événement en attente', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const bad = await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'pique-nique' });
+  assert.strictEqual(bad.status, 400);
+  const solo = client();
+  const bettor = client();
+  const id = (await register(solo, 'pl_solo')).id;
+  const bid = (await register(bettor, 'pl_bettor_coop')).id;
+  await give(bid, { gold: 50 });
+  await admin.post('/api/admin/event', { event: 'fog' });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss' });
+  assert.strictEqual((await alice.get('/api/queue')).data.mode, 'boss');
+  assert.strictEqual((await solo.post('/api/queue/join')).data.joined, true);
+  const bet = await bettor.post('/api/bet', { target: 'u' + id, amount: 10 });
+  assert.match(bet.data.error, /fermés/);
+  assert.strictEqual((await meOf(bettor)).character.gold, 50);
+  const r = await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  assert.strictEqual(r.data.ok, true, 'un seul combattant suffit');
+  assert.strictEqual(battle.event, null);
+  assert.strictEqual(r.data.pendingEvent, 'fog', 'l\'événement attend la prochaine bataille royale');
+  await admin.post('/api/admin/event', { event: null });
+  await admin.post('/api/admin/battle/reset');
+});
+
+test('[BOSS-6, BOSS-7, MODE-5, MODE-6, ACH-1] Combat de Boss : récompense commune pour tous, morts compris', async () => {
+  const a = client();
+  const b = client();
+  const ida = (await register(a, 'pl_boss_a')).id;
+  const idb = (await register(b, 'pl_boss_b')).id;
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss' });
+  await a.post('/api/queue/join');
+  await b.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  const fa = battle.players.find((f) => f.userId === ida);
+  const fb = battle.players.find((f) => f.userId === idb);
+  battle.kill(battle.boss, fb); // pl_boss_b tombe avant la fin
+  battle.kill(fa, battle.boss);
+  battle.tick(0.05);
+  const q = (await alice.get('/api/queue')).data;
+  assert.strictEqual(q.phase, 'ended');
+  assert.strictEqual(q.result.mode, 'boss');
+  assert.strictEqual(q.result.victory, true);
+  for (const c of [a, b]) {
+    const ch = (await meOf(c)).character;
+    assert.strictEqual(ch.chests, 3);
+    assert.strictEqual(ch.gold, 500);
+    assert.deepStrictEqual([ch.level, ch.xp], [2, 225], '25 + 500 XP');
+    assert.deepStrictEqual(ch.record, { battles: 1, kills: 0, wins: 0 }, 'tuer le Troll ne compte pas comme un kill');
+    assert.strictEqual(ch.counters.bossWins, 1);
+  }
+
+  // Défaite : seulement la participation
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss' });
+  await a.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  battle.kill(battle.boss, battle.players[0]);
+  battle.tick(0.05);
+  assert.strictEqual(battle.result.victory, false);
+  const after = (await meOf(a)).character;
+  assert.strictEqual(after.gold, 500);
+  assert.strictEqual(after.xp, 250);
+  assert.strictEqual(after.counters.bossWins, 1);
+  await admin.post('/api/admin/battle/reset');
+});
+
+test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
+  const a = client();
+  const ida = (await register(a, 'pl_dungeon')).id;
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'dungeon' });
+  await a.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  battle.dungeon.room = 11;
+  battle.setStage('fight');
+  battle.kill(null, battle.players.find((f) => f.userId === ida));
+  battle.tick(0.05);
+  const q = (await alice.get('/api/queue')).data;
+  assert.strictEqual(q.result.mode, 'dungeon');
+  assert.strictEqual(q.result.room, 11);
+  const ch = (await meOf(a)).character;
+  assert.strictEqual(ch.gold, 150, 'palier 10');
+  assert.strictEqual(ch.xp, 175, '25 + 150 XP');
+  assert.strictEqual(ch.chests, 0);
+  assert.strictEqual(ch.counters.dungeonBest, 11);
+  assert.deepStrictEqual(ch.record, { battles: 1, kills: 0, wins: 0 });
+
+  // Un raid moins bon ne fait pas baisser le record
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'dungeon' });
+  await a.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  battle.dungeon.room = 2;
+  battle.setStage('fight');
+  battle.kill(null, battle.players[0]);
+  battle.tick(0.05);
+  const after = (await meOf(a)).character;
+  assert.strictEqual(after.counters.dungeonBest, 11);
+  assert.strictEqual(after.gold, 150, 'salle 2 : pas de récompense');
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {
   const bad = { Cookie: 'zl_session=%E0%A4%A; autre=%' };
   // Routes HTTP : pas de session, donc 401 (et surtout pas de 500)
