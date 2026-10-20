@@ -177,14 +177,27 @@ de la file, confirme les `!join` et annonce le vainqueur.
 
 ## Sons
 
-Tous les sons sont **synthétisés dans le navigateur** ([`public/js/sound.js`](public/js/sound.js)) : aucun fichier audio,
-aucun droit d'auteur. Un bouton **🔊 Son** (page perso, page admin, ouverture de coffre) coupe ou remet le son ;
-le choix est mémorisé.
+Les **effets sonores** sont synthétisés dans le navigateur ([`public/js/sound.js`](public/js/sound.js)), sans fichier.
+Les **musiques** de partie sont des MP3 dans [`public/audio/`](public/audio/) (128 kbit/s, volume normalisé à -16 LUFS),
+jouées en boucle pendant le combat, une par mode :
+
+| Mode | Musique | Fichier |
+|---|---|---|
+| Battle Royale | « Not dead YET! » (battle theme, remix chiptune) | `battle-royale.mp3` |
+| Combat de Boss | BOSSFIGHT — « Milky Ways » | `boss.mp3` |
+| Raid de Donjon | Mattashi — « The Final Battle » (Epic 8-Bit Orchestral Battle) | `donjon.mp3` |
+
+Pour changer une musique, il suffit de remplacer le fichier (même nom) ; la liste est dans `TRACKS` (`sound.js`).
+
+**Volume** : en haut des pages perso et admin, deux curseurs, **🔊 Sons** (combats, début et fin de partie, coffres…)
+et **🎵 Musique**. Un clic sur l'icône coupe / remet ; bouger le curseur Musique sans partie en cours fait entendre un
+extrait. Les réglages sont mémorisés par navigateur. Les fenêtres de coffre et de forge gardent un bouton pour couper
+les sons.
 
 | Moment | Son |
 |---|---|
 | Ouverture de la file / inscription d'un viewer | Cor d'appel / petit « pop » |
-| Début de bataille | Clairon médiéval + timbales, puis musique de marche épique en boucle |
+| Début de bataille | Clairon médiéval + timbales, puis la musique du mode en boucle (fondu à l'arrêt) |
 | Coups, kills | Cliquetis discrets, impact |
 | Victoire | Fanfare triomphale + roulement + cymbale |
 | Combat de Boss | Rugissement du Troll (début, changements de phase), alerte et impact des attaques spéciales, explosion + pièces |
@@ -194,7 +207,8 @@ le choix est mémorisé.
 | Recycler | Broyage + pluie de pièces |
 | Point de compétence, récompense reçue | Petit arpège / pièces |
 
-Dans OBS, le son de l'arène passe par la source navigateur `/arena.html` (cocher « Contrôler l'audio via OBS »).
+Dans OBS, le son de l'arène passe par la source navigateur `/arena.html` (cocher « Contrôler l'audio via OBS ») ;
+le volume s'y règle dans le mixeur d'OBS (la page arène n'a pas de curseurs).
 
 Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](shared/rules.js).
 

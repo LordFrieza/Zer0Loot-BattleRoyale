@@ -262,12 +262,12 @@
       if (!window.Sound) return;
       if (!prev) {
         // Page ouverte en plein combat : on lance directement la musique.
-        if (q.phase === 'battle') Sound.music.start();
+        if (q.phase === 'battle') Sound.music.start(0, q.mode);
         return;
       }
       if (q.phase === 'battle' && prev.phase !== 'battle') {
         const fanfare = Sound.play('battleStart');
-        Sound.music.start(Math.max(0, fanfare - 0.25));
+        Sound.music.start(Math.max(0, fanfare - 0.25), q.mode);
         const ev = q.event && Rules.BATTLE_EVENTS[q.event];
         if (ev) {
           this.announces.push({ text: `${ev.icon} ${ev.label.toUpperCase()} !`, sub: ev.desc, subSize: 20, color: ev.color, life: 4, age: 0 });
@@ -285,7 +285,7 @@
         else if (r.mode === 'boss' || (r.mode === 'dungeon' && !r.reward)) setTimeout(() => Sound.play('defeat'), 350);
         else setTimeout(() => Sound.play('victory'), 350);
       }
-      if (q.phase === 'queue' && prev.phase !== 'queue') Sound.play('queueOpen');
+      if (q.phase === 'queue' && prev.phase !== 'queue') { Sound.play('queueOpen'); Sound.music.preload(q.mode); }
       else if (q.phase === 'queue' && q.participants.length > prev.participants.length) {
         const now = performance.now();
         if (now - (this.lastJoinSound || 0) > 120) { this.lastJoinSound = now; Sound.play('join'); }

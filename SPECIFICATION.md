@@ -310,6 +310,7 @@ Ces exigences se vérifient dans un navigateur (skill `smoke-arena`) : elles son
 - **UI-3** `/admin.html` doit afficher l'arène, les contrôles de file, les événements, les inscrits, les outils de test, la liste des joueurs et les classements. (vérification manuelle)
 - **UI-4** `/arena.html` doit afficher uniquement l'arène en plein écran pour une source navigateur OBS (1280×720 ou 1920×1080), avec annonces de séries et sons. (vérification manuelle)
 - **UI-6** Pour les modes coopératifs, l'arène doit afficher le mode sur l'écran de file, la grosse barre de vie du Troll avec ses coches à 66 % et 33 %, les zones d'attaque spéciale au sol, l'explosion du Troll suivie d'une pluie de coffres et de golds, la salle de donjon (dallage, torches) avec fondu au noir et grand « SALLE X », et un écran de fin commun (récompense, meilleurs dégâts) ; la page admin propose le choix du mode et l'onglet Règles explique les deux modes et leurs récompenses. (vérification manuelle)
+- **UI-7** Pendant une partie, l'arène doit jouer en boucle la musique du mode (Battle Royale : « Not dead YET! », Boss : BOSSFIGHT « Milky Ways », Donjon : Mattashi « The Final Battle »), avec fondu à l'arrêt ; les pages perso et admin doivent proposer deux curseurs de volume mémorisés, « Sons » (effets) et « Musique », coupables d'un clic sur leur icône. (vérification manuelle)
 - **UI-5** Les pages doivent être en français, sans framework ni étape de build, les scripts étant chargés dans l'ordre des dépendances. (vérification manuelle)
 
 ## 21. Déploiement et configuration

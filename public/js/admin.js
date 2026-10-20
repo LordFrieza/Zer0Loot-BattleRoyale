@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const socket = io();
 new ArenaView($('arena'), socket);
-Sound.bindToggle($('sound-toggle'));
+Sound.bindVolume($('sound-ctl'));
 $('obs-url').textContent = location.origin + '/arena.html';
 
 const PHASES = { idle: 'En attente', queue: 'File ouverte', ready: 'File fermée', battle: 'Combat', ended: 'Terminé' };

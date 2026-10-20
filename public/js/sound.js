@@ -1,19 +1,30 @@
 /*
- * Moteur audio du jeu : tous les sons sont synthétisés en direct (WebAudio),
- * aucun fichier audio n'est nécessaire.
- *  - Sound.play('equip'), Sound.play('buy')… : effets ponctuels
- *  - Sound.music.start() / stop() : musique de bataille en boucle
- *  - Sound.bindToggle(bouton) : bouton pour couper / remettre le son
- * Le choix « son coupé » est mémorisé dans le navigateur.
+ * Moteur audio du jeu.
+ *  - Sound.play('equip'), Sound.play('buy')… : effets synthétisés en direct (WebAudio), sans fichier
+ *  - Sound.music.start(délai, mode) / stop() : musique de la partie (fichiers MP3 de public/audio/), en boucle
+ *  - Sound.bindVolume(élément) : deux curseurs, volume des sons et volume de la musique
+ *  - Sound.bindToggle(bouton) : bouton pour couper / remettre les sons (coffres, forge)
+ * Les deux volumes sont mémorisés dans le navigateur.
  */
 (function () {
-  const KEY = 'zl_muted';
-  const VOLUME = 0.75;
+  const KEYS = { sfx: 'zl_vol_sfx', music: 'zl_vol_music' };
+  const DEFAULTS = { sfx: 0.8, music: 0.6 };
+  const VOLUME = 0.75; // niveau maximal des effets (avant le limiteur)
+  const MUSIC_LEVEL = 0.8; // niveau maximal de la musique (les MP3 sont normalisés à -16 LUFS)
   let ctx = null;
   let master = null;
-  let muted = false;
-  try { muted = localStorage.getItem(KEY) === '1'; } catch (e) { /* stockage indisponible */ }
+  const vol = { ...DEFAULTS };
+  const lastOn = { ...DEFAULTS }; // volume à remettre quand on réactive un curseur coupé
+  try {
+    for (const k of ['sfx', 'music']) {
+      const v = localStorage.getItem(KEYS[k]);
+      if (v !== null && Number.isFinite(Number(v))) vol[k] = Math.max(0, Math.min(1, Number(v)));
+    }
+    // Ancien réglage « son coupé » : on le reprend pour les deux volumes.
+    if (localStorage.getItem('zl_muted') === '1' && localStorage.getItem(KEYS.sfx) === null) { vol.sfx = 0; vol.music = 0; }
+  } catch (e) { /* stockage indisponible */ }
   const listeners = [];
+  const stateListeners = [];
 
   function ac() {
     if (!ctx) {
@@ -21,7 +32,7 @@
       if (!AC) return null;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = muted ? 0 : VOLUME;
+      master.gain.value = VOLUME * vol.sfx;
       // Compresseur / limiteur : évite la saturation quand plusieurs sons se superposent.
       const comp = ctx.createDynamicsCompressor();
       comp.threshold.value = -12;
@@ -36,7 +47,7 @@
   }
 
   // Le navigateur n'autorise le son qu'après une interaction (clic / touche).
-  const unlock = () => ac();
+  const unlock = () => { ac(); music.resume(); };
   window.addEventListener('pointerdown', unlock, true);
   window.addEventListener('keydown', unlock, true);
 
@@ -52,7 +63,7 @@
 
   function tone(freq, dur, o = {}) {
     const c = ac();
-    if (!c || muted) return;
+    if (!c || vol.sfx <= 0) return;
     const t = c.currentTime + (o.delay || 0);
     const osc = c.createOscillator();
     const g = c.createGain();
@@ -77,7 +88,7 @@
 
   function noise(dur, o = {}) {
     const c = ac();
-    if (!c || muted) return;
+    if (!c || vol.sfx <= 0) return;
     const t = o.at != null ? o.at : c.currentTime + (o.delay || 0);
     const src = c.createBufferSource();
     src.buffer = noiseBuffer(c);
@@ -128,17 +139,6 @@
     f.connect(g).connect(dest || master);
   }
 
-  function kick(t, vol, dest) {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.frequency.setValueAtTime(140, t);
-    o.frequency.exponentialRampToValueAtTime(42, t + 0.18);
-    env(g, t, vol, 0.002, 0.3);
-    o.connect(g).connect(dest || master);
-    o.start(t);
-    o.stop(t + 0.35);
-  }
-
   function snare(t, vol, dest) {
     noise(0.16, { at: t, filter: 'highpass', freq: 1400, vol, dest });
     const o = ctx.createOscillator();
@@ -167,21 +167,6 @@
   function crash(t, vol, dest) {
     noise(1.6, { at: t, filter: 'highpass', freq: 5000, vol, attack: 0.003, dest });
     noise(0.6, { at: t, filter: 'bandpass', freq: 3000, q: 0.7, vol: vol * 0.6, dest });
-  }
-
-  function pluck(freq, t, dur, vol, dest) {
-    const o = ctx.createOscillator();
-    const f = ctx.createBiquadFilter();
-    const g = ctx.createGain();
-    o.type = 'square';
-    o.frequency.value = freq;
-    f.type = 'lowpass';
-    f.frequency.setValueAtTime(freq * 8, t);
-    f.frequency.exponentialRampToValueAtTime(freq * 1.5, t + dur);
-    env(g, t, vol, 0.003, dur);
-    o.connect(f).connect(g).connect(dest || master);
-    o.start(t);
-    o.stop(t + dur + 0.05);
   }
 
   // ---------- Effets ----------
@@ -506,110 +491,192 @@
     },
   };
 
-  // ---------- Musique de bataille (boucle) ----------
-  /*
-   * Marche épique en la mineur, 138 BPM, progression Am – F – G – E sur 8 mesures.
-   * Les notes sont programmées à l'avance (1,5 s) pour rester fluides même si
-   * l'onglet est en arrière-plan.
-   */
-  const music = (function () {
-    const BPM = 138;
-    const STEP = 60 / BPM / 4; // double-croche
-    const CHORDS = [
-      [45, [57, 60, 64]], [41, [57, 60, 65]], [43, [55, 59, 62]], [40, [56, 59, 64]],
-      [45, [57, 60, 64]], [41, [57, 60, 65]], [43, [55, 59, 62]], [40, [56, 59, 64]],
-    ];
-    // Mélodie (une valeur par croche, null = silence), 8 mesures.
-    const MELODY = [
-      69, null, 72, 71, 69, null, 64, null,
-      65, null, 69, 67, 65, 64, 62, null,
-      67, null, 71, 69, 67, null, 74, null,
-      71, null, 68, null, 64, null, null, null,
-      69, 71, 72, 74, 76, null, 72, null,
-      77, null, 76, 74, 72, null, 69, null,
-      74, null, 72, 71, 67, 69, 71, 74,
-      76, null, 75, null, 76, null, null, null,
-    ];
-    let gain = null;
-    let timer = null;
-    let step = 0;
-    let next = 0;
+  // ---------- Musique (fichiers MP3, une par mode de jeu) ----------
+  const TRACKS = {
+    br: '/audio/battle-royale.mp3', // « Not dead YET! » (remix chiptune)
+    boss: '/audio/boss.mp3', // BOSSFIGHT — Milky Ways
+    dungeon: '/audio/donjon.mp3', // Mattashi — The Final Battle
+  };
 
-    function schedule() {
-      while (next < ctx.currentTime + 1.5) {
-        const bar = Math.floor(step / 16) % 8;
-        const s = step % 16;
-        const [bass, chord] = CHORDS[bar];
-        const t = next;
-        // Batterie
-        if (s === 0 || s === 8 || s === 10) kick(t, 0.55, gain);
-        if (s === 4 || s === 12) snare(t, 0.22, gain);
-        if (bar === 7 && s >= 12) snare(t, 0.12 + (s - 12) * 0.04, gain);
-        if (s % 2 === 0) noise(0.03, { at: t, filter: 'highpass', freq: 8000, vol: s % 4 === 0 ? 0.05 : 0.03, dest: gain });
-        if (s === 0 && bar % 4 === 0) crash(t, 0.08, gain);
-        // Basse galopante
-        if ([0, 3, 6, 8, 11, 14].includes(s)) pluck(midi(bass + (s === 14 ? 12 : 0)), t, STEP * 2.5, 0.16, gain);
-        // Arpège d'accompagnement
-        if (s % 2 === 1) pluck(midi(chord[(s >> 1) % 3] + 12), t, STEP * 1.5, 0.035, gain);
-        // Mélodie au cuivre
-        if (s % 2 === 0) {
-          const n = MELODY[bar * 8 + s / 2];
-          if (n) {
-            let len = 1;
-            while (len < 3 && MELODY[bar * 8 + s / 2 + len] === null && (s / 2 + len) < 8) len++;
-            brass(midi(n), t, STEP * 2 * len * 0.9, 0.055, gain);
-          }
-        }
-        step += 1;
-        next += STEP;
+  const music = (function () {
+    const els = {};
+    let current = null; // morceau en cours (élément <audio>)
+    let pending = null; // morceau bloqué par le navigateur, relancé au premier clic
+    let startTimer = null;
+    let previewTimer = null;
+
+    function track(mode) {
+      const src = TRACKS[mode] || TRACKS.br;
+      if (!els[src]) {
+        const a = new Audio(src);
+        a.loop = true;
+        a.preload = 'auto';
+        els[src] = a;
       }
+      return els[src];
+    }
+    const level = () => vol.music * MUSIC_LEVEL;
+
+    // Fondu du volume d'un morceau vers v en `dur` secondes.
+    function fadeTo(a, v, dur, done) {
+      clearInterval(a.fadeTimer);
+      const from = a.volume;
+      const t0 = performance.now();
+      a.fadeTimer = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / (dur * 1000));
+        a.volume = Math.max(0, Math.min(1, from + (v - from) * k));
+        if (k >= 1) { clearInterval(a.fadeTimer); if (done) done(); }
+      }, 30);
+    }
+
+    function tryPlay(a) {
+      a.play().then(() => {
+        if (pending === a) pending = null;
+        stateListeners.forEach((fn) => fn());
+      }).catch(() => {
+        pending = a; // lecture automatique refusée : on attend une interaction
+        stateListeners.forEach((fn) => fn());
+      });
     }
 
     return {
-      get playing() { return !!timer; },
-      start(delay = 0) {
-        const c = ac();
-        if (!c || timer) return;
-        gain = c.createGain();
-        gain.gain.value = 0.8;
-        gain.connect(master);
-        step = 0;
-        next = c.currentTime + 0.1 + delay;
-        schedule();
-        timer = setInterval(schedule, 200);
+      get playing() { return !!current; },
+      get blocked() { return !!pending; },
+      // État du morceau en cours (diagnostic) : fichier, en pause ?, volume.
+      get state() { return current ? { src: current.getAttribute('src'), paused: current.paused, volume: Math.round(current.volume * 100) / 100 } : null; },
+      // Charge à l'avance le morceau d'un mode (ouverture de la file).
+      preload(mode) { track(mode); },
+      start(delay = 0, mode = 'br') {
+        if (current) return;
+        const a = track(mode);
+        current = a;
+        clearTimeout(startTimer);
+        clearTimeout(previewTimer);
+        startTimer = setTimeout(() => {
+          if (current !== a) return;
+          a.currentTime = 0;
+          a.volume = 0;
+          tryPlay(a);
+          fadeTo(a, level(), 1.2);
+        }, delay * 1000);
       },
-      stop(fade = 0.6) {
-        if (!timer) return;
-        clearInterval(timer);
-        timer = null;
-        const g = gain;
-        const t = ctx.currentTime;
-        g.gain.setValueAtTime(g.gain.value, t);
-        g.gain.linearRampToValueAtTime(0, t + fade);
-        setTimeout(() => g.disconnect(), fade * 1000 + 1700);
+      stop(fade = 0.8) {
+        const a = current;
+        current = null;
+        clearTimeout(startTimer);
+        if (!a) return;
+        if (pending === a) pending = null;
+        fadeTo(a, 0, fade, () => { a.pause(); a.currentTime = 0; });
+      },
+      // Relance après une interaction si le navigateur avait bloqué la lecture.
+      resume() {
+        if (pending && pending === current) tryPlay(pending);
+      },
+      // Applique le curseur de volume au morceau en cours.
+      apply() {
+        const a = current;
+        if (a) { clearInterval(a.fadeTimer); a.volume = level(); }
+      },
+      // Pendant le réglage du curseur, s'il n'y a pas de partie : extrait du thème du Battle Royale.
+      preview() {
+        if (current) return;
+        const a = track('br');
+        clearTimeout(previewTimer);
+        clearInterval(a.fadeTimer);
+        a.volume = level();
+        if (a.paused) { a.currentTime = 20; a.play().catch(() => {}); }
+        previewTimer = setTimeout(() => fadeTo(a, 0, 0.6, () => { if (!current) a.pause(); }), 1500);
       },
     };
   })();
 
-  // ---------- Bouton son ----------
-  function setMuted(m) {
-    muted = m;
-    try { localStorage.setItem(KEY, m ? '1' : '0'); } catch (e) { /* ignore */ }
-    if (ctx) master.gain.setTargetAtTime(m ? 0 : VOLUME, ctx.currentTime, 0.05);
-    listeners.forEach((fn) => fn(m));
+  // ---------- Volumes ----------
+  function setVolume(kind, v) {
+    v = Math.max(0, Math.min(1, Math.round(v * 100) / 100));
+    vol[kind] = v;
+    if (v > 0) lastOn[kind] = v;
+    try { localStorage.setItem(KEYS[kind], String(v)); } catch (e) { /* ignore */ }
+    if (kind === 'sfx' && ctx) master.gain.setTargetAtTime(VOLUME * v, ctx.currentTime, 0.05);
+    if (kind === 'music') music.apply();
+    listeners.forEach((fn) => fn());
   }
 
-  function bindToggle(btn) {
-    const render = (m) => { btn.textContent = m ? '🔇 Son coupé' : '🔊 Son'; btn.title = m ? 'Réactiver les sons' : 'Couper les sons'; };
-    render(muted);
+  // Coupe ou remet un volume (en revenant au dernier niveau choisi).
+  function toggle(kind) {
+    setVolume(kind, vol[kind] > 0 ? 0 : lastOn[kind] || DEFAULTS[kind]);
+  }
+
+  // Ancienne API : couper / remettre les sons.
+  function setMuted(m) {
+    setVolume('sfx', m ? 0 : lastOn.sfx || DEFAULTS.sfx);
+  }
+
+  const ICONS = {
+    sfx: (v) => (v <= 0 ? '🔇' : v < 0.34 ? '🔈' : v < 0.67 ? '🔉' : '🔊'),
+    music: () => '🎵',
+  };
+  const LABELS = { sfx: 'Sons', music: 'Musique' };
+
+  /*
+   * Deux curseurs de volume : « Sons » (combats, début et fin de partie, coffres…) et « Musique ».
+   * Clic sur l'icône : couper / remettre.
+   */
+  function bindVolume(root) {
+    root.classList.add('volume-ctl');
+    root.innerHTML = ['sfx', 'music'].map((k) => `
+      <div class="vol" data-k="${k}">
+        <button type="button" class="vol-ico" title="Couper / remettre : ${LABELS[k].toLowerCase()}"></button>
+        <input type="range" min="0" max="100" step="1" aria-label="Volume : ${LABELS[k]}">
+        <span class="vol-val"></span>
+      </div>`).join('');
+    const render = () => {
+      root.querySelectorAll('.vol').forEach((el) => {
+        const k = el.dataset.k;
+        const pct = Math.round(vol[k] * 100);
+        const input = el.querySelector('input');
+        if (document.activeElement !== input) input.value = pct;
+        input.style.setProperty('--v', pct + '%');
+        el.querySelector('.vol-ico').textContent = ICONS[k](vol[k]);
+        el.querySelector('.vol-val').textContent = pct;
+        el.classList.toggle('off', vol[k] <= 0);
+        el.title = `${LABELS[k]} : ${pct} %`;
+      });
+    };
+    root.querySelectorAll('.vol').forEach((el) => {
+      const k = el.dataset.k;
+      const input = el.querySelector('input');
+      input.addEventListener('input', () => {
+        setVolume(k, input.value / 100);
+        if (k === 'music') music.preview();
+      });
+      // Petit son de test quand on relâche le curseur des sons.
+      input.addEventListener('change', () => { if (k === 'sfx') play('join'); });
+      el.querySelector('.vol-ico').addEventListener('click', () => {
+        toggle(k);
+        if (k === 'sfx') play('join');
+        else if (vol.music > 0) music.preview();
+      });
+    });
     listeners.push(render);
-    btn.addEventListener('click', () => { setMuted(!muted); if (!muted) sounds.equip(); });
+    render();
+  }
+
+  // Bouton « couper les sons » (fenêtres de coffre et de forge).
+  function bindToggle(btn) {
+    const render = () => {
+      const off = vol.sfx <= 0;
+      btn.textContent = off ? '🔇 Son coupé' : '🔊 Son';
+      btn.title = off ? 'Réactiver les sons' : 'Couper les sons';
+    };
+    render();
+    listeners.push(render);
+    btn.addEventListener('click', () => { toggle('sfx'); if (vol.sfx > 0) sounds.equip(); });
   }
 
   // Lance un effet (sans erreur si l'audio n'est pas disponible).
   function play(name, ...args) {
     try {
-      if (!ac() || muted) return 0;
+      if (!ac() || vol.sfx <= 0) return 0;
       return sounds[name](...args) || 0;
     } catch (e) {
       return 0;
@@ -619,11 +686,19 @@
   window.Sound = {
     play,
     music,
+    bindVolume,
     bindToggle,
-    get muted() { return muted; },
+    setVolume,
+    get volumes() { return { ...vol }; },
+    // true si les deux volumes sont à zéro
+    get muted() { return vol.sfx <= 0 && vol.music <= 0; },
     setMuted,
-    // true si le navigateur bloque encore le son (aucune interaction).
-    get blocked() { const c = ac(); return !c || c.state !== 'running'; },
-    onStateChange(fn) { const c = ac(); if (c) c.addEventListener('statechange', fn); },
+    // true si le navigateur bloque encore le son ou la musique (aucune interaction).
+    get blocked() { const c = ac(); return !c || c.state !== 'running' || music.blocked; },
+    onStateChange(fn) {
+      const c = ac();
+      if (c) c.addEventListener('statechange', fn);
+      stateListeners.push(fn);
+    },
   };
 })();

@@ -9,7 +9,7 @@ const selected = new Set();
 let simLuck = null;
 const opener = new ChestOpener();
 const forge = new ForgeAnimator();
-Sound.bindToggle($('sound-toggle'));
+Sound.bindVolume($('sound-ctl'));
 let opening = false;
 
 async function refresh() {
