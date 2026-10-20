@@ -20,10 +20,10 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git stash list)",
-      "Bash(ls*)"
+      "Bash(ls*)",
+      "Bash(git push*)"
     ],
     "deny": [
-      "Bash(git push*)",
       "Bash(rm -rf*)"
     ]
   },
