@@ -361,8 +361,22 @@ function renderPotionShop() {
 }
 
 // ---------- Arbre de compétences ----------
-const TREE = { w: 1180, h: 380, cx: 590, cy: 190, step: 80, gap: 96 };
+// L'écart entre les paliers s'adapte à la largeur disponible pour que tout l'arbre reste visible sans défiler ;
+// sur un écran trop étroit, l'arbre entier est réduit (zoom) au lieu de dépasser.
+const TREE = { w: 1180, h: 380, cx: 590, cy: 190, step: 80, gap: 96, scale: 1 };
+const TREE_STEP = { min: 62, max: 92 };
+const TREE_MARGIN = 40; // demi-largeur du carré de spécialisation + contour
 let talentSel = null;
+
+function layoutTree() {
+  const avail = document.querySelector('.talent-scroll').clientWidth;
+  if (!avail) return; // onglet caché : on garde la dernière disposition, recalculée à l'affichage
+  const tiers = Rules.TALENT_TIERS.length;
+  TREE.step = Math.max(TREE_STEP.min, Math.min(TREE_STEP.max, (avail / 2 - TREE_MARGIN) / tiers));
+  TREE.w = Math.round(2 * (tiers * TREE.step + TREE_MARGIN));
+  TREE.cx = TREE.w / 2;
+  TREE.scale = Math.min(1, avail / TREE.w);
+}
 
 function talentPos(n) {
   const dir = n.branch === 'left' ? -1 : 1;
@@ -446,6 +460,7 @@ function renderTalents() {
   };
 
   // Liens et nœuds
+  layoutTree();
   const nodes = Rules.talentNodes(cls);
   const byTier = (b, t) => nodes.filter((n) => n.branch === b && n.tier === t);
   const owned = new Set(c.talents);
@@ -466,8 +481,11 @@ function renderTalents() {
     return `<button class="tnode tnode-${n.type} ${state} ${talentSel === n.id ? 'sel' : ''}" data-id="${n.id}"
       style="left:${x}px;top:${y}px;--c:${tree[n.branch].color}" title="${esc(info.title)}">${info.icon}${pts}</button>`;
   }).join('');
-  $('talent-tree').style.width = TREE.w + 'px';
-  $('talent-tree').style.height = TREE.h + 'px';
+  Object.assign($('talent-tree').style, {
+    width: TREE.w + 'px', height: TREE.h + 'px',
+    transform: TREE.scale < 1 ? `scale(${TREE.scale})` : '', margin: TREE.scale < 1 ? '0' : '0 auto',
+  });
+  document.querySelector('.talent-scroll').style.height = Math.ceil(TREE.h * TREE.scale) + 'px';
   $('talent-tree').innerHTML = `<svg width="${TREE.w}" height="${TREE.h}">${lines}</svg>
     <div class="tnode tnode-start" style="left:${TREE.cx}px;top:${TREE.cy}px" title="Départ">${Rules.CLASS_INFO[cls].icon}</div>${nodeHtml}`;
   $('talent-tree').querySelectorAll('.tnode[data-id]').forEach((el) => {
@@ -505,6 +523,11 @@ function renderTalents() {
     $('talent-tuto').classList.add('open');
   }
 }
+let treeResize = null;
+window.addEventListener('resize', () => {
+  clearTimeout(treeResize);
+  treeResize = setTimeout(() => { if (me && document.querySelector('.talent-scroll').clientWidth) renderTalents(); }, 120);
+});
 $('talent-tuto-ok').onclick = () => {
   try { localStorage.setItem('zl_tuto_talents_' + me.id, '1'); } catch (e) { /* ignore */ }
   $('talent-tuto').classList.remove('open');
@@ -813,6 +836,7 @@ function showTab(name) {
   document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   try { localStorage.setItem('zl_tab', name); } catch (e) { /* ignore */ }
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
 }
 
 document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => {
