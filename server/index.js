@@ -253,6 +253,24 @@ app.post('/api/unequip', requirePlayer, action((req) => {
   game.unequip(req.user.character, req.body.slot);
 }));
 
+// ---------- Presets d'équipement ----------
+
+app.post('/api/preset/save', requirePlayer, action((req) => game.savePreset(req.user.character, req.body.name, req.body.id || null)));
+app.post('/api/preset/apply', requirePlayer, action((req) => game.applyPreset(req.user.character, String(req.body.id || ''))));
+app.post('/api/preset/delete', requirePlayer, action((req) => game.deletePreset(req.user.character, String(req.body.id || ''))));
+
+// ---------- Consommables ----------
+
+app.post('/api/consumable/buy', requirePlayer, action((req) => game.buyConsumable(req.user.character, String(req.body.id || ''), req.body.count)));
+app.post('/api/consumable/equip', requirePlayer, action((req) => {
+  game.equipConsumable(req.user.character, req.body.id === null || req.body.id === undefined ? null : String(req.body.id));
+}));
+
+// ---------- Arbre de compétences ----------
+
+app.post('/api/talent/learn', requirePlayer, action((req) => game.learnTalent(req.user.character, String(req.body.id || ''))));
+app.post('/api/talent/reset', requirePlayer, action((req) => game.resetTalents(req.user.character)));
+
 // ---------- Liaison Twitch ----------
 
 const oauthStates = new Map();
@@ -309,16 +327,66 @@ function lookOf(user) {
 }
 
 function participantFromUser(user) {
+  const c = user.character;
+  const spec = Rules.specOf(c.cls, c.talents || []);
   return {
     key: 'u' + user.id,
     userId: user.id,
     name: user.twitchDisplayName || user.username,
-    level: user.character.level,
-    cls: user.character.cls || null,
-    title: game.titleOf(user.character),
-    app: { ...user.character.look },
-    stats: game.derived(user.character),
+    level: c.level,
+    cls: c.cls || null,
+    spec: spec ? { label: spec.spec, icon: spec.icon } : null,
+    title: game.titleOf(c),
+    app: { ...c.look },
+    stats: game.derived(c),
     look: lookOf(user),
+    ult: Rules.ultOf(c.cls, c.talents || []), // ultime de l'arbre de compétences (null s'il n'en a pas)
+    consumable: c.consumableSlot || null, // potion équipée pour cette partie
+  };
+}
+
+// Nœuds d'arbre tirés au hasard pour un combattant non humain (bots, mannequins d'entraînement).
+function randomTalents(cls, level) {
+  const nodes = Rules.talentNodes(cls);
+  const owned = [];
+  const branch = Math.random() < 0.5 ? 'left' : 'right';
+  for (let tier = 0; tier < Rules.TALENT_TIERS.length && owned.length < Rules.talentPoints(level); tier++) {
+    const options = nodes.filter((n) => n.branch === branch && n.tier === tier);
+    owned.push(options[Math.floor(Math.random() * options.length)].id);
+  }
+  return owned;
+}
+
+// Combattant non humain (jamais sauvegardé) : points, arbre et équipement visuel aléatoires selon le niveau.
+function makeNpc(key, name, level, cls) {
+  const points = Rules.emptyStats();
+  const combatStats = Rules.STATS.filter((s) => s !== 'chance');
+  for (let i = 0; i < level - 1; i++) points[combatStats[Math.floor(Math.random() * combatStats.length)]] += 1;
+  const talents = randomTalents(cls, level);
+  const bonus = Rules.talentBonus(cls, talents);
+  for (const st of Rules.STATS) points[st] += bonus[st];
+  const look = {};
+  for (const slot of Rules.SLOTS) {
+    if (Math.random() < 0.4) look[slot] = game.rollRarity(10);
+  }
+  // Apparence aléatoire (et parfois un cosmétique) pour varier les bots
+  const anyOf = (obj) => { const k = Object.keys(obj); return k[Math.floor(Math.random() * k.length)]; };
+  const app = { ...Rules.DEFAULT_LOOK };
+  for (const part of Object.keys(Rules.APPEARANCE)) app[part] = anyOf(Rules.APPEARANCE[part].options);
+  if (Math.random() < 0.35) { const id = anyOf(Rules.COSMETICS); app[Rules.COSMETICS[id].slot] = id; }
+  const spec = Rules.specOf(cls, talents);
+  return {
+    app,
+    key,
+    bot: true,
+    name,
+    level,
+    cls,
+    spec: spec ? { label: spec.spec, icon: spec.icon } : null,
+    stats: Rules.derive(points, {}, cls),
+    look,
+    ult: Rules.ultOf(cls, talents),
+    consumable: Math.random() < 0.3 ? anyOf(Rules.CONSUMABLES) : null,
   };
 }
 
@@ -332,29 +400,8 @@ const BOT_NAMES = ['Gobelin', 'Squelette', 'Slime', 'Orc', 'Bandit', 'Loup', 'Ko
 function makeBot() {
   botCount += 1;
   const level = 1 + Math.floor(Math.random() * 6);
-  const points = Rules.emptyStats();
-  const combatStats = Rules.STATS.filter((s) => s !== 'chance');
-  for (let i = 0; i < level - 1; i++) points[combatStats[Math.floor(Math.random() * combatStats.length)]] += 1;
-  const look = {};
-  for (const slot of Rules.SLOTS) {
-    if (Math.random() < 0.4) look[slot] = game.rollRarity(10);
-  }
   const cls = Rules.CLASSES[Math.floor(Math.random() * Rules.CLASSES.length)];
-  // Apparence aléatoire (et parfois un cosmétique) pour varier les bots
-  const anyOf = (obj) => { const k = Object.keys(obj); return k[Math.floor(Math.random() * k.length)]; };
-  const app = { ...Rules.DEFAULT_LOOK };
-  for (const part of Object.keys(Rules.APPEARANCE)) app[part] = anyOf(Rules.APPEARANCE[part].options);
-  if (Math.random() < 0.35) { const id = anyOf(Rules.COSMETICS); app[Rules.COSMETICS[id].slot] = id; }
-  return {
-    app,
-    key: 'bot' + botCount,
-    bot: true,
-    name: BOT_NAMES[botCount % BOT_NAMES.length] + '_' + botCount,
-    level,
-    cls,
-    stats: Rules.derive(points, {}, cls),
-    look,
-  };
+  return makeNpc('bot' + botCount, BOT_NAMES[botCount % BOT_NAMES.length] + '_' + botCount, level, cls);
 }
 
 function joinFromTwitch(login, displayName) {
@@ -684,6 +731,90 @@ app.post('/api/admin/simulate-sub', requireAdmin, action((req) => {
 battle.on('queue', () => io.emit('queue', queueView()));
 battle.on('frame', (f) => io.emit('frame', f));
 
+// Au lancement d'une partie, la potion équipée par chaque joueur est utilisée (elle quitte son emplacement).
+battle.on('start', (fighters) => {
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user || !f.consumable) continue;
+    game.useConsumable(user.character);
+    pushMe(user);
+  }
+  db.save();
+});
+
+// ---------- Mode entraînement ----------
+/*
+ * Duel privé contre un mannequin (classe et niveau au choix) ou contre le « fantôme » d'un autre joueur (son build et
+ * son équipement actuels). Simulé sur une Battle à part, diffusé seulement au joueur ; aucune récompense, la potion
+ * équipée est utilisée sans être consommée.
+ */
+const trainings = new Map(); // userId → Battle
+
+function stopTraining(userId) {
+  const b = trainings.get(userId);
+  if (!b) return;
+  b.stopLoop();
+  clearTimeout(b.trainingTimer);
+  b.removeAllListeners();
+  trainings.delete(userId);
+}
+
+app.get('/api/training/opponents', requirePlayer, (req, res) => {
+  res.json(players()
+    .filter((u) => !u.banned && u.id !== req.user.id && u.character.cls)
+    .map((u) => ({ id: u.id, name: u.twitchDisplayName || u.username, cls: u.character.cls, level: u.character.level, ghost: !!u.ghost }))
+    .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
+    .slice(0, 300));
+});
+
+app.post('/api/training/start', requirePlayer, (req, res) => {
+  try {
+    const user = req.user;
+    if (!user.character.cls) throw new Error('Choisis d\'abord une classe');
+    stopTraining(user.id);
+    if (trainings.size >= Rules.TRAINING.maxConcurrent) throw new Error('Trop d\'entraînements en cours, réessaie dans un instant');
+    let opponent;
+    if (req.body.opponent === 'player') {
+      const other = db.state.users[req.body.id];
+      if (!other || other.role !== 'player' || !other.character || other.banned) throw new Error('Joueur introuvable');
+      if (other.id === user.id) throw new Error('Choisis un autre joueur que toi');
+      game.upgrade(other.character);
+      opponent = { ...participantFromUser(other), key: 'g' + other.id, userId: null, bot: true };
+    } else {
+      const level = Math.max(1, Math.min(Rules.TRAINING.maxLevel, Math.floor(Number(req.body.level) || 1)));
+      const cls = Rules.CLASSES.includes(req.body.cls) ? req.body.cls : Rules.CLASSES[Math.floor(Math.random() * Rules.CLASSES.length)];
+      opponent = makeNpc('mannequin', `Mannequin ${Rules.CLASS_INFO[cls].label}`, level, cls);
+      opponent.consumable = null;
+    }
+    const b = new Battle();
+    b.openQueue(60, 'br');
+    clearTimeout(b.queueTimer);
+    b.join(participantFromUser(user));
+    b.join(opponent);
+    const room = 'user:' + user.id;
+    b.on('queue', (q) => io.to(room).emit('trainingQueue', { ...q, training: true }));
+    b.on('frame', (f) => io.to(room).emit('trainingFrame', f));
+    b.on('end', () => { clearTimeout(b.trainingTimer); trainings.delete(user.id); });
+    b.start(null, null);
+    trainings.set(user.id, b);
+    // Garde-fou : un entraînement ne dure jamais plus de TRAINING.maxDuration secondes.
+    b.trainingTimer = setTimeout(() => {
+      if (b.phase !== 'battle') return;
+      const alive = b.fighters.filter((f) => f.alive).sort((x, y) => y.hp / y.maxHp - x.hp / x.maxHp);
+      b.finish(alive[0] || null);
+    }, Rules.TRAINING.maxDuration * 1000);
+    res.json({ ok: true, opponent: { name: opponent.name, cls: opponent.cls, level: opponent.level } });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/training/stop', requirePlayer, (req, res) => {
+  stopTraining(req.user.id);
+  io.to('user:' + req.user.id).emit('trainingQueue', { phase: 'idle', mode: 'br', training: true, participants: [], result: null });
+  res.json({ ok: true });
+});
+
 // ---------- Temps réel ----------
 
 io.on('connection', (socket) => {
@@ -718,4 +849,4 @@ function start(port = PORT) {
 
 if (require.main === module) start();
 
-module.exports = { app, server, io, battle, bets, start };
+module.exports = { app, server, io, battle, bets, start, trainings };

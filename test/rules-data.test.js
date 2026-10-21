@@ -22,9 +22,9 @@ test('[CLS-1] classes : cinq classes, et le Vagaloot neutre sans classe', () => 
   }
 });
 
-test('[STAT-1] stats : onze stats connues, chacune décrite', () => {
+test('[STAT-1] stats : douze stats connues, chacune décrite', () => {
   assert.deepStrictEqual(Rules.STATS, [
-    'vie', 'force', 'defense', 'vitesse', 'esquive', 'critique', 'vitesse_attaque', 'vol_de_vie', 'precision', 'epines', 'chance',
+    'vie', 'force', 'defense', 'vitesse', 'esquive', 'critique', 'vitesse_attaque', 'vol_de_vie', 'precision', 'epines', 'chance', 'stamina',
   ]);
   assert.deepStrictEqual(Object.keys(Rules.emptyStats()), Rules.STATS);
   for (const s of Rules.STATS) assert.ok(Rules.STAT_INFO[s].label);

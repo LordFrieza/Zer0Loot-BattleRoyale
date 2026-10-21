@@ -106,6 +106,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Précision : 5 % + 3 % par point → réduit d'autant l'esquive de la cible, plafond 80 %
   - Épines : 2 % + 2 % par point des dégâts reçus renvoyés à l'attaquant, plafond 50 %
   - Chance : points + bonus d'équipement (les lignes de Chance des objets s'ajoutent en points) → table de loot et forge
+  - Stamina : +5 % de vitesse de remplissage de la barre de stamina par point (plafond ×2,5). Barre pleine en 40 s
+    (Guerrier), 38 s (Archer), 42 s (Mage), 36 s (Assassin), 40 s (Prêtre) sans bonus. Jamais sur les objets.
 - **Table de loot** : chance 0 → 90 / 6 / 3 / 0,9 / 0,1 % ; chance 10 → 80 / 10 / 6 / 3 / 1 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.
 - **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).
@@ -132,9 +134,47 @@ de la file, confirme les `!join` et annonce le vainqueur.
   chapeaux, capes, chaussures, accessoires de visage, auras animées. Essayage sur l'aperçu avant achat ; un article
   acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence du casque** (le casque reste équipé et ses
   bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10 articles).
-- **Page perso en onglets** : Personnage (fiche, caractéristiques, apparence), Inventaire (coffres, équipement,
-  coffre personnel paginé par 20 objets, forge), Boutique, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir,
-  succès à récupérer. Lien direct possible (`/character.html#boutique`).
+- **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence), Inventaire (coffres,
+  équipement et presets, coffre personnel paginé par 20 objets, forge), Arbre de compétences, Boutique (potions puis
+  cosmétiques), Entraînement, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir, points
+  d'arbre, succès à récupérer. Lien direct possible (`/character.html#boutique`).
+- **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
+  n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse).
+- **Presets d'équipement** (panneau Équipement) : jusqu'à 5 presets nommés ; « Équiper » remet exactement l'équipement
+  sauvegardé (⟳ pour le mettre à jour, 🗑 pour le supprimer). Les objets d'un preset sont **protégés** 🔐 : ni
+  recyclage, ni fusion à la forge, tant que le preset existe.
+- **Potions** (onglet Boutique, en haut) : 9 consommables payés en golds, stock jusqu'à 99 chacun. On en équipe **une**
+  dans la case à côté du personnage ; elle est **consommée au lancement de la prochaine partie** (tous les modes), qu'elle
+  se déclenche ou non, et ne se déclenche qu'une fois (une fois par raid dans le donjon) :
+  | Potion | Prix | Déclencheur | Effet |
+  |---|---|---|---|
+  | 🧪 Potion de vie | 60 | vie < 50 % | +4 % de vie max par seconde pendant 6 s |
+  | 🍷 Potion de berserker | 80 | vie < 50 % | dégâts ×1,5 pendant 8 s |
+  | 🧴 Potion de défense | 80 | vie < 50 % | dégâts subis ×0,4 pendant 4 s |
+  | 💨 Potion de célérité | 70 | premier ennemi à portée | vitesse et vitesse d'attaque ×1,4 pendant 10 s |
+  | 🌀 Téléportation d'urgence | 90 | vie < 20 % | téléportation au plus loin des ennemis |
+  | 👻 Potion d'invisibilité | 100 | vie < 20 % | invisible 5 s : plus ciblable (les zones touchent quand même) |
+  | 🌹 Potion de ronces | 70 | vie < 50 % | +40 % d'épines pendant 8 s |
+  | 🔋 Élixir d'endurance | 120 | début du combat | barre de stamina à 50 % |
+  | 🪶 Plume de phénix | 250 | en tombant | renaît avec 30 % de sa vie (pas de kill pour l'adversaire) |
+- **Arbre de compétences** (onglet visible mais verrouillé avant le niveau 4 ; tutoriel en fenêtre au déblocage, puis
+  derrière le bouton ?) : 1 point d'arbre tous les 3 niveaux (niveaux 4, 7, 10, 13…). Deux chemins par classe, chacun
+  menant à une spécialisation ; prendre le premier rond d'un chemin bloque l'autre, et à chaque carrefour on choisit un
+  rond sur trois. Remise à zéro : 250 golds (gratuite en changeant de classe). Une branche complète demande 7 points
+  (niveau 22) : ultime → stats → carrefour → stats (+3 Stamina) → carrefour → stats → spécialisation.
+  | Classe | Chemin gauche (ultime) | Chemin droit (ultime) |
+  |---|---|---|
+  | Guerriloot | Paladin — Rempart sacré | Berserker — Tourbillon |
+  | Archiloot | Tireur d'élite — Flèche perforante | Spammeur — Pluie de flèches |
+  | Magiloot | Pyromancien — Météore | Cryomancien — Blizzard (gel) |
+  | Lootassin | Ombre — Exécution | Venimeux — Nuage toxique |
+  | Saint-Loot | Saint — Prière (soins) | Inquisiteur — Châtiment |
+  L'**ultime** part tout seul quand la **barre de stamina** (barre bleue sous la vie, très longue à remplir) est pleine ;
+  la spécialisation renomme la classe et améliore l'ultime (ex. Flèche perforante plus grosse qui rebondit 2 fois).
+  Bots et mannequins reçoivent un arbre au hasard selon leur niveau. Détails chiffrés : `ULTS` dans `shared/rules.js`.
+- **Entraînement** (onglet Entraînement) : duel privé, visible seulement par le joueur, contre un mannequin (classe et
+  niveau 1 à 50 au choix) ou le fantôme d'un autre joueur (son build, son arbre et son équipement actuels). Règles du
+  Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre Grokk le Troll. Vie et dégâts selon le nombre
     de combattants au lancement (200 PV + 300 PV par combattant). Coup de massue qui touche les voisins, attaques
@@ -144,7 +184,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
     et pluie de coffres et de golds. Défaite : XP de participation seulement.
   - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
     squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
-    gauche, sortie par la droite, fondu au noir et grand « SALLE X ». Pas de réapparition ; les survivants récupèrent
+    gauche, sortie par la droite, fondu au noir et grand « SALLE X ». L'ambiance change toutes les 5 salles : Cachots,
+    Crypte oubliée (flammes vertes, toiles), Forges infernales (lave), Abysses (yeux dans le noir), puis le Néant.
+    Pas de réapparition ; les survivants récupèrent
     30 % de vie entre deux salles. Récompense pour tous selon la salle atteinte : 5 → 50 XP / 50 golds, 10 → 150 / 150,
     15 → 1 coffre + 300 / 300, 20 → 2 coffres + 500 / 500, puis +1 coffre et +250 toutes les 5 salles.
   - En coopération, les kills de monstres ne rapportent rien en eux-mêmes ; pas de paris ni d'événements de bataille.
@@ -200,6 +242,7 @@ les sons.
 | Début de bataille | Clairon médiéval + timbales, puis la musique du mode en boucle (fondu à l'arrêt) |
 | Coups, kills | Cliquetis discrets, impact |
 | Victoire | Fanfare triomphale + roulement + cymbale |
+| Ultime / potion | Montée d'énergie + accord (couleur selon l'ultime) / glouglou + éclat |
 | Combat de Boss | Rugissement du Troll (début, changements de phase), alerte et impact des attaques spéciales, explosion + pièces |
 | Raid de Donjon | Porte qui grince à chaque salle, petite fanfare de salle terminée, marche funèbre en cas d'échec |
 | Équiper / déséquiper | Cliquetis métallique montant / son sourd descendant |

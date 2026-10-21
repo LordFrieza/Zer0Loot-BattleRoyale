@@ -43,6 +43,7 @@ class Battle extends EventEmitter {
     this.fogs = [];
     this.meteors = [];
     this.slams = [];
+    this.zones = [];
     this.participants = new Map();
     this.queueEndsAt = null;
     this.queueTimer = null;
@@ -149,6 +150,7 @@ class Battle extends EventEmitter {
     this.fogs = [];
     this.meteors = [];
     this.slams = [];
+    this.zones = []; // zones des ultimes (météores, flèches, poison)
     this.nextFog = 0;
     this.nextMeteor = 2;
     this.time = 0;
@@ -208,6 +210,12 @@ class Battle extends EventEmitter {
       aoeRadius: combat.aoeRadius || 0,
       aoeRatio: combat.aoeRatio || 0,
       cd: Math.random() * 0.5,
+      // Arbre de compétences : spécialisation, ultime et temps de remplissage de la barre de stamina
+      spec: p.spec || null,
+      ult: p.ult && Rules.ULTS[p.ult.id] ? p.ult : null,
+      staminaTime: s.staminaTime || Rules.STAMINA.baseTime.none,
+      // Potion équipée pour cette partie (déclenchée au plus une fois)
+      consumable: p.consumable && Rules.CONSUMABLES[p.consumable] ? p.consumable : null,
     });
   }
 
@@ -315,6 +323,7 @@ class Battle extends EventEmitter {
     const pos = spawnPositions(spec.length, { x0: 720, y0: DUNGEON_TOP + 40, x1: ARENA.w - 80, y1: ARENA.h - 50 });
     this.monsters = spec.map((s, i) => this.makeMonster(s.type, s.elite, mult, pos[i], i));
     this.fighters = this.players.concat(this.monsters);
+    this.zones = [];
     d.stage = 'enter';
     d.stageT = 0;
     d.enraged = false;
@@ -431,11 +440,20 @@ class Battle extends EventEmitter {
     this.updateEvent(dt, alive);
     if (this.boss) this.updateBoss(dt);
     if (this.dungeon) this.updateDungeonEnrage();
+    for (const f of alive) this.updateBuffs(f, dt);
+    this.updateZones(dt);
 
     for (const f of alive) {
       if (!f.alive) continue;
       // Régénération (Prêtre)
       if (f.regen) this.heal(f, f.maxHp * f.regen * dt);
+      // Potions déclenchées au début du combat ou selon la vie restante
+      if (!f.started) { f.started = true; this.triggerPotion(f, 'start'); }
+      this.checkHpPotion(f);
+      // Barre de stamina (ultime de l'arbre de compétences)
+      if (f.ult) f.stamina = Math.min(1, f.stamina + dt / f.staminaTime);
+      // Gelé (Blizzard, Châtiment) : ne fait rien
+      if (this.time < f.stunUntil) continue;
 
       /*
        * Aggro : l'ennemi le plus proche ; un Guerrier « paraît » plus proche (il attire l'aggro).
@@ -446,7 +464,8 @@ class Battle extends EventEmitter {
       let fallback = null;
       let fallbackScore = Infinity;
       for (const o of alive) {
-        if (o.team === f.team || !o.alive) continue;
+        // Un ennemi invisible (potion) ne peut pas être ciblé.
+        if (o.team === f.team || !o.alive || this.isInvisible(o)) continue;
         const d = Math.hypot(o.x - f.x, o.y - f.y);
         const score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
         if (score < fallbackScore) { fallbackScore = score; fallback = o; }
@@ -455,28 +474,37 @@ class Battle extends EventEmitter {
         if (score < bestScore) { bestScore = score; best = o; }
       }
       best = best || fallback;
-      if (!best) continue;
+      if (!best) { f.targetKey = null; continue; }
       f.targetKey = best.key;
+
+      // Barre de stamina pleine : l'ultime part tout seul.
+      if (f.ult && f.stamina >= 1) {
+        f.stamina = 0;
+        this.castUlt(f, best);
+        if (!f.alive) continue;
+      }
 
       const dx = best.x - f.x;
       const dy = best.y - f.y;
       const dist = Math.hypot(dx, dy) || 1;
       // Distance « bord à bord » : les gros (Troll, chefs) se touchent de plus loin.
       const reach = dist - (best.r + f.r - 2 * RADIUS);
+      const speed = f.speed * this.buffMult(f, 'speed');
       f.cd -= dt;
+      if (reach <= f.range && !f.engaged) { f.engaged = true; this.triggerPotion(f, 'engage'); }
 
       if (reach > f.range) {
-        const step = Math.min(f.speed * dt, reach - f.range + 1);
+        const step = Math.min(speed * dt, reach - f.range + 1);
         f.x += (dx / dist) * step;
         f.y += (dy / dist) * step;
       } else if (f.kite && reach < f.kite) {
         // Archer : recule quand l'ennemi est trop près.
-        const step = f.speed * 0.8 * dt;
+        const step = speed * 0.8 * dt;
         f.x -= (dx / dist) * step;
         f.y -= (dy / dist) * step;
       }
       if (reach <= f.range && f.cd <= 0) {
-        f.cd = f.cooldown;
+        f.cd = f.cooldown / this.buffMult(f, 'attackSpeed');
         this.attack(f, best);
       }
     }
@@ -555,6 +583,231 @@ class Battle extends EventEmitter {
     }
   }
 
+
+  // ---------- Effets temporaires (potions, ultimes) ----------
+
+  addBuff(f, kind, duration, mods = {}) {
+    f.buffs = f.buffs.filter((b) => b.kind !== kind);
+    f.buffs.push(Object.assign({ kind, until: this.time + duration }, mods));
+  }
+
+  // Produit des multiplicateurs actifs (damage, taken, speed, attackSpeed).
+  buffMult(f, key) {
+    let m = 1;
+    for (const b of f.buffs) if (b[key]) m *= b[key];
+    return m;
+  }
+
+  // Somme des bonus actifs (regen, thorns, lifesteal).
+  buffSum(f, key) {
+    let total = 0;
+    for (const b of f.buffs) if (b[key]) total += b[key];
+    return total;
+  }
+
+  isInvisible(f) {
+    return f.buffs.some((b) => b.invisible);
+  }
+
+  updateBuffs(f, dt) {
+    f.buffs = f.buffs.filter((b) => b.until > this.time);
+    const regen = this.buffSum(f, 'regen');
+    if (regen) this.heal(f, f.maxHp * regen * dt);
+    // Tourbillon : frappe tous les ennemis autour à intervalle régulier.
+    const spin = f.buffs.find((b) => b.spin);
+    if (spin && this.time >= spin.next) {
+      spin.next = this.time + spin.every;
+      for (const o of this.fighters) {
+        if (!o.alive || o.team === f.team || Math.hypot(o.x - f.x, o.y - f.y) > spin.radius + o.r) continue;
+        const crit = Math.random() < f.crit;
+        this.hit(f, o, f.damage * f.dmgMult * this.buffMult(f, 'damage') * spin.ratio * (crit ? Rules.CRIT_MULTIPLIER : 1), { crit, splash: true, ult: true });
+      }
+    }
+  }
+
+  // ---------- Potions ----------
+
+  triggerPotion(f, trigger) {
+    const c = f.consumable && !f.potionUsed && Rules.CONSUMABLES[f.consumable];
+    if (!c || c.trigger !== trigger) return;
+    f.potionUsed = true;
+    const e = c.effect;
+    const ev = { t: 'potion', to: f.key, id: f.consumable };
+    if (e.duration) {
+      this.addBuff(f, 'potion_' + f.consumable, e.duration, {
+        damage: e.damage, taken: e.taken, speed: e.speed, attackSpeed: e.attackSpeed, regen: e.regen, thorns: e.thorns, invisible: e.invisible,
+      });
+    }
+    if (e.stamina && f.ult) f.stamina = Math.max(f.stamina, e.stamina);
+    if (e.teleport) {
+      ev.fx = Math.round(f.x);
+      ev.fy = Math.round(f.y);
+      this.teleportAway(f);
+    }
+    this.events.push(ev);
+  }
+
+  checkHpPotion(f) {
+    if (!f.alive || !f.consumable || f.potionUsed) return;
+    const ratio = f.hp / f.maxHp;
+    if (ratio < 0.5) this.triggerPotion(f, 'hp50');
+    if (ratio < 0.2) this.triggerPotion(f, 'hp20');
+  }
+
+  // Téléportation d'urgence : le point (parmi 30 tirés au hasard) le plus éloigné des ennemis.
+  teleportAway(f) {
+    const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+    const enemies = this.fighters.filter((o) => o.alive && o.team !== f.team);
+    let best = null;
+    let bestScore = -1;
+    for (let i = 0; i < 30; i++) {
+      const p = { x: 40 + Math.random() * (ARENA.w - 80), y: top + 40 + Math.random() * (ARENA.h - top - 80) };
+      const score = enemies.length ? Math.min(...enemies.map((o) => Math.hypot(o.x - p.x, o.y - p.y))) : Math.random();
+      if (score > bestScore) { bestScore = score; best = p; }
+    }
+    f.x = best.x;
+    f.y = best.y;
+  }
+
+  // ---------- Ultimes (arbre de compétences) ----------
+
+  castUlt(f, target) {
+    const U = Rules.ULTS[f.ult.id];
+    const P = f.ult.enhanced ? U.plus : U.base;
+    const ev = { t: 'ult', from: f.key, id: f.ult.id, enhanced: !!f.ult.enhanced, x: Math.round(f.x), y: Math.round(f.y) };
+    const enemies = this.fighters.filter((o) => o.alive && o.team !== f.team);
+    const allies = this.fighters.filter((o) => o.alive && o.team === f.team);
+    const dmg = f.damage * f.dmgMult * this.buffMult(f, 'damage');
+    const near = (a, b, r) => Math.hypot(a.x - b.x, a.y - b.y) <= r + (b.r || 0);
+    switch (f.ult.id) {
+      case 'rempart':
+        this.addBuff(f, 'rempart', P.duration, { taken: P.taken });
+        this.heal(f, f.maxHp * P.heal);
+        if (P.allyHeal) {
+          ev.targets = [];
+          for (const a of allies) {
+            if (a === f || !near(f, a, P.radius)) continue;
+            this.heal(a, a.maxHp * P.allyHeal);
+            this.addBuff(a, 'rempart', P.duration, { taken: P.allyTaken });
+            ev.targets.push(a.key);
+          }
+          ev.r = P.radius;
+        }
+        break;
+      case 'tourbillon':
+        this.addBuff(f, 'tourbillon', P.duration, { spin: true, every: P.every, next: this.time, radius: P.radius, ratio: P.ratio, lifesteal: P.lifesteal });
+        ev.r = P.radius;
+        break;
+      case 'perforante': {
+        const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+        const path = rayPath(f.x, f.y, target.x - f.x, target.y - f.y, P.bounces, { x0: 0, y0: top, x1: ARENA.w, y1: ARENA.h });
+        for (let i = 1; i < path.length; i++) {
+          for (const o of enemies) {
+            if (o.alive && distToSegment(o, path[i - 1], path[i]) <= P.width / 2 + o.r) this.hit(f, o, dmg * P.ratio, { ult: true });
+          }
+        }
+        ev.path = path.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+        ev.width = P.width;
+        break;
+      }
+      case 'pluie':
+        for (let i = 0; i < P.arrows; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const r = Math.sqrt(Math.random()) * P.radius;
+          this.zones.push({
+            kind: 'arrow', owner: f, x: target.x + Math.cos(a) * r, y: target.y + Math.sin(a) * r, r: P.impact,
+            t: 0.4 + (i / P.arrows) * P.duration, warn: 0.4, dmg: dmg * P.ratio,
+          });
+        }
+        ev.tx = Math.round(target.x);
+        ev.ty = Math.round(target.y);
+        ev.r = P.radius;
+        break;
+      case 'meteore': {
+        let pool = enemies.slice();
+        for (let i = 0; i < P.count && pool.length; i++) {
+          const spot = densestSpot(pool, P.radius);
+          this.zones.push({ kind: 'meteor', owner: f, x: spot.x, y: spot.y, r: P.radius, t: P.warn, warn: P.warn, dmg: dmg * P.ratio });
+          pool = pool.filter((o) => Math.hypot(o.x - spot.x, o.y - spot.y) > P.radius);
+        }
+        break;
+      }
+      case 'blizzard':
+        ev.tx = Math.round(target.x);
+        ev.ty = Math.round(target.y);
+        ev.r = P.radius;
+        for (const o of enemies) {
+          if (!near(target, o, P.radius)) continue;
+          this.hit(f, o, dmg * P.ratio, { splash: true, ult: true });
+          // Les boss résistent : gel réduit de moitié.
+          o.stunUntil = Math.max(o.stunUntil, this.time + P.stun * (o.kind === 'troll' ? 0.5 : 1));
+        }
+        break;
+      case 'execution': {
+        const victims = enemies.slice().sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp).slice(0, P.targets);
+        ev.hops = [];
+        for (const v of victims) {
+          if (!v.alive) continue;
+          const side = f.x <= v.x ? -1 : 1;
+          ev.hops.push({ fx: Math.round(f.x), fy: Math.round(f.y), x: Math.round(v.x + side * (v.r + f.r)), y: Math.round(v.y), to: v.key });
+          f.x = v.x + side * (v.r + f.r);
+          f.y = v.y;
+          this.hit(f, v, dmg * P.ratio, { crit: true, ult: true });
+          if (!f.alive) break;
+        }
+        break;
+      }
+      case 'poison':
+        this.zones.push({ kind: 'poison', owner: f, x: f.x, y: f.y, r: P.radius, t: P.duration, life: P.duration, tick: 0, dps: dmg * P.ratio, follow: P.follow });
+        ev.r = P.radius;
+        break;
+      case 'priere':
+        this.heal(f, f.maxHp * P.self);
+        ev.targets = [f.key];
+        for (const a of allies) {
+          if (a === f || !near(f, a, P.radius)) continue;
+          this.heal(a, a.maxHp * P.ally);
+          if (P.duration) this.addBuff(a, 'priere', P.duration, { taken: P.taken });
+          ev.targets.push(a.key);
+        }
+        if (P.duration) this.addBuff(f, 'priere', P.duration, { taken: P.taken });
+        break;
+      case 'chatiment': {
+        const victims = enemies.slice().sort((a, b) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b.x - f.x, b.y - f.y)).slice(0, P.targets);
+        ev.targets = victims.map((v) => v.key);
+        for (const v of victims) {
+          this.hit(f, v, dmg * P.ratio, { ult: true });
+          if (P.stun) v.stunUntil = Math.max(v.stunUntil, this.time + P.stun * (v.kind === 'troll' ? 0.5 : 1));
+        }
+        break;
+      }
+      default:
+    }
+    this.events.push(ev);
+  }
+
+  // Zones des ultimes : impacts différés (météores, pluie de flèches) et nuage de poison.
+  updateZones(dt) {
+    for (const z of this.zones) {
+      z.t -= dt;
+      if (z.kind === 'poison') {
+        if (z.follow && z.owner.alive) { z.x = z.owner.x; z.y = z.owner.y; }
+        z.tick -= dt;
+        if (z.tick > 0) continue;
+        z.tick += 0.5;
+        for (const o of this.fighters) {
+          if (o.alive && o.team !== z.owner.team && Math.hypot(o.x - z.x, o.y - z.y) <= z.r + o.r) this.hit(z.owner, o, z.dps * 0.5, { splash: true, ult: true });
+        }
+      } else if (z.t <= 0) {
+        this.events.push({ t: 'zoneHit', kind: z.kind, x: Math.round(z.x), y: Math.round(z.y), r: z.r });
+        for (const o of this.fighters) {
+          if (o.alive && o.team !== z.owner.team && Math.hypot(o.x - z.x, o.y - z.y) <= z.r + o.r) this.hit(z.owner, o, z.dmg, { splash: true, ult: true });
+        }
+      }
+    }
+    this.zones = this.zones.filter((z) => z.t > 0);
+  }
+
   // ---------- Événements ----------
 
   inFog(f) {
@@ -614,7 +867,7 @@ class Battle extends EventEmitter {
       return;
     }
     const crit = Math.random() < attacker.crit;
-    const raw = attacker.damage * attacker.dmgMult * (0.85 + Math.random() * 0.3) * (crit ? Rules.CRIT_MULTIPLIER : 1);
+    const raw = attacker.damage * attacker.dmgMult * this.buffMult(attacker, 'damage') * (0.85 + Math.random() * 0.3) * (crit ? Rules.CRIT_MULTIPLIER : 1);
     const tx = target.x;
     const ty = target.y;
     this.hit(attacker, target, raw, { crit, proj });
@@ -636,14 +889,16 @@ class Battle extends EventEmitter {
   // Applique des dégâts (après défense), puis vol de vie et épines.
   hit(attacker, target, raw, opts = {}) {
     if (!target.alive) return;
-    const dmg = Math.max(1, Math.round(raw * (1 - target.reduction)));
+    const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
-    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit: !!opts.crit, proj: opts.proj, splash: opts.splash || undefined });
-    if (attacker.lifesteal && attacker.alive) this.heal(attacker, dmg * attacker.lifesteal);
+    this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit: !!opts.crit, proj: opts.proj, splash: opts.splash || undefined, ult: opts.ult || undefined });
+    const lifesteal = attacker.lifesteal + this.buffSum(attacker, 'lifesteal');
+    if (lifesteal && attacker.alive) this.heal(attacker, dmg * lifesteal);
     if (target.hp <= 0) this.kill(attacker, target);
+    else this.checkHpPotion(target);
     // Épines : une partie des dégâts reçus est renvoyée à l'attaquant.
-    const reflected = Math.round(dmg * target.thorns);
+    const reflected = Math.round(dmg * (target.thorns + this.buffSum(target, 'thorns')));
     if (reflected >= 1 && attacker.alive) {
       attacker.hp -= reflected;
       target.dealt += reflected;
@@ -665,6 +920,14 @@ class Battle extends EventEmitter {
 
   kill(killer, victim) {
     if (!victim.alive) return;
+    // Plume de phénix : renaît une fois au lieu de tomber.
+    const potion = victim.consumable && !victim.potionUsed && Rules.CONSUMABLES[victim.consumable];
+    if (potion && potion.trigger === 'death') {
+      victim.potionUsed = true;
+      victim.hp = Math.max(1, Math.round(victim.maxHp * potion.effect.revive));
+      this.events.push({ t: 'potion', to: victim.key, id: victim.consumable });
+      return;
+    }
     victim.alive = false;
     victim.hp = 0;
     victim.diedAt = this.time;
@@ -754,6 +1017,10 @@ class Battle extends EventEmitter {
         fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
       })),
       dungeon: d ? { room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged } : null,
+      zones: (this.zones || []).map((z) => ({
+        kind: z.kind, x: Math.round(z.x), y: Math.round(z.y), r: z.r,
+        p: z.kind === 'poison' ? Math.round((z.t / z.life) * 100) / 100 : Math.round((1 - z.t / z.warn) * 100) / 100,
+      })),
       fighters: shown.map((f) => ({
         key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, app: f.app, level: f.level,
         kind: f.kind, elite: f.elite || undefined, r: f.r, scale: f.scale,
@@ -761,6 +1028,11 @@ class Battle extends EventEmitter {
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
         alive: f.alive, kills: f.kills, target: f.targetKey,
+        spec: f.spec || undefined,
+        ult: f.ult ? f.ult.id : undefined,
+        st: f.ult ? Math.round(f.stamina * 100) / 100 : undefined, // barre de stamina (0 à 1)
+        potion: f.consumable && !f.potionUsed ? f.consumable : undefined,
+        fx: fxOf(f, this.time),
       })),
       events: this.events,
     };
@@ -776,7 +1048,45 @@ function fighter(fields) {
     range: 40, taunt: 1, kite: 0, hunter: false, regen: 0, projectile: null, aoeRadius: 0, aoeRatio: 0, cleave: false,
     cd: 0, dmgMult: 1, targetKey: null, alive: true, kills: 0, dealt: 0,
     chain: 0, lastKillAt: -Infinity, healAcc: 0, diedAt: null, diedRoom: null,
+    spec: null, ult: null, staminaTime: 0, stamina: 0, consumable: null, potionUsed: false, started: false, engaged: false,
+    buffs: [], stunUntil: 0,
   }, fields);
+}
+
+// Effets visibles d'un combattant (pour l'affichage) : potions, ultimes, gel, invisibilité.
+function fxOf(f, time) {
+  if (!f.alive) return undefined;
+  const fx = f.buffs.map((b) => b.kind);
+  if (time < f.stunUntil) fx.push('frozen');
+  if (f.buffs.some((b) => b.invisible)) fx.push('invisible');
+  return fx.length ? fx : undefined;
+}
+
+// Trajectoire d'une flèche qui part de (x, y) dans la direction (dx, dy) jusqu'au bord, avec `bounces` rebonds.
+function rayPath(x, y, dx, dy, bounces, b) {
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+  const pts = [{ x, y }];
+  for (let i = 0; i <= bounces; i++) {
+    const tx = dx > 0 ? (b.x1 - x) / dx : dx < 0 ? (b.x0 - x) / dx : Infinity;
+    const ty = dy > 0 ? (b.y1 - y) / dy : dy < 0 ? (b.y0 - y) / dy : Infinity;
+    const t = Math.min(tx, ty);
+    x += dx * t;
+    y += dy * t;
+    pts.push({ x, y });
+    if (tx < ty) dx = -dx; else dy = -dy;
+  }
+  return pts;
+}
+
+// Distance d'un point au segment [a, b].
+function distToSegment(p, a, b) {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const l2 = vx * vx + vy * vy || 1;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / l2));
+  return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
 }
 
 // Point où sont regroupés le plus de combattants (cible du rocher du Troll).

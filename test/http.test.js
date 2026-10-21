@@ -415,6 +415,87 @@ test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle 
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[CON-4, Q-7] potions : la potion équipée est consommée au lancement, même sans se déclencher', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const c = client();
+  const id = (await register(c, 'pl_potion')).id;
+  await give(id, { gold: 500, xp: 1500 }); // 300 + 500 + 700 XP : niveau 4, un point d'arbre
+  assert.strictEqual((await c.post('/api/class', { cls: 'guerrier' })).status, 200);
+  assert.strictEqual((await c.post('/api/talent/learn', { id: 'left.ult' })).status, 200);
+  assert.strictEqual((await c.post('/api/consumable/buy', { id: 'phenix', count: 1 })).status, 200);
+  assert.strictEqual((await c.post('/api/consumable/equip', { id: 'phenix' })).status, 200);
+  assert.strictEqual((await meOf(c)).character.consumableSlot, 'phenix');
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss' });
+  await c.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  const f = battle.players.find((x) => x.userId === id);
+  assert.strictEqual(f.consumable, 'phenix');
+  assert.deepStrictEqual(f.ult, { id: 'rempart', enhanced: false });
+  const ch = (await meOf(c)).character;
+  assert.strictEqual(ch.consumableSlot, null, 'consommée au lancement');
+  assert.deepStrictEqual(ch.consumables, {});
+  await admin.post('/api/admin/battle/reset');
+});
+
+test('[TRN-1, TRN-2, TRN-3, TRN-4, TAL-6] entraînement : duel privé contre un mannequin ou un fantôme, sans récompense', async () => {
+  const { trainings } = require('../server/index');
+  const c = client();
+  const other = client();
+  const id = (await register(c, 'pl_train')).id;
+  const otherId = (await register(other, 'pl_ghost')).id;
+  assert.match((await c.post('/api/training/start', { opponent: 'bot', level: 5 })).data.error, /classe/);
+  await c.post('/api/class', { cls: 'archer' });
+  await other.post('/api/class', { cls: 'mage' });
+  await give(id, { gold: 100 });
+  await c.post('/api/consumable/buy', { id: 'vie' });
+  await c.post('/api/consumable/equip', { id: 'vie' });
+
+  // Mannequin de niveau 30 : arbre complet, ultime amélioré, niveau borné à 50
+  const r = await c.post('/api/training/start', { opponent: 'bot', cls: 'pretre', level: 30 });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.data));
+  assert.strictEqual(r.data.opponent.cls, 'pretre');
+  const b = trainings.get(id);
+  assert.ok(b && b !== battle, 'bataille séparée de celle du stream');
+  b.stopLoop();
+  const [me, bot] = b.fighters;
+  assert.strictEqual(me.consumable, 'vie', 'potion active en entraînement');
+  assert.ok(bot.ult && bot.ult.enhanced, 'mannequin avec un arbre complet');
+  assert.strictEqual(bot.consumable, null);
+  assert.strictEqual((await c.post('/api/training/start', { opponent: 'bot', level: 999 })).data.opponent.level, 50);
+  assert.notStrictEqual(trainings.get(id), b, 'relancer remplace le duel précédent');
+
+  // Fantôme d'un autre joueur ; refus de soi-même et d'un inconnu
+  assert.match((await c.post('/api/training/start', { opponent: 'player', id })).data.error, /autre joueur/);
+  assert.match((await c.post('/api/training/start', { opponent: 'player', id: 'inconnu' })).data.error, /introuvable/);
+  const opponents = (await c.get('/api/training/opponents')).data;
+  assert.ok(opponents.some((p) => p.id === otherId) && !opponents.some((p) => p.id === id));
+  assert.strictEqual((await c.post('/api/training/start', { opponent: 'player', id: otherId })).status, 200);
+  const duel = trainings.get(id);
+  duel.stopLoop();
+  const ghost = duel.fighters[1];
+  assert.strictEqual(ghost.cls, 'mage');
+  assert.strictEqual(ghost.userId, null, 'le fantôme ne gagne rien');
+
+  // Fin du duel : aucune récompense, aucun compteur, potion toujours équipée
+  const before = (await meOf(c)).character;
+  duel.kill(duel.fighters[0], ghost);
+  duel.finish(duel.fighters[0]);
+  const after = (await meOf(c)).character;
+  assert.deepStrictEqual(after.record, before.record);
+  assert.strictEqual(after.xp, before.xp);
+  assert.strictEqual(after.consumableSlot, 'vie', 'potion non consommée');
+  assert.ok(!trainings.has(id), 'entraînement terminé');
+
+  // Arrêt manuel
+  await c.post('/api/training/start', { opponent: 'bot', level: 3 });
+  assert.ok(trainings.has(id));
+  await c.post('/api/training/stop');
+  assert.ok(!trainings.has(id));
+  assert.strictEqual(Rules.TRAINING.maxDuration, 150);
+  assert.strictEqual(Rules.TRAINING.maxConcurrent, 20);
+});
+
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {
   const bad = { Cookie: 'zl_session=%E0%A4%A; autre=%' };
   // Routes HTTP : pas de session, donc 401 (et surtout pas de 500)

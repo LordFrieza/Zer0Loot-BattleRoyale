@@ -48,7 +48,9 @@
     <nav class="tabs-nav" id="tabs-nav">
       <button data-tab="perso">🧙 Personnage <span class="tab-badge" data-badge="perso"></span></button>
       <button data-tab="inventaire"><i class="ico-chest"></i> Inventaire <span class="tab-badge" data-badge="inventaire"></span></button>
+      <button data-tab="arbre" id="tab-arbre">🌳 Arbre de compétences <span class="tab-badge" data-badge="arbre"></span></button>
       <button data-tab="boutique">🛍️ Boutique</button>
+      <button data-tab="entrainement">🏋️ Entraînement</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
       <button data-tab="classements">🏆 Classements</button>
       <button data-tab="regles">📖 Règles</button>
@@ -58,7 +60,10 @@
     <div class="grid2">
       <div>
         <div class="panel char-card">
-          <canvas id="avatar" width="200" height="200"></canvas>
+          <div class="avatar-row">
+            <canvas id="avatar" width="200" height="200"></canvas>
+            <button type="button" class="potion-slot" id="potion-slot" title="Potion pour la prochaine partie"></button>
+          </div>
           <div class="char-name" id="char-name"></div>
           <div class="char-title" id="char-title"></div>
           <div class="class-badge" id="class-badge"></div>
@@ -111,6 +116,7 @@
     <div class="panel" id="equipment-panel">
       <h2>🧙 Équipement <span class="sub">Clique sur un objet équipé pour le retirer</span><button class="help-btn" type="button">?</button></h2>
       <div class="equip-grid" id="equipment"></div>
+      <div class="presets" id="presets"></div>
       <div class="sets-active" id="sets-active"></div>
       <div class="help">
         <h3>🧩 Les panoplies</h3>
@@ -119,6 +125,10 @@
           Plus tu en équipes, plus le bonus grandit (points dans <b>chacune</b> des deux stats de la panoplie) : <span id="set-tiers"></span>. Les objets de panoplie sont plus fréquents
           dans les hautes raretés, et <b>fusionner 3 pièces d'une même panoplie</b> à la forge donne une pièce de cette panoplie.</p>
         <div class="sets-help" id="sets-help"></div>
+        <h3>💾 Les presets</h3>
+        <p class="muted">Sauvegarde ton équipement actuel sous un nom (jusqu'à <span id="preset-max"></span> presets), puis remets-le
+          en un clic. Les objets enregistrés dans un preset sont <b>protégés</b> 🔐 : ils ne peuvent être ni recyclés, ni fusionnés
+          à la forge. Supprime le preset pour lever la protection.</p>
       </div>
     </div>
 
@@ -126,6 +136,8 @@
       <h2>🧰 Coffre personnel <span class="sub" id="inv-count"></span>
         <button class="secondary small" id="recycle-toggle">♻️ Recycler</button></h2>
       <div class="recycle-bar" id="recycle-bar" style="display:none"></div>
+      <label class="inv-toggle"><input type="checkbox" id="inv-show-other"> Afficher les objets des autres classes
+        <span class="muted">(armes et objets secondaires que ta classe ne peut pas équiper)</span></label>
       <div class="inv-filters" id="inv-filters"></div>
       <div class="inventory" id="inventory"></div>
       <div class="pager" id="inv-pager"></div>
@@ -158,7 +170,25 @@
 
     </section>
 
+    <section class="tab" data-tab="arbre">
+    <div class="panel" id="talents-panel">
+      <h2>🌳 Arbre de compétences <span class="sub" id="talent-sub"></span><button class="help-btn" type="button">?</button></h2>
+      <div class="help talent-help" id="talent-help"></div>
+      <div id="talent-locked" class="talent-locked"></div>
+      <div class="talent-head" id="talent-head"></div>
+      <div class="talent-scroll"><div class="talent-tree" id="talent-tree"></div></div>
+      <div class="talent-detail" id="talent-detail"></div>
+    </div>
+    </section>
+
     <section class="tab" data-tab="boutique">
+    <div class="panel" id="potion-shop">
+      <h2>🧪 Potions et consommables <span class="sub">Payés en golds · utilisés dans tous les modes</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Achète des potions d'avance, puis équipe-en <b>une</b> dans la case à côté de ton personnage (onglet Personnage).
+        Elle est <b>consommée au lancement de ta prochaine partie</b> (Battle Royale, Boss ou Donjon), qu'elle se déclenche ou non, et ne
+        se déclenche qu'une fois. En entraînement, elle s'active sans être consommée.</p>
+      <div class="potion-grid" id="potion-grid"></div>
+    </div>
     <div class="panel" id="shop">
       <h2>🛍️ Boutique <span class="sub">Cosmétiques purement visuels, payés en golds</span><button class="help-btn" type="button">?</button></h2>
       <p class="muted help">Les cosmétiques ne changent pas tes stats : ils changent seulement ton look en bataille. Un
@@ -173,6 +203,38 @@
         </div>
         <div id="shop-list"></div>
       </div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="entrainement">
+    <div class="panel" id="training-panel">
+      <h2>🏋️ Entraînement <span class="sub">Teste ton build sans rien risquer</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Un duel privé, visible seulement par toi : face à un <b>mannequin</b> (classe et niveau au choix, points et arbre
+        tirés au hasard) ou face au <b>fantôme</b> d'un autre joueur, avec son build, son arbre et son équipement actuels.
+        Ton personnage combat avec tout ce qu'il a, y compris ta potion équipée (activée mais <b>pas consommée</b>).
+        Aucune récompense, aucune perte, rien n'est compté dans les classements.</p>
+      <div class="training-controls">
+        <div class="chips" id="training-kind">
+          <button class="chip active" data-kind="bot">🎯 Mannequin</button>
+          <button class="chip" data-kind="player">👻 Fantôme d'un joueur</button>
+        </div>
+        <div class="row" id="training-bot">
+          <label style="margin:0">Classe</label>
+          <select id="training-cls"></select>
+          <label style="margin:0">Niveau</label>
+          <input type="number" id="training-level" min="1" value="5" style="width:80px">
+        </div>
+        <div class="row" id="training-player" style="display:none">
+          <input id="training-search" placeholder="Rechercher un joueur…" style="flex:1;min-width:160px">
+          <select id="training-opponent" style="flex:2;min-width:200px"></select>
+        </div>
+        <div class="row">
+          <button class="gold" id="training-start">⚔️ Lancer le duel</button>
+          <button class="secondary" id="training-stop" disabled>⏹ Arrêter</button>
+          <span class="muted" id="training-status"></span>
+        </div>
+      </div>
+      <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas></div>
     </div>
     </section>
 
@@ -284,6 +346,28 @@
     </div>
   </div>
 
+  <div class="modal" id="potion-modal">
+    <div class="modal-box" style="max-width:720px">
+      <h2>🧪 Potion pour la prochaine partie</h2>
+      <p class="muted" style="margin-top:4px">Elle sera consommée au lancement de ta prochaine partie, qu'elle se déclenche ou non.</p>
+      <div class="potion-pick" id="potion-pick"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px">
+        <button class="secondary" id="potion-shop-link">🛍️ Acheter des potions</button>
+        <button class="secondary" id="potion-modal-close">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="talent-tuto">
+    <div class="modal-box" style="max-width:760px">
+      <h2>🌳 Ton arbre de compétences est débloqué !</h2>
+      <div id="talent-tuto-body"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px">
+        <button class="gold" id="talent-tuto-ok">C'est parti !</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
@@ -293,6 +377,7 @@
   <script src="/js/chest.js"></script>
   <script src="/js/forge.js"></script>
   <script src="/js/leaderboard.js"></script>
+  <script src="/js/arena.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

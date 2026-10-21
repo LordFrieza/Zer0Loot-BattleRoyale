@@ -224,6 +224,11 @@ test('[DNG-8] donjon : récompenses par palier de salle atteinte', () => {
   assert.deepStrictEqual(Rules.dungeonReward(30), { tier: 30, xp: 1000, gold: 1000, chests: 4 });
 });
 
+test('[DNG-9] donjon : une ambiance toutes les 5 salles', () => {
+  assert.deepStrictEqual(Rules.DUNGEON_THEMES.map((t) => t.name), ['Les Cachots', 'La Crypte oubliée', 'Les Forges infernales', 'Les Abysses', 'Le Néant']);
+  assert.deepStrictEqual([1, 5, 6, 10, 11, 16, 20, 21, 99].map(Rules.dungeonTheme), [0, 0, 1, 1, 2, 3, 3, 4, 4]);
+});
+
 test('[DNG-1, DNG-2] donjon : nombre de monstres, types débloqués, multiplicateurs et chefs', () => {
   for (const room of [1, 3, 10, 40]) {
     const expected = Math.max(2, Math.min(36, Math.round(10 * (0.55 + 0.06 * (room - 1)))));

@@ -8,7 +8,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   const STATS = [
     'vie', 'force', 'defense', 'vitesse', 'esquive', 'critique',
-    'vitesse_attaque', 'vol_de_vie', 'precision', 'epines', 'chance',
+    'vitesse_attaque', 'vol_de_vie', 'precision', 'epines', 'chance', 'stamina',
   ];
 
   const STAT_INFO = {
@@ -23,6 +23,7 @@
     precision: { label: 'Précision', icon: '🎯', desc: 'Réduit les chances de l\'adversaire d\'esquiver tes attaques.' },
     epines: { label: 'Épines', icon: '🌵', desc: 'Renvoie une partie des dégâts reçus à l\'attaquant.' },
     chance: { label: 'Chance', icon: '🍀', desc: 'Augmente les chances d\'obtenir des raretés supérieures (coffres et forge).' },
+    stamina: { label: 'Stamina', icon: '🔋', desc: 'Accélère le remplissage de la barre de stamina, qui déclenche ton ultime (arbre de compétences).' },
   };
 
   // ---------- Classes ----------
@@ -125,7 +126,8 @@
 
   // ---------- Équipement ----------
   // Poids de tirage des lignes de stats : 1 par défaut, plus pour les stats « de prédilection ».
-  const w = (favored) => Object.assign(Object.fromEntries(STATS.map((s) => [s, 1])), favored);
+  // La Stamina ne sort pas sur les objets (points de caractéristique et arbre de compétences seulement).
+  const w = (favored) => Object.assign(Object.fromEntries(STATS.filter((s) => s !== 'stamina').map((s) => [s, 1])), favored);
 
   const SLOTS = ['casque', 'plastron', 'gants', 'ceinture', 'pantalon', 'boucles', 'arme', 'secondaire'];
 
@@ -177,7 +179,7 @@
   const STAT_SUFFIX = {
     vie: 'de Vitalité', force: 'du Colosse', defense: 'du Rempart', vitesse: 'du Vent', esquive: 'de l\'Ombre',
     critique: 'du Bourreau', vitesse_attaque: 'de la Tempête', vol_de_vie: 'du Vampire', precision: 'du Faucon',
-    epines: 'du Hérisson', chance: 'du Trèfle',
+    epines: 'du Hérisson', chance: 'du Trèfle', stamina: 'de l\'Endurance',
   };
 
   const RARITY_PREFIX = {
@@ -453,6 +455,272 @@
     return { tier, xp: 500 + 250 * extra, gold: 500 + 250 * extra, chests: 2 + extra };
   }
 
+
+  // ---------- Consommables (boutique) ----------
+  /*
+   * Une potion s'équipe dans l'emplacement de consommable de la fiche ; elle est consommée au lancement de la
+   * prochaine partie (tous les modes), qu'elle se déclenche ou non. Elle se déclenche au plus une fois.
+   * Déclencheurs : start (début du combat), engage (premier ennemi à portée), hp50 / hp20 (vie sous 50 / 20 %),
+   * death (au moment de tomber).
+   */
+  const CONSUMABLES = {
+    vie: {
+      label: 'Potion de vie', icon: '🧪', color: '#ff4d6d', price: 60, trigger: 'hp50',
+      desc: 'Sous 50 % de vie : régénère 4 % de ta vie max par seconde pendant 6 s.',
+      effect: { regen: 0.04, duration: 6 },
+    },
+    berserker: {
+      label: 'Potion de berserker', icon: '🍷', color: '#ff6b2a', price: 80, trigger: 'hp50',
+      desc: 'Sous 50 % de vie : +50 % de dégâts pendant 8 s.',
+      effect: { damage: 1.5, duration: 8 },
+    },
+    defense: {
+      label: 'Potion de défense', icon: '🧴', color: '#5fd3ff', price: 80, trigger: 'hp50',
+      desc: 'Sous 50 % de vie : −60 % de dégâts subis pendant 4 s.',
+      effect: { taken: 0.4, duration: 4 },
+    },
+    celerite: {
+      label: 'Potion de célérité', icon: '💨', color: '#ffd23f', price: 70, trigger: 'engage',
+      desc: 'Dès que le premier ennemi est à portée : +40 % de vitesse et de vitesse d\'attaque pendant 10 s.',
+      effect: { speed: 1.4, attackSpeed: 1.4, duration: 10 },
+    },
+    teleportation: {
+      label: 'Potion de téléportation d\'urgence', icon: '🌀', color: '#b14dff', price: 90, trigger: 'hp20',
+      desc: 'Sous 20 % de vie : téléportation à un endroit aléatoire de l\'arène, le plus loin possible des ennemis.',
+      effect: { teleport: true },
+    },
+    invisibilite: {
+      label: 'Potion d\'invisibilité', icon: '👻', color: '#cfd8e3', price: 100, trigger: 'hp20',
+      desc: 'Sous 20 % de vie : invisible pendant 5 s. Les ennemis te perdent de vue, mais les attaques de zone te touchent toujours.',
+      effect: { invisible: true, duration: 5 },
+    },
+    ronces: {
+      label: 'Potion de ronces', icon: '🌹', color: '#b14dff', price: 70, trigger: 'hp50',
+      desc: 'Sous 50 % de vie : +40 % d\'épines (dégâts renvoyés) pendant 8 s.',
+      effect: { thorns: 0.4, duration: 8 },
+    },
+    endurance: {
+      label: 'Élixir d\'endurance', icon: '🔋', color: '#29e7ff', price: 120, trigger: 'start',
+      desc: 'La barre de stamina démarre à moitié remplie : ton ultime arrive bien plus tôt (il faut avoir un ultime).',
+      effect: { stamina: 0.5 },
+    },
+    phenix: {
+      label: 'Plume de phénix', icon: '🪶', color: '#ff9a1f', price: 250, trigger: 'death',
+      desc: 'Quand tu tombes, tu renais aussitôt avec 30 % de ta vie (une seule fois).',
+      effect: { revive: 0.3 },
+    },
+  };
+  const CONSUMABLE_TRIGGERS = {
+    start: 'Au début du combat', engage: 'Premier ennemi à portée', hp50: 'Vie sous 50 %', hp20: 'Vie sous 20 %', death: 'En tombant',
+  };
+  const CONSUMABLE_STACK_MAX = 99; // stock maximum par potion
+
+  // ---------- Presets d'équipement ----------
+  // Les objets d'un preset sont protégés : ni recyclage, ni fusion à la forge.
+  const PRESET_MAX = 5;
+  const PRESET_NAME_MAX = 24;
+
+  // ---------- Stamina, arbre de compétences et ultimes ----------
+  // Temps de remplissage de la barre de stamina (secondes, sans bonus) : TRÈS long, mais les ultimes frappent fort.
+  const STAMINA = {
+    baseTime: { guerrier: 40, archer: 38, mage: 42, assassin: 36, pretre: 40, none: 40 },
+    perPoint: 0.05, // +5 % de vitesse de remplissage par point de Stamina
+    cap: 2.5,
+  };
+  const TALENT_EVERY = 3; // 1 point de compétence d'arbre tous les 3 niveaux : niveaux 4, 7, 10, 13…
+  const TALENT_RESET_PRICE = 250;
+
+  function talentPoints(level) {
+    return Math.max(0, Math.floor(((level || 1) - 1) / TALENT_EVERY));
+  }
+
+  /*
+   * Ultimes : lancés automatiquement quand la barre de stamina est pleine.
+   * `plus` : version améliorée, débloquée avec la spécialisation au bout de la branche.
+   */
+  const ULTS = {
+    rempart: {
+      label: 'Rempart sacré', icon: '🛡️', color: '#ffd23f',
+      desc: 'Pendant 5 s, −60 % de dégâts subis ; soigne 25 % de la vie max.',
+      descPlus: 'Pendant 8 s ; soigne aussi les alliés proches de 20 % et réduit leurs dégâts subis de 30 %.',
+      base: { duration: 5, taken: 0.4, heal: 0.25 },
+      plus: { duration: 8, taken: 0.4, heal: 0.25, allyHeal: 0.2, allyTaken: 0.7, radius: 220 },
+    },
+    tourbillon: {
+      label: 'Tourbillon', icon: '🌪️', color: '#ff4d6d',
+      desc: 'Tourne sur lui-même 3 s : toutes les 0,5 s, 70 % des dégâts aux ennemis à moins de 90 px.',
+      descPlus: 'Pendant 5 s, rayon 120 px, et rend 30 % des dégâts du tourbillon en vie.',
+      base: { duration: 3, every: 0.5, ratio: 0.7, radius: 90, lifesteal: 0 },
+      plus: { duration: 5, every: 0.5, ratio: 0.7, radius: 120, lifesteal: 0.3 },
+    },
+    perforante: {
+      label: 'Flèche perforante', icon: '🏹', color: '#3ddc5a',
+      desc: 'Une énorme flèche traverse tout l\'écran vers la cible : 300 % des dégâts à chaque ennemi sur sa trajectoire.',
+      descPlus: 'Flèche plus grosse (400 %), qui rebondit 2 fois sur les bords de l\'écran avant de disparaître.',
+      base: { ratio: 3, width: 24, bounces: 0 },
+      plus: { ratio: 4, width: 38, bounces: 2 },
+    },
+    pluie: {
+      label: 'Pluie de flèches', icon: '🌧️', color: '#9be564',
+      desc: '14 flèches tombent en 2 s autour de la cible (rayon 150 px) : 60 % des dégâts par flèche.',
+      descPlus: '28 flèches en 2,5 s sur un rayon de 190 px.',
+      base: { arrows: 14, duration: 2, radius: 150, impact: 40, ratio: 0.6 },
+      plus: { arrows: 28, duration: 2.5, radius: 190, impact: 40, ratio: 0.6 },
+    },
+    meteore: {
+      label: 'Météore', icon: '☄️', color: '#ff6b2a',
+      desc: 'Un météore s\'écrase sur le plus gros groupe d\'ennemis après 1 s : 350 % des dégâts (rayon 110 px).',
+      descPlus: 'Trois météores, sur trois groupes différents (rayon 120 px).',
+      base: { count: 1, warn: 1, radius: 110, ratio: 3.5 },
+      plus: { count: 3, warn: 1, radius: 120, ratio: 3.5 },
+    },
+    blizzard: {
+      label: 'Blizzard', icon: '❄️', color: '#7fd8ff',
+      desc: 'Vague de glace autour de la cible (rayon 150 px) : 100 % des dégâts et gèle les ennemis 2 s.',
+      descPlus: 'Rayon 210 px, 150 % des dégâts et gel de 3,5 s.',
+      base: { radius: 150, ratio: 1, stun: 2 },
+      plus: { radius: 210, ratio: 1.5, stun: 3.5 },
+    },
+    execution: {
+      label: 'Exécution', icon: '🗡️', color: '#ffd23f',
+      desc: 'Se téléporte derrière l\'ennemi le plus affaibli et frappe à 350 % des dégâts.',
+      descPlus: 'Enchaîne sur 3 ennemis affaiblis, l\'un après l\'autre.',
+      base: { targets: 1, ratio: 3.5 },
+      plus: { targets: 3, ratio: 3.5 },
+    },
+    poison: {
+      label: 'Nuage toxique', icon: '☠️', color: '#7ccf6a',
+      desc: 'Nuage de poison autour de soi pendant 5 s (rayon 120 px) : 120 % des dégâts par seconde aux ennemis dedans.',
+      descPlus: 'Pendant 8 s, rayon 170 px, et le nuage suit l\'assassin.',
+      base: { duration: 5, radius: 120, ratio: 1.2, follow: false },
+      plus: { duration: 8, radius: 170, ratio: 1.2, follow: true },
+    },
+    priere: {
+      label: 'Prière', icon: '🙏', color: '#fff3a0',
+      desc: 'Soigne 40 % de sa vie max et 30 % aux alliés proches (220 px).',
+      descPlus: 'Soigne 40 % à tous les alliés de l\'arène et réduit leurs dégâts subis de 30 % pendant 4 s.',
+      base: { self: 0.4, ally: 0.3, radius: 220, taken: 1, duration: 0 },
+      plus: { self: 0.4, ally: 0.4, radius: 9999, taken: 0.7, duration: 4 },
+    },
+    chatiment: {
+      label: 'Châtiment', icon: '⚡', color: '#ffe27a',
+      desc: 'Des rayons sacrés frappent les 3 ennemis les plus proches : 220 % des dégâts chacun.',
+      descPlus: '5 ennemis, 280 % des dégâts et étourdissement de 1 s.',
+      base: { targets: 3, ratio: 2.2, stun: 0 },
+      plus: { targets: 5, ratio: 2.8, stun: 1 },
+    },
+  };
+
+  /*
+   * Arbre de compétences : deux branches par classe (gauche / droite), chacune donnant au bout une spécialisation.
+   * Paliers d'une branche, du centre vers l'extérieur :
+   *   ult (rouge) → g1 → a (3 choix) → g2 → b (3 choix) → g3 → spec (bleu)
+   * Choisir une branche bloque l'autre ; dans un palier à 3 choix, en prendre un bloque les deux autres.
+   * Seule une remise à zéro (payante) débloque les chemins abandonnés.
+   */
+  const TALENT_TIERS = ['ult', 'g1', 'a', 'g2', 'b', 'g3', 'spec'];
+  const TALENT_TREES = {
+    guerrier: {
+      left: { spec: 'Paladin', icon: '🛡️', color: '#ffd23f', ult: 'rempart', stats: ['vie', 'defense', 'epines'], desc: 'Tank sacré : vie, défense et protection.' },
+      right: { spec: 'Berserker', icon: '🪓', color: '#ff4d6d', ult: 'tourbillon', stats: ['force', 'critique', 'vol_de_vie'], desc: 'Furie : dégâts, critiques et vol de vie.' },
+    },
+    archer: {
+      left: { spec: 'Tireur d\'élite', icon: '🎯', color: '#3ddc5a', ult: 'perforante', stats: ['force', 'critique', 'precision'], desc: 'Un tir, un mort : dégâts et critiques.' },
+      right: { spec: 'Spammeur', icon: '🌧️', color: '#9be564', ult: 'pluie', stats: ['vitesse_attaque', 'precision', 'vitesse'], desc: 'Des flèches partout : vitesse d\'attaque et précision.' },
+    },
+    mage: {
+      left: { spec: 'Pyromancien', icon: '🔥', color: '#ff6b2a', ult: 'meteore', stats: ['force', 'critique', 'vitesse_attaque'], desc: 'Tout brûler : dégâts de zone massifs.' },
+      right: { spec: 'Cryomancien', icon: '❄️', color: '#7fd8ff', ult: 'blizzard', stats: ['precision', 'vie', 'defense'], desc: 'Contrôle : geler les ennemis et tenir la ligne.' },
+    },
+    assassin: {
+      left: { spec: 'Ombre', icon: '🌑', color: '#ffd23f', ult: 'execution', stats: ['critique', 'vitesse', 'esquive'], desc: 'Frapper vite et disparaître : critiques et esquive.' },
+      right: { spec: 'Venimeux', icon: '🐍', color: '#7ccf6a', ult: 'poison', stats: ['vitesse_attaque', 'vol_de_vie', 'critique'], desc: 'Empoisonner tout ce qui bouge : vitesse d\'attaque et vol de vie.' },
+    },
+    pretre: {
+      left: { spec: 'Saint', icon: '😇', color: '#fff3a0', ult: 'priere', stats: ['vie', 'defense', 'stamina'], desc: 'Soigneur : vie, défense et ultime plus fréquent.' },
+      right: { spec: 'Inquisiteur', icon: '⚖️', color: '#ffe27a', ult: 'chatiment', stats: ['force', 'precision', 'critique'], desc: 'Justice divine : dégâts sacrés à distance.' },
+    },
+  };
+
+  // Liste des nœuds d'un arbre : { id, branch, tier, option, type ('ult' | 'stat' | 'spec'), points }.
+  function talentNodes(cls) {
+    const tree = TALENT_TREES[cls];
+    if (!tree) return [];
+    const out = [];
+    for (const branch of ['left', 'right']) {
+      const [s1, s2, s3] = tree[branch].stats;
+      const pts = (pairs) => Object.fromEntries(pairs.filter(([k]) => k));
+      out.push({ id: branch + '.ult', branch, tier: 0, option: 0, type: 'ult', points: {} });
+      out.push({ id: branch + '.g1', branch, tier: 1, option: 0, type: 'stat', points: pts([[s1, 3], [s2, 3]]) });
+      [[[s1, 6]], [[s2, 6]], [[s3, 6]]].forEach((p, i) => out.push({ id: `${branch}.a${i + 1}`, branch, tier: 2, option: i, type: 'stat', points: pts(p) }));
+      out.push({ id: branch + '.g2', branch, tier: 3, option: 0, type: 'stat', points: pts([[s1, 3], ['stamina', 3]]) });
+      [[[s1, 4], [s2, 4]], [[s1, 4], [s3, 4]], [[s2, 4], [s3, 4]]].forEach((p, i) => out.push({ id: `${branch}.b${i + 1}`, branch, tier: 4, option: i, type: 'stat', points: pts(p) }));
+      out.push({ id: branch + '.g3', branch, tier: 5, option: 0, type: 'stat', points: pts([[s1, 4], [s2, 4]]) });
+      out.push({ id: branch + '.spec', branch, tier: 6, option: 0, type: 'spec', points: {} });
+    }
+    return out;
+  }
+
+  // Raison pour laquelle un nœud ne peut pas être appris (null s'il peut l'être).
+  function talentBlocker(cls, owned, id, available) {
+    const nodes = talentNodes(cls);
+    const node = nodes.find((n) => n.id === id);
+    if (!node) return 'Compétence inconnue';
+    owned = owned || [];
+    if (owned.includes(id)) return 'Déjà apprise';
+    const ownedNodes = nodes.filter((n) => owned.includes(n.id));
+    if (ownedNodes.some((n) => n.branch !== node.branch)) return 'Tu as choisi l\'autre chemin (remise à zéro pour changer)';
+    if (ownedNodes.some((n) => n.tier === node.tier)) return 'Chemin bloqué : tu as pris une autre compétence à ce palier';
+    if (node.tier > 0 && !ownedNodes.some((n) => n.tier === node.tier - 1)) return 'Apprends d\'abord la compétence précédente';
+    if (available !== undefined && available <= 0) return 'Aucun point de compétence d\'arbre disponible';
+    return null;
+  }
+
+  // Points de stats donnés par les nœuds appris.
+  function talentBonus(cls, owned) {
+    const points = emptyStats();
+    for (const n of talentNodes(cls)) {
+      if ((owned || []).includes(n.id)) for (const [st, v] of Object.entries(n.points)) points[st] += v;
+    }
+    return points;
+  }
+
+  // Branche choisie (left / right) ou null.
+  function talentBranch(owned) {
+    const first = (owned || [])[0];
+    return first ? first.split('.')[0] : null;
+  }
+
+  // Ultime du personnage : { id, enhanced } ou null (il faut le nœud rouge ; la spécialisation l'améliore).
+  function ultOf(cls, owned) {
+    const tree = TALENT_TREES[cls];
+    const branch = talentBranch(owned);
+    if (!tree || !branch || !owned.includes(branch + '.ult')) return null;
+    return { id: tree[branch].ult, enhanced: owned.includes(branch + '.spec') };
+  }
+
+  // Spécialisation obtenue (au bout de la branche) ou null.
+  function specOf(cls, owned) {
+    const tree = TALENT_TREES[cls];
+    const branch = talentBranch(owned);
+    return tree && branch && owned.includes(branch + '.spec') ? tree[branch] : null;
+  }
+
+  // ---------- Mode entraînement ----------
+  const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150 };
+
+  // ---------- Raid de Donjon : ambiance qui change toutes les 5 salles ----------
+  const DUNGEON_THEMES = [
+    { name: 'Les Cachots', desc: 'Pierres humides et torches.' },
+    { name: 'La Crypte oubliée', desc: 'Ossements, toiles d\'araignée et flammes vertes.' },
+    { name: 'Les Forges infernales', desc: 'Roche brûlante et coulées de lave.' },
+    { name: 'Les Abysses', desc: 'Ténèbres glacées, des yeux brillent dans le noir.' },
+    { name: 'Le Néant', desc: 'Il n\'y a plus de murs. Seulement le vide…' },
+  ];
+  function dungeonTheme(room) {
+    return Math.min(DUNGEON_THEMES.length - 1, Math.floor((Math.max(1, room) - 1) / 5));
+  }
+
   // ---------- Apparence (gratuite) ----------
   const APPEARANCE = {
     color: {
@@ -587,8 +855,11 @@
     const thorns = Math.min(0.5, ((2 + 2 * p.epines) * mult('epines')) / 100);
     // Chance : les bonus d'équipement s'AJOUTENT aux points (une stat sans valeur de base ne peut pas être multipliée).
     const luck = Math.round((p.chance + g.chance) * 10) / 10;
+    // Stamina : la barre se remplit en STAMINA.baseTime[classe] secondes, +5 % de vitesse par point (plafond ×2,5).
+    const staminaSpeed = Math.min(STAMINA.cap, (1 + STAMINA.perPoint * p.stamina) * mult('stamina'));
+    const staminaTime = Math.round((STAMINA.baseTime[cls] || STAMINA.baseTime.none) / staminaSpeed * 10) / 10;
 
-    return { maxHp, damage, armor, reduction, speed, dodge, crit, attackSpeed, cooldown, lifesteal, precision, thorns, luck };
+    return { maxHp, damage, armor, reduction, speed, dodge, crit, attackSpeed, cooldown, lifesteal, precision, thorns, luck, staminaSpeed, staminaTime };
   }
 
   const pct = (x) => Math.round(x * 1000) / 10 + ' %';
@@ -616,6 +887,7 @@
       case 'precision': return '−' + pct(d.precision) + ' d\'esquive adverse';
       case 'epines': return pct(d.thorns) + ' des dégâts renvoyés';
       case 'chance': return d.luck + ' chance effective';
+      case 'stamina': return 'barre pleine en ' + String(d.staminaTime).replace('.', ',') + ' s';
       default: return '';
     }
   }
@@ -632,6 +904,9 @@
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
     BATTLE_EVENTS, GAME_MODES, BOSS, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
-    dungeonRoom, dungeonMultipliers, dungeonReward, SUB_REWARD_GOLD, APPEARANCE, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
+    dungeonRoom, dungeonMultipliers, dungeonReward, SUB_REWARD_GOLD, APPEARANCE,
+    CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
+    STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
   };
 });

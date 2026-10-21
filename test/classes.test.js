@@ -5,7 +5,7 @@ const { Rules, game } = require('./helpers');
 test('[CLS-3, CLS-4, CLS-5] classes : première classe gratuite, changement à 100 golds', () => {
   const c = game.newCharacter();
   assert.strictEqual(c.cls, null);
-  assert.deepStrictEqual(game.chooseClass(c, 'mage'), { cost: 0, unequipped: 0 });
+  assert.deepStrictEqual(game.chooseClass(c, 'mage'), { cost: 0, unequipped: 0, talentsReset: 0 });
   assert.throws(() => game.chooseClass(c, 'mage'), /déjà/);
   assert.throws(() => game.chooseClass(c, 'archer'), /100 golds/);
   assert.throws(() => game.chooseClass(c, 'ninja'), /inconnue/);
@@ -28,7 +28,7 @@ test('[CLS-2, CLS-6, EQP-1] classes : armes réservées, objets incompatibles re
   game.equip(c, book.id);
   game.equip(c, helmet.id);
   c.gold = 100;
-  assert.deepStrictEqual(game.chooseClass(c, 'guerrier'), { cost: 100, unequipped: 2 });
+  assert.deepStrictEqual(game.chooseClass(c, 'guerrier'), { cost: 100, unequipped: 2, talentsReset: 0 });
   assert.deepStrictEqual(Object.keys(c.equipment), ['casque']);
   game.equip(c, sword.id);
   assert.strictEqual(c.equipment.arme.kind, 'epee');

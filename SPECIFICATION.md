@@ -97,7 +97,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **Q-4** Quand le minuteur expire ou que l'admin ferme la file, le serveur doit passer en phase `ready` sans effacer les inscrits.
 - **Q-5** Tant que la phase est `queue`, le serveur doit accepter les inscriptions ; chaque participant est identifié par une clé unique (`u<id>` ou `bot<n>`).
 - **Q-6** Si la clé est déjà inscrite ou que la phase n'est pas `queue`, alors l'inscription doit être refusée sans erreur.
-- **Q-7** Quand un joueur s'inscrit, le serveur doit capturer son nom (Twitch si lié), niveau, classe, titre, apparence, stats dérivées et visuel d'équipement.
+- **Q-7** Quand un joueur s'inscrit, le serveur doit capturer son nom (Twitch si lié), niveau, classe, spécialisation, titre, apparence, stats dérivées, ultime, potion équipée et visuel d'équipement.
 - **Q-8** Quand la bataille démarre, le serveur doit rafraîchir les stats de chaque participant humain depuis la base (les changements faits pendant la file comptent).
 - **Q-9** Quand l'admin ajoute des bots, le serveur doit en créer un nombre borné entre 1 et 50 (5 si la valeur est absente, nulle ou non numérique), uniquement en phase `queue` : niveau 1-6, points aléatoires hors Chance, équipement visuel aléatoire (40 % par slot), classe et apparence aléatoires, cosmétique 35 % du temps ; ils ne sont jamais sauvegardés.
 - **Q-10** Quand l'admin simule un `!join`, le serveur doit valider le pseudo `^[A-Za-z0-9_]{3,25}$` et appliquer le même chemin qu'un vrai `!join`.
@@ -185,6 +185,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **DNG-5** Un aventurier mort ne doit jamais réapparaître ; à l'entrée d'une nouvelle salle, les survivants doivent récupérer 30 % de leur vie max (sans dépasser le maximum).
 - **DNG-6** Au-delà de 45 s de combat dans une même salle, les dégâts des monstres doivent augmenter de 5 % par seconde supplémentaire.
 - **DNG-7** Quand tous les aventuriers sont morts, le raid doit se terminer ; la salle atteinte est celle où l'équipe est tombée.
+- **DNG-9** L'ambiance du donjon doit changer toutes les 5 salles : salles 1-5 « Les Cachots », 6-10 « La Crypte oubliée », 11-15 « Les Forges infernales », 16-20 « Les Abysses », 21 et au-delà « Le Néant ».
 - **DNG-8** La récompense commune doit dépendre du palier de 5 salles atteint : moins de 5 → rien ; 5 → 50 XP et 50 golds ; 10 → 150 / 150 ; 15 → 1 coffre, 300 / 300 ; 20 → 2 coffres, 500 / 500 ; ensuite +1 coffre et +250 XP / golds tous les 5 salles. Le compteur `dungeonBest` doit garder la meilleure salle atteinte.
 
 ## 8. Classes
@@ -204,10 +205,13 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CLS-4** Quand un joueur change de classe, le serveur doit débiter 100 golds ; si les golds sont insuffisants, alors il doit refuser.
 - **CLS-5** Si la classe demandée est inconnue ou identique à l'actuelle, alors le serveur doit refuser.
 - **CLS-6** Quand la classe change, le serveur doit renvoyer à l'inventaire les objets équipés incompatibles avec la nouvelle classe.
+- **CLS-7** Quand la classe change, le serveur doit remettre l'arbre de compétences à zéro gratuitement (l'arbre dépend de la classe) et indiquer le nombre de points rendus.
 
 ## 9. Stats et valeurs dérivées
 
-- **STAT-1** Il doit exister 11 stats : vie, force, défense, vitesse, esquive, critique, vitesse d'attaque, vol de vie, précision, épines, chance.
+- **STAT-1** Il doit exister 12 stats : vie, force, défense, vitesse, esquive, critique, vitesse d'attaque, vol de vie, précision, épines, chance, stamina.
+- **STAT-7** La barre de stamina doit se remplir en `temps de base de la classe / min(2,5, 1 + 0,05 × points de Stamina)` secondes ; temps de base : Guerrier 40 s, Archer 38 s, Mage 42 s, Assassin 36 s, Prêtre 40 s (40 s sans classe).
+- **STAT-8** Les points de l'arbre de compétences doivent s'ajouter aux points de compétence et de panoplie dans le calcul des valeurs dérivées.
 - **STAT-2** Le serveur doit calculer les valeurs dérivées à partir des points (compétences + bonus de panoplie), des bonus % d'équipement et des bonus de classe ; le multiplicateur d'une stat vaut `max(0, 1 + (équipement% + classe%)/100)`.
 - **STAT-3** Formules : PV max `(100 + 10·vie)×m` ; dégâts `(10 + 2·force)×m` ; armure `(5 + 3·déf)×m` et réduction `armure/(armure+100)` ; vitesse `min(220, (60 + 5·vit)×m)` ; esquive `min(0,6, r/(r+100))` avec `r = (5 + 3·esq)×m`.
 - **STAT-4** Formules : critique `min(0,60, (1 + 2·crit)×m/100 + plat classe)`, dégâts ×2 ; vitesse d'attaque `min(2,5, (1 + 0,05·va)×m)` et recharge `1 s × cooldownMult / vitesse` ; vol de vie `min(0,4, (2 + 1,5·vdv)×m/100)` ; précision `min(0,8, (5 + 3·pré)×m/100 + plat classe)` ; épines `min(0,5, (2 + 2·ép)×m/100)`.
@@ -233,6 +237,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **LOOT-4** Quand un objet est créé, le serveur doit tirer ses stats sans doublon selon les poids de prédilection de l'emplacement ou du type d'arme, avec un générateur cryptographique.
 - **LOOT-5** Pour les emplacements `arme` et `secondaire`, le serveur doit choisir le type de l'objet : celui de la classe du joueur avec 50 % de chance (100 % à la fusion), sinon un type aléatoire de l'emplacement.
 - **LOOT-6** Quand un objet est créé, il doit appartenir à une panoplie avec la probabilité 5 / 8 / 12 / 18 / 25 % selon la rareté.
+- **LOOT-8** La Stamina ne doit jamais sortir comme ligne d'objet (coffres, forge, relance) : elle ne vient que des points, de l'arbre et des potions.
 - **LOOT-7** Le nom d'un objet doit être `<base> <préfixe de rareté> <suffixe>` ; le suffixe est celui de la panoplie si elle existe, sinon celui de la première stat.
 - **CHEST-1** Quand un joueur achète des coffres, le serveur doit débiter 100 golds par coffre (quantité ≥ 1) et refuser si les golds sont insuffisants.
 - **CHEST-2** Quand un joueur ouvre un coffre, le serveur doit exiger au moins un coffre, en consommer un, créer 3 objets (rareté tirée selon sa chance effective), les ajouter à l'inventaire illimité, mettre à jour `lootStats` et les compteurs `chests` et `legendary`, puis renvoyer la meilleure rareté et le nombre de clics requis.
@@ -240,6 +245,52 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **EQP-1** Quand un joueur équipe un objet, le serveur doit exiger que l'objet soit dans l'inventaire et compatible avec sa classe, puis renvoyer l'objet précédent du même emplacement à l'inventaire.
 - **EQP-2** Quand un joueur déséquipe un emplacement, le serveur doit renvoyer l'objet à l'inventaire, ou refuser si l'emplacement est vide.
 - **EQP-3** Quand un joueur recycle des objets de son inventaire, le serveur doit les supprimer et créditer 3 golds par objet quelle que soit la rareté, et incrémenter le compteur `recycled` ; si aucun objet n'est trouvé, alors il doit refuser.
+
+## 12 bis. Presets d'équipement
+
+- **PRE-1** Quand un joueur sauvegarde son équipement, le serveur doit exiger un nom (1 à 24 caractères) et au moins un objet équipé, enregistrer l'objet de chaque emplacement (ou vide) et refuser au-delà de 5 presets ; avec l'identifiant d'un preset existant, il doit le remplacer.
+- **PRE-2** Quand un joueur applique un preset, le serveur doit remettre exactement son équipement (un emplacement vide dans le preset est vidé) ; un objet introuvable ou réservé à une autre classe est ignoré et compté.
+- **PRE-3** Si un objet enregistré dans au moins un preset est envoyé au recyclage ou à la fusion, alors le serveur doit refuser l'opération entière.
+- **PRE-4** Quand un preset est supprimé, ses objets ne doivent plus être protégés (sauf s'ils sont dans un autre preset).
+
+## 12 ter. Potions et consommables
+
+- **CON-1** La boutique doit proposer 9 consommables : Potion de vie (60 golds, sous 50 % : +4 % de vie max par seconde pendant 6 s), Potion de berserker (80, sous 50 % : dégâts ×1,5 pendant 8 s), Potion de défense (80, sous 50 % : dégâts subis ×0,4 pendant 4 s), Potion de célérité (70, premier ennemi à portée : vitesse et vitesse d'attaque ×1,4 pendant 10 s), Potion de téléportation d'urgence (90, sous 20 % : téléportation), Potion d'invisibilité (100, sous 20 % : invisible 5 s), Potion de ronces (70, sous 50 % : +40 % d'épines pendant 8 s), Élixir d'endurance (120, début du combat : barre de stamina à 50 %), Plume de phénix (250, en tombant : renaît avec 30 % de sa vie).
+- **CON-2** Quand un joueur achète un consommable, le serveur doit débiter `prix × quantité` (quantité bornée entre 1 et 99) et l'ajouter au stock ; il doit refuser si les golds manquent ou si le stock (emplacement compris) dépasserait 99.
+- **CON-3** Le joueur doit pouvoir placer une potion de son stock dans son unique emplacement de consommable ; la potion qui y était retourne au stock, et `null` vide l'emplacement ; une potion absente du stock est refusée.
+- **CON-4** Quand une partie (Battle Royale, Boss ou Donjon) est lancée, la potion équipée par chaque combattant humain doit être consommée (l'emplacement est vidé), qu'elle se déclenche ou non.
+- **CON-5** Pendant une partie, une potion doit se déclencher au plus une fois, selon son déclencheur : début du combat, premier ennemi à portée, vie sous 50 %, vie sous 20 %, ou au moment de tomber ; dans le donjon, une fois pour tout le raid.
+- **CON-6** Tant qu'un combattant est invisible, aucun ennemi ne doit pouvoir le cibler ; les dégâts de zone le touchent toujours. La téléportation d'urgence le place, parmi 30 points tirés au hasard, au plus loin des ennemis.
+- **CON-7** Quand la Plume de phénix se déclenche, le combattant ne meurt pas : il garde 30 % de sa vie max et le coup n'est pas compté comme un kill.
+- **CON-8** Quand un fantôme est rattaché à un compte, son stock de potions (et sa potion équipée) doit s'ajouter au stock du compte.
+
+## 12 quater. Arbre de compétences et ultimes
+
+- **TAL-1** Le joueur doit gagner un point d'arbre tous les 3 niveaux : `floor((niveau − 1) / 3)` points au total (premier point au niveau 4).
+- **TAL-2** Chaque classe doit avoir un arbre à deux branches menant chacune à une spécialisation (Guerrier : Paladin / Berserker ; Archer : Tireur d'élite / Spammeur ; Mage : Pyromancien / Cryomancien ; Assassin : Ombre / Venimeux ; Prêtre : Saint / Inquisiteur). Une branche enchaîne, depuis le centre : l'ultime, un nœud de stats, un carrefour à 3 choix, un nœud de stats (avec +3 Stamina), un carrefour à 3 choix, un nœud de stats, puis la spécialisation.
+- **TAL-3** Quand un joueur apprend un nœud, le serveur doit exiger une classe, un point disponible, le nœud du palier précédent de la même branche, aucun nœud de l'autre branche et aucun autre nœud du même palier ; sinon il doit refuser avec la raison.
+- **TAL-4** Quand un joueur remet son arbre à zéro, le serveur doit débiter 250 golds, rendre tous les points et débloquer tous les chemins ; il doit refuser si l'arbre est déjà vierge ou si les golds manquent.
+- **TAL-5** Le premier nœud d'une branche doit donner l'ultime de la branche ; la spécialisation doit renommer la classe du joueur (fiche, arène) et améliorer son ultime.
+- **TAL-6** Les bots et les mannequins d'entraînement doivent recevoir un arbre tiré au hasard selon leur niveau (une branche, un choix au hasard à chaque palier).
+- **ULT-1** Tant qu'un combattant a un ultime et combat, sa barre de stamina doit se remplir de `dt / temps de remplissage` ; elle se garde entre les salles du donjon et ne se remplit pas pendant les transitions.
+- **ULT-2** Quand la barre est pleine et que le combattant a une cible, le serveur doit lancer l'ultime, remettre la barre à 0 et émettre l'événement `ult`.
+- **ULT-3** Rempart sacré : dégâts subis ×0,4 pendant 5 s et soin de 25 % de la vie max ; amélioré : 8 s, et les alliés à moins de 220 px sont soignés de 20 % et subissent ×0,7 de dégâts.
+- **ULT-4** Tourbillon : pendant 3 s, toutes les 0,5 s, 70 % des dégâts aux ennemis à moins de 90 px ; amélioré : 5 s, 120 px et 30 % de vol de vie pendant l'effet.
+- **ULT-5** Flèche perforante : 300 % des dégâts à chaque ennemi sur la trajectoire (de l'archer vers la cible jusqu'au bord, largeur 24 px) ; améliorée : 400 %, largeur 38 px, 2 rebonds sur les bords.
+- **ULT-6** Pluie de flèches : 14 flèches en 2 s dans un rayon de 150 px autour de la cible, 60 % des dégâts par flèche (rayon d'impact 40 px) ; améliorée : 28 flèches en 2,5 s sur 190 px.
+- **ULT-7** Météore : impact après 1 s sur le plus gros groupe d'ennemis, 350 % des dégâts dans 110 px ; amélioré : 3 météores sur 3 groupes différents, 120 px.
+- **ULT-8** Blizzard : 100 % des dégâts et gel de 2 s des ennemis à moins de 150 px de la cible ; amélioré : 150 %, 3,5 s, 210 px. Un combattant gelé ne bouge pas et n'attaque pas ; le gel est réduit de moitié sur le Troll.
+- **ULT-9** Exécution : téléportation derrière l'ennemi au plus faible pourcentage de vie et coup à 350 % ; améliorée : enchaîne sur 3 ennemis.
+- **ULT-10** Nuage toxique : zone de 120 px pendant 5 s infligeant 120 % des dégâts par seconde (par tranche de 0,5 s) aux ennemis dedans ; amélioré : 8 s, 170 px, et le nuage suit l'assassin.
+- **ULT-11** Prière : soigne 40 % de sa vie max et 30 % aux alliés à moins de 220 px ; améliorée : 40 % à tous les alliés et dégâts subis ×0,7 pendant 4 s.
+- **ULT-12** Châtiment : 220 % des dégâts aux 3 ennemis les plus proches ; amélioré : 5 ennemis, 280 % et étourdissement de 1 s.
+
+## 12 quinquies. Entraînement
+
+- **TRN-1** Quand un joueur lance un entraînement, le serveur doit exiger qu'il ait une classe et créer un adversaire : un mannequin (classe au choix ou au hasard, niveau borné entre 1 et 50, points et arbre au hasard, sans potion) ou le fantôme d'un autre joueur (son build, son arbre et son équipement actuels) ; il doit refuser un joueur inexistant, banni ou lui-même.
+- **TRN-2** L'entraînement doit se jouer sur une bataille séparée de la bataille du stream, avec les règles du Battle Royale, et n'envoyer ses images (`trainingFrame`) et son état (`trainingQueue`) qu'au joueur concerné.
+- **TRN-3** L'entraînement ne doit donner aucune récompense, ne rien compter (batailles, kills, succès) et ne pas consommer la potion équipée (elle peut tout de même se déclencher).
+- **TRN-4** Un joueur ne doit avoir qu'un entraînement à la fois (en relancer un arrête le précédent) ; au plus 20 entraînements en même temps sur le serveur ; un entraînement dure au plus 150 s (au-delà, le meilleur ratio de vie gagne) ; le joueur peut l'arrêter.
 
 ## 12. Forge
 
@@ -311,6 +362,7 @@ Ces exigences se vérifient dans un navigateur (skill `smoke-arena`) : elles son
 - **UI-4** `/arena.html` doit afficher uniquement l'arène en plein écran pour une source navigateur OBS (1280×720 ou 1920×1080), avec annonces de séries et sons. (vérification manuelle)
 - **UI-6** Pour les modes coopératifs, l'arène doit afficher le mode sur l'écran de file, la grosse barre de vie du Troll avec ses coches à 66 % et 33 %, les zones d'attaque spéciale au sol, l'explosion du Troll suivie d'une pluie de coffres et de golds, la salle de donjon (dallage, torches) avec fondu au noir et grand « SALLE X », et un écran de fin commun (récompense, meilleurs dégâts) ; la page admin propose le choix du mode et l'onglet Règles explique les deux modes et leurs récompenses. (vérification manuelle)
 - **UI-7** Pendant une partie, l'arène doit jouer en boucle la musique du mode (Battle Royale : « Not dead YET! », Boss : BOSSFIGHT « Milky Ways », Donjon : Mattashi « The Final Battle »), avec fondu à l'arrêt ; les pages perso et admin doivent proposer deux curseurs de volume mémorisés, « Sons » (effets) et « Musique », coupables d'un clic sur leur icône. (vérification manuelle)
+- **UI-8** La fiche joueur doit proposer : une case de potion à côté du personnage (fenêtre de choix parmi le stock), les potions en haut de l'onglet Boutique, les presets dans le panneau Équipement (objets protégés marqués 🔐), une case « Afficher les objets des autres classes » et un filtre « Hors classe » dans le coffre personnel, un onglet Arbre de compétences visible mais verrouillé avant le niveau 4, un tutoriel en fenêtre au déblocage (puis derrière le bouton ?), et un onglet Entraînement ; l'arène doit afficher la barre de stamina, les ultimes, les potions déclenchées et les effets (gel, invisibilité, boucliers). (vérification manuelle)
 - **UI-5** Les pages doivent être en français, sans framework ni étape de build, les scripts étant chargés dans l'ordre des dépendances. (vérification manuelle)
 
 ## 21. Déploiement et configuration

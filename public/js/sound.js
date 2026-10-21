@@ -403,6 +403,28 @@
       timpani(ctx.currentTime + 0.7, 41, 0.6);
     },
 
+    // Ultime lancé : montée d'énergie puis accord puissant (couleur selon l'ultime).
+    ult(id) {
+      const c = ctx;
+      const t = c.currentTime + 0.02;
+      noise(0.35, { filter: 'bandpass', freq: 400, sweep: 3500, q: 1.2, vol: 0.16, attack: 0.15 });
+      const roots = { rempart: 60, priere: 64, chatiment: 62, blizzard: 66, meteore: 55, tourbillon: 57, perforante: 64, pluie: 67, execution: 59, poison: 56 };
+      const root = roots[id] || 60;
+      fanfare([[root, 0, 0.6], [root + 7, 0.5, 2.2]], 0.12, 0.11, 0.25);
+      fanfare([[root - 12, 0.5, 2.2]], 0.12, 0.07, 0.25);
+      timpani(t + 0.3, 49, 0.6);
+      if (id === 'blizzard') noise(1, { filter: 'highpass', freq: 4000, vol: 0.12, delay: 0.3 });
+      if (id === 'meteore') tone(80, 0.8, { vol: 0.2, to: 40, delay: 0.3 });
+    },
+
+    // Potion déclenchée : glouglou puis petit éclat (téléportation : souffle magique).
+    potion(id) {
+      for (let i = 0; i < 3; i++) tone(320 + i * 90 + Math.random() * 40, 0.08, { type: 'sine', vol: 0.12, to: 180, delay: i * 0.07 });
+      if (id === 'teleportation' || id === 'invisibilite') noise(0.4, { filter: 'bandpass', freq: 2500, sweep: 600, q: 2, vol: 0.14, delay: 0.2 });
+      else [0, 4, 7].forEach((st, i) => tone(midi(79 + st), 0.18, { type: 'triangle', vol: 0.07, delay: 0.24 + i * 0.05 }));
+      if (id === 'phenix') fanfare([[67, 0, 0.5], [74, 0.5, 2]], 0.11, 0.1, 0.25);
+    },
+
     // Un combattant tombe.
     kill() {
       noise(0.25, { freq: 900, sweep: 200, vol: 0.25 });

@@ -36,6 +36,10 @@ function upgrade(character) {
   character.look = Object.assign({}, Rules.DEFAULT_LOOK, character.look);
   if (!character.owned) character.owned = []; // cosmétiques achetés
   if (character.title === undefined) character.title = null;
+  if (!character.consumables) character.consumables = {}; // stock de potions : { id: quantité }
+  if (character.consumableSlot === undefined) character.consumableSlot = null; // potion prête pour la prochaine partie
+  if (!character.presets) character.presets = []; // presets d'équipement
+  if (!character.talents) character.talents = []; // nœuds appris dans l'arbre de compétences (dans l'ordre)
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -69,6 +73,10 @@ function newCharacter() {
     title: null, // id du succès affiché comme titre
     look: { ...Rules.DEFAULT_LOOK }, // apparence : couleur, yeux, sourcils, bouche + cosmétiques portés
     owned: [], // cosmétiques achetés à la boutique
+    consumables: {}, // stock de potions : { id: quantité }
+    consumableSlot: null, // potion équipée pour la prochaine partie
+    presets: [], // presets d'équipement : [{ id, name, items: { slot: itemId | null } }]
+    talents: [], // arbre de compétences : nœuds appris, dans l'ordre
   };
 }
 
@@ -83,9 +91,10 @@ function gearBonus(character) {
 
 function derived(character) {
   upgrade(character);
-  // Les panoplies donnent des points bonus, qui s'ajoutent aux points de compétence.
+  // Les panoplies et l'arbre de compétences donnent des points bonus, qui s'ajoutent aux points de compétence.
   const setPoints = Rules.setBonus(character.equipment).points;
-  const points = Object.fromEntries(Rules.STATS.map((st) => [st, (character.stats[st] || 0) + setPoints[st]]));
+  const talentPoints = Rules.talentBonus(character.cls, character.talents);
+  const points = Object.fromEntries(Rules.STATS.map((st) => [st, (character.stats[st] || 0) + setPoints[st] + talentPoints[st]]));
   return Rules.derive(points, gearBonus(character), character.cls);
 }
 
@@ -216,7 +225,10 @@ function buyChests(character, count) {
 // Recyclage : chaque objet du coffre personnel rapporte Rules.RECYCLE_GOLD, quelle que soit sa rareté.
 function recycle(character, itemIds) {
   if (!Array.isArray(itemIds) || itemIds.length === 0) throw new Error('Aucun objet sélectionné');
+  upgrade(character);
   const ids = new Set(itemIds);
+  const locked = protectedIds(character);
+  if (itemIds.some((id) => locked.has(id))) throw new Error('Un objet protégé par un preset ne peut pas être recyclé');
   const before = character.inventory.length;
   character.inventory = character.inventory.filter((i) => !ids.has(i.id));
   const count = before - character.inventory.length;
@@ -252,6 +264,8 @@ function chooseClass(character, cls) {
   if (character.gold < cost) throw new Error(`Changer de classe coûte ${cost} golds`);
   character.gold -= cost;
   character.cls = cls;
+  const talentsReset = character.talents.length;
+  character.talents = []; // l'arbre dépend de la classe : remis à zéro gratuitement
   let unequipped = 0;
   for (const [slot, item] of Object.entries(character.equipment)) {
     if (item && !Rules.canEquip(item, cls)) {
@@ -260,7 +274,7 @@ function chooseClass(character, cls) {
       unequipped += 1;
     }
   }
-  return { cost, unequipped };
+  return { cost, unequipped, talentsReset };
 }
 
 // ---------- Forge ----------
@@ -276,6 +290,8 @@ function fuse(character, itemIds) {
   if (ids.length !== Rules.FUSE_COUNT) throw new Error(`Sélectionne exactement ${Rules.FUSE_COUNT} objets`);
   const items = ids.map((id) => character.inventory.find((i) => i.id === id));
   if (items.some((i) => !i)) throw new Error('Objets introuvables dans ton coffre personnel');
+  const locked = protectedIds(character);
+  if (ids.some((id) => locked.has(id))) throw new Error('Un objet protégé par un preset ne peut pas être fusionné');
   const rarity = items[0].rarity;
   if (items.some((i) => i.rarity !== rarity)) throw new Error('Les 3 objets doivent être de la même rareté');
   const chance = Rules.fuseUpgradeChance(rarity, derived(character).luck);
@@ -320,6 +336,133 @@ function reroll(character, itemId, lineIndex) {
   if (index === 0 && item.base) item.name = itemName(item);
   bump(character, 'rerolled');
   return { item, line, old, price };
+}
+
+
+// ---------- Presets d'équipement ----------
+
+// Identifiants des objets enregistrés dans au moins un preset (protégés du recyclage et de la forge).
+function protectedIds(character) {
+  const ids = new Set();
+  for (const p of character.presets || []) for (const id of Object.values(p.items)) if (id) ids.add(id);
+  return ids;
+}
+
+// Enregistre l'équipement actuel dans un nouveau preset, ou remplace un preset existant (id).
+function savePreset(character, name, id) {
+  upgrade(character);
+  name = String(name || '').trim().slice(0, Rules.PRESET_NAME_MAX);
+  if (!name) throw new Error('Donne un nom à ton preset');
+  const items = Object.fromEntries(Rules.SLOTS.map((slot) => [slot, character.equipment[slot] ? character.equipment[slot].id : null]));
+  if (!Object.values(items).some(Boolean)) throw new Error('Équipe au moins un objet avant de sauvegarder');
+  if (id) {
+    const preset = character.presets.find((p) => p.id === id);
+    if (!preset) throw new Error('Preset introuvable');
+    Object.assign(preset, { name, items });
+    return { preset };
+  }
+  if (character.presets.length >= Rules.PRESET_MAX) throw new Error(`${Rules.PRESET_MAX} presets maximum`);
+  const preset = { id: crypto.randomUUID(), name, items };
+  character.presets.push(preset);
+  return { preset };
+}
+
+// Remet exactement l'équipement du preset (un emplacement vide dans le preset est vidé).
+function applyPreset(character, id) {
+  upgrade(character);
+  const preset = character.presets.find((p) => p.id === id);
+  if (!preset) throw new Error('Preset introuvable');
+  let changed = 0;
+  let missing = 0;
+  let locked = 0;
+  for (const slot of Rules.SLOTS) {
+    const wanted = preset.items[slot] || null;
+    const current = character.equipment[slot];
+    if ((current ? current.id : null) === wanted) continue;
+    if (!wanted) { unequip(character, slot); changed += 1; continue; }
+    const item = character.inventory.find((i) => i.id === wanted);
+    if (!item) { missing += 1; continue; }
+    if (!Rules.canEquip(item, character.cls)) { locked += 1; continue; }
+    equip(character, wanted);
+    changed += 1;
+  }
+  return { changed, missing, locked, name: preset.name };
+}
+
+function deletePreset(character, id) {
+  upgrade(character);
+  const before = character.presets.length;
+  character.presets = character.presets.filter((p) => p.id !== id);
+  if (character.presets.length === before) throw new Error('Preset introuvable');
+}
+
+// ---------- Consommables ----------
+
+function buyConsumable(character, id, count = 1) {
+  upgrade(character);
+  const c = Rules.CONSUMABLES[id];
+  if (!c) throw new Error('Consommable inconnu');
+  count = Math.max(1, Math.min(Rules.CONSUMABLE_STACK_MAX, Math.floor(Number(count) || 1)));
+  const have = character.consumables[id] || 0;
+  if (have + count + (character.consumableSlot === id ? 1 : 0) > Rules.CONSUMABLE_STACK_MAX) throw new Error(`${Rules.CONSUMABLE_STACK_MAX} exemplaires maximum`);
+  const cost = c.price * count;
+  if (character.gold < cost) throw new Error(`Il te faut ${cost} golds`);
+  character.gold -= cost;
+  character.consumables[id] = have + count;
+  return { price: cost, count };
+}
+
+// Place une potion du stock dans l'emplacement (celle qui y était retourne au stock) ; null pour la retirer.
+function equipConsumable(character, id) {
+  upgrade(character);
+  if (id !== null && !Rules.CONSUMABLES[id]) throw new Error('Consommable inconnu');
+  if (id !== null && !(character.consumables[id] > 0)) throw new Error('Tu n\'as pas cette potion : achète-la à la boutique');
+  if (character.consumableSlot) {
+    const prev = character.consumableSlot;
+    character.consumables[prev] = (character.consumables[prev] || 0) + 1;
+    character.consumableSlot = null;
+  }
+  if (id !== null) {
+    character.consumables[id] -= 1;
+    if (!character.consumables[id]) delete character.consumables[id];
+    character.consumableSlot = id;
+  }
+}
+
+// Au lancement d'une partie : la potion équipée est utilisée (elle disparaît, qu'elle se déclenche ou non).
+function useConsumable(character) {
+  upgrade(character);
+  const id = character.consumableSlot;
+  character.consumableSlot = null;
+  return id;
+}
+
+// ---------- Arbre de compétences ----------
+
+function talentState(character) {
+  const total = Rules.talentPoints(character.level);
+  return { total, spent: character.talents.length, available: total - character.talents.length };
+}
+
+function learnTalent(character, id) {
+  upgrade(character);
+  if (!character.cls) throw new Error('Choisis d\'abord une classe');
+  const st = talentState(character);
+  const blocker = Rules.talentBlocker(character.cls, character.talents, id, st.available);
+  if (blocker) throw new Error(blocker);
+  character.talents.push(id);
+  return { spec: id.endsWith('.spec') ? Rules.specOf(character.cls, character.talents).spec : null };
+}
+
+// Remise à zéro payante : tous les points reviennent, tous les chemins se débloquent.
+function resetTalents(character) {
+  upgrade(character);
+  if (!character.talents.length) throw new Error('Ton arbre est déjà vierge');
+  if (character.gold < Rules.TALENT_RESET_PRICE) throw new Error(`La remise à zéro coûte ${Rules.TALENT_RESET_PRICE} golds`);
+  character.gold -= Rules.TALENT_RESET_PRICE;
+  const refunded = character.talents.length;
+  character.talents = [];
+  return { price: Rules.TALENT_RESET_PRICE, refunded };
 }
 
 // ---------- Succès & titres ----------
@@ -441,6 +584,8 @@ function absorbGhost(user, ghost) {
   upgrade(c);
   upgrade(g);
   for (const r of Object.keys(c.lootStats)) c.lootStats[r] += g.lootStats[r];
+  for (const [id, n] of Object.entries(g.consumables || {})) c.consumables[id] = (c.consumables[id] || 0) + n;
+  if (g.consumableSlot) c.consumables[g.consumableSlot] = (c.consumables[g.consumableSlot] || 0) + 1;
   for (const k of Rules.COUNTERS) {
     // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
     c.counters[k] = k === 'dungeonBest' ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
@@ -473,6 +618,11 @@ function publicCharacter(user) {
     gear: gearBonus(c),
     derived: d,
     lootTable: Rules.lootTable(d.luck),
+    talentState: talentState(c),
+    talentPoints: Rules.talentBonus(c.cls, c.talents),
+    ult: Rules.ultOf(c.cls, c.talents),
+    spec: Rules.specOf(c.cls, c.talents),
+    protectedIds: [...protectedIds(c)],
   };
 }
 
@@ -481,4 +631,7 @@ module.exports = {
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
+  protectedIds, savePreset, applyPreset, deletePreset,
+  buyConsumable, equipConsumable, useConsumable,
+  talentState, learnTalent, resetTalents,
 };

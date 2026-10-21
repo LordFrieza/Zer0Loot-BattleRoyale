@@ -25,7 +25,9 @@ function render() {
   $('char-name').textContent = me.twitchDisplayName || me.username;
   window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
   const ci = c.cls && Rules.CLASS_INFO[c.cls];
-  $('class-badge').innerHTML = ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '<span class="muted">Sans classe</span>';
+  $('class-badge').innerHTML = c.spec
+    ? `<span style="color:${c.spec.color}">${c.spec.icon} ${esc(c.spec.spec)}</span> <span class="muted" style="font-size:12px">(${ci.label})</span>`
+    : ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '<span class="muted">Sans classe</span>';
   $('change-class').textContent = c.cls ? `🔄 Changer de classe (${Rules.CLASS_CHANGE_PRICE} 🪙)` : '🎭 Choisir ma classe';
   if (!c.cls && !classModalShown) { classModalShown = true; openClassModal(); }
   $('level').textContent = 'Niveau ' + c.level;
@@ -51,6 +53,11 @@ function render() {
   renderAchievements();
   renderAppearance();
   renderShop();
+  renderPotionSlot();
+  renderPotionShop();
+  renderPresets();
+  renderTalents();
+  if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
   renderBadges();
   $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
   $('sub-info').innerHTML = `💜 Chaque <b>abonnement</b> à la chaîne (sub, resub ou sub offert) rapporte <b>${Rules.SUB_REWARD_GOLD} golds</b>
@@ -61,6 +68,12 @@ function render() {
 function setMod(stat) {
   const pts = me.character.sets.points[stat];
   return pts ? `<div class="up" style="font-size:12px">+${pts} pts 🧩 panoplie</div>` : '';
+}
+
+// Points bonus de l'arbre de compétences sur une stat.
+function talentMod(stat) {
+  const pts = me.character.talentPoints[stat];
+  return pts ? `<div class="up" style="font-size:12px">+${pts} pts 🌳 arbre</div>` : '';
 }
 
 // Bonus / malus de la classe sur une stat (affiché à côté des bonus d'équipement).
@@ -88,7 +101,7 @@ function renderStats() {
       <td class="stat-name">${info.icon} ${info.label}</td>
       <td class="stat-desc help">${info.desc}</td>
       <td class="stat-pts">${c.stats[s]}</td>
-      <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}</td>
+      <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}${talentMod(s)}</td>
       <td class="stat-value">${Rules.describeDerived(s, c.derived)}</td>
       <td>${c.skillPoints > 0 ? `<button class="plus" data-stat="${s}" title="Ajouter un point">+</button>` : ''}</td>
     </tr>`;
@@ -159,24 +172,39 @@ function renderPager(pages, total) {
   });
 }
 
+// Objets d'une autre classe (armes et objets secondaires que la classe du joueur ne peut pas équiper).
+const otherClass = (item) => !!Rules.itemClass(item) && !Rules.canEquip(item, me.character.cls);
+let showOther = true;
+try { showOther = localStorage.getItem('zl_inv_show_other') !== '0'; } catch (e) { /* ignore */ }
+$('inv-show-other').checked = showOther;
+$('inv-show-other').onchange = (e) => {
+  showOther = e.target.checked;
+  try { localStorage.setItem('zl_inv_show_other', showOther ? '1' : '0'); } catch (err) { /* ignore */ }
+  if (!showOther && invFilter === 'other') invFilter = 'all';
+  invPage = 0;
+  renderInventory();
+};
+
 function renderInventory() {
   const inv = me.character.inventory;
-  const filters = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]));
+  // Avec la case décochée, les objets hors classe disparaissent de toutes les vues sauf du filtre « Hors classe ».
+  const visible = showOther ? inv : inv.filter((i) => !otherClass(i));
+  const filters = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]), [['other', '🚫 Hors classe']]);
   $('inv-filters').innerHTML = filters.map(([k, label]) => {
-    const n = k === 'all' ? inv.length : inv.filter((i) => i.slot === k).length;
-    return `<button class="${invFilter === k ? 'active' : ''}" data-f="${k}">${label} (${n})</button>`;
+    const n = k === 'all' ? visible.length : k === 'other' ? inv.filter(otherClass).length : visible.filter((i) => i.slot === k).length;
+    return `<button class="${invFilter === k ? 'active' : ''}" data-f="${k}" ${k === 'other' ? 'title="Seulement les objets des autres classes : pratique pour les recycler"' : ''}>${label} (${n})</button>`;
   }).join('');
   $('inv-filters').querySelectorAll('button').forEach((b) => {
     b.onclick = () => { invFilter = b.dataset.f; invPage = 0; renderInventory(); };
   });
   $('inv-count').textContent = inv.length + ' objet(s)';
-  const list = inv
+  const list = (invFilter === 'other' ? inv : visible)
     .map((item, i) => ({ item, i }))
-    .filter(({ item }) => invFilter === 'all' || item.slot === invFilter)
+    .filter(({ item }) => invFilter === 'all' || (invFilter === 'other' ? otherClass(item) : item.slot === invFilter))
     .sort((x, y) => Rules.RARITIES.indexOf(y.item.rarity) - Rules.RARITIES.indexOf(x.item.rarity) || y.i - x.i)
     .map(({ item }) => item);
-  // Retire de la sélection les objets qui ne sont plus dans l'inventaire.
-  const ids = new Set(inv.map((i) => i.id));
+  // Retire de la sélection les objets qui ne sont plus dans l'inventaire ou plus affichés (filtre, case « autres classes »).
+  const ids = new Set(list.map((i) => i.id));
   for (const id of [...selected]) if (!ids.has(id)) selected.delete(id);
 
   // Pagination : INV_PAGE_SIZE objets par page (les filtres et la sélection de recyclage portent sur toutes les pages).
@@ -192,7 +220,7 @@ function renderInventory() {
       const btn = ok
         ? `<button class="small" data-equip="${item.id}">Équiper</button>`
         : `<button class="small secondary" disabled title="Change de classe ou passe-le à la forge">🔒 ${Rules.CLASS_INFO[Rules.itemClass(item)].label} uniquement</button>`;
-      return itemHtml(item, `${ok ? compareHtml(item) : ''}<div class="actions">${btn}</div>`, me.character.cls);
+      return itemHtml(item, `${protectedTag(item)}${ok ? compareHtml(item) : ''}<div class="actions">${btn}</div>`, me.character.cls);
     }).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
@@ -200,8 +228,10 @@ function renderInventory() {
   });
   $('inventory').querySelectorAll('.item').forEach((el) => {
     el.classList.toggle('selected', recycleMode && selected.has(el.dataset.id));
+    el.classList.toggle('protected', isProtected(el.dataset.id));
     el.onclick = () => {
       if (!recycleMode) return;
+      if (isProtected(el.dataset.id)) { toast('🔐 Objet protégé par un preset : il ne peut pas être recyclé'); return; }
       if (selected.has(el.dataset.id)) selected.delete(el.dataset.id);
       else selected.add(el.dataset.id);
       el.classList.toggle('selected');
@@ -211,6 +241,334 @@ function renderInventory() {
   $('recycle-toggle').disabled = inv.length === 0 && !recycleMode;
   renderRecycleBar(list);
 }
+
+
+// ---------- Presets d'équipement ----------
+const isProtected = (id) => !!(me && me.character.protectedIds.includes(id));
+
+function protectedTag(item) {
+  const names = me.character.presets.filter((p) => Object.values(p.items).includes(item.id)).map((p) => esc(p.name));
+  return names.length ? `<div class="protected-tag" title="Protégé : ni recyclage, ni fusion">🔐 Preset : ${names.join(', ')}</div>` : '';
+}
+
+function renderPresets() {
+  const c = me.character;
+  $('preset-max').textContent = Rules.PRESET_MAX;
+  const equippedIds = Object.fromEntries(Rules.SLOTS.map((s) => [s, c.equipment[s] ? c.equipment[s].id : null]));
+  const list = c.presets.map((p) => {
+    const n = Object.values(p.items).filter(Boolean).length;
+    const current = Rules.SLOTS.every((s) => (p.items[s] || null) === equippedIds[s]);
+    return `<div class="preset ${current ? 'current' : ''}" data-id="${p.id}">
+      <span class="preset-name">${current ? '✅ ' : '💾 '}${esc(p.name)}</span><span class="muted">${n} objet${n > 1 ? 's' : ''}</span>
+      <button class="small" data-apply ${current ? 'disabled' : ''}>${current ? 'Équipé' : 'Équiper'}</button>
+      <button class="small secondary" data-update title="Remplacer ce preset par l'équipement actuel">⟳</button>
+      <button class="small secondary" data-del title="Supprimer ce preset (les objets ne sont plus protégés)">🗑</button>
+    </div>`;
+  }).join('');
+  const full = c.presets.length >= Rules.PRESET_MAX;
+  $('presets').innerHTML = `<div class="presets-head"><b>💾 Presets d'équipement</b>
+      <input id="preset-name" maxlength="${Rules.PRESET_NAME_MAX}" placeholder="${full ? 'Maximum atteint' : 'Nom du preset (ex. Boss, PvP…)'}" ${full ? 'disabled' : ''}>
+      <button class="small gold" id="preset-save" ${full ? 'disabled' : ''}>Sauvegarder l'équipement actuel</button></div>
+    <div class="preset-list">${list || '<span class="muted">Aucun preset : équipe tes objets puis sauvegarde-les ici. Ils seront protégés 🔐.</span>'}</div>`;
+  $('preset-save').onclick = async () => {
+    const r = await act('/api/preset/save', { name: $('preset-name').value }, 'equip');
+    if (r) toast(`💾 Preset « ${r.preset.name} » sauvegardé : ses objets sont protégés 🔐`);
+  };
+  $('presets').querySelectorAll('.preset').forEach((el) => {
+    const p = c.presets.find((x) => x.id === el.dataset.id);
+    el.querySelector('[data-apply]').onclick = async () => {
+      const r = await act('/api/preset/apply', { id: p.id }, 'equip');
+      if (r) toast(`✅ Preset « ${r.name} » équipé${r.missing ? ` (${r.missing} objet(s) introuvable(s))` : ''}${r.locked ? ` (${r.locked} objet(s) d'une autre classe)` : ''}`);
+    };
+    el.querySelector('[data-update]').onclick = async () => {
+      if (!confirm(`Remplacer « ${p.name} » par l'équipement actuel ?`)) return;
+      if (await act('/api/preset/save', { name: p.name, id: p.id }, 'equip')) toast(`💾 Preset « ${p.name} » mis à jour`);
+    };
+    el.querySelector('[data-del]').onclick = async () => {
+      if (!confirm(`Supprimer le preset « ${p.name} » ? Ses objets ne seront plus protégés.`)) return;
+      if (await act('/api/preset/delete', { id: p.id }, 'unequip')) toast(`🗑 Preset « ${p.name} » supprimé`);
+    };
+  });
+}
+
+// ---------- Potions ----------
+function potionCard(id, extra = '') {
+  const c = Rules.CONSUMABLES[id];
+  return `<div class="potion-card" style="--c:${c.color}">
+    <div class="potion-ico">${c.icon}</div>
+    <div class="potion-body"><b>${c.label}</b>
+      <div class="potion-trigger">⏱ ${Rules.CONSUMABLE_TRIGGERS[c.trigger]}</div>
+      <div class="muted">${c.desc}</div>${extra}</div>
+  </div>`;
+}
+
+function renderPotionSlot() {
+  const id = me.character.consumableSlot;
+  const c = id && Rules.CONSUMABLES[id];
+  const stock = Object.values(me.character.consumables).reduce((a, b) => a + b, 0);
+  $('potion-slot').classList.toggle('filled', !!c);
+  $('potion-slot').style.setProperty('--c', c ? c.color : 'var(--border)');
+  $('potion-slot').innerHTML = c
+    ? `<span class="potion-slot-ico">${c.icon}</span><span class="potion-slot-label">Prête</span>`
+    : `<span class="potion-slot-ico">＋</span><span class="potion-slot-label">Potion${stock ? ` (${stock})` : ''}</span>`;
+  $('potion-slot').title = c ? `${c.label} — ${c.desc}\nUtilisée à ta prochaine partie. Clique pour changer.` : 'Aucune potion pour la prochaine partie. Clique pour en choisir une.';
+}
+
+function openPotionModal() {
+  const ch = me.character;
+  const owned = Object.keys(Rules.CONSUMABLES).filter((id) => ch.consumables[id] > 0);
+  let html = '';
+  if (ch.consumableSlot) {
+    html += potionCard(ch.consumableSlot, `<div class="row" style="margin-top:6px"><b class="up">✅ Équipée</b><button class="small secondary" data-unequip>Retirer (retour au stock)</button></div>`);
+  }
+  html += owned.length
+    ? owned.map((id) => potionCard(id, `<div class="row" style="margin-top:6px"><span class="muted">En stock : <b>${ch.consumables[id]}</b></span><button class="small gold" data-use="${id}">Équiper</button></div>`)).join('')
+    : `<p class="muted">Tu n'as aucune potion en stock. Achète-en dans l'onglet <b>Boutique</b>.</p>`;
+  $('potion-pick').innerHTML = html;
+  $('potion-pick').querySelectorAll('[data-use]').forEach((b) => {
+    b.onclick = async () => {
+      if (await act('/api/consumable/equip', { id: b.dataset.use }, 'equip')) {
+        $('potion-modal').classList.remove('open');
+        toast(`${Rules.CONSUMABLES[b.dataset.use].icon} ${Rules.CONSUMABLES[b.dataset.use].label} prête pour ta prochaine partie !`);
+      }
+    };
+  });
+  const un = $('potion-pick').querySelector('[data-unequip]');
+  if (un) un.onclick = async () => { if (await act('/api/consumable/equip', { id: null }, 'unequip')) openPotionModal(); };
+  $('potion-modal').classList.add('open');
+}
+$('potion-slot').onclick = openPotionModal;
+$('potion-modal-close').onclick = () => $('potion-modal').classList.remove('open');
+$('potion-shop-link').onclick = () => { $('potion-modal').classList.remove('open'); showTab('boutique'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
+function renderPotionShop() {
+  const ch = me.character;
+  $('potion-grid').innerHTML = Object.entries(Rules.CONSUMABLES).map(([id, c]) => {
+    const have = (ch.consumables[id] || 0) + (ch.consumableSlot === id ? 1 : 0);
+    return potionCard(id, `<div class="row" style="margin-top:8px">
+      <span class="shop-price">${c.price} 🪙</span>
+      <span class="muted">${have ? `Tu en as <b>${have}</b>${ch.consumableSlot === id ? ' (1 équipée)' : ''}` : 'Aucune'}</span>
+      <span class="spacer"></span>
+      <button class="small gold" data-buy="${id}" data-n="1" ${ch.gold < c.price ? 'disabled' : ''}>Acheter</button>
+      <button class="small secondary" data-buy="${id}" data-n="5" ${ch.gold < c.price * 5 ? 'disabled' : ''}>×5</button></div>`);
+  }).join('');
+  $('potion-grid').querySelectorAll('[data-buy]').forEach((b) => {
+    b.onclick = async () => {
+      const r = await act('/api/consumable/buy', { id: b.dataset.buy, count: Number(b.dataset.n) }, 'buy');
+      if (r) toast(`${Rules.CONSUMABLES[b.dataset.buy].icon} ${r.count} × ${Rules.CONSUMABLES[b.dataset.buy].label} (−${r.price} 🪙). Équipe-la dans la case à côté de ton personnage !`, 5000);
+    };
+  });
+}
+
+// ---------- Arbre de compétences ----------
+const TREE = { w: 1180, h: 380, cx: 590, cy: 190, step: 80, gap: 96 };
+let talentSel = null;
+
+function talentPos(n) {
+  const dir = n.branch === 'left' ? -1 : 1;
+  const x = TREE.cx + dir * TREE.step * (n.tier + 1);
+  const y = n.tier === 2 || n.tier === 4 ? TREE.cy + (n.option - 1) * TREE.gap : TREE.cy;
+  return { x, y };
+}
+
+const statsText = (points) => Object.entries(points).map(([st, v]) => `+${v} ${Rules.STAT_INFO[st].label}`).join(', ');
+
+function talentInfo(cls, n) {
+  const b = Rules.TALENT_TREES[cls][n.branch];
+  if (n.type === 'ult') {
+    const U = Rules.ULTS[b.ult];
+    return { icon: U.icon, title: `Ultime : ${U.label}`, html: `<p>${U.desc}</p><p class="muted">Se lance tout seul quand ta <b>barre de stamina</b> est pleine. Avec la spécialisation <b>${esc(b.spec)}</b> : ${U.descPlus}</p>` };
+  }
+  if (n.type === 'spec') {
+    const U = Rules.ULTS[b.ult];
+    return { icon: b.icon, title: `Spécialisation : ${b.spec}`, html: `<p>Ta classe devient <b>${esc(b.spec)}</b> (${b.desc})</p><p><b>${U.icon} ${U.label} amélioré :</b> ${U.descPlus}</p>` };
+  }
+  return { icon: Rules.STAT_INFO[Object.keys(n.points)[0]].icon, title: statsText(n.points), html: '<p class="muted">Points de caractéristiques bonus, comme des points de compétence (ils s\'ajoutent à tes points).</p>' };
+}
+
+function talentState(c, n) {
+  if (c.talents.includes(n.id)) return 'owned';
+  const reason = Rules.talentBlocker(c.cls, c.talents, n.id, c.talentState.available);
+  if (!reason) return 'available';
+  if (/autre chemin|Chemin bloqué/.test(reason)) return 'blocked';
+  if (/Aucun point/.test(reason)) return 'next';
+  return 'future';
+}
+
+function tutoHtml() {
+  return `<ol class="tuto-steps">
+    <li><b>1 point d'arbre tous les ${Rules.TALENT_EVERY} niveaux</b> (niveaux 4, 7, 10, 13…), en plus de tes points de caractéristiques.</li>
+    <li>Ton arbre a <b>deux chemins</b>, un de chaque côté du rond central. Le premier rond de chaque chemin (🔴) débloque un <b>ultime</b>.
+      Dès que tu en prends un, <b>l'autre chemin se bloque</b>.</li>
+    <li>L'ultime se lance <b>tout seul en combat</b> quand ta <b>barre de stamina</b> (barre bleue sous ta vie) est pleine. Elle est
+      <b>très longue</b> à remplir, mais l'ultime est très puissant. La caractéristique <b>🔋 Stamina</b> la remplit plus vite.</li>
+    <li>Les ronds verts donnent des <b>points de caractéristiques bonus</b>. Aux carrefours, tu choisis <b>un rond sur trois</b> : les deux autres se bloquent.</li>
+    <li>Au bout du chemin, le carré bleu est la <b>spécialisation</b> : ta classe change de nom et ton ultime devient bien plus fort.</li>
+    <li>Envie de changer ? La <b>remise à zéro</b> (${Rules.TALENT_RESET_PRICE} 🪙) te rend tous tes points et débloque tous les chemins. Changer de classe remet aussi l'arbre à zéro (gratuitement).</li>
+  </ol>`;
+}
+
+function renderTalents() {
+  const c = me.character;
+  const st = c.talentState;
+  const unlockLevel = 1 + Rules.TALENT_EVERY;
+  const locked = c.level < unlockLevel || !c.cls;
+  $('talent-help').innerHTML = tutoHtml();
+  $('tab-arbre').classList.toggle('locked-tab', locked);
+  $('talent-sub').textContent = locked ? `Débloqué au niveau ${unlockLevel}` : `${st.available} point${st.available > 1 ? 's' : ''} à dépenser`;
+  $('talent-locked').innerHTML = locked
+    ? `<div class="talent-lock-box">🔒 <b>${c.cls ? `Disponible au niveau ${unlockLevel}` : 'Choisis d\'abord une classe'}</b>${c.cls ? ` — encore ${unlockLevel - c.level} niveau${unlockLevel - c.level > 1 ? 'x' : ''}.` : ''}
+       Tu gagneras alors ton premier point d'arbre, puis un tous les ${Rules.TALENT_EVERY} niveaux. Voici un aperçu de ton arbre :</div>`
+    : '';
+  $('talents-panel').classList.toggle('tree-locked', locked);
+  const cls = c.cls || 'guerrier';
+  const tree = Rules.TALENT_TREES[cls];
+  const nextLevel = unlockLevel + st.total * Rules.TALENT_EVERY;
+  const ult = c.ult && Rules.ULTS[c.ult.id];
+  $('talent-head').innerHTML = `
+    <div class="talent-points"><b>${st.available}</b> point${st.available > 1 ? 's' : ''} disponible${st.available > 1 ? 's' : ''}
+      <span class="muted">· ${st.spent} dépensé${st.spent > 1 ? 's' : ''} · prochain point au niveau ${nextLevel}</span></div>
+    <div class="talent-ult">${ult ? `${ult.icon} Ultime : <b style="color:${ult.color}">${ult.label}${c.ult.enhanced ? ' ★' : ''}</b> · barre pleine en <b>${String(c.derived.staminaTime).replace('.', ',')} s</b>` : '<span class="muted">Pas encore d\'ultime : prends le premier rond rouge d\'un chemin.</span>'}</div>
+    <button class="small danger" id="talent-reset" ${c.talents.length ? '' : 'disabled'}>↺ Remise à zéro (${Rules.TALENT_RESET_PRICE} 🪙)</button>
+    <div class="branch-cards">${['left', 'right'].map((b) => {
+      const br = tree[b];
+      const U = Rules.ULTS[br.ult];
+      const chosen = Rules.talentBranch(c.talents);
+      return `<div class="branch-card ${chosen && chosen !== b ? 'off' : ''}" style="--c:${br.color}">
+        <b>${b === 'left' ? '⬅' : ''} ${br.icon} ${esc(br.spec)} ${b === 'right' ? '➡' : ''}</b><span class="muted">${br.desc}</span>
+        <span>${U.icon} ${U.label}</span></div>`;
+    }).join('')}</div>`;
+  const resetBtn = $('talent-reset');
+  if (resetBtn) resetBtn.onclick = async () => {
+    if (!confirm(`Remettre ton arbre à zéro pour ${Rules.TALENT_RESET_PRICE} golds ? Tous tes points te sont rendus.`)) return;
+    const r = await act('/api/talent/reset', {}, 'reroll');
+    if (r) { talentSel = null; toast(`↺ Arbre remis à zéro : ${r.refunded} point(s) récupéré(s)`); }
+  };
+
+  // Liens et nœuds
+  const nodes = Rules.talentNodes(cls);
+  const byTier = (b, t) => nodes.filter((n) => n.branch === b && n.tier === t);
+  const owned = new Set(c.talents);
+  let lines = '';
+  for (const b of ['left', 'right']) {
+    const color = tree[b].color;
+    const link = (a, z, on) => { lines += `<line x1="${a.x}" y1="${a.y}" x2="${z.x}" y2="${z.y}" class="${on ? 'on' : ''}" style="--c:${color}"/>`; };
+    for (const n of byTier(b, 0)) link({ x: TREE.cx, y: TREE.cy }, talentPos(n), owned.has(n.id));
+    for (let t = 1; t < Rules.TALENT_TIERS.length; t++) {
+      for (const n of byTier(b, t)) for (const p of byTier(b, t - 1)) link(talentPos(p), talentPos(n), owned.has(n.id) && owned.has(p.id));
+    }
+  }
+  const nodeHtml = nodes.map((n) => {
+    const { x, y } = talentPos(n);
+    const state = talentState(c, n);
+    const info = talentInfo(cls, n);
+    const pts = n.type === 'stat' ? `<small>${Object.values(n.points).reduce((a, v) => a + v, 0)}</small>` : '';
+    return `<button class="tnode tnode-${n.type} ${state} ${talentSel === n.id ? 'sel' : ''}" data-id="${n.id}"
+      style="left:${x}px;top:${y}px;--c:${tree[n.branch].color}" title="${esc(info.title)}">${info.icon}${pts}</button>`;
+  }).join('');
+  $('talent-tree').style.width = TREE.w + 'px';
+  $('talent-tree').style.height = TREE.h + 'px';
+  $('talent-tree').innerHTML = `<svg width="${TREE.w}" height="${TREE.h}">${lines}</svg>
+    <div class="tnode tnode-start" style="left:${TREE.cx}px;top:${TREE.cy}px" title="Départ">${Rules.CLASS_INFO[cls].icon}</div>${nodeHtml}`;
+  $('talent-tree').querySelectorAll('.tnode[data-id]').forEach((el) => {
+    el.onclick = () => { talentSel = el.dataset.id; renderTalents(); };
+  });
+
+  // Détail du nœud sélectionné
+  const sel = nodes.find((n) => n.id === talentSel);
+  if (!sel) {
+    $('talent-detail').innerHTML = '<p class="muted">Clique sur un rond pour voir ce qu\'il apporte.</p>';
+  } else {
+    const info = talentInfo(cls, sel);
+    const state = talentState(c, sel);
+    const reason = Rules.talentBlocker(c.cls, c.talents, sel.id, st.available);
+    const action = locked ? '<span class="muted">🔒 Arbre pas encore débloqué.</span>'
+      : state === 'owned' ? '<b class="up">✅ Appris</b>'
+        : state === 'available' ? `<button class="gold" id="talent-learn">Apprendre (1 point)</button>`
+          : `<span class="muted">🔒 ${esc(reason)}</span>`;
+    $('talent-detail').innerHTML = `<div class="talent-detail-box" style="--c:${tree[sel.branch].color}">
+      <div class="talent-detail-title">${info.icon} <b>${esc(info.title)}</b></div>${info.html}<div class="row">${action}</div></div>`;
+    const learn = $('talent-learn');
+    if (learn) learn.onclick = async () => {
+      const r = await act('/api/talent/learn', { id: sel.id }, 'levelUp');
+      if (r) toast(r.spec ? `🎉 Spécialisation obtenue : tu es maintenant ${r.spec} !` : `✨ ${info.title} appris !`, 5000);
+    };
+  }
+
+  // Tutoriel en fenêtre, la première fois que l'arbre se débloque
+  const tutoKey = 'zl_tuto_talents_' + me.id;
+  let seen = true;
+  try { seen = localStorage.getItem(tutoKey) === '1'; } catch (e) { /* ignore */ }
+  if (!locked && !seen && !$('talent-tuto').classList.contains('open')) {
+    $('talent-tuto-body').innerHTML = `<p>Tu as atteint le niveau ${unlockLevel} : voici ton <b>premier point d'arbre de compétences</b> !</p>${tutoHtml()}
+      <p class="muted">Ces explications restent disponibles avec le bouton <b>?</b> de l'onglet 🌳 Arbre de compétences.</p>`;
+    $('talent-tuto').classList.add('open');
+  }
+}
+$('talent-tuto-ok').onclick = () => {
+  try { localStorage.setItem('zl_tuto_talents_' + me.id, '1'); } catch (e) { /* ignore */ }
+  $('talent-tuto').classList.remove('open');
+  showTab('arbre');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// ---------- Entraînement ----------
+// Mini-bus d'événements : l'arène d'entraînement reçoit ses images comme l'arène du stream reçoit les siennes.
+const trainingBus = { h: {}, on(ev, fn) { (this.h[ev] = this.h[ev] || []).push(fn); }, emit(ev, d) { (this.h[ev] || []).forEach((fn) => fn(d)); } };
+let trainingView = null;
+let trainingKind = 'bot';
+let trainingOpponents = null;
+
+function ensureTrainingView() {
+  if (trainingView) return;
+  trainingView = new ArenaView($('training-arena'), trainingBus);
+  trainingBus.emit('queue', { phase: 'idle', mode: 'br', training: true, participants: [], result: null });
+}
+
+async function loadTrainingOpponents() {
+  if (trainingOpponents) return;
+  try { trainingOpponents = await api('/api/training/opponents'); } catch (e) { trainingOpponents = []; }
+  renderTrainingOpponents();
+}
+
+function renderTrainingOpponents() {
+  const q = $('training-search').value.trim().toLowerCase();
+  const list = (trainingOpponents || []).filter((p) => !q || p.name.toLowerCase().includes(q));
+  $('training-opponent').innerHTML = list.length
+    ? list.map((p) => `<option value="${p.id}">${Rules.CLASS_INFO[p.cls].icon} ${esc(p.name)} — niv. ${p.level}</option>`).join('')
+    : '<option value="">Aucun joueur trouvé</option>';
+}
+
+function setupTraining() {
+  $('training-cls').innerHTML = Rules.CLASSES.map((cls) => `<option value="${cls}">${Rules.CLASS_INFO[cls].icon} ${Rules.CLASS_INFO[cls].label}</option>`).join('');
+  $('training-level').max = Rules.TRAINING.maxLevel;
+  $('training-kind').querySelectorAll('[data-kind]').forEach((b) => {
+    b.onclick = () => {
+      trainingKind = b.dataset.kind;
+      $('training-kind').querySelectorAll('[data-kind]').forEach((x) => x.classList.toggle('active', x === b));
+      $('training-bot').style.display = trainingKind === 'bot' ? '' : 'none';
+      $('training-player').style.display = trainingKind === 'player' ? '' : 'none';
+      if (trainingKind === 'player') loadTrainingOpponents();
+    };
+  });
+  $('training-search').oninput = renderTrainingOpponents;
+  $('training-start').onclick = async () => {
+    ensureTrainingView();
+    const body = trainingKind === 'bot'
+      ? { opponent: 'bot', cls: $('training-cls').value, level: Number($('training-level').value) }
+      : { opponent: 'player', id: $('training-opponent').value };
+    try {
+      const r = await api('/api/training/start', body);
+      $('training-status').textContent = `Duel contre ${r.opponent.name} (niv. ${r.opponent.level})…`;
+      $('training-stop').disabled = false;
+      $('training-arena').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (err) {
+      toast('⚠️ ' + err.message);
+    }
+  };
+  $('training-stop').onclick = () => api('/api/training/stop', {}).catch(() => {});
+}
+setupTraining();
 
 // ---------- Classes ----------
 let classModalShown = false;
@@ -246,7 +604,7 @@ function openClassModal() {
       const r = await act('/api/class', { cls }, 'victory');
       if (r) {
         $('class-modal').classList.remove('open');
-        toast(`${Rules.CLASS_INFO[cls].icon} Tu es maintenant ${Rules.CLASS_INFO[cls].label} !${r.unequipped ? ` (${r.unequipped} objet(s) retiré(s))` : ''}`, 5000);
+        toast(`${Rules.CLASS_INFO[cls].icon} Tu es maintenant ${Rules.CLASS_INFO[cls].label} !${r.unequipped ? ` (${r.unequipped} objet(s) retiré(s))` : ''}${r.talentsReset ? ` Ton arbre de compétences a été remis à zéro (${r.talentsReset} point(s) rendu(s)).` : ''}`, 6000);
       }
     };
   });
@@ -306,7 +664,7 @@ function renderForge() {
     .map(([k, label]) => `<button class="${fuseFilter === k ? 'active' : ''}" data-ff="${k}">${label}${k === 'all' ? '' : ` (${counts[k]})`}</button>`).join('');
   $('fuse-filters').querySelectorAll('[data-ff]').forEach((b) => { b.onclick = () => { fuseFilter = b.dataset.ff; renderForge(); }; });
   const pickable = inv
-    .filter((i) => !fuseSel.includes(i.id) && (fuseFilter === 'all' || i.rarity === fuseFilter))
+    .filter((i) => !fuseSel.includes(i.id) && !isProtected(i.id) && (fuseFilter === 'all' || i.rarity === fuseFilter))
     .sort((a, b) => Rules.RARITIES.indexOf(a.rarity) - Rules.RARITIES.indexOf(b.rarity));
   $('fuse-pick').innerHTML = pickable.length
     ? pickable.map((i) => {
@@ -447,7 +805,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'boutique', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'boutique', 'entrainement', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -474,6 +832,7 @@ function renderBadges() {
   };
   set('perso', c.skillPoints);
   set('inventaire', c.chests);
+  set('arbre', Math.max(0, c.talentState.available));
   set('succes', claim);
 }
 
@@ -696,7 +1055,7 @@ function renderRecycleBar(visible) {
     b.onclick = () => {
       const k = b.dataset.select;
       if (k === 'none') selected.clear();
-      else visible.filter((i) => k === 'all' || i.rarity === k).forEach((i) => selected.add(i.id));
+      else visible.filter((i) => (k === 'all' || i.rarity === k) && !isProtected(i.id)).forEach((i) => selected.add(i.id));
       renderInventory();
     };
   });
@@ -991,6 +1350,19 @@ const REWARD_SOUNDS = {
   boss: 'victory', dungeon: 'victory',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
+socket.on('trainingQueue', (q) => {
+  ensureTrainingView();
+  trainingBus.emit('queue', q);
+  const running = q.phase === 'battle';
+  $('training-stop').disabled = !running;
+  if (q.phase === 'ended' && q.result && q.result.winner) {
+    const won = q.result.winner.key === 'u' + me.id;
+    $('training-status').innerHTML = won ? '🏆 <b class="up">Victoire !</b> Relance quand tu veux.' : `💀 <b class="down">${esc(q.result.winner.name)} gagne.</b> Ajuste ton build et retente !`;
+  } else if (q.phase === 'idle') {
+    $('training-status').textContent = 'Duel arrêté.';
+  }
+});
+socket.on('trainingFrame', (f) => trainingBus.emit('frame', f));
 socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
 socket.on('bet', (r) => {
   lastBetResult = r;

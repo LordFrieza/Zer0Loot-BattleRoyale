@@ -8,6 +8,17 @@
   const FIGHTER_SCALE = 1.25;
   const WALL_H = 70; // hauteur du mur du fond dans le donjon
   const TORCHES = [210, 640, 1070];
+  /*
+   * Ambiances du donjon, une toutes les 5 salles (voir Rules.DUNGEON_THEMES) :
+   * cachots, crypte (flammes vertes, toiles), forges (lave), abysses (yeux dans le noir), néant.
+   */
+  const DUNGEON_PALETTES = [
+    { base: '#211d26', floor: [255, 8, 15], wall: [260, 10, 11], moss: 'rgba(90,140,70,.25)', bones: 0.35, glow: '255,170,60', flame: ['#fff3c0', '#ffa030', 'rgba(255,60,0,0)'], vignette: 0.72 },
+    { base: '#141a16', floor: [140, 9, 12], wall: [150, 10, 8], moss: 'rgba(110,190,90,.3)', bones: 0.6, glow: '90,255,120', flame: ['#e6ffd0', '#5cff7a', 'rgba(0,160,40,0)'], vignette: 0.8, extra: 'webs' },
+    { base: '#1f0e0a', floor: [12, 22, 11], wall: [8, 28, 8], moss: null, bones: 0.25, glow: '255,110,40', flame: ['#fff3c0', '#ff6a20', 'rgba(255,40,0,0)'], vignette: 0.74, extra: 'lava' },
+    { base: '#070b18', floor: [222, 28, 8], wall: [228, 30, 6], moss: null, bones: 0.3, glow: '80,150,255', flame: ['#e0f4ff', '#3fa0ff', 'rgba(0,60,255,0)'], vignette: 0.88, extra: 'eyes' },
+    { base: '#08040e', floor: [285, 26, 6], wall: [285, 30, 3], moss: null, bones: 0, glow: '200,80,255', flame: ['#ffe0ff', '#c040ff', 'rgba(120,0,255,0)'], vignette: 0.92, extra: 'void' },
+  ];
   const TROLL_SCALE = 1.35; // le Troll est dessiné plus grand que les combattants
   const TROLL_LIFT = 40; // décalage pour que ses pieds touchent le sol
 
@@ -71,11 +82,14 @@
       this.sparks = [];
       this.projectiles = []; // flèches et boules de feu
       this.blasts = []; // explosions du mage
+      this.beams = []; // flèches perforantes
+      this.pillars = []; // colonnes de lumière (Prière, Châtiment, Rempart)
+      this.slashes = []; // entailles (Exécution)
       this.announces = []; // « PREMIER KILL ! », « DOUBLE KILL ! »…
       this.lastShotSound = 0;
       this.last = performance.now();
       this.bg = this.makeBackground();
-      this.dungeonBg = this.makeDungeonBackground();
+      this.dungeonBgs = []; // une image de fond par ambiance, créée à la demande
       this.loadImages();
       this.lastHitSound = 0;
       socket.on('queue', (q) => this.onQueue(q));
@@ -125,13 +139,14 @@
     }
 
     // Salle de donjon : dallage de pierre, mur du fond avec torches, portes à gauche et à droite.
-    makeDungeonBackground() {
+    makeDungeonBackground(theme = 0) {
+      const P = DUNGEON_PALETTES[theme] || DUNGEON_PALETTES[0];
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
       const g = c.getContext('2d');
-      let seed = 11;
+      let seed = 11 + theme * 101;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      g.fillStyle = '#211d26';
+      g.fillStyle = P.base;
       g.fillRect(0, 0, W, H);
       // dalles irrégulières
       const rowH = 46;
@@ -139,8 +154,8 @@
         let x = row % 2 ? -30 : 0;
         while (x < W) {
           const w = 70 + rnd() * 50;
-          const l = 15 + rnd() * 8;
-          g.fillStyle = `hsl(${255 + rnd() * 20}, 8%, ${l}%)`;
+          const l = P.floor[2] + rnd() * 8;
+          g.fillStyle = `hsl(${P.floor[0] + rnd() * 20}, ${P.floor[1]}%, ${l}%)`;
           g.fillRect(x + 2, y + 2, w - 4, rowH - 4);
           g.fillStyle = 'rgba(255,255,255,.04)';
           g.fillRect(x + 2, y + 2, w - 4, 3);
@@ -148,8 +163,8 @@
             g.strokeStyle = 'rgba(0,0,0,.45)';
             g.beginPath(); g.moveTo(x + w * 0.3, y + 6); g.lineTo(x + w * 0.45, y + rowH * 0.5); g.lineTo(x + w * 0.38, y + rowH - 6); g.stroke();
           }
-          if (rnd() < 0.1) { // mousse
-            g.fillStyle = 'rgba(90,140,70,.25)';
+          if (P.moss && rnd() < 0.1) { // mousse
+            g.fillStyle = P.moss;
             g.beginPath(); g.ellipse(x + rnd() * w, y + rowH - 6, 12, 4, 0, 0, Math.PI * 2); g.fill();
           }
           x += w;
@@ -161,18 +176,70 @@
         const y = WALL_H + 30 + rnd() * (H - WALL_H - 60);
         g.save();
         g.translate(x, y); g.rotate(rnd() * Math.PI);
-        g.fillStyle = 'rgba(220,210,190,.35)';
+        g.fillStyle = `rgba(220,210,190,${P.bones})`;
         g.fillRect(-8, -1.5, 16, 3);
         g.beginPath(); g.arc(-8, 0, 2.6, 0, Math.PI * 2); g.arc(8, 0, 2.6, 0, Math.PI * 2); g.fill();
         g.restore();
       }
-      // mur du fond
-      g.fillStyle = '#16131b';
-      g.fillRect(0, 0, W, WALL_H);
-      for (let y = 0, row = 0; y < WALL_H; y += 22, row++) {
-        for (let x = row % 2 ? -24 : 0; x < W; x += 48) {
-          g.fillStyle = `hsl(260, 10%, ${11 + rnd() * 6}%)`;
-          g.fillRect(x + 1.5, y + 1.5, 45, 19);
+      // Forges : fissures de lave sur le sol
+      if (P.extra === 'lava') {
+        g.save();
+        g.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 14; i++) {
+          let x = rnd() * W;
+          let y = WALL_H + rnd() * (H - WALL_H);
+          g.strokeStyle = `rgba(255,${90 + rnd() * 60},20,.55)`;
+          g.lineWidth = 2 + rnd() * 2;
+          g.shadowColor = '#ff5a00';
+          g.shadowBlur = 12;
+          g.beginPath(); g.moveTo(x, y);
+          for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * 90; y += (rnd() - 0.5) * 50; g.lineTo(x, y); }
+          g.stroke();
+        }
+        g.restore();
+      }
+      // Néant : le sol se dissout dans le vide étoilé
+      if (P.extra === 'void') {
+        const fade = g.createRadialGradient(W / 2, H / 2 + 40, 150, W / 2, H / 2 + 40, W * 0.6);
+        fade.addColorStop(0, 'rgba(8,4,14,0)');
+        fade.addColorStop(1, 'rgba(8,4,14,.95)');
+        g.fillStyle = fade;
+        g.fillRect(0, 0, W, H);
+        for (let i = 0; i < 160; i++) {
+          g.fillStyle = `rgba(${200 + rnd() * 55},${150 + rnd() * 100},255,${0.2 + rnd() * 0.6})`;
+          g.fillRect(rnd() * W, rnd() * H, 1.5, 1.5);
+        }
+      }
+      // mur du fond (absent dans le Néant)
+      if (P.extra !== 'void') {
+        g.fillStyle = `hsl(${P.wall[0]}, ${P.wall[1]}%, ${P.wall[2] - 3}%)`;
+        g.fillRect(0, 0, W, WALL_H);
+        for (let y = 0, row = 0; y < WALL_H; y += 22, row++) {
+          for (let x = row % 2 ? -24 : 0; x < W; x += 48) {
+            g.fillStyle = `hsl(${P.wall[0]}, ${P.wall[1]}%, ${P.wall[2] + rnd() * 6}%)`;
+            g.fillRect(x + 1.5, y + 1.5, 45, 19);
+          }
+        }
+      }
+      // Crypte : toiles d'araignée dans les coins
+      if (P.extra === 'webs') {
+        g.strokeStyle = 'rgba(220,230,220,.22)';
+        g.lineWidth = 1;
+        for (const [cx, sx] of [[0, 1], [W, -1]]) {
+          for (let a = 0; a <= 5; a++) {
+            const ang = (a / 5) * Math.PI / 2;
+            g.beginPath(); g.moveTo(cx, WALL_H); g.lineTo(cx + sx * Math.cos(ang) * 150, WALL_H + Math.sin(ang) * 150); g.stroke();
+          }
+          for (let r = 30; r <= 150; r += 30) {
+            g.beginPath();
+            for (let a = 0; a <= 5; a++) {
+              const ang = (a / 5) * Math.PI / 2;
+              const px = cx + sx * Math.cos(ang) * r;
+              const py = WALL_H + Math.sin(ang) * r;
+              if (a) g.quadraticCurveTo(cx + sx * Math.cos(ang - 0.15) * r * 0.85, WALL_H + Math.sin(ang - 0.15) * r * 0.85, px, py); else g.moveTo(px, py);
+            }
+            g.stroke();
+          }
         }
       }
       const wallShade = g.createLinearGradient(0, WALL_H - 10, 0, WALL_H + 26);
@@ -181,7 +248,7 @@
       g.fillStyle = wallShade;
       g.fillRect(0, WALL_H - 10, W, 36);
       // supports de torches
-      for (const tx of TORCHES) {
+      for (const tx of P.extra === 'void' ? [] : TORCHES) {
         g.fillStyle = '#3b2a1c';
         g.fillRect(tx - 3, 34, 6, 22);
         g.fillStyle = '#6b6b78';
@@ -202,30 +269,48 @@
       // vignette
       const v = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.72);
       v.addColorStop(0, 'rgba(0,0,0,0)');
-      v.addColorStop(1, 'rgba(0,0,0,.72)');
+      v.addColorStop(1, `rgba(0,0,0,${P.vignette})`);
       g.fillStyle = v;
       g.fillRect(0, 0, W, H);
       return c;
     }
 
-    // Flammes des torches du donjon (animées).
-    drawTorches(t) {
+    dungeonBackground(theme) {
+      if (!this.dungeonBgs[theme]) this.dungeonBgs[theme] = this.makeDungeonBackground(theme);
+      return this.dungeonBgs[theme];
+    }
+
+    // Flammes des torches du donjon (animées), aux couleurs de l'ambiance ; yeux dans le noir aux Abysses.
+    drawTorches(t, theme = 0) {
+      const P = DUNGEON_PALETTES[theme] || DUNGEON_PALETTES[0];
       const ctx = this.ctx;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      TORCHES.forEach((tx, i) => {
+      if (P.extra === 'eyes') {
+        // paires d'yeux qui clignent sur les bords
+        [[70, 260], [1210, 330], [40, 560], [1240, 610], [620, 30], [980, 40]].forEach(([x, y], i) => {
+          const open = Math.sin(t / 900 + i * 1.7) > -0.85;
+          if (!open) return;
+          ctx.fillStyle = `rgba(${i % 2 ? '255,60,60' : '255,220,90'},${0.55 + Math.sin(t / 300 + i) * 0.2})`;
+          ctx.beginPath(); ctx.ellipse(x - 6, y, 3, 1.6, 0, 0, Math.PI * 2); ctx.ellipse(x + 6, y, 3, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+        });
+      }
+      const torches = P.extra === 'void'
+        ? [[180, 120 + Math.sin(t / 700) * 20], [1100, 140 + Math.cos(t / 800) * 20], [640, 60 + Math.sin(t / 600) * 10]] // flammes flottantes
+        : TORCHES.map((x) => [x, 26]);
+      torches.forEach(([tx, ty], i) => {
         const fl = 1 + Math.sin(t / 90 + i * 2) * 0.12 + Math.sin(t / 37 + i) * 0.06;
-        const glow = ctx.createRadialGradient(tx, 26, 4, tx, 40, 150 * fl);
-        glow.addColorStop(0, 'rgba(255,170,60,.35)');
-        glow.addColorStop(1, 'rgba(255,120,30,0)');
+        const glow = ctx.createRadialGradient(tx, ty, 4, tx, ty + 14, 150 * fl);
+        glow.addColorStop(0, `rgba(${P.glow},.35)`);
+        glow.addColorStop(1, `rgba(${P.glow},0)`);
         ctx.fillStyle = glow;
-        ctx.beginPath(); ctx.arc(tx, 40, 150 * fl, 0, Math.PI * 2); ctx.fill();
-        const flame = ctx.createRadialGradient(tx, 22, 1, tx, 22, 12 * fl);
-        flame.addColorStop(0, '#fff3c0');
-        flame.addColorStop(0.5, '#ffa030');
-        flame.addColorStop(1, 'rgba(255,60,0,0)');
+        ctx.beginPath(); ctx.arc(tx, ty + 14, 150 * fl, 0, Math.PI * 2); ctx.fill();
+        const flame = ctx.createRadialGradient(tx, ty - 4, 1, tx, ty - 4, 12 * fl);
+        flame.addColorStop(0, P.flame[0]);
+        flame.addColorStop(0.5, P.flame[1]);
+        flame.addColorStop(1, P.flame[2]);
         ctx.fillStyle = flame;
-        ctx.beginPath(); ctx.ellipse(tx, 20, 7 * fl, 13 * fl, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(tx, ty - 6, 7 * fl, 13 * fl, 0, 0, Math.PI * 2); ctx.fill();
       });
       ctx.restore();
     }
@@ -296,7 +381,7 @@
       if (f.phase === 'battle' && (!this.frame || this.frame.phase !== 'battle')) {
         this.disp.clear(); this.feed = []; this.floaters = []; this.sparks = [];
         // (les annonces ne sont pas effacées : celle de l'événement arrive juste avant cette image)
-        this.projectiles = []; this.blasts = [];
+        this.projectiles = []; this.blasts = []; this.beams = []; this.pillars = []; this.slashes = [];
         this.bossDeath = null; this.loot = []; this.bossHpShown = null;
       }
       if (f.phase === 'idle') { this.bossDeath = null; this.loot = []; }
@@ -378,6 +463,29 @@
           const next = (e.room + 1) % 5 === 0 && reward ? `Prochaine salle : palier de récompense !` : 'En route vers la salle suivante…';
           this.announces.push({ text: `SALLE ${e.room} TERMINÉE !`, sub: next, subSize: 24, color: '#3ddc5a', life: 2.4, age: 0 });
           if (window.Sound) Sound.play('roomClear');
+        } else if (e.t === 'ult' && from) {
+          this.onUlt(e, from, byKey);
+        } else if (e.t === 'potion' && to) {
+          const c = Rules.CONSUMABLES[e.id];
+          this.floaters.push({ x: to.x, y: to.y - 88, text: `${c.icon} ${c.label} !`, color: c.color, life: 1.8, size: 16 });
+          this.spark(to.x, to.y - 20, c.color, 18);
+          if (e.fx !== undefined) {
+            this.spark(e.fx, e.fy - 10, '#d38bff', 26);
+            const dd = this.disp.get(e.to);
+            if (dd) { dd.x = to.x; dd.y = to.y; } // pas de glissade : téléportation
+          }
+          if (window.Sound) Sound.play('potion', e.id);
+        } else if (e.t === 'zoneHit') {
+          if (e.kind === 'meteor') {
+            this.blasts.push({ x: e.x, y: e.y, r: e.r * 1.4, life: 0.5 });
+            this.spark(e.x, e.y, '#ff6b2a', 36);
+            this.shake = Math.max(this.shake || 0, 0.4);
+            if (window.Sound) Sound.play('meteor');
+          } else if (e.kind === 'arrow') {
+            this.spark(e.x, e.y, '#e8d7b0', 4);
+            const now = performance.now();
+            if (window.Sound && now - (this.lastArrowSound || 0) > 90) { this.lastArrowSound = now; Sound.play('hit'); }
+          }
         } else if (e.t === 'enrage') {
           this.announces.push({ text: 'LES MONSTRES S\'ÉNERVENT !', sub: 'Ils frappent de plus en plus fort…', subSize: 24, color: '#ff4d6d', life: 2.6, age: 0 });
         }
@@ -438,8 +546,9 @@
       if (this.shake > 0) ctx.translate((Math.random() - 0.5) * 14 * this.shake, (Math.random() - 0.5) * 14 * this.shake);
       const phase = (this.queue && this.queue.phase) || 'idle';
       const dungeon = phase !== 'idle' && this.queue && this.queue.mode === 'dungeon';
-      ctx.drawImage(dungeon ? this.dungeonBg : this.bg, 0, 0);
-      if (dungeon) this.drawTorches(t);
+      const theme = dungeon && this.frame && this.frame.dungeon ? Rules.dungeonTheme(this.frame.dungeon.room) : 0;
+      ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.bg, 0, 0);
+      if (dungeon) this.drawTorches(t, theme);
 
       if (phase === 'battle' || (phase === 'ended' && this.frame && this.frame.fighters.length)) {
         this.drawBattle(dt, t);
@@ -478,9 +587,10 @@
     drawIdle(t) {
       if (!this.drawLogo(W / 2, H / 2, 260, 1, 30 + Math.sin(t / 600) * 14)) this.title('ZER0LOOT', H / 2, 110, '#fff');
       this.ctx.globalAlpha = Math.random() < 0.015 ? 0.5 : 1; // petit grésillement de néon
-      this.title('BATTLE ROYALE', H / 2 + 185, 46, '#fff', '#ff3fd8');
+      const training = this.queue && this.queue.training;
+      this.title(training ? 'ENTRAÎNEMENT' : 'BATTLE ROYALE', H / 2 + 185, 46, '#fff', '#ff3fd8');
       this.ctx.globalAlpha = 0.6 + Math.sin(t / 500) * 0.3;
-      this.title('En attente du prochain combat…', H / 2 + 245, 24, '#cfc6ff', '#29e7ff');
+      this.title(training ? 'Choisis un adversaire et lance le duel' : 'En attente du prochain combat…', H / 2 + 245, 24, '#cfc6ff', '#29e7ff');
       this.ctx.globalAlpha = 1;
     }
 
@@ -591,6 +701,7 @@
         ctx.restore();
       }
 
+      this.drawZones(f.zones || [], t, 'ground');
       // Morts d'abord (au sol)
       for (const fi of order) {
         if (fi.alive) continue;
@@ -626,8 +737,11 @@
         } else if (isMonster(fi)) {
           drawMonster(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, t, seed: fi.x });
         } else {
-          drawFighter(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob });
+          this.drawFx(fi, d.x, d.y, t, 'under');
+          const invisible = fi.fx && fi.fx.includes('invisible');
+          drawFighter(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, alpha: invisible ? 0.28 + Math.sin(t / 120) * 0.08 : 1 });
         }
+        if (fi.fx) this.drawFx(fi, d.x, d.y, t, 'over');
 
         // Pseudo, titre et barre de vie (dessinés après le brouillard ; cachés dedans)
         if (!fi.hidden && fi.kind !== 'troll' && d.x > -20 && d.x < W + 20) labels.push({ fi, x: d.x, y: d.y });
@@ -652,6 +766,9 @@
         ctx.beginPath(); ctx.arc(-4, -7, 5, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
+
+      this.drawZones(f.zones || [], t, 'air');
+      this.drawBeams(dt);
 
       // Météores en chute
       for (const m of f.meteors || []) {
@@ -704,8 +821,20 @@
         ctx.fillRect(x - bw / 2 - 1, y - 49, bw + 2, 7);
         ctx.fillStyle = ratio > 0.5 ? '#3ddc5a' : ratio > 0.25 ? '#ffb000' : '#ff4d6d';
         ctx.fillRect(x - bw / 2, y - 48, bw * ratio, 5);
+        // Barre de stamina (ultime) juste sous la vie : brille quand elle est presque pleine.
+        if (fi.st !== undefined) {
+          ctx.fillStyle = 'rgba(0,0,0,.7)';
+          ctx.fillRect(x - bw / 2 - 1, y - 42, bw + 2, 4);
+          ctx.save();
+          if (fi.st > 0.9) { ctx.shadowColor = '#29e7ff'; ctx.shadowBlur = 8 + Math.sin(t / 80) * 4; }
+          ctx.fillStyle = fi.st > 0.9 ? '#9ff6ff' : '#29c7ff';
+          ctx.fillRect(x - bw / 2, y - 41.5, bw * fi.st, 2.5);
+          ctx.restore();
+        }
         const nameY = fi.title ? y - 67 : y - 58;
-        this.label(classIcon(fi.cls) + fi.name + (fi.kills ? ` ⚔${fi.kills}` : ''), x, nameY, 12, '#fff');
+        const icon = fi.spec ? fi.spec.icon + ' ' : classIcon(fi.cls);
+        const potion = fi.potion && Rules.CONSUMABLES[fi.potion] ? ' ' + Rules.CONSUMABLES[fi.potion].icon : '';
+        this.label(icon + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : ''), x, nameY, 12, '#fff');
         if (fi.title) this.label(fi.title, x, y - 56, 10, '#ffcf5a');
       }
 
@@ -763,7 +892,13 @@
         const k = 1 - b.life / 0.5;
         ctx.save();
         ctx.globalAlpha = Math.max(0, b.life * 2);
-        if (b.color === 'dust') {
+        if (b.color === 'ice') {
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, b.r * (0.4 + k * 0.7));
+          g.addColorStop(0, 'rgba(230,250,255,.9)'); g.addColorStop(0.5, 'rgba(120,200,255,.5)'); g.addColorStop(1, 'rgba(60,140,255,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.4 + k * 0.7), 0, Math.PI * 2); ctx.fill();
+        } else if (b.color === 'dust') {
           // Onde de choc / coup de massue : anneau de poussière au sol
           ctx.strokeStyle = 'rgba(214,190,150,.8)';
           ctx.lineWidth = 10 * (1 - k) + 2;
@@ -953,6 +1088,10 @@
         ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k);
         ctx.translate(-W / 2, -H / 2);
         this.title(`SALLE ${room}`, H / 2 - 20, 110, '#ffc21a', '#ff9a00');
+        const zone = Rules.DUNGEON_THEMES[Rules.dungeonTheme(room)];
+        const P = DUNGEON_PALETTES[Rules.dungeonTheme(room)];
+        const newZone = room > 1 && room % 5 === 1;
+        this.title(newZone ? `Nouvelle zone : ${zone.name}` : `— ${zone.name} —`, H / 2 - 105, newZone ? 30 : 22, `rgb(${P.glow})`, `rgb(${P.glow})`);
         const tier = Rules.dungeonReward(room);
         let sub = room === 1 ? 'Le raid commence !' : 'Les monstres sont plus nombreux et plus forts…';
         if (room % Rules.ELITE.every === 0) sub = '👑 Un chef garde cette salle !';
@@ -1042,6 +1181,228 @@
       }
     }
 
+    // ---------- Ultimes et potions ----------
+
+    // Un ultime est lancé : annonce au-dessus du lanceur + effet propre à l'ultime.
+    onUlt(e, from, byKey) {
+      const U = Rules.ULTS[e.id];
+      const dFrom = this.disp.get(e.from);
+      this.floaters.push({ x: from.x, y: from.y - 92, text: `${U.icon} ${U.label.toUpperCase()}${e.enhanced ? ' ★' : ''}`, color: U.color, life: 2, size: e.enhanced ? 22 : 19 });
+      this.spark(from.x, from.y - 20, U.color, 30);
+      if (window.Sound) Sound.play('ult', e.id);
+      const posOf = (key) => byKey.get(key);
+      switch (e.id) {
+        case 'perforante':
+          this.beams.push({ path: e.path, width: e.width, color: U.color, t: 0, dur: 0.75 });
+          break;
+        case 'blizzard':
+          this.blasts.push({ x: e.tx, y: e.ty, r: e.r, life: 0.7, color: 'ice' });
+          this.spark(e.tx, e.ty, '#bdf0ff', 50);
+          break;
+        case 'execution':
+          for (const h of e.hops || []) {
+            this.spark(h.fx, h.fy - 10, '#7a6a9a', 20);
+            this.spark(h.x, h.y - 10, '#ffd23f', 24);
+            this.slashes.push({ x: h.x, y: h.y - 14, t: 0, color: U.color });
+          }
+          if (dFrom && e.hops && e.hops.length) { const last = e.hops[e.hops.length - 1]; dFrom.x = last.x; dFrom.y = last.y; }
+          break;
+        case 'priere':
+        case 'chatiment':
+          for (const key of e.targets || []) {
+            const tg = posOf(key);
+            if (tg) this.pillars.push({ x: tg.x, y: tg.y, t: 0, color: e.id === 'priere' ? '#fff3a0' : '#ffe27a', holy: e.id === 'priere' });
+          }
+          break;
+        case 'rempart':
+          for (const key of e.targets || []) { const tg = posOf(key); if (tg) this.pillars.push({ x: tg.x, y: tg.y, t: 0, color: '#ffd23f', holy: true }); }
+          break;
+        case 'pluie':
+          this.floaters.push({ x: e.tx, y: e.ty - 20, text: '🏹🏹🏹', color: '#9be564', life: 1, size: 18 });
+          break;
+        default:
+      }
+    }
+
+    // Effets visibles d'un combattant (fx) : sous lui (auras) ou par-dessus (gel, bouclier, tourbillon).
+    drawFx(fi, x, y, t, layer) {
+      if (!fi.fx) return;
+      const ctx = this.ctx;
+      const has = (k) => fi.fx.includes(k);
+      ctx.save();
+      if (layer === 'under') {
+        const aura = (color, r) => {
+          const g = ctx.createRadialGradient(x, y + 4, 4, x, y + 4, r);
+          g.addColorStop(0, color);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.ellipse(x, y + 8, r, r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+        };
+        if (has('potion_berserker')) aura('rgba(255,60,40,.55)', 34);
+        if (has('potion_vie')) aura('rgba(80,255,120,.45)', 30);
+        if (has('potion_ronces')) aura('rgba(190,80,255,.45)', 30);
+        if (has('potion_celerite')) aura('rgba(255,230,60,.45)', 30);
+      } else {
+        if (has('rempart') || has('potion_defense') || has('priere')) {
+          ctx.strokeStyle = has('rempart') ? 'rgba(255,215,80,.85)' : 'rgba(95,211,255,.8)';
+          ctx.fillStyle = has('rempart') ? 'rgba(255,215,80,.12)' : 'rgba(95,211,255,.1)';
+          ctx.lineWidth = 2.5;
+          ctx.shadowColor = ctx.strokeStyle;
+          ctx.shadowBlur = 10;
+          ctx.beginPath(); ctx.arc(x, y - 10, 30 + Math.sin(t / 150) * 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+        if (has('tourbillon')) {
+          ctx.strokeStyle = 'rgba(255,90,90,.85)';
+          ctx.lineWidth = 4;
+          ctx.shadowColor = '#ff4d6d';
+          ctx.shadowBlur = 12;
+          const a0 = t / 70;
+          for (let i = 0; i < 3; i++) {
+            ctx.beginPath(); ctx.arc(x, y - 4, 46, a0 + i * 2.09, a0 + i * 2.09 + 1.1); ctx.stroke();
+          }
+        }
+        if (has('frozen')) {
+          ctx.fillStyle = 'rgba(170,230,255,.45)';
+          ctx.strokeStyle = 'rgba(230,250,255,.9)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x - 18, y + 20); ctx.lineTo(x - 22, y - 30); ctx.lineTo(x - 6, y - 46); ctx.lineTo(x + 14, y - 40); ctx.lineTo(x + 22, y - 10); ctx.lineTo(x + 18, y + 20);
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        if (has('potion_celerite')) {
+          ctx.strokeStyle = 'rgba(255,230,90,.7)';
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            const yy = y - 20 + i * 10;
+            const off = (t / 6 + i * 13) % 26;
+            ctx.beginPath(); ctx.moveTo(x - 26 - off, yy); ctx.lineTo(x - 16 - off, yy); ctx.stroke();
+          }
+        }
+        if (has('potion_vie')) {
+          ctx.fillStyle = 'rgba(120,255,150,.9)';
+          ctx.font = '700 12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('+', x + Math.sin(t / 200) * 14, y - 40 - ((t / 15) % 20));
+        }
+      }
+      ctx.restore();
+    }
+
+    // Zones des ultimes : nuage de poison (au sol), météores et flèches qui tombent (en l'air).
+    drawZones(zones, t, layer) {
+      const ctx = this.ctx;
+      for (const z of zones) {
+        ctx.save();
+        if (z.kind === 'poison' && layer === 'ground') {
+          for (let i = 0; i < 4; i++) {
+            const ox = Math.sin(t / 900 + i * 1.7) * z.r * 0.2;
+            const oy = Math.cos(t / 1100 + i * 2.3) * z.r * 0.15;
+            const g = ctx.createRadialGradient(z.x + ox, z.y + oy, 4, z.x + ox, z.y + oy, z.r * (0.7 + i * 0.1));
+            g.addColorStop(0, `rgba(120,220,80,${0.32 * Math.min(1, z.p * 3)})`);
+            g.addColorStop(1, 'rgba(80,160,40,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(z.x + ox, z.y + oy, z.r * (0.7 + i * 0.1), 0, Math.PI * 2); ctx.fill();
+          }
+        } else if (z.kind === 'meteor' && layer === 'air' && z.p >= 0) {
+          ctx.strokeStyle = `rgba(255,80,30,${0.5 + Math.sin(t / 60) * 0.3})`;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([8, 6]);
+          ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          const k2 = 1 - z.p;
+          const mx = z.x + 300 * k2;
+          const my = z.y - 560 * k2;
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(mx, my, 3, mx, my, 34);
+          g.addColorStop(0, '#fff3b0'); g.addColorStop(0.4, '#ff8a1f'); g.addColorStop(1, 'rgba(255,40,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(mx, my, 34, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,140,40,.5)';
+          ctx.lineWidth = 12;
+          ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 70, my - 130); ctx.stroke();
+        } else if (z.kind === 'arrow' && layer === 'air' && z.p >= 0) {
+          const ay = z.y - 260 * (1 - z.p);
+          ctx.strokeStyle = '#e8d7b0';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(z.x + 6, ay - 22); ctx.lineTo(z.x, ay); ctx.stroke();
+          ctx.fillStyle = '#d0d0e0';
+          ctx.beginPath(); ctx.moveTo(z.x, ay + 2); ctx.lineTo(z.x - 3, ay - 5); ctx.lineTo(z.x + 4, ay - 4); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,.25)';
+          ctx.beginPath(); ctx.ellipse(z.x, z.y, 6 * z.p, 2 * z.p, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Flèche perforante (trajectoire lumineuse), colonnes de lumière (Prière, Châtiment) et entailles (Exécution).
+    drawBeams(dt) {
+      const ctx = this.ctx;
+      for (const b of this.beams) {
+        b.t += dt;
+        const k = Math.min(1, b.t / (b.dur * 0.45));
+        const fade = Math.max(0, 1 - Math.max(0, b.t - b.dur * 0.45) / (b.dur * 0.55));
+        // longueur totale parcourue jusqu'ici
+        const lens = [];
+        let total = 0;
+        for (let i = 1; i < b.path.length; i++) { const l = Math.hypot(b.path[i].x - b.path[i - 1].x, b.path[i].y - b.path[i - 1].y); lens.push(l); total += l; }
+        let left = total * k;
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = b.color;
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = 20;
+        ctx.lineWidth = b.width;
+        ctx.beginPath();
+        ctx.moveTo(b.path[0].x, b.path[0].y - 12);
+        let head = b.path[0];
+        for (let i = 1; i < b.path.length && left > 0; i++) {
+          const seg = Math.min(left, lens[i - 1]);
+          const r = seg / lens[i - 1];
+          head = { x: b.path[i - 1].x + (b.path[i].x - b.path[i - 1].x) * r, y: b.path[i - 1].y + (b.path[i].y - b.path[i - 1].y) * r };
+          ctx.lineTo(head.x, head.y - 12);
+          left -= seg;
+        }
+        ctx.stroke();
+        ctx.lineWidth = b.width * 0.35;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+      }
+      this.beams = this.beams.filter((b) => b.t < b.dur);
+
+      for (const p of this.pillars) {
+        p.t += dt;
+        const a = Math.max(0, 1 - p.t / 0.9);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createLinearGradient(p.x, 0, p.x, p.y);
+        g.addColorStop(0, 'rgba(255,255,255,0)');
+        g.addColorStop(1, p.color);
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = g;
+        const wdt = p.holy ? 34 : 18;
+        ctx.fillRect(p.x - wdt / 2, 0, wdt, p.y + 10);
+        ctx.restore();
+      }
+      this.pillars = this.pillars.filter((p) => p.t < 0.9);
+
+      for (const s of this.slashes) {
+        s.t += dt;
+        const a = Math.max(0, 1 - s.t / 0.4);
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = '#fff';
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(s.x - 22, s.y - 18); ctx.lineTo(s.x + 22, s.y + 18); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(s.x + 22, s.y - 18); ctx.lineTo(s.x - 22, s.y + 18); ctx.stroke();
+        ctx.restore();
+      }
+      this.slashes = this.slashes.filter((s) => s.t < 0.4);
+    }
+
     // Cadre du HUD : fond sombre avec une barre néon à gauche.
     hudBox(x, y, w, h, color) {
       const ctx = this.ctx;
@@ -1087,10 +1448,12 @@
         ctx.translate(W / 2, 150);
         ctx.scale(s, s);
         ctx.translate(-W / 2, -150);
-        this.title('🏆 VICTOIRE ROYALE 🏆', 150, 56, '#ffc21a', '#ff9a00');
+        this.title(this.queue.training ? '🏋️ FIN DE L\'ENTRAÎNEMENT' : '🏆 VICTOIRE ROYALE 🏆', 150, 56, '#ffc21a', '#ff9a00');
         ctx.restore();
         this.title(r.winner.name, 240, 64, '#fff', '#ff3fd8');
-        this.title(`${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
+        this.title(this.queue.training
+          ? `remporte le duel en ${formatCountdown(r.duration * 1000)} · aucune récompense en entraînement`
+          : `${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
         const fighter = this.frame && this.frame.fighters.find((f) => f.key === r.winner.key);
         if (fighter) drawFighter(ctx, W / 2, 420, fighter, { scale: 3, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
       }
