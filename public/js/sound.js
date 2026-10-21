@@ -403,6 +403,18 @@
       timpani(ctx.currentTime + 0.7, 41, 0.6);
     },
 
+    // Ouverture du sondage du donjon : carillon à deux notes et roulement.
+    pollOpen() {
+      [[76, 0], [72, 0.35], [79, 0.7]].forEach(([n, d]) => tone(midi(n), 0.6, { type: 'triangle', vol: 0.12, delay: d }));
+      for (let i = 0; i < 10; i++) timpani(ctx.currentTime + 1.1 + i * 0.06, 52, 0.12);
+    },
+
+    // Fin du sondage : le bonus choisi par le chat est appliqué.
+    pollEnd() {
+      fanfare([[72, 0, 0.5], [76, 0.5, 0.5], [79, 1, 0.5], [84, 1.5, 2.5]], 0.09, 0.12);
+      [0, 4, 7, 12].forEach((st, i) => tone(midi(84 + st), 0.25, { type: 'triangle', vol: 0.05, delay: 0.5 + i * 0.06 }));
+    },
+
     // Ultime lancé : montée d'énergie puis accord puissant (couleur selon l'ultime).
     ult(id) {
       const c = ctx;

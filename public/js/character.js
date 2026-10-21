@@ -810,8 +810,11 @@ $('fuse-go').onclick = async () => {
     `À chaque salle, les monstres sont <b>plus nombreux</b> et plus forts (+${pct(D.hpPerRoom)} de vie et +${pct(D.damagePerRoom)} de dégâts par salle). Leur nombre dépend du nombre d'aventuriers au départ.`,
     `<b>Pas de réapparition</b> : un aventurier tombé est éliminé du raid. Entre deux salles, les survivants récupèrent <b>${pct(D.healBetweenRooms)}</b> de leur vie.`,
     `Après ${D.enrageAt} s dans la même salle, les monstres s'énervent (+${pct(D.enrageRate)} de dégâts par seconde).`,
+    `🗳️ <b>Sondage du chat</b> : après chaque salle de chef, le combat se met en pause ${Rules.DUNGEON_POLL.duration} s et <b>tout le monde</b> (même sans jouer) vote entre deux bonus tirés au hasard, avec leur commande dans le chat (ou <b>!1</b> / <b>!2</b>) ou avec les boutons de cette page. Une voix par personne, le dernier vote compte. Les bonus de combat durent jusqu'au sondage suivant.`,
     `Le raid s'arrête quand tout le monde est tombé. <b>Tout le monde</b> reçoit la récompense de la salle atteinte, plus ${Rules.REWARDS.participation.xp} XP de participation.`,
   ].map((x) => `<li>${x}</li>`).join('');
+  $('dungeon-boons').innerHTML = Object.values(Rules.DUNGEON_BOONS).map((b) =>
+    `<tr><td style="color:${b.color};white-space:nowrap"><b>${b.icon} ${b.label}</b></td><td><code>${b.cmd}</code></td><td>${b.desc}</td></tr>`).join('');
   const tiers = [5, 10, 15, 20, 25, 30].map((room) => Rules.dungeonReward(room));
   $('dungeon-rewards').innerHTML = '<tr><th>Salle atteinte</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
     + `<tr><td><b>Salles 1 à 4</b></td><td>+${Rules.REWARDS.participation.xp} XP <span class="muted">(participation)</span></td><td>—</td><td>—</td></tr>`
@@ -1252,6 +1255,7 @@ function renderQueue() {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const what = queue.mode === 'boss' ? '👹 Combat de Boss en cours !' : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
+    if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
     const r = queue.result;
     let text;
@@ -1265,9 +1269,36 @@ function renderQueue() {
   if (m && queue.phase !== 'ended') box.insertAdjacentHTML('afterbegin', `<span class="mode-tag" style="--c:${m.color};margin-right:8px" title="${esc(m.desc)}">${m.icon} ${m.label}</span>`);
 }
 
+// Sondage du donjon : tout le monde vote (une voix par personne, le dernier vote compte).
+let pollVote = null; // { room, choice } : mon vote dans le sondage en cours
+function renderPollVote(box) {
+  const poll = queue.poll;
+  const mine = pollVote && pollVote.room === poll.room ? pollVote.choice : null;
+  const total = poll.options.reduce((a, o) => a + o.votes, 0);
+  box.insertAdjacentHTML('beforeend', `<div class="poll-vote">
+    <div class="row"><b>🗳️ Sondage du donjon : le chat choisit un bonus pour les aventuriers !</b><span class="countdown" id="poll-cd"></span></div>
+    <div class="poll-options">${poll.options.map((o, i) => {
+      const b = Rules.DUNGEON_BOONS[o.id];
+      const share = total ? Math.round((o.votes / total) * 100) : 0;
+      return `<button class="poll-option ${mine === o.id ? 'mine' : ''}" data-vote="${o.id}" style="--c:${b.color}">
+        <span class="poll-ico">${b.icon}</span><span class="poll-body"><b>${b.label}</b><span>${b.desc}</span>
+        <small>Chat : <code>${b.cmd}</code> ou <code>!${i + 1}</code> · ${o.votes} voix (${share} %)${mine === o.id ? ' · ✅ ton vote' : ''}</small></span>
+        <span class="poll-bar" style="width:${share}%"></span></button>`;
+    }).join('')}</div></div>`);
+  box.querySelectorAll('[data-vote]').forEach((btn) => {
+    btn.onclick = async () => {
+      const r = await act('/api/poll/vote', { choice: btn.dataset.vote }, 'equip');
+      if (r) { pollVote = { room: poll.room, choice: r.choice }; renderQueue(); }
+    };
+  });
+  tickCountdown();
+}
+
 function tickCountdown() {
   const el = $('cd');
   if (el && queue && queue.queueEndsAt) el.textContent = formatCountdown(queue.queueEndsAt - Date.now());
+  const pc = $('poll-cd');
+  if (pc && queue && queue.poll) pc.textContent = formatCountdown(queue.poll.endsAt - Date.now());
 }
 setInterval(tickCountdown, 250);
 
@@ -1367,11 +1398,11 @@ const REWARD_LABELS = {
   win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
-  boss: '👹 LE TROLL EST VAINCU !', dungeon: '🏰 Récompense du raid :',
+  boss: '👹 LE TROLL EST VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
-  boss: 'victory', dungeon: 'victory',
+  boss: 'victory', dungeon: 'victory', poll: 'reward',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
 socket.on('trainingQueue', (q) => {

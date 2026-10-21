@@ -446,13 +446,82 @@
     { room: 15, xp: 300, gold: 300, chests: 1 },
     { room: 20, xp: 500, gold: 500, chests: 2 },
   ];
-  function dungeonReward(room) {
+  // `mult` : multiplicateur « Quitte ou double » voté pendant le raid (arrondi à l'unité).
+  function dungeonReward(room, mult = 1) {
     const tier = Math.floor(room / 5) * 5;
     if (tier < 5) return null;
     const known = DUNGEON_TIERS.find((t) => t.room === tier);
-    if (known) return { tier, xp: known.xp, gold: known.gold, chests: known.chests };
     const extra = (tier - 20) / 5;
-    return { tier, xp: 500 + 250 * extra, gold: 500 + 250 * extra, chests: 2 + extra };
+    const r = known || { xp: 500 + 250 * extra, gold: 500 + 250 * extra, chests: 2 + extra };
+    const m = (v) => Math.round(v * mult);
+    return { tier, xp: m(r.xp), gold: m(r.gold), chests: m(r.chests) };
+  }
+
+  /*
+   * Sondage du donjon : après chaque salle de chef (toutes les 5 salles), le combat se met en pause et le chat
+   * vote pendant 60 s entre deux bonus tirés au hasard (une commande par bonus, ou !1 / !2).
+   * Les bonus « jusqu'au prochain sondage » durent les 5 salles suivantes.
+   */
+  const DUNGEON_POLL = { every: ELITE.every, duration: 60, choices: 2 };
+  const DUNGEON_BOONS = {
+    vie: {
+      cmd: '!vie', icon: '❤️', label: 'Grand soin', color: '#ff4d6d',
+      desc: 'Les survivants regagnent 50 % de leur vie max.', effect: { heal: 0.5 },
+    },
+    or: {
+      cmd: '!or', icon: '💰', label: 'Pluie d\'or', color: '#ffc21a',
+      desc: 'Tous les participants gagnent tout de suite 10 golds par salle franchie (50 en salle 5, 100 en salle 10…).', effect: { goldPerRoom: 10 },
+    },
+    xp: {
+      cmd: '!xp', icon: '📚', label: 'Savoir ancien', color: '#29e7ff',
+      desc: 'Tous les participants gagnent tout de suite 20 XP par salle franchie (100 en salle 5…).', effect: { xpPerRoom: 20 },
+    },
+    coffre: {
+      cmd: '!coffre', icon: '🎁', label: 'Coffre au trésor', color: '#b83cff',
+      desc: 'Tous les participants reçoivent tout de suite 1 coffre.', effect: { chests: 1 },
+    },
+    stamina: {
+      cmd: '!stamina', icon: '🔋', label: 'Second souffle', color: '#ffe066',
+      desc: 'La barre de stamina des survivants se remplit de 40 % (ultime plus tôt).', effect: { stamina: 0.4 },
+    },
+    mort: {
+      cmd: '!mort', icon: '👼', label: 'Résurrection', color: '#fff2a8', needsDead: true,
+      desc: 'Un aventurier tombé, tiré au hasard, revient à la vie avec 50 % de sa vie.', effect: { revive: 0.5 },
+    },
+    rage: {
+      cmd: '!rage', icon: '😡', label: 'Fureur', color: '#ff3c28',
+      desc: 'Dégâts des survivants ×1,25 jusqu\'au prochain sondage.', effect: { damage: 1.25 },
+    },
+    armure: {
+      cmd: '!armure', icon: '🛡️', label: 'Peau de pierre', color: '#5fd3ff',
+      desc: 'Dégâts subis par les survivants ×0,75 jusqu\'au prochain sondage.', effect: { taken: 0.75 },
+    },
+    vitesse: {
+      cmd: '!vitesse', icon: '⚡', label: 'Adrénaline', color: '#ffe63c',
+      desc: 'Vitesse de déplacement et d\'attaque ×1,2 jusqu\'au prochain sondage.', effect: { speed: 1.2, attackSpeed: 1.2 },
+    },
+    vampire: {
+      cmd: '!vampire', icon: '🧛', label: 'Soif de sang', color: '#c0102c',
+      desc: '+15 % de vol de vie pour les survivants jusqu\'au prochain sondage.', effect: { lifesteal: 0.15 },
+    },
+    ronces: {
+      cmd: '!ronces', icon: '🌵', label: 'Armure de ronces', color: '#3ddc5a',
+      desc: 'Les survivants renvoient 25 % des dégâts reçus jusqu\'au prochain sondage.', effect: { thorns: 0.25 },
+    },
+    defi: {
+      cmd: '!defi', icon: '💀', label: 'Quitte ou double', color: '#9b59ff',
+      desc: 'Monstres +25 % de vie et de dégâts pour le reste du raid, mais la récompense finale est ×1,5.', effect: { monsters: 1.25, reward: 1.5 },
+    },
+    raccourci: {
+      cmd: '!raccourci', icon: '🗝️', label: 'Passage secret', color: '#c8a2ff',
+      desc: 'Le groupe saute 2 salles (elles comptent pour la récompense).', effect: { skip: 2 },
+    },
+  };
+  // Commande de chat → bonus ; !1 / !2 désignent le premier / second choix du sondage en cours.
+  function boonFromCommand(command, options) {
+    const n = /^!(\d)$/.exec(command);
+    if (n) return options[Number(n[1]) - 1] || null;
+    return options.find((id) => DUNGEON_BOONS[id].cmd === command) || null;
   }
 
 
@@ -904,7 +973,7 @@
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
     BATTLE_EVENTS, GAME_MODES, BOSS, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
-    dungeonRoom, dungeonMultipliers, dungeonReward, SUB_REWARD_GOLD, APPEARANCE,
+    dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,

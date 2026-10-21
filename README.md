@@ -189,6 +189,29 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Pas de réapparition ; les survivants récupèrent
     30 % de vie entre deux salles. Récompense pour tous selon la salle atteinte : 5 → 50 XP / 50 golds, 10 → 150 / 150,
     15 → 1 coffre + 300 / 300, 20 → 2 coffres + 500 / 500, puis +1 coffre et +250 toutes les 5 salles.
+  - **Sondage du chat (Donjon)** : après chaque salle de chef (5, 10, 15…), le raid se met en pause **60 s** et tout le
+    monde vote (participant ou simple spectateur) entre **2 bonus tirés au hasard** parmi 13, avec la commande du bonus
+    dans le chat (`!vie`, `!or`…) ou `!1` / `!2`, ou avec les boutons de la fiche personnage. Une voix par personne (le
+    dernier vote compte), égalité tirée au sort ; l'admin peut clore le sondage plus tôt. Grand cartel « LE CHAT
+    DÉCIDE ! » dans l'arène avec les voix en direct, annonce dans le chat Twitch si le compte bot est configuré.
+
+    | Bonus | Commande | Effet |
+    |---|---|---|
+    | ❤️ Grand soin | `!vie` | +50 % de vie max aux survivants |
+    | 💰 Pluie d'or | `!or` | 10 golds × salle à tous les participants, tout de suite (50 en salle 5) |
+    | 📚 Savoir ancien | `!xp` | 20 XP × salle à tous les participants, tout de suite (100 en salle 5) |
+    | 🎁 Coffre au trésor | `!coffre` | 1 coffre à tous les participants, tout de suite |
+    | 🔋 Second souffle | `!stamina` | +40 % de barre de stamina aux survivants |
+    | 👼 Résurrection | `!mort` | un aventurier tombé (au hasard) revient avec 50 % de vie ; proposé seulement s'il y a un mort |
+    | 😡 Fureur | `!rage` | dégâts ×1,25 jusqu'au prochain sondage |
+    | 🛡️ Peau de pierre | `!armure` | dégâts subis ×0,75 jusqu'au prochain sondage |
+    | ⚡ Adrénaline | `!vitesse` | vitesse et vitesse d'attaque ×1,2 jusqu'au prochain sondage |
+    | 🧛 Soif de sang | `!vampire` | +15 % de vol de vie jusqu'au prochain sondage |
+    | 🌵 Armure de ronces | `!ronces` | renvoie 25 % des dégâts reçus jusqu'au prochain sondage |
+    | 💀 Quitte ou double | `!defi` | monstres +25 % de vie et de dégâts pour le reste du raid, récompense finale ×1,5 (cumulable) |
+    | 🗝️ Passage secret | `!raccourci` | le groupe saute 2 salles, qui comptent pour la récompense |
+
+    Les golds, l'XP et le coffre vont à tous les participants humains, morts compris.
   - En coopération, les kills de monstres ne rapportent rien en eux-mêmes ; pas de paris ni d'événements de bataille.
     Difficulté réglée par simulation (des centaines de combats) dans `shared/rules.js` (`BOSS`, `DUNGEON`, `ELITE`).
     5 succès liés (Tueur de troll, Fléau des trolls, Explorateur, Aventurier, Seigneur du donjon).

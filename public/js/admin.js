@@ -66,11 +66,30 @@ function render() {
   renderModes();
   $('add-bots').disabled = q.phase !== 'queue';
   $('simulate').disabled = q.phase !== 'queue';
+  renderPoll();
   $('count').textContent = q.participants.length;
   $('plist').innerHTML = q.participants.length
     ? q.participants.map((p) => `<div><span>${p.bot ? '🤖' : '👤'} ${p.cls ? Rules.CLASS_INFO[p.cls].icon + ' ' : ''}${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>`).join('')
     : '<span class="muted">Personne pour l\'instant.</span>';
 }
+
+// Sondage du donjon en cours : décompte des voix et clôture anticipée.
+function renderPoll() {
+  const poll = queue && queue.poll;
+  $('poll-admin').style.display = poll ? '' : 'none';
+  if (!poll) return;
+  const total = poll.options.reduce((a, o) => a + o.votes, 0);
+  $('poll-admin').innerHTML = `<b>🗳️ Sondage de la salle ${poll.room}</b> <span class="countdown" id="poll-cd"></span>
+    ${poll.options.map((o) => { const b = Rules.DUNGEON_BOONS[o.id]; return `<div style="--c:${b.color}">${b.icon} <b>${b.label}</b> <span class="muted">${b.cmd}</span> — ${o.votes} voix${total ? ` (${Math.round((o.votes / total) * 100)} %)` : ''}</div>`; }).join('')}
+    <button class="secondary small" id="poll-close">Clore le sondage maintenant</button>`;
+  $('poll-close').onclick = () => run('/api/admin/poll/close');
+  tickPoll();
+}
+function tickPoll() {
+  const el = $('poll-cd');
+  if (el && queue && queue.poll) el.textContent = formatCountdown(queue.poll.endsAt - Date.now());
+}
+setInterval(tickPoll, 250);
 
 socket.on('queue', (q) => { queue = q; render(); });
 socket.on('twitch', (s) => {

@@ -5,10 +5,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { before, after } = test;
-const { Rules, db } = require('./helpers');
+const { Rules, db, game } = require('./helpers');
 
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
-const { server, io, battle } = require('../server/index');
+const { server, io, battle, chatCommand } = require('../server/index');
 
 let base = '';
 
@@ -412,6 +412,56 @@ test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle 
   const after = (await meOf(a)).character;
   assert.strictEqual(after.counters.dungeonBest, 11);
   assert.strictEqual(after.gold, 150, 'salle 2 : pas de récompense');
+  await admin.post('/api/admin/battle/reset');
+});
+
+test('[DNG-11, DNG-12, DNG-14] sondage du donjon : votes du chat et du site, clôture admin, golds pour tous', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const a = client();
+  const b = client();
+  const ida = (await register(a, 'pl_poll_a')).id;
+  const idb = (await register(b, 'pl_poll_b')).id;
+  await a.post('/api/twitch/link-dev', { login: 'poll_a' });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'dungeon' });
+  await a.post('/api/queue/join');
+  await b.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  // Hors sondage : refusé
+  assert.strictEqual((await a.post('/api/poll/vote', { choice: 'or' })).status, 400);
+  assert.strictEqual((await admin.post('/api/admin/poll/close')).status, 400);
+  battle.dungeon.room = 4;
+  battle.nextRoom();
+  battle.setStage('fight');
+  for (const m of battle.monsters) battle.kill(null, m);
+  battle.tick(0.05);
+  while (battle.dungeon.stage === 'clear') battle.tick(0.05);
+  assert.strictEqual(battle.dungeon.stage, 'poll');
+  battle.dungeon.poll.options = ['or', 'rage'];
+  // Le joueur B est mort : il touchera quand même les golds
+  battle.kill(null, battle.players.find((f) => f.userId === idb));
+
+  chatCommand('!rage', { login: 'Viewer1', displayName: 'Viewer1' });
+  chatCommand('!2', { login: 'viewer2', displayName: 'viewer2' });
+  chatCommand('!rage', { login: 'poll_a', displayName: 'poll_a' });
+  // Le site et le chat partagent la voix d'un compte lié : ce vote remplace son !rage
+  assert.deepStrictEqual((await a.post('/api/poll/vote', { choice: 'or' })).data, { ok: true, choice: 'or' });
+  assert.deepStrictEqual((await b.post('/api/poll/vote', { choice: 'or' })).data, { ok: true, choice: 'or' });
+  assert.strictEqual((await b.post('/api/poll/vote', { choice: 'vie' })).status, 400, 'pas dans ce sondage');
+  // Un compte banni ne vote pas ; un spectateur sans compte, si
+  const banned = game.getOrCreateTwitchUser('poll_banni', 'poll_banni');
+  await admin.post(`/api/admin/players/${banned.id}/ban`, { banned: true });
+  chatCommand('!rage', { login: 'poll_banni', displayName: 'poll_banni' });
+  chatCommand('!or', { login: 'viewer3', displayName: 'viewer3' });
+  battle.tick(2); // décompte renvoyé aux pages
+  const q = (await alice.get('/api/queue')).data;
+  assert.deepStrictEqual(q.poll.options, [{ id: 'or', votes: 3 }, { id: 'rage', votes: 2 }]);
+  assert.ok(q.poll.endsAt > Date.now());
+
+  assert.strictEqual((await admin.post('/api/admin/poll/close')).status, 200);
+  assert.strictEqual(battle.dungeon.stage, 'exit');
+  assert.strictEqual((await meOf(a)).character.gold, 50);
+  assert.strictEqual((await meOf(b)).character.gold, 50, 'mort, mais participant');
   await admin.post('/api/admin/battle/reset');
 });
 

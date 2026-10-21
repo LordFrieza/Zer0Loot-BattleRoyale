@@ -258,16 +258,20 @@ test('[DNG-1, DNG-2] donjon : nombre de monstres, types débloqués, multiplicat
   assert.strictEqual(chief.name, Rules.ELITES[chief.kind]);
 });
 
-test('[DNG-3, DNG-4, DNG-5, DNG-7] donjon : enchaînement des salles, pas de réapparition, fin du raid', () => {
+test('[DNG-3, DNG-4, DNG-5, DNG-7, DNG-10] donjon : enchaînement des salles, pas de réapparition, fin du raid', () => {
   const b = coop('dungeon', 6, (i) => ({ ...Rules.derive({}, {}, 'guerrier'), maxHp: 400 + i * 50, damage: 25 }));
   const stages = [];
   const deadForever = new Set();
   let hitsDuringEnter = 0;
   let clears = 0;
+  const polls = [];
+  b.on('pollEnd', (r) => polls.push(r.id));
   b.on('frame', (fr) => {
     if (fr.dungeon && stages[stages.length - 1] !== fr.dungeon.stage) stages.push(fr.dungeon.stage);
     if (fr.dungeon && fr.dungeon.stage === 'enter') hitsDuringEnter += fr.events.filter((e) => e.t === 'hit').length;
     clears += fr.events.filter((e) => e.t === 'roomClear').length;
+    // Seul le bonus « Résurrection » d'un sondage peut ramener un aventurier.
+    for (const e of fr.events) if (e.t === 'revive') deadForever.delete(e.to);
     for (const p of b.players) {
       if (!p.alive) deadForever.add(p.key);
       else assert.ok(!deadForever.has(p.key), 'un aventurier tombé ne revient pas');
@@ -276,10 +280,12 @@ test('[DNG-3, DNG-4, DNG-5, DNG-7] donjon : enchaînement des salles, pas de ré
   const res = run(b);
   assert.ok(res, 'le raid se termine');
   assert.ok(res.room >= 2, 'au moins une salle franchie');
-  assert.strictEqual(clears, res.room - 1);
+  // « Passage secret » fait sauter 2 salles sans combat.
+  const skipped = (b.dungeon.lastPoll && polls.filter((id) => id === 'raccourci').length * 2) || 0;
+  assert.strictEqual(clears + skipped, res.room - 1);
   assert.deepStrictEqual(stages.slice(0, 7), ['dark', 'enter', 'fight', 'clear', 'exit', 'dark', 'enter']);
   assert.strictEqual(hitsDuringEnter, 0, 'pas de combat pendant l\'entrée');
-  assert.deepStrictEqual(res.reward, Rules.dungeonReward(res.room));
+  assert.deepStrictEqual(res.reward, Rules.dungeonReward(res.room, b.dungeon.rewardMult));
   assert.ok(b.players.every((p) => !p.alive));
   assert.strictEqual(res.room, b.dungeon.room, 'salle où l\'équipe est tombée');
 });
@@ -353,4 +359,198 @@ test('[BET-1, MODE-5] paris : fermés dans les modes coopératifs', () => {
     clearTimeout(b.queueTimer);
     assert.strictEqual(new Bets(b).open(), open, mode);
   }
+});
+
+// ---------- Sondage du donjon ----------
+
+// Raid arrêté sur le sondage de la salle 5, avec les choix imposés.
+function atPoll(options, players = 3) {
+  const b = started(coop('dungeon', players));
+  b.dungeon.room = 4;
+  b.nextRoom();
+  b.setStage('fight');
+  for (const m of b.monsters) b.kill(null, m);
+  b.tick(0.05);
+  while (b.dungeon.stage === 'clear') b.tick(0.05);
+  if (options) b.dungeon.poll.options = options;
+  return b;
+}
+
+test('[DNG-10] sondage : après chaque salle de chef, 2 bonus distincts, 60 s, puis sortie', () => {
+  assert.strictEqual(Object.keys(Rules.DUNGEON_BOONS).length, 13);
+  assert.deepStrictEqual(Rules.DUNGEON_POLL, { every: 5, duration: 60, choices: 2 });
+  const cmds = Object.values(Rules.DUNGEON_BOONS).map((x) => x.cmd);
+  assert.strictEqual(new Set(cmds).size, cmds.length, 'une commande par bonus');
+
+  // Salle ordinaire : pas de sondage
+  const plain = started(coop('dungeon', 2));
+  plain.dungeon.room = 2;
+  plain.nextRoom();
+  plain.setStage('fight');
+  for (const m of plain.monsters) plain.kill(null, m);
+  plain.tick(0.05);
+  while (plain.dungeon.stage === 'clear') plain.tick(0.05);
+  assert.strictEqual(plain.dungeon.stage, 'exit');
+
+  const starts = [];
+  const b = started(coop('dungeon', 2));
+  b.on('pollStart', (p) => starts.push(p));
+  b.dungeon.room = 4;
+  b.nextRoom();
+  b.setStage('fight');
+  for (const m of b.monsters) b.kill(null, m);
+  b.tick(0.05);
+  while (b.dungeon.stage === 'clear') b.tick(0.05);
+  assert.strictEqual(b.dungeon.stage, 'poll');
+  assert.strictEqual(starts.length, 1);
+  const opts = b.dungeon.poll.options;
+  assert.strictEqual(opts.length, 2);
+  assert.notStrictEqual(opts[0], opts[1]);
+  assert.ok(b.publicQueue().poll, 'décompte dans la file');
+  assert.ok(b.frame().dungeon.poll.left > 59);
+  // Combat en pause : 59 s plus tard, toujours le sondage
+  for (let i = 0; i < 59 * 20; i++) b.tick(0.05);
+  assert.strictEqual(b.dungeon.stage, 'poll');
+  for (let i = 0; i < 25; i++) b.tick(0.05);
+  assert.strictEqual(b.dungeon.stage, 'exit', 'fin des 60 s');
+  assert.strictEqual(b.publicQueue().poll, null);
+
+  // « Résurrection » seulement si quelqu'un est mort
+  const seen = new Set();
+  for (let i = 0; i < 300; i++) { b.openPoll(); b.dungeon.poll.options.forEach((id) => seen.add(id)); }
+  assert.ok(!seen.has('mort'));
+  assert.strictEqual(seen.size, 12, 'tous les autres bonus sortent');
+  b.kill(null, b.players[0]);
+  let mort = false;
+  for (let i = 0; i < 300 && !mort; i++) { b.openPoll(); mort = b.dungeon.poll.options.includes('mort'); }
+  assert.ok(mort);
+});
+
+test('[DNG-11, DNG-12] sondage : une voix par personne, le dernier vote compte, égalité tirée au sort', () => {
+  const b = atPoll(['vie', 'rage']);
+  assert.strictEqual(b.vote('t:a', '!vie'), 'vie');
+  assert.strictEqual(b.vote('t:b', '!2'), 'rage');
+  assert.strictEqual(b.vote('u:7', 'rage'), 'rage', 'identifiant depuis le site');
+  assert.strictEqual(b.vote('t:c', '!RAGE'), 'rage', 'majuscules acceptées');
+  assert.strictEqual(b.vote('t:d', '!or'), null, 'bonus absent du sondage');
+  assert.strictEqual(b.vote('t:d', '!3'), null);
+  assert.strictEqual(b.vote('t:c', '!1'), 'vie', 'changement d\'avis');
+  assert.deepStrictEqual(b.pollCounts(), [{ id: 'vie', votes: 2 }, { id: 'rage', votes: 2 }]);
+  b.vote('t:e', '!vie');
+  const ends = [];
+  b.on('pollEnd', (r) => ends.push(r));
+  const r = b.closePoll();
+  assert.strictEqual(r.id, 'vie');
+  assert.deepStrictEqual(r.counts, [{ id: 'vie', votes: 3 }, { id: 'rage', votes: 2 }]);
+  assert.strictEqual(ends.length, 1);
+  assert.strictEqual(b.dungeon.stage, 'exit');
+  assert.strictEqual(b.closePoll(), null, 'plus de sondage');
+  assert.strictEqual(b.vote('t:f', '!vie'), null, 'vote refusé hors sondage');
+
+  // Égalité (ici aucun vote) : tirage au sort
+  const won = new Set();
+  for (let i = 0; i < 60; i++) won.add(atPoll(['armure', 'vitesse']).closePoll().id);
+  assert.deepStrictEqual([...won].sort(), ['armure', 'vitesse']);
+
+  // Hors donjon : aucun sondage
+  const br = started(coop('br', 2));
+  assert.strictEqual(br.vote('t:a', '!vie'), null);
+  assert.strictEqual(br.publicQueue().poll, null);
+});
+
+test('[DNG-13] sondage : effets immédiats (soin, stamina, résurrection, passage secret)', () => {
+  const choose = (id, players = 3) => {
+    const b = atPoll([id, id === 'vie' ? 'or' : 'vie'], players);
+    b.vote('t:x', id);
+    return b;
+  };
+  let b = choose('vie');
+  const [p] = b.players;
+  p.hp = p.maxHp * 0.2;
+  b.closePoll();
+  assert.ok(Math.abs(p.hp - p.maxHp * 0.7) < 1e-6);
+
+  b = choose('stamina');
+  b.players.forEach((f) => { f.ult = { id: 'rempart', enhanced: false }; f.stamina = 0.1; });
+  b.closePoll();
+  assert.ok(b.players.every((f) => Math.abs(f.stamina - 0.5) < 1e-9));
+
+  b = choose('mort');
+  const dead = b.players[1];
+  b.kill(null, dead);
+  const r = b.closePoll();
+  assert.strictEqual(dead.alive, true);
+  assert.strictEqual(dead.hp, Math.round(dead.maxHp * 0.5));
+  assert.deepStrictEqual(r.revived, { key: dead.key, name: dead.name });
+  assert.strictEqual(dead.diedRoom, null);
+  while (b.dungeon.stage !== 'enter') b.tick(0.05);
+  assert.ok(b.frame().fighters.some((f) => f.key === dead.key && f.alive), 'il repart avec le groupe');
+
+  b = choose('raccourci');
+  b.closePoll();
+  while (b.dungeon.stage !== 'enter') b.tick(0.05);
+  assert.strictEqual(b.dungeon.room, 8, 'salles 6 et 7 sautées');
+});
+
+test('[DNG-13] sondage : bonus jusqu\'au prochain sondage et « Quitte ou double »', () => {
+  const b = atPoll(['rage', 'armure']);
+  b.vote('t:x', '!rage');
+  b.closePoll();
+  const [p] = b.players;
+  assert.strictEqual(b.buffMult(p, 'damage'), 1.25);
+  assert.deepStrictEqual(b.frame().dungeon.boons, ['rage']);
+  assert.ok(!(b.frame().fighters[0].fx || []).includes('boon_rage'), 'affiché dans le bandeau, pas sur le perso');
+  // Il dure toutes les salles suivantes…
+  b.time += 500;
+  b.updateBuffs(p, 0.05);
+  assert.strictEqual(b.buffMult(p, 'damage'), 1.25);
+  // … jusqu'au sondage suivant
+  b.openPoll();
+  assert.strictEqual(b.buffMult(p, 'damage'), 1);
+  assert.deepStrictEqual(b.dungeon.boons, []);
+
+  const mods = { armure: ['taken', 0.75], vitesse: ['speed', 1.2], vampire: ['lifesteal', 0.15], ronces: ['thorns', 0.25] };
+  for (const [id, [key, v]] of Object.entries(mods)) {
+    const x = atPoll([id, 'vie']);
+    x.vote('t:x', id);
+    x.closePoll();
+    const f = x.players[0];
+    const got = key === 'lifesteal' || key === 'thorns' ? x.buffSum(f, key) : x.buffMult(f, key);
+    assert.ok(Math.abs(got - v) < 1e-9, id);
+    if (id === 'vitesse') assert.strictEqual(x.buffMult(f, 'attackSpeed'), 1.2);
+  }
+
+  // Quitte ou double : monstres plus forts pour le reste du raid, récompense ×1,5
+  const d = atPoll(['defi', 'vie'], 4);
+  d.vote('t:x', '!defi');
+  d.closePoll();
+  while (d.dungeon.stage !== 'enter') d.tick(0.05);
+  const room = d.dungeon.room;
+  const mult = Rules.dungeonMultipliers(room);
+  const normal = d.monsters.find((m) => !m.elite);
+  assert.strictEqual(normal.maxHp, Math.round(Rules.MONSTERS[normal.kind].hp * mult.hp * 1.25));
+  let res = null;
+  d.on('coopEnd', (r) => { res = r; });
+  d.dungeon.room = 12;
+  d.setStage('fight');
+  for (const f of d.players) d.kill(null, f);
+  d.tick(0.05);
+  assert.deepStrictEqual(res.reward, { tier: 10, xp: 225, gold: 225, chests: 0 });
+  assert.strictEqual(res.rewardMult, 1.5);
+  assert.deepStrictEqual(Rules.dungeonReward(15, 1.5), { tier: 15, xp: 450, gold: 450, chests: 2 });
+  assert.deepStrictEqual(Rules.dungeonReward(15, 1.5 * 1.5), { tier: 15, xp: 675, gold: 675, chests: 2 });
+});
+
+test('[DNG-14] sondage : golds, XP et coffre calculés selon la salle', () => {
+  const reward = (id, room) => {
+    const b = atPoll([id, 'vie']);
+    b.dungeon.room = room;
+    b.vote('t:x', id);
+    return b.closePoll().reward;
+  };
+  assert.deepStrictEqual(reward('or', 5), { xp: 0, gold: 50, chests: 0 });
+  assert.deepStrictEqual(reward('or', 10), { xp: 0, gold: 100, chests: 0 });
+  assert.deepStrictEqual(reward('xp', 5), { xp: 100, gold: 0, chests: 0 });
+  assert.deepStrictEqual(reward('coffre', 15), { xp: 0, gold: 0, chests: 1 });
+  assert.strictEqual(reward('rage', 5), undefined, 'pas de récompense pour un bonus de combat');
 });

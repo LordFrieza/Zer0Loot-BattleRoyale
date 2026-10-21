@@ -486,6 +486,18 @@
             const now = performance.now();
             if (window.Sound && now - (this.lastArrowSound || 0) > 90) { this.lastArrowSound = now; Sound.play('hit'); }
           }
+        } else if (e.t === 'poll') {
+          if (window.Sound) Sound.play('pollOpen');
+        } else if (e.t === 'pollEnd') {
+          const b = Rules.DUNGEON_BOONS[e.id];
+          this.announces = [];
+          this.announces.push({ text: `${b.icon} ${b.label.toUpperCase()} !`, sub: `Le chat a choisi : ${b.desc}`, subSize: 22, color: b.color, life: 3.6, age: 0 });
+          if (window.Sound) Sound.play('pollEnd');
+        } else if (e.t === 'revive' && to) {
+          const dd = this.disp.get(e.to);
+          if (dd) { dd.deathT = 0; dd.x = to.x; dd.y = to.y; }
+          this.floaters.push({ x: to.x, y: to.y - 88, text: '👼 De retour !', color: '#fff2a8', life: 2.4, size: 18 });
+          this.spark(to.x, to.y - 20, '#fff2a8', 30);
         } else if (e.t === 'enrage') {
           this.announces.push({ text: 'LES MONSTRES S\'ÉNERVENT !', sub: 'Ils frappent de plus en plus fort…', subSize: 24, color: '#ff4d6d', life: 2.6, age: 0 });
         }
@@ -945,6 +957,18 @@
         ctx.fillStyle = f.dungeon.enraged ? '#ff8fa3' : '#cfc6ff';
         ctx.fillText(`${clock}${f.dungeon.enraged ? '  😡 monstres énervés' : ''}`, 30, 95);
         hudY = 112;
+        // Bonus votés par le chat (jusqu'au prochain sondage) et « Quitte ou double »
+        const dg = f.dungeon;
+        const tags = (dg.boons || []).map((id) => ({ text: `${Rules.DUNGEON_BOONS[id].icon} ${Rules.DUNGEON_BOONS[id].label}`, color: Rules.DUNGEON_BOONS[id].color }));
+        const fmt = (m) => String(Math.round(m * 100) / 100).replace('.', ',');
+        if (dg.rewardMult > 1) tags.push({ text: `💀 Monstres ×${fmt(dg.monsterMult)} · butin ×${fmt(dg.rewardMult)}`, color: '#9b59ff' });
+        ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
+        for (const tg of tags) {
+          this.hudBox(16, hudY, Math.max(250, ctx.measureText(tg.text).width + 30), 30, tg.color);
+          ctx.fillStyle = tg.color;
+          ctx.fillText(tg.text, 30, hudY + 21);
+          hudY += 34;
+        }
       } else if (f.mode === 'boss') {
         this.hudBox(16, 16, 230, 64, '#7ccf6a');
         ctx.font = '900 24px "Segoe UI", system-ui, sans-serif';
@@ -997,6 +1021,114 @@
       if (this.queue && this.queue.phase === 'ended') this.announces = [];
       else this.drawAnnounces(dt);
       if (f.mode === 'dungeon' && f.dungeon && f.phase === 'battle') this.drawRoomTransition(f.dungeon);
+      if (f.mode === 'dungeon' && f.dungeon && f.dungeon.poll && f.phase === 'battle') this.drawPoll(f.dungeon.poll, t);
+    }
+
+    /*
+     * Sondage du donjon : deux grandes cartes avec la commande à taper dans le chat, le nombre de voix
+     * et une barre de temps (60 s).
+     */
+    drawPoll(poll, t) {
+      const ctx = this.ctx;
+      const left = Math.max(0, poll.left - (performance.now() - this.frameAt) / 1000);
+      const total = poll.options.reduce((a, o) => a + o.votes, 0);
+      const best = Math.max(...poll.options.map((o) => o.votes));
+      const box = (x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+      };
+      ctx.save();
+      ctx.fillStyle = 'rgba(4, 2, 16, .6)';
+      ctx.fillRect(0, 0, W, H);
+      const pulse = 1 + Math.sin(t / 260) * 0.025;
+      ctx.save();
+      ctx.translate(W / 2, 92); ctx.scale(pulse, pulse); ctx.translate(-W / 2, -92);
+      this.title('🗳️ LE CHAT DÉCIDE !', 92, 48, '#ffc21a', '#ff9a00');
+      ctx.restore();
+      this.title('Tapez la commande dans le chat Twitch (ou votez sur le site)', 140, 22, '#fff', '#b83cff');
+
+      const cw = 470;
+      const ch = 380;
+      const gap = 90;
+      const y0 = 175;
+      poll.options.forEach((o, i) => {
+        const b = Rules.DUNGEON_BOONS[o.id];
+        const x = W / 2 - cw - gap / 2 + i * (cw + gap);
+        const share = total ? o.votes / total : 0;
+        const lead = total > 0 && o.votes === best;
+        ctx.save();
+        box(x, y0, cw, ch, 18);
+        ctx.fillStyle = 'rgba(14, 10, 38, .94)';
+        ctx.fill();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = lead ? 5 : 2.5;
+        ctx.shadowColor = b.color;
+        ctx.shadowBlur = lead ? 26 + Math.sin(t / 180) * 8 : 12;
+        ctx.stroke();
+        ctx.restore();
+        ctx.textAlign = 'center';
+        ctx.font = '70px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+        ctx.fillText(b.icon, x + cw / 2, y0 + 92);
+        ctx.font = '900 28px Orbitron, "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = b.color;
+        ctx.fillText(b.label.toUpperCase(), x + cw / 2, y0 + 140);
+        // Description sur 3 lignes au plus
+        ctx.font = '600 18px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#e8e2ff';
+        const lines = [];
+        let line = '';
+        for (const word of b.desc.split(' ')) {
+          const next = line ? line + ' ' + word : word;
+          if (ctx.measureText(next).width > cw - 50 && line) { lines.push(line); line = word; } else line = next;
+        }
+        lines.push(line);
+        lines.slice(0, 3).forEach((l, k) => ctx.fillText(l, x + cw / 2, y0 + 176 + k * 24));
+        // Commande à taper
+        ctx.font = '900 30px Orbitron, "Segoe UI", system-ui, sans-serif';
+        const cmd = `${b.cmd}   ou   !${i + 1}`;
+        const cwid = ctx.measureText(cmd).width + 40;
+        box(x + cw / 2 - cwid / 2, y0 + 254, cwid, 48, 24);
+        ctx.fillStyle = b.color;
+        ctx.globalAlpha = 0.18;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(cmd, x + cw / 2, y0 + 290);
+        // Voix
+        box(x + 30, y0 + 322, cw - 60, 34, 10);
+        ctx.fillStyle = 'rgba(255,255,255,.08)';
+        ctx.fill();
+        if (share > 0) {
+          box(x + 30, y0 + 322, Math.max(20, (cw - 60) * share), 34, 10);
+          ctx.fillStyle = b.color;
+          ctx.fill();
+        }
+        ctx.font = '800 19px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 6;
+        ctx.fillText(`${o.votes} voix · ${Math.round(share * 100)} %`, x + cw / 2, y0 + 346);
+        ctx.shadowBlur = 0;
+      });
+      this.title('OU', y0 + ch / 2 + 14, 40, '#fff', '#ff3fd8');
+
+      // Temps restant
+      const bw = 700;
+      const bx = W / 2 - bw / 2;
+      const by = y0 + ch + 34;
+      const p = left / Rules.DUNGEON_POLL.duration;
+      box(bx, by, bw, 18, 9);
+      ctx.fillStyle = 'rgba(255,255,255,.1)';
+      ctx.fill();
+      box(bx, by, Math.max(18, bw * p), 18, 9);
+      ctx.fillStyle = left < 10 ? '#ff4d6d' : '#29e7ff';
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      this.title(`⏳ ${Math.ceil(left)} s · ${total} vote${total > 1 ? 's' : ''}`, by + 60, 26, left < 10 ? '#ff8fa3' : '#fff', '#29e7ff');
+      ctx.restore();
     }
 
     /*

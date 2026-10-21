@@ -429,16 +429,25 @@ function rewardSub(login, displayName, kind) {
   return user;
 }
 
-// Branché dans start() : l'import de ce module (tests) ne doit pas ouvrir de connexion au chat.
-function startTwitch() {
-  twitch.startChat((command, from) => {
-    if (command !== '!join') return;
+// Commandes du chat Twitch : !join, et les votes du sondage du donjon (!vie, !or… ou !1 / !2).
+function chatCommand(command, from) {
+  if (command === '!join') {
     const r = joinFromTwitch(from.login, from.displayName);
     if (r.ok) {
       const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
       twitch.say(`@${from.displayName} rejoint la bataille ⚔️${hint}`);
     }
-  }, (sub) => rewardSub(sub.login, sub.displayName, sub.kind));
+    return;
+  }
+  const login = String(from.login || '').toLowerCase();
+  const user = login && db.findUserByTwitch(login);
+  if (user && user.banned) return;
+  battle.vote('t:' + login, command);
+}
+
+// Branché dans start() : l'import de ce module (tests) ne doit pas ouvrir de connexion au chat.
+function startTwitch() {
+  twitch.startChat(chatCommand, (sub) => rewardSub(sub.login, sub.displayName, sub.kind));
 }
 
 app.post('/api/queue/join', requirePlayer, (req, res) => {
@@ -448,6 +457,14 @@ app.post('/api/queue/join', requirePlayer, (req, res) => {
 });
 
 app.get('/api/queue', (req, res) => res.json(queueView()));
+
+// Vote au sondage du donjon depuis le site : une seule voix par personne, partagée avec le chat si le Twitch est lié.
+app.post('/api/poll/vote', requirePlayer, (req, res) => {
+  const voter = req.user.twitchLogin ? 't:' + req.user.twitchLogin : 'u:' + req.user.id;
+  const id = battle.vote(voter, String(req.body.choice || ''));
+  if (!id) return res.status(400).json({ error: 'Aucun sondage en cours pour ce choix' });
+  res.json({ ok: true, choice: id });
+});
 
 // ---------- Paris ----------
 
@@ -526,6 +543,10 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
   const info = ev && Rules.BATTLE_EVENTS[ev];
   twitch.say(info ? `🔥 Que le combat commence ! Événement : ${info.icon} ${info.label} !` : '🔥 Que le combat commence !');
   return { event: ev, pendingEvent };
+}));
+
+app.post('/api/admin/poll/close', requireAdmin, action(() => {
+  if (!battle.closePoll()) throw new Error('Aucun sondage en cours');
 }));
 
 app.post('/api/admin/battle/reset', requireAdmin, action(() => battle.reset()));
@@ -624,6 +645,32 @@ battle.on('coopEnd', (result, fighters) => {
   }
   notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
+});
+
+// ---------- Sondage du donjon ----------
+
+const boonText = (id) => { const b = Rules.DUNGEON_BOONS[id]; return `${b.icon} ${b.label} (${b.cmd})`; };
+
+battle.on('pollStart', (poll) => {
+  twitch.say(`🗳️ Salle ${poll.room} franchie ! Votez dans le chat pendant ${Rules.DUNGEON_POLL.duration} s : ${poll.options.map((o) => boonText(o.id)).join(' OU ')}`);
+});
+
+// Bonus immédiat (golds, XP, coffre) : pour TOUS les participants humains, morts compris.
+battle.on('pollEnd', (result, fighters) => {
+  const b = Rules.DUNGEON_BOONS[result.id];
+  if (result.reward) {
+    for (const f of fighters) {
+      const user = f.userId && db.state.users[f.userId];
+      if (!user) continue;
+      const levels = game.grant(user.character, result.reward);
+      io.to('user:' + user.id).emit('reward', { type: 'poll', reward: result.reward, levels, boon: result.id });
+      pushMe(user);
+    }
+    db.save();
+  }
+  const total = result.counts.reduce((a, c) => a + c.votes, 0);
+  const extra = result.revived ? ` ${result.revived.name} revient à la vie !` : '';
+  twitch.say(`🗳️ Le chat a choisi ${b.icon} ${b.label} (${total} vote${total > 1 ? 's' : ''}) : ${b.desc}${extra}`);
 });
 
 // ---------- Classements ----------
@@ -849,4 +896,4 @@ function start(port = PORT) {
 
 if (require.main === module) start();
 
-module.exports = { app, server, io, battle, bets, start, trainings };
+module.exports = { app, server, io, battle, bets, start, trainings, chatCommand };

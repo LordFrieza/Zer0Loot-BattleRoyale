@@ -68,6 +68,7 @@ class Battle extends EventEmitter {
       // L'événement n'est révélé qu'au lancement de la bataille.
       event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
       result: this.result,
+      poll: this.publicPoll(),
     };
   }
 
@@ -164,7 +165,10 @@ class Battle extends EventEmitter {
       this.setupBoss();
     } else {
       // Écran noir « SALLE 1 », puis les aventuriers entrent par la gauche.
-      this.dungeon = { room: 0, stage: 'dark', stageT: Rules.DUNGEON.stages.dark * 0.35, fightStart: 0, enraged: false };
+      this.dungeon = {
+        room: 0, stage: 'dark', stageT: Rules.DUNGEON.stages.dark * 0.35, fightStart: 0, enraged: false,
+        poll: null, lastPoll: null, boons: [], monsterMult: 1, rewardMult: 1, // sondages (voir DUNGEON_POLL)
+      };
       this.monsters = [];
       for (const p of this.players) { p.x = -60; p.y = ARENA.h / 2; }
     }
@@ -318,7 +322,8 @@ class Battle extends EventEmitter {
       p.targetKey = null;
     });
     // Le nombre de monstres dépend du nombre d'aventuriers au départ du raid.
-    const mult = Rules.dungeonMultipliers(d.room);
+    const base = Rules.dungeonMultipliers(d.room);
+    const mult = { hp: base.hp * d.monsterMult, damage: base.damage * d.monsterMult }; // « Quitte ou double »
     const spec = Rules.dungeonRoom(d.room, this.players.length);
     const pos = spawnPositions(spec.length, { x0: 720, y0: DUNGEON_TOP + 40, x1: ARENA.w - 80, y1: ARENA.h - 50 });
     this.monsters = spec.map((s, i) => this.makeMonster(s.type, s.elite, mult, pos[i], i));
@@ -380,7 +385,18 @@ class Battle extends EventEmitter {
       if (d.stageT >= S.enter) this.setStage('fight');
     } else if (d.stage === 'clear') {
       for (const p of heroes) if (p.regen) this.heal(p, p.maxHp * p.regen * dt);
-      if (d.stageT >= S.clear) this.setStage('exit');
+      if (d.stageT >= S.clear) {
+        if (d.room % Rules.DUNGEON_POLL.every === 0) this.openPoll();
+        else this.setStage('exit');
+      }
+    } else if (d.stage === 'poll') {
+      // Les votes sont renvoyés aux pages au plus une fois par seconde.
+      if (d.poll.dirty && this.time >= d.poll.pushAt) {
+        d.poll.dirty = false;
+        d.poll.pushAt = this.time + 1;
+        this.changed();
+      }
+      if (d.stageT >= Rules.DUNGEON_POLL.duration) this.closePoll();
     } else if (d.stage === 'exit') {
       for (const p of heroes) {
         p.x += WALK_SPEED * dt;
@@ -397,6 +413,104 @@ class Battle extends EventEmitter {
     this.dungeon.stage = stage;
     this.dungeon.stageT = 0;
     if (stage === 'fight') this.dungeon.fightStart = this.time;
+  }
+
+  // ---------- Sondage du donjon (toutes les 5 salles) ----------
+
+  openPoll() {
+    const d = this.dungeon;
+    // Les bonus du sondage précédent s'arrêtent ici.
+    for (const p of this.players) p.buffs = p.buffs.filter((b) => !b.boon);
+    d.boons = [];
+    const someoneDead = this.players.some((p) => !p.alive);
+    const pool = Object.keys(Rules.DUNGEON_BOONS).filter((id) => !Rules.DUNGEON_BOONS[id].needsDead || someoneDead);
+    const options = [];
+    while (options.length < Rules.DUNGEON_POLL.choices && pool.length) options.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    d.poll = { room: d.room, options, votes: new Map(), dirty: false, pushAt: 0 };
+    this.setStage('poll');
+    this.events.push({ t: 'poll', options });
+    this.emit('pollStart', this.publicPoll());
+    this.changed();
+  }
+
+  pollCounts() {
+    const poll = this.dungeon.poll;
+    const votes = [...poll.votes.values()];
+    return poll.options.map((id) => ({ id, votes: votes.filter((v) => v === id).length }));
+  }
+
+  publicPoll() {
+    const d = this.dungeon;
+    if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
+    const left = Math.max(0, Rules.DUNGEON_POLL.duration - d.stageT);
+    return { room: d.room, options: this.pollCounts(), endsAt: Date.now() + Math.round(left * 1000) };
+  }
+
+  /*
+   * Vote d'un spectateur (une voix par personne, le dernier vote compte).
+   * `choice` : identifiant du bonus (site) ou commande de chat (!vie, !1…). Retourne le bonus choisi, ou null.
+   */
+  vote(voter, choice) {
+    const d = this.dungeon;
+    if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
+    const options = d.poll.options;
+    const id = options.includes(choice) ? choice : Rules.boonFromCommand(String(choice || '').toLowerCase(), options);
+    if (!id) return null;
+    d.poll.votes.set(voter, id);
+    d.poll.dirty = true;
+    return id;
+  }
+
+  // Fin du sondage (minuteur ou admin) : le bonus le plus voté l'emporte, égalité tirée au sort.
+  closePoll() {
+    const d = this.dungeon;
+    if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
+    const counts = this.pollCounts();
+    const top = Math.max(...counts.map((c) => c.votes));
+    const best = counts.filter((c) => c.votes === top);
+    const id = best[Math.floor(Math.random() * best.length)].id;
+    const outcome = this.applyBoon(id);
+    d.lastPoll = { room: d.room, id, counts, ...outcome };
+    d.poll = null;
+    this.events.push({ t: 'pollEnd', id, counts, revived: outcome.revived ? outcome.revived.key : undefined });
+    this.emit('pollEnd', d.lastPoll, this.players);
+    this.setStage('exit');
+    this.changed();
+    return d.lastPoll;
+  }
+
+  applyBoon(id) {
+    const d = this.dungeon;
+    const e = Rules.DUNGEON_BOONS[id].effect;
+    const heroes = this.players.filter((p) => p.alive);
+    const out = {};
+    if (e.heal) for (const p of heroes) this.heal(p, p.maxHp * e.heal);
+    if (e.stamina) for (const p of heroes) if (p.ult) p.stamina = Math.min(1, p.stamina + e.stamina);
+    if (e.revive) {
+      const dead = this.players.filter((p) => !p.alive);
+      const p = dead[Math.floor(Math.random() * dead.length)];
+      if (p) {
+        const near = heroes.length ? heroes.reduce((a, h) => a + h.x, 0) / heroes.length : 200;
+        Object.assign(p, {
+          alive: true, hp: Math.round(p.maxHp * e.revive), diedAt: null, diedRoom: null, buffs: [], stunUntil: 0, targetKey: null,
+          x: Math.max(40, near - 40), y: DUNGEON_TOP + 60 + Math.random() * (ARENA.h - DUNGEON_TOP - 120),
+        });
+        this.events.push({ t: 'revive', to: p.key });
+        out.revived = { key: p.key, name: p.name };
+      }
+    }
+    const mods = { damage: e.damage, taken: e.taken, speed: e.speed, attackSpeed: e.attackSpeed, lifesteal: e.lifesteal, thorns: e.thorns };
+    if (Object.values(mods).some((v) => v)) {
+      for (const p of heroes) this.addBuff(p, 'boon_' + id, Infinity, { boon: true, ...mods });
+      d.boons.push(id);
+    }
+    if (e.monsters) d.monsterMult *= e.monsters;
+    if (e.reward) d.rewardMult *= e.reward;
+    if (e.skip) d.room += e.skip;
+    // Récompenses immédiates, créditées par index.js à tous les participants humains (morts compris).
+    const reward = { xp: (e.xpPerRoom || 0) * d.room, gold: (e.goldPerRoom || 0) * d.room, chests: e.chests || 0 };
+    if (reward.xp || reward.gold || reward.chests) out.reward = reward;
+    return out;
   }
 
   // Au-delà de DUNGEON.enrageAt secondes dans une salle, les monstres frappent de plus en plus fort.
@@ -991,7 +1105,8 @@ class Battle extends EventEmitter {
       this.result.reward = victory ? { ...Rules.BOSS.reward } : null;
     } else {
       this.result.room = this.dungeon.room;
-      this.result.reward = Rules.dungeonReward(this.dungeon.room);
+      this.result.reward = Rules.dungeonReward(this.dungeon.room, this.dungeon.rewardMult);
+      if (this.dungeon.rewardMult !== 1) this.result.rewardMult = Math.round(this.dungeon.rewardMult * 1000) / 1000;
     }
     this.emit('coopEnd', this.result, this.players);
     this.changed();
@@ -1016,7 +1131,11 @@ class Battle extends EventEmitter {
         kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / Rules.BOSS.slam.warn) * 100) / 100,
         fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
       })),
-      dungeon: d ? { room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged } : null,
+      dungeon: d ? {
+        room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged,
+        poll: d.poll ? { options: this.pollCounts(), left: Math.max(0, Math.round((Rules.DUNGEON_POLL.duration - d.stageT) * 10) / 10) } : null,
+        boons: d.boons, monsterMult: d.monsterMult, rewardMult: d.rewardMult,
+      } : null,
       zones: (this.zones || []).map((z) => ({
         kind: z.kind, x: Math.round(z.x), y: Math.round(z.y), r: z.r,
         p: z.kind === 'poison' ? Math.round((z.t / z.life) * 100) / 100 : Math.round((1 - z.t / z.warn) * 100) / 100,
@@ -1056,7 +1175,7 @@ function fighter(fields) {
 // Effets visibles d'un combattant (pour l'affichage) : potions, ultimes, gel, invisibilité.
 function fxOf(f, time) {
   if (!f.alive) return undefined;
-  const fx = f.buffs.map((b) => b.kind);
+  const fx = f.buffs.filter((b) => !b.boon).map((b) => b.kind); // les bonus de sondage s'affichent dans le bandeau du donjon
   if (time < f.stunUntil) fx.push('frozen');
   if (f.buffs.some((b) => b.invisible)) fx.push('invisible');
   return fx.length ? fx : undefined;
