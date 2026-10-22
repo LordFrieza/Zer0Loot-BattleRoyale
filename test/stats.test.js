@@ -33,3 +33,25 @@ test('[STAT-4] nouvelles stats : valeurs de base, points, plafonds', () => {
   assert.deepStrictEqual([max.cooldown, max.lifesteal, max.precision, max.thorns], [0.4, 0.4, 0.8, 0.5]);
   for (const stat of Rules.STATS) assert.ok(Rules.describeDerived(stat, d));
 });
+
+test('[STAT-9] remise à zéro des caractéristiques : 50 golds par point, 500 au maximum', () => {
+  assert.deepStrictEqual([0, 1, 5, 10, 11, 40].map(Rules.statResetPrice), [0, 50, 250, 500, 500, 500]);
+  const c = game.newCharacter();
+  assert.throws(() => game.resetStats(c), /Aucun point/);
+  c.skillPoints = 5;
+  for (const st of ['force', 'force', 'vie', 'chance', 'stamina']) game.allocate(c, st);
+  assert.strictEqual(c.skillPoints, 0);
+  c.gold = 249;
+  assert.throws(() => game.resetStats(c), /250 golds/);
+  c.gold = 300;
+  assert.deepStrictEqual(game.resetStats(c), { price: 250, refunded: 5 });
+  assert.strictEqual(c.gold, 50);
+  assert.strictEqual(c.skillPoints, 5);
+  assert.ok(Rules.STATS.every((st) => c.stats[st] === 0));
+  // Au-delà de 10 points, le prix reste plafonné
+  c.skillPoints = 30;
+  for (let i = 0; i < 30; i++) game.allocate(c, 'vie');
+  c.gold = 600;
+  assert.deepStrictEqual(game.resetStats(c), { price: 500, refunded: 30 });
+  assert.strictEqual(c.gold, 100);
+});

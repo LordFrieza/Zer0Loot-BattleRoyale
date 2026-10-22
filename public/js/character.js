@@ -109,6 +109,19 @@ function renderStats() {
   $('stats').querySelectorAll('.plus').forEach((b) => {
     b.onclick = () => act('/api/stats/allocate', { stat: b.dataset.stat }, 'levelUp');
   });
+  // Remise à zéro : 50 golds par point placé, 500 golds au maximum
+  const placed = Rules.STATS.reduce((sum, s) => sum + (c.stats[s] || 0), 0);
+  const price = Rules.statResetPrice(placed);
+  $('stats-reset').innerHTML = placed
+    ? `<button class="secondary small" id="stats-reset-btn" ${c.gold < price ? 'disabled' : ''}>↺ Remettre mes ${placed} point(s) à zéro (${price} 🪙)</button>
+      <span class="muted">${Rules.STAT_RESET.perPoint} golds par point placé, ${Rules.STAT_RESET.max} golds maximum.</span>`
+    : '';
+  const btn = $('stats-reset-btn');
+  if (btn) btn.onclick = async () => {
+    if (!confirm(`Remettre tes ${placed} point(s) de caractéristiques à zéro pour ${price} golds ? Tu pourras les répartir à nouveau.`)) return;
+    const r = await act('/api/stats/reset', {}, 'reroll');
+    if (r) toast(`↺ ${r.refunded} point(s) de compétence à répartir à nouveau !`);
+  };
 }
 
 function renderEquipment() {

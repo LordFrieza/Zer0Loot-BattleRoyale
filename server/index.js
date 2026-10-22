@@ -269,6 +269,7 @@ app.post('/api/consumable/equip', requirePlayer, action((req) => {
 // ---------- Arbre de compétences ----------
 
 app.post('/api/talent/learn', requirePlayer, action((req) => game.learnTalent(req.user.character, String(req.body.id || ''))));
+app.post('/api/stats/reset', requirePlayer, action((req) => game.resetStats(req.user.character)));
 app.post('/api/talent/reset', requirePlayer, action((req) => game.resetTalents(req.user.character)));
 
 // ---------- Liaison Twitch ----------

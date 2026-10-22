@@ -599,6 +599,12 @@
   const TALENT_EVERY = 3; // 1 point de compétence d'arbre tous les 3 niveaux : niveaux 4, 7, 10, 13…
   const TALENT_RESET_PRICE = 250;
 
+  // Remise à zéro des points de caractéristiques : 50 golds par point placé, jamais plus de 500 golds.
+  const STAT_RESET = { perPoint: 50, max: 500 };
+  function statResetPrice(points) {
+    return Math.min(STAT_RESET.max, STAT_RESET.perPoint * points);
+  }
+
   function talentPoints(level) {
     return Math.max(0, Math.floor(((level || 1) - 1) / TALENT_EVERY));
   }
@@ -975,7 +981,7 @@
     BATTLE_EVENTS, GAME_MODES, BOSS, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
-    STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
+    STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
   };
 });

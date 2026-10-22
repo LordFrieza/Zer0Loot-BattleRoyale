@@ -598,12 +598,13 @@
       drawHelmet(ctx, RC[look.casque]);
     }
 
-    // arme de la classe (main avant) avec mouvement d'attaque
+    // arme de la classe (main avant) avec mouvement d'attaque : au repos, elle est tenue droite, un peu vers
+    // l'avant, pour ne jamais passer devant le visage (et les cosmétiques) ; le coup part vers l'avant.
     const swing = o.swing || 0;
     const ranged = weaponKind === 'arc' || weaponKind === 'baton';
     ctx.save();
     ctx.translate(11, 0);
-    ctx.rotate(ranged ? -0.25 + swing * 0.5 : -0.9 + swing * 2.1);
+    ctx.rotate(ranged ? 0.15 + swing * 0.4 : 0.25 + swing * 1.45);
     drawWeapon(ctx, weaponKind, look.arme ? RC[look.arme] : METAL);
     ctx.restore();
 

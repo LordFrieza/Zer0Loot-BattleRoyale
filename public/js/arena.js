@@ -1094,7 +1094,9 @@
         ctx.fill();
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#fff';
-        ctx.fillText(cmd, x + cw / 2, y0 + 290);
+        // Centrée dans la pastille d'après la hauteur réelle des lettres (Orbitron ou police de secours d'OBS).
+        const m = ctx.measureText(cmd);
+        ctx.fillText(cmd, x + cw / 2, y0 + 254 + 24 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
         // Voix
         box(x + 30, y0 + 322, cw - 60, 34, 10);
         ctx.fillStyle = 'rgba(255,255,255,.08)';

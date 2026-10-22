@@ -125,6 +125,19 @@ function allocate(character, stat) {
   character.stats[stat] += 1;
 }
 
+// Remise à zéro des caractéristiques : tous les points placés redeviennent des points à répartir.
+function resetStats(character) {
+  upgrade(character);
+  const placed = Rules.STATS.reduce((sum, st) => sum + (character.stats[st] || 0), 0);
+  if (!placed) throw new Error('Aucun point de caractéristique à remettre à zéro');
+  const price = Rules.statResetPrice(placed);
+  if (character.gold < price) throw new Error(`La remise à zéro coûte ${price} golds`);
+  character.gold -= price;
+  for (const st of Rules.STATS) character.stats[st] = 0;
+  character.skillPoints += placed;
+  return { price, refunded: placed };
+}
+
 // Générateur cryptographique : tirages équitables et imprévisibles.
 function random() {
   return crypto.randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
@@ -627,7 +640,7 @@ function publicCharacter(user) {
 }
 
 module.exports = {
-  newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, rollRarity, makeItem,
+  newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,

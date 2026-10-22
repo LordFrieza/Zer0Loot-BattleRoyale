@@ -222,6 +222,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **STAT-4** Formules : critique `min(0,60, (1 + 2·crit)×m/100 + plat classe)`, dégâts ×2 ; vitesse d'attaque `min(2,5, (1 + 0,05·va)×m)` et recharge `1 s × cooldownMult / vitesse` ; vol de vie `min(0,4, (2 + 1,5·vdv)×m/100)` ; précision `min(0,8, (5 + 3·pré)×m/100 + plat classe)` ; épines `min(0,5, (2 + 2·ép)×m/100)`.
 - **STAT-5** La chance effective doit valoir `points + bonus d'équipement` (les % d'équipement s'**ajoutent** en points pour la Chance et ne multiplient pas).
 - **STAT-6** Quand un joueur alloue un point, le serveur doit exiger un point de compétence disponible et une stat connue, puis retirer 1 point et ajouter 1 à la stat.
+- **STAT-9** Quand un joueur remet ses caractéristiques à zéro (`/api/stats/reset`), le serveur doit exiger au moins un point placé et `min(500, 50 × points placés)` golds, retirer ce prix, remettre toutes les stats à 0 et rendre les points placés en points de compétence (les bonus de panoplie et de l'arbre ne sont pas touchés).
 
 ## 10. Progression et récompenses
 
