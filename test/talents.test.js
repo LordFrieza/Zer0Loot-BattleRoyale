@@ -226,7 +226,7 @@ test('[ULT-8] Blizzard : gel des ennemis, réduit de moitié sur le Troll', () =
   b.tick(0.05);
   assert.strictEqual(foe.x, x);
   assert.ok(foe.cd <= 0);
-  foe.kind = 'troll';
+  foe.isBoss = true; // tous les boss (Troll, Dragon, Magicien)
   foe.stunUntil = 0;
   b.castUlt(a, foe);
   assert.ok(Math.abs(foe.stunUntil - (b.time + 1)) < 1e-9);

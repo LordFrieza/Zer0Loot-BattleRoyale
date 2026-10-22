@@ -174,7 +174,24 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **BOSS-4** Quand la vie du Troll passe sous 66 % puis sous 33 %, il doit passer une phase : dégâts ×1,3, vitesse d'attaque ×1,35, attaques spéciales 20 % plus fréquentes ; le serveur émet l'événement `bossPhase`.
 - **BOSS-5** À partir de 150 s de combat, le Troll doit entrer en rage finale : dégâts ×3.
 - **BOSS-6** Quand le Troll meurt, la partie doit se terminer par une victoire ; si tous les combattants sont morts ou que la durée dépasse 300 s, par une défaite.
-- **BOSS-7** Quand le Troll est vaincu, chaque combattant humain (mort ou vivant) doit gagner 3 coffres, 500 XP et 500 golds, et +1 au compteur `bossWins` ; en cas de défaite, seulement l'XP de participation.
+- **BOSS-7** Quand le boss est vaincu, chaque combattant humain (mort ou vivant) doit gagner 3 coffres, 500 XP et 500 golds, et +1 au compteur `bossWins` ; en cas de défaite, seulement l'XP de participation. Les règles BOSS-5 à BOSS-7 valent pour les trois boss.
+- **BOSS-8** L'admin doit choisir le boss (`troll`, `dragon` ou `sorcier`, Troll par défaut) en ouvrant une file en mode Combat de Boss (`boss` dans `/api/admin/queue/open`) ; un boss inconnu est refusé ; la file publique indique le boss (`queue.boss`).
+- **BOSS-9** Un boss en vol ne doit être ni ciblé ni blessé par un combattant dont la portée est inférieure à 150 px ; un boss parti (nid) ou protégé (bouclier) ne doit être ni ciblé ni blessé par personne, et ne subit pas les épines. Les ennemis ajoutés par le boss (œufs, dragonnets, cristaux, illusions) disparaissent quand il meurt.
+
+#### Pyrax le Dragon
+
+- **DRG-1** Le Dragon doit avoir `200 + 330 × n` PV, `6 + 0,2 × n` dégâts, un rayon de 60 px, 1,6 s de recharge et des coups de griffes qui touchent aussi à 40 % les combattants à moins de 70 px de la cible.
+- **DRG-2** Toutes les 7 s, il doit alterner le souffle de feu (cône de 340 px et ±0,5 rad vers le combattant le plus entouré, annoncé 1,4 s avant, dégâts ×1,2) et le coup de queue (cercle de 140 px autour de lui, annoncé 1,1 s avant, dégâts ×0,9).
+- **DRG-3** Quand sa vie passe sous 75 % puis sous 30 %, il doit s'envoler 12 s (BOSS-9), lancer une boule de feu (70 px, annoncée 1,2 s avant, dégâts ×0,8) sur un combattant au hasard toutes les 1,2 s (0,9 s au second envol), puis atterrir sur le plus gros groupe (160 px, annoncé 1,4 s avant, dégâts ×1,1).
+- **DRG-4** Quand sa vie passe sous 50 %, il doit quitter l'arène 16 s et laisser `clamp(⌈n / 4⌉, 3, 10)` œufs immobiles de `60 + 8 × n` PV ; à son retour (fin du délai, ou plus tôt si tous les œufs sont détruits), chaque œuf restant éclot en dragonnet (`80 + 6 × n` PV, 60 % des dégâts du Dragon), puis il revient en volant, furieux (dégâts ×1,25, attaques ×1,2) et atterrit comme en DRG-3.
+
+#### Malvorath le Magicien des ténèbres
+
+- **SRC-1** Le Magicien doit avoir `180 + 200 × n` PV, `7 + 0,2 × n` dégâts, attaquer à distance (portée 260 px, traits d'ombre, recharge 1,3 s) et se téléporter à un endroit au hasard de l'arène toutes les 15 s.
+- **SRC-2** Toutes les 8 s, il doit alterner la malédiction (`⌈vivants / 5⌉` combattants non maudits perdent 2,5 % de leur vie max par seconde pendant 8 s, par demi-seconde) et les zones d'ombre (`min(4, 2 + ⌊vivants / 10⌋)` cercles de 75 px sous des combattants au hasard, annoncés 1,5 s avant, dégâts ×0,9).
+- **SRC-3** Un combattant maudit qui se trouve à moins de 120 px d'un Prêtre vivant (lui compris) doit être purifié aussitôt (événement `purify`).
+- **SRC-4** Quand sa vie passe sous 70 % puis sous 20 %, il doit se téléporter au centre et se protéger d'un bouclier (BOSS-9) tant que 4 cristaux immobiles (`60 + 10 × n` PV) tiennent ; chaque cristal debout lui rend 0,15 % de sa vie max par seconde.
+- **SRC-5** Quand sa vie passe sous 45 %, il doit se dédoubler : 3 illusions identiques (5 % de sa vie max chacune, 50 % de ses dégâts, mêmes attaques) apparaissent et chacun (lui compris) se téléporte à un endroit différent.
 
 ### 7.9 Raid de Donjon
 
@@ -285,7 +302,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **ULT-5** Flèche perforante : 300 % des dégâts à chaque ennemi sur la trajectoire (de l'archer vers la cible jusqu'au bord, largeur 24 px) ; améliorée : 400 %, largeur 38 px, 2 rebonds sur les bords.
 - **ULT-6** Pluie de flèches : 14 flèches en 2 s dans un rayon de 150 px autour de la cible, 60 % des dégâts par flèche (rayon d'impact 40 px) ; améliorée : 28 flèches en 2,5 s sur 190 px.
 - **ULT-7** Météore : impact après 1 s sur le plus gros groupe d'ennemis, 350 % des dégâts dans 110 px ; amélioré : 3 météores sur 3 groupes différents, 120 px.
-- **ULT-8** Blizzard : 100 % des dégâts et gel de 2 s des ennemis à moins de 150 px de la cible ; amélioré : 150 %, 3,5 s, 210 px. Un combattant gelé ne bouge pas et n'attaque pas ; le gel est réduit de moitié sur le Troll.
+- **ULT-8** Blizzard : 100 % des dégâts et gel de 2 s des ennemis à moins de 150 px de la cible ; amélioré : 150 %, 3,5 s, 210 px. Un combattant gelé ne bouge pas et n'attaque pas ; le gel est réduit de moitié sur les boss.
 - **ULT-9** Exécution : téléportation derrière l'ennemi au plus faible pourcentage de vie et coup à 350 % ; améliorée : enchaîne sur 3 ennemis.
 - **ULT-10** Nuage toxique : zone de 120 px pendant 5 s infligeant 120 % des dégâts par seconde (par tranche de 0,5 s) aux ennemis dedans ; amélioré : 8 s, 170 px, et le nuage suit l'assassin.
 - **ULT-11** Prière : soigne 40 % de sa vie max et 30 % aux alliés à moins de 220 px ; améliorée : 40 % à tous les alliés et dégâts subis ×0,7 pendant 4 s.
@@ -366,7 +383,7 @@ Ces exigences se vérifient dans un navigateur (skill `smoke-arena`) : elles son
 - **UI-2** `/character.html` doit proposer les onglets Personnage, Inventaire, Boutique, Succès, Classements et Règles, ainsi que l'inscription à la file et les paris. (vérification manuelle)
 - **UI-3** `/admin.html` doit afficher l'arène, les contrôles de file, les événements, les inscrits, les outils de test, la liste des joueurs et les classements. (vérification manuelle)
 - **UI-4** `/arena.html` doit afficher uniquement l'arène en plein écran pour une source navigateur OBS (1280×720 ou 1920×1080), avec annonces de séries et sons. (vérification manuelle)
-- **UI-6** Pour les modes coopératifs, l'arène doit afficher le mode sur l'écran de file, la grosse barre de vie du Troll avec ses coches à 66 % et 33 %, les zones d'attaque spéciale au sol, l'explosion du Troll suivie d'une pluie de coffres et de golds, la salle de donjon (dallage, torches) avec fondu au noir et grand « SALLE X », et un écran de fin commun (récompense, meilleurs dégâts) ; la page admin propose le choix du mode et l'onglet Règles explique les deux modes et leurs récompenses. (vérification manuelle)
+- **UI-6** Pour les modes coopératifs, l'arène doit afficher le mode sur l'écran de file, la grosse barre de vie du Troll avec ses coches à 66 % et 33 %, les zones d'attaque spéciale au sol, l'explosion du Troll suivie d'une pluie de coffres et de golds, la salle de donjon (dallage, torches) avec fondu au noir et grand « SALLE X », et un écran de fin commun (récompense, meilleurs dégâts) ; la page admin propose le choix du mode (et du boss) et l'onglet Règles explique les modes, les trois boss et leurs récompenses ; le Dragon en vol plane au-dessus de son ombre, le Magicien protégé est enfermé dans une bulle reliée à ses cristaux, l'état du boss (en vol, au nid, bouclier) s'affiche sous sa barre de vie. (vérification manuelle)
 - **UI-7** Pendant une partie, l'arène doit jouer en boucle la musique du mode (Battle Royale : « Not dead YET! », Boss : BOSSFIGHT « Milky Ways », Donjon : Mattashi « The Final Battle »), avec fondu à l'arrêt ; les pages perso et admin doivent proposer deux curseurs de volume mémorisés, « Sons » (effets) et « Musique », coupables d'un clic sur leur icône. (vérification manuelle)
 - **UI-8** La fiche joueur doit proposer : une case de potion à côté du personnage (fenêtre de choix parmi le stock), les potions en haut de l'onglet Boutique, les presets dans le panneau Équipement (objets protégés marqués 🔐), une case « Afficher les objets des autres classes » et un filtre « Hors classe » dans le coffre personnel, un onglet Arbre de compétences visible mais verrouillé avant le niveau 4, un tutoriel en fenêtre au déblocage (puis derrière le bouton ?), et un onglet Entraînement ; l'arène doit afficher la barre de stamina, les ultimes, les potions déclenchées et les effets (gel, invisibilité, boucliers). (vérification manuelle)
 - **UI-5** Les pages doivent être en français, sans framework ni étape de build, les scripts étant chargés dans l'ordre des dépendances. (vérification manuelle)

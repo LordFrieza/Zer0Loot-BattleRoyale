@@ -379,6 +379,29 @@ test('[BOSS-6, BOSS-7, MODE-5, MODE-6, ACH-1] Combat de Boss : récompense commu
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[BOSS-8, BOSS-7] Combat de Boss : l\'admin choisit le boss (Dragon, Magicien), même récompense', async () => {
+  await admin.post('/api/admin/battle/reset');
+  assert.strictEqual((await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'licorne' })).status, 400);
+  const r = await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'dragon' });
+  assert.strictEqual(r.data.boss, 'dragon');
+  assert.strictEqual((await alice.get('/api/queue')).data.boss, 'dragon');
+  const a = client();
+  const ida = (await register(a, 'pl_dragon')).id;
+  await a.post('/api/queue/join');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  assert.strictEqual(battle.boss.kind, 'dragon');
+  battle.kill(battle.players.find((f) => f.userId === ida), battle.boss);
+  battle.tick(0.05);
+  assert.strictEqual(battle.result.boss.id, 'dragon');
+  const ch = (await meOf(a)).character;
+  assert.deepStrictEqual([ch.chests, ch.gold, ch.counters.bossWins], [3, 500, 1]);
+  // Le Magicien des ténèbres
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'sorcier' });
+  assert.strictEqual((await alice.get('/api/queue')).data.boss, 'sorcier');
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
   const a = client();
   const ida = (await register(a, 'pl_dungeon')).id;

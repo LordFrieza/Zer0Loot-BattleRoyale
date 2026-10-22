@@ -39,6 +39,7 @@ class Battle extends EventEmitter {
     super();
     this.phase = 'idle'; // idle | queue | ready | battle | ended
     this.mode = 'br';
+    this.bossId = 'troll'; // boss choisi par l'admin pour le Combat de Boss (voir Rules.BOSSES)
     this.event = null; // événement de la bataille en cours (voir Rules.BATTLE_EVENTS)
     this.fogs = [];
     this.meteors = [];
@@ -61,6 +62,7 @@ class Battle extends EventEmitter {
     return {
       phase: this.phase,
       mode: this.mode,
+      boss: this.mode === 'boss' ? this.bossId : null,
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
         key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, app: p.app || null, title: p.title || null,
@@ -76,9 +78,11 @@ class Battle extends EventEmitter {
     this.emit('queue', this.publicQueue());
   }
 
-  openQueue(seconds, mode = 'br') {
+  openQueue(seconds, mode = 'br', bossId = 'troll') {
     if (this.phase === 'battle') throw new Error('Une bataille est en cours');
     if (!Rules.GAME_MODES[mode]) throw new Error('Mode de jeu inconnu');
+    if (mode === 'boss' && !Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
+    this.bossId = mode === 'boss' ? bossId : 'troll';
     this.stopLoop();
     this.emit('cleared'); // la bataille précédente n'aura pas lieu : paris remboursés
     this.participants.clear();
@@ -226,14 +230,16 @@ class Battle extends EventEmitter {
   // ---------- Combat de Boss ----------
 
   setupBoss() {
-    const B = Rules.BOSS;
-    const st = Rules.bossStats(this.players.length);
+    const B = Rules.BOSSES[this.bossId];
+    const st = Rules.bossStats(this.players.length, B.id);
     const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
     this.players.forEach((f, i) => Object.assign(f, positions[i]));
     this.boss = fighter({
       key: 'boss',
       name: B.name,
-      kind: 'troll',
+      kind: B.kind,
+      isBoss: true,
+      bossId: B.id,
       team: MONSTERS,
       x: ARENA.w * 0.72,
       y: ARENA.h / 2 + 20,
@@ -247,23 +253,48 @@ class Battle extends EventEmitter {
       crit: 0.05,
       cooldown: B.cooldown,
       precision: B.precision,
-      range: 40,
-      cleave: true,
+      range: B.range || 40,
+      kite: B.kite || 0,
+      projectile: B.projectile || null,
+      cleave: B.cleaveRadius ? { r: B.cleaveRadius, ratio: B.cleaveRatio } : false,
       cd: 1,
     });
-    this.boss.phase = 0;
-    this.boss.enraged = false;
-    this.boss.slamEvery = B.slam.every;
-    this.boss.slamIn = B.slam.every * 0.7;
-    this.boss.nextSpecial = 'slam';
+    const every = B.specialEvery || B.slam.every;
+    Object.assign(this.boss, {
+      phase: 0,
+      enraged: false,
+      flying: false, // Dragon en vol : intouchable au corps à corps
+      away: false, // Dragon parti au nid : intouchable
+      shielded: false, // Magicien derrière son bouclier : intouchable
+      flyMinRange: B.flight ? B.flight.minRange : 0,
+      slamEvery: every, // attaques spéciales (le nom vient du Troll)
+      slamIn: every * 0.7,
+      nextSpecial: 0,
+      blinkIn: B.blinkEvery || 0,
+      script: [], // grandes étapes à franchir selon la vie (vol, nid, bouclier, illusions)
+      stage: null, // étape en cours : { kind, until, … }
+    });
+    if (B.flight) for (const at of B.flight.at) this.boss.script.push({ at, kind: 'flight' });
+    if (B.nest) this.boss.script.push({ at: B.nest.at, kind: 'nest' });
+    if (B.shield) for (const at of B.shield.at) this.boss.script.push({ at, kind: 'shield' });
+    if (B.clones) this.boss.script.push({ at: B.clones.at, kind: 'clones' });
+    this.boss.script.sort((a, c) => c.at - a.at);
+    this.adds = []; // œufs, dragonnets, cristaux, illusions
+    this.addSeq = 0;
     this.fighters.push(this.boss);
+  }
+
+  // Intouchable pour cet attaquant ? (Dragon en vol ou parti, Magicien protégé par son bouclier)
+  immune(target, attacker) {
+    if (target.away || target.shielded) return true;
+    return !!(target.flying && attacker && attacker.range < target.flyMinRange);
   }
 
   updateBoss(dt) {
     const b = this.boss;
-    const B = Rules.BOSS;
+    const B = Rules.BOSSES[b.bossId];
     if (b.alive) {
-      // Phases à 66 % et 33 % de vie
+      // Phases du Troll à 66 % et 33 % de vie
       while (b.phase < B.phases.length && b.hp / b.maxHp <= B.phases[b.phase].at) {
         const ph = B.phases[b.phase];
         b.phase += 1;
@@ -277,33 +308,276 @@ class Battle extends EventEmitter {
         b.dmgMult *= B.enrageMult;
         this.events.push({ t: 'bossEnrage' });
       }
-      // Attaques spéciales : onde de choc autour de lui, puis rocher sur le plus gros groupe.
-      b.slamIn -= dt;
-      const heroes = this.players.filter((p) => p.alive);
-      if (b.slamIn <= 0 && heroes.length) {
-        b.slamIn = b.slamEvery;
-        if (b.nextSpecial === 'slam') {
-          this.slams.push({ kind: 'slam', x: b.x, y: b.y, r: B.slam.radius, t: B.slam.warn });
-          b.nextSpecial = 'rock';
-        } else {
-          const spot = densestSpot(heroes, B.slam.rockRadius);
-          this.slams.push({ kind: 'rock', x: spot.x, y: spot.y, r: B.slam.rockRadius, t: B.slam.warn, fx: b.x, fy: b.y - 60 });
-          b.nextSpecial = 'slam';
-        }
-        this.events.push({ t: 'slamWarn' });
+      // Grandes étapes (une à la fois) quand la vie passe sous un seuil
+      if (!b.stage && b.script.length && b.hp / b.maxHp <= b.script[0].at) {
+        const step = b.script.shift();
+        b.phase += 1;
+        if (step.kind === 'flight') this.startFlight(B);
+        else if (step.kind === 'nest') this.startNest(B);
+        else if (step.kind === 'shield') this.startShield(B);
+        else this.splitClones(B);
+      }
+      if (b.stage) this.updateStage(dt, B);
+      else this.bossSpecials(dt, B);
+      if (b.bossId === 'sorcier') this.updateCurses(B);
+    }
+    this.resolveSlams(dt);
+  }
+
+  // Attaques spéciales au sol, annoncées avant l'impact.
+  bossSpecials(dt, B) {
+    const b = this.boss;
+    const heroes = this.players.filter((p) => p.alive);
+    if (!heroes.length) return;
+    if (B.blinkEvery) {
+      b.blinkIn -= dt;
+      if (b.blinkIn <= 0) {
+        b.blinkIn = B.blinkEvery;
+        this.blink(b, { x: 220 + Math.random() * (ARENA.w - 440), y: 230 + Math.random() * (ARENA.h - 320) });
       }
     }
+    b.slamIn -= dt;
+    if (b.slamIn > 0) return;
+    b.slamIn = b.slamEvery;
+    const n = b.nextSpecial;
+    b.nextSpecial = 1 - n;
+    if (B.id === 'troll') {
+      // Onde de choc autour de lui, puis rocher sur le plus gros groupe
+      if (n === 0) this.slams.push({ kind: 'slam', x: b.x, y: b.y, r: B.slam.radius, t: B.slam.warn, warn: B.slam.warn, ratio: B.slam.ratio });
+      else {
+        const spot = densestSpot(heroes, B.slam.rockRadius);
+        this.slams.push({ kind: 'rock', x: spot.x, y: spot.y, r: B.slam.rockRadius, t: B.slam.warn, warn: B.slam.warn, ratio: B.slam.ratio, fx: b.x, fy: b.y - 60 });
+      }
+    } else if (B.id === 'dragon') {
+      // Souffle de feu en cône vers le plus gros groupe, puis coup de queue autour de lui
+      if (n === 0) {
+        const spot = densestSpot(heroes, 120);
+        const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
+        this.slams.push({ kind: 'cone', x: b.x, y: b.y, r: B.breath.length, angle, half: B.breath.angle, t: B.breath.warn, warn: B.breath.warn, ratio: B.breath.ratio });
+      } else {
+        this.slams.push({ kind: 'tail', x: b.x, y: b.y, r: B.tail.radius, t: B.tail.warn, warn: B.tail.warn, ratio: B.tail.ratio });
+      }
+    } else {
+      // Malédiction sur quelques combattants, puis zones d'ombre sous leurs pieds
+      if (n === 0) this.castCurse(B, heroes);
+      else {
+        const V = B.void;
+        const count = Math.min(V.max, V.base + Math.floor(heroes.length / V.perPlayers));
+        const shuffled = [...heroes].sort(() => Math.random() - 0.5).slice(0, count);
+        for (const h of shuffled) this.slams.push({ kind: 'void', x: h.x, y: h.y, r: V.radius, t: V.warn, warn: V.warn, ratio: V.ratio });
+      }
+    }
+    this.events.push({ t: 'slamWarn', boss: B.id });
+  }
+
+  // Impact des attaques annoncées (cercles, cône du souffle, atterrissage).
+  resolveSlams(dt) {
+    const b = this.boss;
     for (const s of this.slams) {
       s.t -= dt;
       if (s.t > 0) continue;
       this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r });
+      if (s.kind === 'land') this.land(s);
       if (!b.alive) continue;
-      const raw = b.damage * b.dmgMult * B.slam.ratio;
+      const raw = b.damage * b.dmgMult * s.ratio;
       for (const f of this.players) {
-        if (f.alive && Math.hypot(f.x - s.x, f.y - s.y) <= s.r) this.hit(b, f, raw * (0.9 + Math.random() * 0.2), { splash: true });
+        if (f.alive && inSlam(s, f)) this.hit(b, f, raw * (0.9 + Math.random() * 0.2), { splash: true });
       }
     }
     this.slams = this.slams.filter((s) => s.t > 0);
+  }
+
+  updateStage(dt, B) {
+    const b = this.boss;
+    const st = b.stage;
+    const heroes = this.players.filter((p) => p.alive);
+    if (st.kind === 'flight') {
+      // Il plane au-dessus de l'arène et bombarde des combattants au hasard.
+      const dx = st.tx - b.x;
+      const dy = st.ty - b.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 20 || this.time >= st.retarget) {
+        // (assez bas pour que le dragon, dessiné haut dans le ciel, reste à l'écran)
+        st.tx = 200 + Math.random() * (ARENA.w - 400);
+        st.ty = 300 + Math.random() * (ARENA.h - 400);
+        st.retarget = this.time + 3;
+      } else {
+        const step = Math.min(dist, 150 * dt);
+        b.x += (dx / dist) * step;
+        b.y += (dy / dist) * step;
+      }
+      if (st.landing) return;
+      st.fireIn -= dt;
+      if (st.fireIn <= 0 && heroes.length) {
+        st.fireIn = st.fireEvery;
+        const h = heroes[Math.floor(Math.random() * heroes.length)];
+        const F = B.flight;
+        this.slams.push({ kind: 'fireball', x: h.x, y: h.y, r: F.fireballRadius, t: F.fireballWarn, warn: F.fireballWarn, ratio: F.fireballRatio, fx: b.x, fy: b.y - 120 });
+      }
+      if (this.time >= st.until && heroes.length) {
+        // Atterrissage brutal sur le plus gros groupe
+        const spot = densestSpot(heroes, B.flight.landRadius);
+        st.landing = true;
+        st.tx = spot.x;
+        st.ty = spot.y;
+        this.slams.push({ kind: 'land', x: spot.x, y: spot.y, r: B.flight.landRadius, t: B.flight.landWarn, warn: B.flight.landWarn, ratio: B.flight.landRatio });
+        this.events.push({ t: 'slamWarn', boss: B.id });
+      }
+    } else if (st.kind === 'nest') {
+      const eggs = this.adds.filter((a) => a.kind === 'oeuf' && a.alive);
+      if (this.time >= st.until || !eggs.length) {
+        // Les œufs restants éclosent ; le dragon revient, furieux, et atterrit sur le plus gros groupe.
+        for (const egg of eggs) this.hatch(egg, B);
+        b.away = false;
+        b.dmgMult *= B.nest.returnDamageMult;
+        b.cooldown /= B.nest.returnAttackSpeedMult;
+        this.events.push({ t: 'bossReturn', hatched: eggs.length, label: 'PYRAX REVIENT, FOU DE RAGE !' });
+        b.x = ARENA.w - 160;
+        b.y = 180;
+        this.startFlight(B, true);
+      }
+    } else if (st.kind === 'shield') {
+      const crystals = this.adds.filter((a) => a.kind === 'cristal' && a.alive);
+      // Chaque cristal encore debout soigne le Magicien.
+      this.heal(b, b.maxHp * B.shield.regen * crystals.length * dt);
+      if (!crystals.length) {
+        b.shielded = false;
+        b.stage = null;
+        this.events.push({ t: 'shieldDown' });
+      } else this.bossSpecials(dt, B);
+    }
+  }
+
+  startFlight(B, landingOnly = false) {
+    const b = this.boss;
+    const F = B.flight;
+    const flights = F.at.length - b.script.filter((s) => s.kind === 'flight').length;
+    b.flying = true;
+    b.targetKey = null;
+    b.stage = {
+      kind: 'flight', until: landingOnly ? this.time : this.time + F.duration,
+      fireIn: 0.8, fireEvery: F.fireballEvery * (flights > 1 ? 0.75 : 1), tx: b.x, ty: b.y, retarget: 0, landing: false,
+    };
+    if (!landingOnly) this.events.push({ t: 'bossFly', duration: F.duration });
+  }
+
+  land(s) {
+    const b = this.boss;
+    if (!b.stage || b.stage.kind !== 'flight') return;
+    b.flying = false;
+    b.stage = null;
+    b.x = s.x;
+    b.y = s.y;
+    b.slamIn = b.slamEvery * 0.6;
+  }
+
+  startNest(B) {
+    const b = this.boss;
+    const N = B.nest;
+    const n = this.players.length;
+    const count = Math.max(N.eggsMin, Math.min(N.eggsMax, Math.ceil(n / N.eggsPer)));
+    b.away = true;
+    b.targetKey = null;
+    b.x = ARENA.w + 220; // hors de l'arène
+    b.y = 160;
+    b.stage = { kind: 'nest', until: this.time + N.duration };
+    const pos = spawnPositions(count, { x0: 520, y0: 110, x1: ARENA.w - 120, y1: ARENA.h - 80 });
+    const hp = Math.round(N.eggHpBase + N.eggHpPerPlayer * n);
+    for (const p of pos) this.addMonster({ kind: 'oeuf', name: 'Œuf de dragon', x: p.x, y: p.y, r: 18, hp, inert: true });
+    this.events.push({ t: 'bossAway', eggs: count, duration: N.duration });
+  }
+
+  hatch(egg, B) {
+    const W = B.whelp;
+    egg.alive = false;
+    egg.hp = 0;
+    this.events.push({ t: 'hatch', to: egg.key, x: Math.round(egg.x), y: Math.round(egg.y) });
+    this.addMonster({
+      kind: 'dragonnet', name: 'Dragonnet', x: egg.x, y: egg.y, r: W.radius,
+      hp: Math.round(W.hpBase + W.hpPerPlayer * this.players.length),
+      damage: this.boss.damage * W.damageRatio, speed: W.speed, cooldown: W.cooldown, range: W.range,
+    });
+  }
+
+  startShield(B) {
+    const b = this.boss;
+    const S = B.shield;
+    b.shielded = true;
+    b.stage = { kind: 'shield' };
+    this.blink(b, { x: ARENA.w / 2, y: ARENA.h / 2 });
+    const spots = [[190, 240], [ARENA.w - 190, 240], [190, ARENA.h - 100], [ARENA.w - 190, ARENA.h - 100]].slice(0, S.crystals);
+    const hp = Math.round(S.crystalHpBase + S.crystalHpPerPlayer * this.players.length);
+    for (const [x, y] of spots) this.addMonster({ kind: 'cristal', name: 'Cristal d\'ombre', x, y, r: 20, hp, inert: true });
+    this.events.push({ t: 'shieldUp', crystals: spots.length });
+  }
+
+  // Le Magicien se dédouble : des illusions fragiles qui attaquent aussi (moins fort).
+  splitClones(B) {
+    const b = this.boss;
+    const C = B.clones;
+    const spots = spawnPositions(C.count + 1, { x0: 300, y0: 230, x1: ARENA.w - 100, y1: ARENA.h - 70 }).sort(() => Math.random() - 0.5);
+    this.blink(b, spots[0]);
+    for (let i = 1; i <= C.count; i++) {
+      this.addMonster({
+        kind: 'sorcier', name: b.name, clone: true, x: spots[i].x, y: spots[i].y, r: b.r,
+        hp: Math.round(b.maxHp * C.hpRatio), damage: b.damage * C.damageRatio, speed: b.speed, cooldown: b.cooldown,
+        range: b.range, kite: b.kite, projectile: b.projectile, dodge: b.dodge, precision: b.precision,
+      });
+    }
+    this.events.push({ t: 'clones', count: C.count });
+  }
+
+  addMonster(o) {
+    this.addSeq += 1;
+    const m = fighter(Object.assign({
+      key: `a${this.addSeq}`, team: MONSTERS, maxHp: o.hp, damage: 0, reduction: 0, speed: 0, dodge: 0, crit: 0.05,
+      cooldown: 1, precision: 0.1, range: 30, cd: 0.6 + Math.random() * 0.6,
+    }, o));
+    if (o.inert) { m.cd = Infinity; m.damage = 0; } // œufs et cristaux : n'attaquent pas
+    this.adds.push(m);
+    this.fighters.push(m);
+    return m;
+  }
+
+  // Téléportation du Magicien (vers un point donné, ou loin des combattants).
+  blink(f, to = null) {
+    const fx = Math.round(f.x);
+    const fy = Math.round(f.y);
+    if (to) { f.x = to.x; f.y = to.y; } else this.teleportAway(f);
+    f.targetKey = null;
+    this.events.push({ t: 'blink', to: f.key, fx, fy, x: Math.round(f.x), y: Math.round(f.y) });
+  }
+
+  castCurse(B, heroes) {
+    const C = B.curse;
+    const free = heroes.filter((h) => !h.buffs.some((x) => x.curse));
+    const count = Math.max(1, Math.ceil(heroes.length / C.perPlayers));
+    for (const h of free.sort(() => Math.random() - 0.5).slice(0, count)) {
+      this.addBuff(h, 'curse', C.duration, { curse: true, dot: C.dps, tick: this.time + 0.5 });
+      this.events.push({ t: 'curse', to: h.key });
+    }
+  }
+
+  // Malédictions : dégâts chaque demi-seconde ; un Prêtre (lui compris) tout proche les purifie.
+  updateCurses(B) {
+    const priests = this.players.filter((p) => p.alive && p.cls === 'pretre');
+    for (const h of this.players) {
+      if (!h.alive) continue;
+      const curse = h.buffs.find((x) => x.curse);
+      if (!curse) continue;
+      const priest = priests.find((p) => Math.hypot(p.x - h.x, p.y - h.y) <= B.curse.purifyRadius);
+      if (priest) {
+        h.buffs = h.buffs.filter((x) => x !== curse);
+        this.events.push({ t: 'purify', to: h.key, from: priest.key });
+        continue;
+      }
+      if (this.time < curse.tick) continue;
+      curse.tick += 0.5;
+      const dmg = Math.max(1, Math.round(h.maxHp * curse.dot * 0.5));
+      h.hp -= dmg;
+      this.events.push({ t: 'hit', from: this.boss.key, to: h.key, dmg, curse: true });
+      if (h.hp <= 0) this.kill(this.boss, h);
+    }
   }
 
   // ---------- Raid de Donjon ----------
@@ -566,8 +840,8 @@ class Battle extends EventEmitter {
       this.checkHpPotion(f);
       // Barre de stamina (ultime de l'arbre de compétences)
       if (f.ult) f.stamina = Math.min(1, f.stamina + dt / f.staminaTime);
-      // Gelé (Blizzard, Châtiment) : ne fait rien
-      if (this.time < f.stunUntil) continue;
+      // Gelé (Blizzard, Châtiment) : ne fait rien ; le Dragon en vol ou au nid suit son propre script.
+      if (this.time < f.stunUntil || f.flying || f.away) continue;
 
       /*
        * Aggro : l'ennemi le plus proche ; un Guerrier « paraît » plus proche (il attire l'aggro).
@@ -579,7 +853,7 @@ class Battle extends EventEmitter {
       let fallbackScore = Infinity;
       for (const o of alive) {
         // Un ennemi invisible (potion) ne peut pas être ciblé.
-        if (o.team === f.team || !o.alive || this.isInvisible(o)) continue;
+        if (o.team === f.team || !o.alive || this.isInvisible(o) || this.immune(o, f)) continue;
         const d = Math.hypot(o.x - f.x, o.y - f.y);
         const score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
         if (score < fallbackScore) { fallbackScore = score; fallback = o; }
@@ -624,7 +898,7 @@ class Battle extends EventEmitter {
     }
 
     // Séparation pour éviter que les persos se superposent (les plus gros poussent les petits).
-    const living = this.fighters.filter((f) => f.alive);
+    const living = this.fighters.filter((f) => f.alive && !f.flying && !f.away);
     for (let i = 0; i < living.length; i++) {
       for (let j = i + 1; j < living.length; j++) {
         const a = living[i];
@@ -685,8 +959,11 @@ class Battle extends EventEmitter {
   }
 
   checkBossEnd() {
-    if (!this.boss.alive) this.finishCoop(true);
-    else if (!this.players.some((p) => p.alive) || this.time > MAX_DURATION) this.finishCoop(false);
+    if (!this.boss.alive) {
+      // Les œufs, dragonnets, cristaux et illusions disparaissent avec leur maître.
+      for (const a of this.adds) if (a.alive) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
+      this.finishCoop(true);
+    } else if (!this.players.some((p) => p.alive) || this.time > MAX_DURATION) this.finishCoop(false);
   }
 
   checkDungeonEnd() {
@@ -854,7 +1131,7 @@ class Battle extends EventEmitter {
           if (!near(target, o, P.radius)) continue;
           this.hit(f, o, dmg * P.ratio, { splash: true, ult: true });
           // Les boss résistent : gel réduit de moitié.
-          o.stunUntil = Math.max(o.stunUntil, this.time + P.stun * (o.kind === 'troll' ? 0.5 : 1));
+          o.stunUntil = Math.max(o.stunUntil, this.time + P.stun * (o.isBoss ? 0.5 : 1));
         }
         break;
       case 'execution': {
@@ -891,7 +1168,7 @@ class Battle extends EventEmitter {
         ev.targets = victims.map((v) => v.key);
         for (const v of victims) {
           this.hit(f, v, dmg * P.ratio, { ult: true });
-          if (P.stun) v.stunUntil = Math.max(v.stunUntil, this.time + P.stun * (v.kind === 'troll' ? 0.5 : 1));
+          if (P.stun) v.stunUntil = Math.max(v.stunUntil, this.time + P.stun * (v.isBoss ? 0.5 : 1));
         }
         break;
       }
@@ -988,9 +1265,9 @@ class Battle extends EventEmitter {
     // Mage : explosion autour de la cible. Troll : son coup de massue balaie les combattants proches.
     const splash = attacker.aoeRadius
       ? { r: attacker.aoeRadius, ratio: attacker.aoeRatio }
-      : attacker.cleave ? { r: Rules.BOSS.cleaveRadius, ratio: Rules.BOSS.cleaveRatio } : null;
+      : attacker.cleave ? { r: attacker.cleave.r, ratio: attacker.cleave.ratio } : null;
     if (splash) {
-      this.events.push({ t: 'aoe', from: attacker.key, x: Math.round(tx), y: Math.round(ty), r: splash.r, cleave: attacker.cleave || undefined });
+      this.events.push({ t: 'aoe', from: attacker.key, x: Math.round(tx), y: Math.round(ty), r: splash.r, cleave: attacker.cleave ? true : undefined });
       for (const o of this.fighters) {
         if (!o.alive || o === target || o.team === attacker.team) continue;
         if (Math.hypot(o.x - tx, o.y - ty) <= splash.r) {
@@ -1002,7 +1279,7 @@ class Battle extends EventEmitter {
 
   // Applique des dégâts (après défense), puis vol de vie et épines.
   hit(attacker, target, raw, opts = {}) {
-    if (!target.alive) return;
+    if (!target.alive || this.immune(target, attacker)) return;
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
@@ -1013,7 +1290,7 @@ class Battle extends EventEmitter {
     else this.checkHpPotion(target);
     // Épines : une partie des dégâts reçus est renvoyée à l'attaquant.
     const reflected = Math.round(dmg * (target.thorns + this.buffSum(target, 'thorns')));
-    if (reflected >= 1 && attacker.alive) {
+    if (reflected >= 1 && attacker.alive && !this.immune(attacker, target)) {
       attacker.hp -= reflected;
       target.dealt += reflected;
       this.events.push({ t: 'thorns', from: target.key, to: attacker.key, dmg: reflected });
@@ -1101,8 +1378,8 @@ class Battle extends EventEmitter {
       duration: Math.round(this.time),
     };
     if (this.mode === 'boss') {
-      this.result.boss = { name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
-      this.result.reward = victory ? { ...Rules.BOSS.reward } : null;
+      this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
+      this.result.reward = victory ? { ...Rules.BOSSES[this.boss.bossId].reward } : null;
     } else {
       this.result.room = this.dungeon.room;
       this.result.reward = Rules.dungeonReward(this.dungeon.room, this.dungeon.rewardMult);
@@ -1126,10 +1403,16 @@ class Battle extends EventEmitter {
       event: this.event || null,
       fogs: (this.fogs || []).map((z) => ({ x: Math.round(z.x), y: Math.round(z.y), r: Math.round(z.r), a: Math.round(z.a * 100) / 100 })),
       meteors: (this.meteors || []).map((m) => ({ x: Math.round(m.x), y: Math.round(m.y), r: m.r, p: Math.round((1 - m.t / METEOR_FALL) * 100) / 100 })),
-      boss: b ? { key: b.key, name: b.name, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, phase: b.phase, enraged: b.enraged, alive: b.alive } : null,
+      boss: b ? {
+        key: b.key, id: b.bossId, name: b.name, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, phase: b.phase, enraged: b.enraged, alive: b.alive,
+        flying: b.flying || undefined, away: b.away || undefined, shielded: b.shielded || undefined,
+        // Compte à rebours de l'étape en cours (vol, nid), pour la barre du boss
+        timer: b.stage && b.stage.until > this.time ? { kind: b.stage.kind, left: Math.round((b.stage.until - this.time) * 10) / 10 } : undefined,
+      } : null,
       slams: this.slams.map((s) => ({
-        kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / Rules.BOSS.slam.warn) * 100) / 100,
+        kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / s.warn) * 100) / 100, w: s.warn,
         fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
+        a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
       })),
       dungeon: d ? {
         room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged,
@@ -1142,7 +1425,7 @@ class Battle extends EventEmitter {
       })),
       fighters: shown.map((f) => ({
         key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, app: f.app, level: f.level,
-        kind: f.kind, elite: f.elite || undefined, r: f.r, scale: f.scale,
+        kind: f.kind, elite: f.elite || undefined, clone: f.clone || undefined, r: f.r, scale: f.scale,
         hidden: this.event === 'fog' && f.alive && this.inFog(f),
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
@@ -1156,6 +1439,18 @@ class Battle extends EventEmitter {
       events: this.events,
     };
   }
+}
+
+// Un combattant est-il dans la zone d'une attaque annoncée ? (cercle, ou cône pour le souffle du Dragon)
+function inSlam(s, f) {
+  const dx = f.x - s.x;
+  const dy = f.y - s.y;
+  const dist = Math.hypot(dx, dy);
+  if (s.kind !== 'cone') return dist <= s.r;
+  if (dist > s.r + f.r) return false;
+  let diff = Math.abs(Math.atan2(dy, dx) - s.angle);
+  if (diff > Math.PI) diff = 2 * Math.PI - diff;
+  return dist < f.r * 2 || diff <= s.half;
 }
 
 // Combattant avec les valeurs par défaut.

@@ -495,9 +495,11 @@ battle.on('cleared', () => notifyBets(bets.refundAll()));
 app.post('/api/admin/queue/open', requireAdmin, action((req) => {
   const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
   const mode = req.body.mode || 'br';
-  battle.openQueue(seconds, mode);
+  battle.openQueue(seconds, mode, req.body.boss || 'troll');
   const m = Rules.GAME_MODES[mode];
-  twitch.say(`${m.icon} La file du ${m.label} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
+  const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}` : '';
+  twitch.say(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
+  return { boss: mode === 'boss' ? battle.bossId : null };
 }));
 
 app.post('/api/admin/queue/close', requireAdmin, action(() => battle.closeQueue()));
@@ -533,7 +535,7 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
     // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
     battle.start(refreshParticipant, null);
     twitch.say(battle.mode === 'boss'
-      ? `👹 ${Rules.BOSS.name} débarque ! Tous ensemble contre lui !`
+      ? `${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name} débarque ! Tous ensemble contre lui !`
       : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
     return { event: null, pendingEvent };
   }
@@ -638,8 +640,8 @@ battle.on('coopEnd', (result, fighters) => {
   db.save();
   if (result.mode === 'boss') {
     twitch.say(result.victory
-      ? `🏆 ${Rules.BOSS.name} est vaincu ! Tous les participants gagnent ${Rules.BOSS.reward.chests} coffres, ${Rules.BOSS.reward.xp} XP et ${Rules.BOSS.reward.gold} golds !`
-      : `💀 ${Rules.BOSS.name} a écrasé tout le monde… Retentez votre chance !`);
+      ? `🏆 ${result.boss.name} est vaincu ! Tous les participants gagnent ${result.reward.chests} coffres, ${result.reward.xp} XP et ${result.reward.gold} golds !`
+      : `💀 ${result.boss.name} a écrasé tout le monde… Retentez votre chance !`);
   } else {
     const r = result.reward;
     twitch.say(`🏰 Le raid s'arrête en salle ${result.room} !${r ? ` Tous les aventuriers gagnent ${[r.chests ? r.chests + ' coffre(s)' : '', r.xp + ' XP', r.gold + ' golds'].filter(Boolean).join(', ')}.` : ' Il faut atteindre la salle 5 pour une récompense.'}`);

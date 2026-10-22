@@ -350,7 +350,7 @@
     },
     boss: {
       label: 'Combat de Boss', icon: '👹', color: '#7ccf6a', coop: true, minPlayers: 1,
-      desc: 'Tout le monde s\'allie contre un Troll géant. On gagne ensemble… ou on perd ensemble.',
+      desc: 'Tout le monde s\'allie contre un boss géant (Troll, Dragon ou Magicien des ténèbres). On gagne ensemble… ou on perd ensemble.',
     },
     dungeon: {
       label: 'Raid de Donjon', icon: '🏰', color: '#5fd3ff', coop: true, minPlayers: 1,
@@ -363,7 +363,14 @@
    * À 66 % puis 33 % de vie, il passe une phase : plus de dégâts et d'attaques par seconde.
    */
   const BOSS = {
+    id: 'troll',
+    kind: 'troll',
     name: 'Grokk le Troll',
+    short: 'Grokk',
+    icon: '👹',
+    color: '#7ccf6a',
+    desc: 'Une brute : coups de massue qui balaient, onde de choc et rochers lancés sur les groupes.',
+    marks: [0.66, 0.33], // coches de la barre de vie
     hpBase: 200,
     hpPerPlayer: 300,
     damageBase: 6,
@@ -388,11 +395,96 @@
     reward: { xp: 500, gold: 500, chests: 3 }, // pour TOUS les participants si le Troll est vaincu
   };
 
-  function bossStats(players) {
+  /*
+   * Pyrax le Dragon : souffle de feu en cône et coup de queue ; à 75 % et 30 % il s'envole (seuls les combattants
+   * à distance peuvent le toucher) et bombarde le sol ; à 50 % il s'enfuit pondre des œufs qu'il faut détruire
+   * avant l'éclosion (sinon : dragonnets).
+   */
+  const DRAGON = {
+    id: 'dragon',
+    kind: 'dragon',
+    name: 'Pyrax le Dragon',
+    short: 'Pyrax',
+    icon: '🐉',
+    color: '#ff6b2a',
+    desc: 'Crache le feu, s\'envole hors de portée du corps à corps et pond des œufs à détruire avant l\'éclosion.',
+    marks: [0.75, 0.5, 0.3],
+    hpBase: 200,
+    hpPerPlayer: 330,
+    damageBase: 6,
+    damagePerPlayer: 0.2,
+    cooldown: 1.6, // coups de griffes
+    speed: 70,
+    radius: 60,
+    reduction: 0.15,
+    precision: 0.2,
+    dodge: 0.02,
+    range: 45,
+    cleaveRadius: 70,
+    cleaveRatio: 0.4,
+    specialEvery: 7, // en alternance : souffle de feu, puis coup de queue
+    breath: { warn: 1.4, length: 340, angle: 0.5, ratio: 1.2 }, // cône (demi-angle en radians) vers le plus gros groupe
+    tail: { warn: 1.1, radius: 140, ratio: 0.9 },
+    // En vol : intouchable au corps à corps (portée < minRange), boules de feu sur des combattants au hasard,
+    // puis atterrissage brutal sur le plus gros groupe.
+    flight: { at: [0.75, 0.3], duration: 12, minRange: 150, fireballEvery: 1.2, fireballRadius: 70, fireballWarn: 1.2, fireballRatio: 0.8, landWarn: 1.4, landRadius: 160, landRatio: 1.1 },
+    // Le nid : le dragon quitte l'arène et laisse 1 œuf pour 4 combattants (3 à 10) ; ceux qui restent à son retour
+    // éclosent en dragonnets. S'ils sont tous détruits, il revient plus tôt.
+    // À son retour du nid, il est furieux : dégâts ×1,25 et attaques ×1,2.
+    nest: { at: 0.5, duration: 16, eggsPer: 4, eggsMin: 3, eggsMax: 10, eggHpBase: 60, eggHpPerPlayer: 8, returnDamageMult: 1.25, returnAttackSpeedMult: 1.2 },
+    whelp: { hpBase: 80, hpPerPlayer: 6, damageRatio: 0.6, speed: 95, radius: 18, cooldown: 1.1, range: 30 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  /*
+   * Malvorath le Magicien des ténèbres : attaque de loin et se téléporte ; maudit des combattants (un Prêtre proche
+   * les purifie) et fait tomber des zones d'ombre ; à 70 % et 20 % il se protège derrière un bouclier tant que ses
+   * cristaux tiennent ; à 45 % il se dédouble en illusions fragiles.
+   */
+  const SORCIER = {
+    id: 'sorcier',
+    kind: 'sorcier',
+    name: 'Malvorath le Magicien des ténèbres',
+    short: 'Malvorath',
+    icon: '🧙',
+    color: '#9b59ff',
+    desc: 'Se téléporte, maudit les héros (les Prêtres purifient), se cache derrière des cristaux et se dédouble.',
+    marks: [0.7, 0.45, 0.2],
+    hpBase: 180,
+    hpPerPlayer: 200,
+    damageBase: 7,
+    damagePerPlayer: 0.2,
+    cooldown: 1.3, // traits d'ombre
+    speed: 55,
+    radius: 30,
+    reduction: 0.1,
+    precision: 0.25,
+    dodge: 0.05,
+    range: 260,
+    projectile: 'shadow',
+    blinkEvery: 15, // se téléporte à un endroit au hasard de l'arène
+    specialEvery: 8, // en alternance : malédiction, puis zones d'ombre
+    curse: { perPlayers: 5, duration: 8, dps: 0.025, purifyRadius: 120 }, // 2,5 % de la vie max par seconde
+    void: { base: 2, perPlayers: 10, max: 4, radius: 75, warn: 1.5, ratio: 0.9 },
+    shield: { at: [0.7, 0.2], crystals: 4, crystalHpBase: 60, crystalHpPerPlayer: 10, regen: 0.0015 }, // soin par cristal et par seconde
+    clones: { at: 0.45, count: 3, hpRatio: 0.05, damageRatio: 0.5 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER };
+
+  function bossStats(players, id = 'troll') {
+    const B = BOSSES[id] || BOSS;
     const n = Math.max(1, players);
     return {
-      maxHp: Math.round(BOSS.hpBase + BOSS.hpPerPlayer * n),
-      damage: Math.round((BOSS.damageBase + BOSS.damagePerPlayer * n) * 10) / 10,
+      maxHp: Math.round(B.hpBase + B.hpPerPlayer * n),
+      damage: Math.round((B.damageBase + B.damagePerPlayer * n) * 10) / 10,
     };
   }
 
@@ -978,7 +1070,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, GAME_MODES, BOSS, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    BATTLE_EVENTS, GAME_MODES, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

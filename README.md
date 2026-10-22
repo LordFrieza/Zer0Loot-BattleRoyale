@@ -176,12 +176,25 @@ de la file, confirme les `!join` et annonce le vainqueur.
   niveau 1 à 50 au choix) ou le fantôme d'un autre joueur (son build, son arbre et son équipement actuels). Règles du
   Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
-  - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre Grokk le Troll. Vie et dégâts selon le nombre
+  - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
+    « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon ou Malvorath le Magicien des ténèbres.
+    Même récompense pour les trois, même rage finale à 2 min 30.
+  - **Grokk le Troll** : vie et dégâts selon le nombre
     de combattants au lancement (200 PV + 300 PV par combattant). Coup de massue qui touche les voisins, attaques
     spéciales annoncées au sol (onde de choc, rocher sur le plus gros groupe). Grosse barre de vie avec coches à 66 % et
     33 % : à chaque coche, +30 % de dégâts et +35 % de vitesse d'attaque. Rage finale à 2 min 30 (dégâts ×3).
     Victoire : **3 coffres, 500 XP et 500 golds pour TOUS les participants** (morts compris), avec explosion du Troll
     et pluie de coffres et de golds. Défaite : XP de participation seulement.
+  - **Pyrax le Dragon** (200 PV + 330 par combattant) : griffes qui touchent les voisins, souffle de feu en cône vers le
+    plus gros groupe et coup de queue tout autour. À **75 %** et **30 %**, il **s'envole** 12 s : seuls les combattants
+    à distance (portée ≥ 150 : Archer, Mage) peuvent le toucher, il bombarde le sol de boules de feu puis atterrit
+    lourdement sur le plus gros groupe. À **50 %**, il part **pondre** : 1 œuf pour 4 combattants (3 à 10) à détruire en
+    16 s, sinon ils éclosent en **dragonnets** ; il revient furieux (dégâts +25 %, attaques +20 %).
+  - **Malvorath le Magicien des ténèbres** (180 PV + 200 par combattant) : attaque de loin (traits d'ombre) et se
+    téléporte toutes les 15 s. Alterne **malédictions** (2,5 % de la vie par seconde pendant 8 s ; un **Prêtre** à moins
+    de 120 px purifie aussitôt, lui compris) et **zones d'ombre** sous les pieds des combattants. À **70 %** et **20 %**,
+    **bouclier** : il est intouchable tant que ses 4 **cristaux** tiennent (et ils le soignent). À **45 %**, il se
+    **dédouble** en 3 illusions fragiles qui attaquent aussi : les dégâts de zone font la différence.
   - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
     squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
     gauche, sortie par la droite, fondu au noir et grand « SALLE X ». L'ambiance change toutes les 5 salles : Cachots,

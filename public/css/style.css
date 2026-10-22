@@ -691,3 +691,15 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .poll-admin { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--accent2); border-radius: 10px; background: rgba(255, 194, 26, .06); display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .poll-admin div { border-left: 3px solid var(--c); padding-left: 8px; }
 .poll-admin button { align-self: flex-start; }
+
+/* ---------- Choix du boss (admin) ---------- */
+.boss-pick { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 8px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; }
+.boss-pick-title { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.boss-pick button { background: rgba(14, 10, 38, .85); border: 1px solid var(--border); justify-content: flex-start; box-shadow: none; }
+.boss-pick button:hover { border-color: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 40%, transparent); }
+.boss-pick button.active { background: color-mix(in srgb, var(--c) 25%, rgba(14, 10, 38, .9)); border-color: var(--c); color: #fff; box-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent); }
+.boss-block { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.boss-block h4 { color: var(--c); margin: 0 0 4px; }
+.boss-block .rules-list { margin: 0; }
+.boss-mini { flex: none; }
+@media (max-width: 600px) { .boss-block { flex-direction: column; } }

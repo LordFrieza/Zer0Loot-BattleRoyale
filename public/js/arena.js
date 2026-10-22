@@ -19,17 +19,19 @@
     { base: '#070b18', floor: [222, 28, 8], wall: [228, 30, 6], moss: null, bones: 0.3, glow: '80,150,255', flame: ['#e0f4ff', '#3fa0ff', 'rgba(0,60,255,0)'], vignette: 0.88, extra: 'eyes' },
     { base: '#08040e', floor: [285, 26, 6], wall: [285, 30, 3], moss: null, bones: 0, glow: '200,80,255', flame: ['#ffe0ff', '#c040ff', 'rgba(120,0,255,0)'], vignette: 0.92, extra: 'void' },
   ];
-  const TROLL_SCALE = 1.35; // le Troll est dessiné plus grand que les combattants
-  const TROLL_LIFT = 40; // décalage pour que ses pieds touchent le sol
+  // Les boss sont dessinés plus grands que les combattants ; lift : décalage pour que leurs pieds touchent le sol.
+  const BOSS_DRAW = { troll: { scale: 1.35, lift: 40 }, dragon: { scale: 1.2, lift: 34 }, sorcier: { scale: 1.25, lift: 26 } };
+  const FLY_HEIGHT = 150; // le Dragon en vol plane au-dessus de son ombre
+  const isBossKind = (f) => !!BOSS_DRAW[f.kind];
 
   function classIcon(cls) {
     const ci = window.Rules && Rules.CLASS_INFO[cls];
     return ci ? ci.icon + ' ' : '';
   }
 
-  // Monstre du donjon (le Troll est traité à part).
+  // Monstre du donjon ou créature d'un boss (les boss et les illusions du Magicien sont traités à part).
   function isMonster(f) {
-    return !!f.kind && f.kind !== 'player' && f.kind !== 'troll';
+    return !!f.kind && f.kind !== 'player' && !isBossKind(f);
   }
 
   function shade(hex, k) {
@@ -359,14 +361,15 @@
           setTimeout(() => Sound.play('eventStart', q.event), Math.max(0, fanfare * 1000 - 200));
         }
         if (q.mode === 'boss') {
-          this.announces.push({ text: '👹 COMBAT DE BOSS !', sub: `Tous ensemble contre ${Rules.BOSS.name} !`, subSize: 26, color: '#7ccf6a', life: 3.5, age: 0 });
+          const B = Rules.BOSSES[q.boss] || Rules.BOSS;
+          this.announces.push({ text: `${B.icon} COMBAT DE BOSS !`, sub: `Tous ensemble contre ${B.name} !`, subSize: 26, color: B.color, life: 3.5, age: 0 });
           setTimeout(() => Sound.play('roar', true), Math.max(0, fanfare * 1000 - 300));
         }
       } else if (prev.phase === 'battle' && q.phase !== 'battle') {
         Sound.music.stop();
         const r = q.result;
         if (q.phase !== 'ended' || !r) return;
-        if (r.mode === 'boss' && r.victory) setTimeout(() => Sound.play('victory'), 2600); // après l'explosion du Troll
+        if (r.mode === 'boss' && r.victory) setTimeout(() => Sound.play('victory'), 2600); // après l'explosion du boss
         else if (r.mode === 'boss' || (r.mode === 'dungeon' && !r.reward)) setTimeout(() => Sound.play('defeat'), 350);
         else setTimeout(() => Sound.play('victory'), 350);
       }
@@ -413,7 +416,7 @@
         }
         // Projectiles (archer, mage) : purement visuels, les dégâts sont déjà calculés.
         if ((e.t === 'hit' || e.t === 'dodge') && e.proj && from && to) {
-          this.projectiles.push({ x0: from.x, y0: from.y - 12, x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' ? 0.25 : 0.16, kind: e.proj });
+          this.projectiles.push({ x0: from.x, y0: from.y - 12, x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' || e.proj === 'shadow' ? 0.3 : 0.16, kind: e.proj });
           const now = performance.now();
           if (window.Sound && now - this.lastShotSound > 110) { this.lastShotSound = now; Sound.play('shoot', e.proj); }
         }
@@ -442,17 +445,71 @@
           const boss = this.disp.get('boss');
           if (boss) boss.swing = 1;
         } else if (e.t === 'slam') {
-          this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.6, color: 'dust' });
-          this.spark(e.x, e.y, '#b89a6a', 50);
-          this.spark(e.x, e.y, '#8a8a8a', 20);
-          this.shake = Math.max(this.shake || 0, 0.5);
-          if (window.Sound) Sound.play('slam');
+          if (e.kind === 'void') {
+            this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.5, color: 'void' });
+            this.spark(e.x, e.y, '#b06bff', 30);
+            if (window.Sound) Sound.play('voidBlast');
+          } else if (e.kind === 'cone' || e.kind === 'fireball') {
+            if (e.kind === 'fireball') this.blasts.push({ x: e.x, y: e.y, r: e.r * 1.3, life: 0.5 });
+            this.spark(e.x, e.y, '#ff6b2a', e.kind === 'cone' ? 20 : 30);
+            this.shake = Math.max(this.shake || 0, e.kind === 'cone' ? 0.3 : 0.25);
+            if (window.Sound) Sound.play(e.kind === 'cone' ? 'fireBreath' : 'meteor');
+          } else {
+            this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.6, color: 'dust' });
+            this.spark(e.x, e.y, '#b89a6a', 50);
+            this.spark(e.x, e.y, '#8a8a8a', 20);
+            this.shake = Math.max(this.shake || 0, e.kind === 'land' ? 0.8 : 0.5);
+            if (window.Sound) Sound.play('slam');
+          }
+          // Souffle de feu : la gerbe de flammes reste visible un instant
+          if (e.kind === 'cone') { const s = (this.frame && this.frame.slams || []).find((x) => x.kind === 'cone'); this.flames = { x: e.x, y: e.y, r: e.r, a: s ? s.a : 0, half: s ? s.half : 0.5, life: 0.6 }; }
+        } else if (e.t === 'bossFly') {
+          const B = this.bossInfo();
+          this.announces.push({ text: `🪽 ${B.short.toUpperCase()} S'ENVOLE !`, sub: 'Seuls les combattants à distance peuvent le toucher !', subSize: 24, color: '#ff9a1f', life: 3, age: 0 });
+          if (window.Sound) Sound.play('roar', true);
+        } else if (e.t === 'bossAway') {
+          const B = this.bossInfo();
+          this.announces.push({ text: `🥚 ${B.short.toUpperCase()} PART PONDRE !`, sub: `Détruisez les ${e.eggs} œufs avant qu'ils n'éclosent !`, subSize: 24, color: '#ffc21a', life: 3.4, age: 0 });
+          if (window.Sound) Sound.play('roar', false);
+        } else if (e.t === 'bossReturn') {
+          this.announces.push({ text: e.label, sub: e.hatched ? `${e.hatched} dragonnet${e.hatched > 1 ? 's' : ''} ${e.hatched > 1 ? 'ont' : 'a'} éclos !` : 'Tous les œufs ont été détruits !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
+          this.shake = Math.max(this.shake || 0, 0.6);
+          if (window.Sound) Sound.play('roar', true);
+        } else if (e.t === 'hatch') {
+          this.spark(e.x, e.y - 10, '#ffc46b', 24);
+          this.floaters.push({ x: e.x, y: e.y - 40, text: '🐣', color: '#fff', life: 1.4, size: 24 });
+        } else if (e.t === 'shieldUp') {
+          this.announces.push({ text: '🛡️ BOUCLIER D\'OMBRE !', sub: `Détruisez les ${e.crystals} cristaux pour le briser !`, subSize: 24, color: '#b06bff', life: 3.2, age: 0 });
+          if (window.Sound) Sound.play('shieldUp');
+        } else if (e.t === 'shieldDown') {
+          this.announces.push({ text: 'LE BOUCLIER SE BRISE !', sub: 'À l\'attaque !', subSize: 26, color: '#ffe066', life: 2.4, age: 0 });
+          const boss = this.disp.get('boss');
+          if (boss) this.spark(boss.x, boss.y - 40, '#d9b3ff', 60);
+          if (window.Sound) Sound.play('shieldDown');
+        } else if (e.t === 'clones') {
+          this.announces.push({ text: '🪞 IL SE DÉDOUBLE !', sub: 'Trouvez le vrai Magicien parmi ses illusions !', subSize: 24, color: '#b06bff', life: 3, age: 0 });
+        } else if (e.t === 'blink') {
+          const dd = this.disp.get(e.to);
+          this.spark(e.fx, e.fy - 40, '#b06bff', 26);
+          this.spark(e.x, e.y - 40, '#e3c4ff', 26);
+          if (dd) { dd.x = e.x; dd.y = e.y; }
+          if (window.Sound) Sound.play('blink');
+        } else if (e.t === 'curse' && to) {
+          this.floaters.push({ x: to.x, y: to.y - 80, text: '☠️ Maudit !', color: '#c88bff', life: 1.6, size: 15 });
+          if (window.Sound) Sound.play('curse');
+        } else if (e.t === 'purify' && to) {
+          this.floaters.push({ x: to.x, y: to.y - 80, text: '✨ Purifié !', color: '#ffe8a0', life: 1.6, size: 15 });
+          this.spark(to.x, to.y - 20, '#fff2a8', 22);
+          if (from) this.beams.push({ path: [{ x: from.x, y: from.y - 10 }, { x: to.x, y: to.y - 10 }], width: 5, color: '#ffe8a0', t: 0, dur: 0.5 });
+        } else if (e.t === 'vanish') {
+          const dd = this.disp.get(e.to);
+          if (dd) this.spark(dd.x, dd.y - 20, '#b06bff', 24);
         } else if (e.t === 'bossPhase') {
           this.announces.push({ text: e.label, sub: 'Il frappe plus fort et plus vite !', subSize: 26, color: e.phase > 1 ? '#ff4d6d' : '#ff9a1f', life: 2.8, age: 0 });
           this.shake = Math.max(this.shake || 0, 0.6);
           if (window.Sound) Sound.play('roar', e.phase > 1);
         } else if (e.t === 'bossEnrage') {
-          this.announces.push({ text: '🔥 RAGE FINALE !', sub: 'Le Troll frappe 3 fois plus fort !', subSize: 26, color: '#ff2a2a', life: 3, age: 0 });
+          this.announces.push({ text: '🔥 RAGE FINALE !', sub: `${this.bossInfo().short} frappe 3 fois plus fort !`, subSize: 26, color: '#ff2a2a', life: 3, age: 0 });
           this.shake = Math.max(this.shake || 0, 0.8);
           if (window.Sound) Sound.play('roar', true);
         } else if (e.t === 'bossDown') {
@@ -519,7 +576,8 @@
           this.floaters.push({ x: to.x, y: to.y - 44, text: 'ESQUIVE', color: '#7fd8ff', life: 1, size: 16 });
         } else if (e.t === 'kill' && to) {
           this.spark(to.x, to.y - 10, '#ff4d6d', 26);
-          if (to.kind !== 'troll') this.floaters.push({ x: to.x, y: to.y - 50, text: '💀', color: '#fff', life: 1.4, size: 28 });
+          if (to.clone) this.spark(to.x, to.y - 40, '#b06bff', 30);
+          else if (!isBossKind(to) && to.kind !== 'oeuf' && to.kind !== 'cristal') this.floaters.push({ x: to.x, y: to.y - 50, text: '💀', color: '#fff', life: 1.4, size: 28 });
           // En coopération, le fil n'affiche que les aventuriers tombés et les chefs vaincus.
           let text = null;
           if (f.mode === 'br' || !f.mode) text = from ? `${from.name}  ⚔  ${to.name}` : `☠ ${to.name} (zone)`;
@@ -625,7 +683,9 @@
         this.title(q.mode === 'br' ? 'La bataille va commencer !' : 'L\'aventure va commencer !', 188, 30, '#ffc21a', '#ff9a00');
       }
       // Mode de jeu choisi par le streamer
-      this.title(`${mode.icon} MODE : ${mode.label.toUpperCase()}`, 128, 30, mode.color, mode.color, W - 360);
+      const QB = q.mode === 'boss' && Rules.BOSSES[q.boss];
+      if (QB) this.title(`${QB.icon} COMBAT DE BOSS : ${QB.name.toUpperCase()}`, 128, 30, QB.color, QB.color, W - 360);
+      else this.title(`${mode.icon} MODE : ${mode.label.toUpperCase()}`, 128, 30, mode.color, mode.color, W - 360);
       this.drawLogo(100, 80, 110);
       const pot = q.bets && q.bets.pool ? `   ·   💰 ${q.bets.pool} golds pariés sur le site` : '';
       const who = q.mode === 'dungeon' ? 'aventurier' : 'combattant';
@@ -700,17 +760,45 @@
         ctx.restore();
       }
 
-      // Attaques spéciales du Troll : zone d'impact au sol qui se remplit
+      // Attaques spéciales des boss : zone d'impact au sol qui se remplit (cercle, ou cône pour le souffle du Dragon)
       for (const s of f.slams || []) {
+        const blink = 0.55 + Math.sin(t / 60) * 0.3;
+        const rgb = s.kind === 'void' ? '170,80,255' : s.kind === 'rock' ? '255,150,40' : '255,60,40';
         ctx.save();
-        ctx.strokeStyle = `rgba(255,${s.kind === 'rock' ? 150 : 60},40,${0.55 + Math.sin(t / 60) * 0.3})`;
+        ctx.strokeStyle = `rgba(${rgb},${blink})`;
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 8]);
-        ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r, s.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = `rgba(255,70,30,${0.1 + s.p * 0.3})`;
-        ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r * s.p, s.r * 0.75 * s.p, 0, 0, Math.PI * 2); ctx.fill();
+        if (s.kind === 'cone') {
+          ctx.translate(s.x, s.y + 10);
+          ctx.scale(1, 0.75);
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, s.r, s.a - s.half, s.a + s.half); ctx.closePath(); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = `rgba(255,90,20,${0.1 + s.p * 0.35})`;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, s.r * s.p, s.a - s.half, s.a + s.half); ctx.closePath(); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r, s.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = s.kind === 'void' ? `rgba(110,30,200,${0.15 + s.p * 0.35})` : `rgba(255,70,30,${0.1 + s.p * 0.3})`;
+          ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r * s.p, s.r * 0.75 * s.p, 0, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
+      }
+      // Souffle de feu qui vient de partir
+      if (this.flames) {
+        const fl = this.flames;
+        fl.life -= dt;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.translate(fl.x, fl.y + 10);
+        ctx.scale(1, 0.75);
+        const g = ctx.createRadialGradient(0, 0, 10, 0, 0, fl.r);
+        g.addColorStop(0, `rgba(255,240,170,${fl.life})`);
+        g.addColorStop(0.5, `rgba(255,120,30,${fl.life})`);
+        g.addColorStop(1, 'rgba(255,40,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, fl.r, fl.a - fl.half, fl.a + fl.half); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        if (fl.life <= 0) this.flames = null;
       }
 
       this.drawZones(f.zones || [], t, 'ground');
@@ -719,7 +807,8 @@
         if (fi.alive) continue;
         const d = this.disp.get(fi.key);
         if (!d) continue;
-        if (fi.kind === 'troll') { this.drawBossDeath(dt, t, d, fi); continue; }
+        if (fi.key === 'boss') { this.drawBossDeath(dt, t, d, fi); continue; }
+        if (fi.clone || fi.kind === 'oeuf' || fi.kind === 'cristal') continue; // illusions, œufs et cristaux disparaissent
         d.deathT = Math.min(1, d.deathT + dt * 2);
         ctx.save();
         ctx.globalAlpha = 0.35;
@@ -739,15 +828,17 @@
         if (target) d.facing = target.x >= d.x ? 1 : -1;
         else if (Math.abs(fi.x - d.x) > 1) d.facing = fi.x > d.x ? 1 : -1; // entrée / sortie des salles
         d.flash = Math.max(0, d.flash - dt * 5);
-        d.swing = Math.max(0, d.swing - dt * (fi.kind === 'troll' ? 2.2 : 4));
+        d.swing = Math.max(0, d.swing - dt * (isBossKind(fi) ? 2.2 : 4));
         const swing = d.swing > 0 ? Math.sin((1 - d.swing) * Math.PI) : 0;
         const moving = Math.hypot(fi.x - d.x, fi.y - d.y) > 0.5;
         const bob = moving ? Math.abs(Math.sin(t / 90 + fi.x)) * -3 : Math.sin(t / 400 + fi.y) * 1;
         const lunge = swing * 6 * d.facing;
-        if (fi.kind === 'troll') {
-          drawMonster(ctx, d.x, d.y - TROLL_LIFT, fi, { scale: TROLL_SCALE, facing: d.facing, flash: d.flash, swing, t, phase: f.boss && f.boss.phase, enraged: f.boss && f.boss.enraged });
+        if (isBossKind(fi)) {
+          this.drawBoss(fi, d, f.boss, swing, t, dt);
         } else if (isMonster(fi)) {
-          drawMonster(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, t, seed: fi.x });
+          const nest = f.boss && f.boss.timer && f.boss.timer.kind === 'nest' ? f.boss.timer : null;
+          const crack = fi.kind === 'oeuf' && nest ? 1 - nest.left / Rules.BOSSES.dragon.nest.duration : 0;
+          drawMonster(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, t, seed: fi.x, crack });
         } else {
           this.drawFx(fi, d.x, d.y, t, 'under');
           const invisible = fi.fx && fi.fx.includes('invisible');
@@ -756,17 +847,26 @@
         if (fi.fx) this.drawFx(fi, d.x, d.y, t, 'over');
 
         // Pseudo, titre et barre de vie (dessinés après le brouillard ; cachés dedans)
-        if (!fi.hidden && fi.kind !== 'troll' && d.x > -20 && d.x < W + 20) labels.push({ fi, x: d.x, y: d.y });
+        if (!fi.hidden && !isBossKind(fi) && d.x > -20 && d.x < W + 20) labels.push({ fi, x: d.x, y: d.y });
       }
 
-      // Rochers lancés par le Troll
+      // Rochers lancés par le Troll, boules de feu crachées par le Dragon en vol
       for (const s of f.slams || []) {
-        if (s.kind !== 'rock' || s.fx == null) continue;
-        const p = Math.min(1, s.p + (performance.now() - this.frameAt) / 1000 / Rules.BOSS.slam.warn);
+        if ((s.kind !== 'rock' && s.kind !== 'fireball') || s.fx == null) continue;
+        const p = Math.min(1, s.p + (performance.now() - this.frameAt) / 1000 / s.w);
         const rx = s.fx + (s.x - s.fx) * p;
-        const ry = s.fy + (s.y - s.fy) * p - Math.sin(p * Math.PI) * 220;
+        const ry = s.fy + (s.y - s.fy) * p - Math.sin(p * Math.PI) * (s.kind === 'rock' ? 220 : 60);
         ctx.save();
         ctx.translate(rx, ry);
+        if (s.kind === 'fireball') {
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
+          g.addColorStop(0, '#fff3b0'); g.addColorStop(0.45, '#ff8a1f'); g.addColorStop(1, 'rgba(255,40,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          continue;
+        }
         ctx.rotate(p * 9);
         ctx.fillStyle = '#7d7468';
         ctx.strokeStyle = '#3d3830';
@@ -886,6 +986,16 @@
           ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(4, -3); ctx.lineTo(4, 3); ctx.closePath(); ctx.fill();
           ctx.fillStyle = '#ff6b4a';
           ctx.fillRect(-12, -2.5, 4, 5);
+        } else if (p.kind === 'shadow') {
+          // trait d'ombre du Magicien : orbe violette avec une traînée
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = 'rgba(160,80,255,.45)';
+          ctx.lineWidth = 6;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-Math.cos(ang) * 26, -Math.sin(ang) * 26); ctx.stroke();
+          const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 13);
+          g.addColorStop(0, '#f4dcff'); g.addColorStop(0.45, '#9b59ff'); g.addColorStop(1, 'rgba(60,0,120,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
         } else {
           ctx.globalCompositeOperation = 'lighter';
           const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 11);
@@ -904,7 +1014,14 @@
         const k = 1 - b.life / 0.5;
         ctx.save();
         ctx.globalAlpha = Math.max(0, b.life * 2);
-        if (b.color === 'ice') {
+        if (b.color === 'void') {
+          // Zone d'ombre du Magicien : implosion violette
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, b.r * (1.1 - k * 0.5));
+          g.addColorStop(0, 'rgba(240,210,255,.9)'); g.addColorStop(0.5, 'rgba(150,60,255,.6)'); g.addColorStop(1, 'rgba(60,0,140,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.1 - k * 0.5), 0, Math.PI * 2); ctx.fill();
+        } else if (b.color === 'ice') {
           ctx.globalCompositeOperation = 'lighter';
           const g = ctx.createRadialGradient(b.x, b.y, 2, b.x, b.y, b.r * (0.4 + k * 0.7));
           g.addColorStop(0, 'rgba(230,250,255,.9)'); g.addColorStop(0.5, 'rgba(120,200,255,.5)'); g.addColorStop(1, 'rgba(60,140,255,0)');
@@ -939,7 +1056,7 @@
       this.floaters = this.floaters.filter((fl) => fl.life > 0);
 
       // HUD
-      const heroes = f.fighters.filter((x) => !isMonster(x) && x.kind !== 'troll');
+      const heroes = f.fighters.filter((x) => !isMonster(x) && !isBossKind(x));
       const alive = heroes.filter((x) => x.alive).length;
       const total = this.queue && this.queue.participants ? this.queue.participants.length : heroes.length;
       const time = Math.floor(f.time);
@@ -1137,6 +1254,64 @@
      * Grosse barre de vie du Troll en haut de l'écran, avec les coches à 66 % et 33 %
      * (à chaque coche franchie, il devient plus fort). Une traînée blanche montre les dégâts récents.
      */
+    bossInfo() {
+      const b = this.frame && this.frame.boss;
+      return Rules.BOSSES[b && b.id] || Rules.BOSSES[this.queue && this.queue.boss] || Rules.BOSS;
+    }
+
+    /*
+     * Un boss (ou une illusion du Magicien) : le Dragon en vol plane au-dessus de son ombre,
+     * le Magicien protégé est enfermé dans une bulle reliée à ses cristaux.
+     */
+    drawBoss(fi, d, boss, swing, t, dt) {
+      const ctx = this.ctx;
+      const BD = BOSS_DRAW[fi.kind];
+      const real = fi.key === 'boss';
+      const state = real && boss ? boss : {};
+      // Envol / atterrissage en douceur
+      const airborne = state.flying || state.away ? 1 : 0;
+      d.air = (d.air || 0) + (airborne - (d.air || 0)) * Math.min(1, dt * 2.5);
+      const lift = BD.lift + d.air * FLY_HEIGHT;
+      if (d.air > 0.02) {
+        ctx.save();
+        ctx.fillStyle = `rgba(0,0,0,${0.35 * d.air})`;
+        ctx.beginPath(); ctx.ellipse(d.x, d.y + 20, 70 * (1 - d.air * 0.3), 18 * (1 - d.air * 0.3), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      if (state.shielded) {
+        // rayons des cristaux vers le Magicien
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const c of this.frame.fighters) {
+          if (c.kind !== 'cristal' || !c.alive) continue;
+          const cd = this.disp.get(c.key);
+          if (!cd) continue;
+          ctx.strokeStyle = `rgba(176,107,255,${0.35 + Math.sin(t / 90 + cd.x) * 0.2})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(cd.x, cd.y - 30); ctx.lineTo(d.x, d.y - 50); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      drawMonster(ctx, d.x, d.y - lift, fi, {
+        scale: BD.scale, facing: d.facing, flash: d.flash, swing, t, seed: fi.x,
+        phase: state.phase, enraged: state.enraged, flying: d.air > 0.3,
+      });
+      if (state.shielded) {
+        ctx.save();
+        const r = 72 + Math.sin(t / 200) * 3;
+        const g = ctx.createRadialGradient(d.x, d.y - 40, r * 0.6, d.x, d.y - 40, r);
+        g.addColorStop(0, 'rgba(140,60,255,0.05)');
+        g.addColorStop(1, 'rgba(190,120,255,0.45)');
+        ctx.fillStyle = g;
+        ctx.strokeStyle = 'rgba(220,180,255,.8)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#b06bff';
+        ctx.shadowBlur = 18;
+        ctx.beginPath(); ctx.arc(d.x, d.y - 40, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     drawBossBar(dt, t, boss) {
       if (!boss) return;
       const ctx = this.ctx;
@@ -1156,7 +1331,8 @@
       ctx.font = '900 22px Orbitron, "Segoe UI", system-ui, sans-serif';
       ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(0,0,0,.85)';
-      const title = `👹 ${boss.name}${boss.enraged ? ' — RAGE FINALE' : boss.phase ? ` — PHASE ${boss.phase + 1}` : ''}`;
+      const B = Rules.BOSSES[boss.id] || Rules.BOSS;
+      const title = `${B.icon} ${boss.name}${boss.enraged ? ' — RAGE FINALE' : boss.phase ? ` — PHASE ${boss.phase + 1}` : ''}`;
       ctx.strokeText(title, W / 2, y - 16);
       ctx.fillStyle = boss.enraged ? '#ff6b4a' : '#fff';
       ctx.fillText(title, W / 2, y - 16);
@@ -1177,16 +1353,34 @@
       g.addColorStop(1, shade(color, -0.25));
       ctx.fillStyle = g;
       ctx.fillRect(x, y, bw * ratio, bh);
-      // coches à 66 % et 33 %
-      for (const ph of Rules.BOSS.phases) {
-        const cx = x + bw * ph.at;
-        const passed = ratio <= ph.at;
+      // coches des étapes du boss (66 % et 33 % pour le Troll…)
+      for (const at of B.marks) {
+        const cx = x + bw * at;
+        const passed = ratio <= at;
         ctx.fillStyle = passed ? 'rgba(0,0,0,.6)' : '#fff';
         ctx.fillRect(cx - 2, y - 8, 4, bh + 16);
         ctx.beginPath(); ctx.moveTo(cx - 7, y - 12); ctx.lineTo(cx + 7, y - 12); ctx.lineTo(cx, y - 4); ctx.closePath(); ctx.fill();
         ctx.font = '800 11px "Segoe UI", system-ui, sans-serif';
         ctx.fillStyle = passed ? '#ff8fa3' : '#fff';
-        ctx.fillText(`${Math.round(ph.at * 100)} %`, cx, y + bh + 14);
+        ctx.fillText(`${Math.round(at * 100)} %`, cx, y + bh + 14);
+      }
+      // État du boss : en vol, au nid, derrière son bouclier
+      let status = null;
+      const left = boss.timer ? ` · ${Math.ceil(boss.timer.left)} s` : '';
+      if (boss.away) status = { text: `🥚 AU NID — détruisez les œufs !${left}`, color: '#ffc21a' };
+      else if (boss.flying) status = { text: `🪽 EN VOL — seuls les combattants à distance le touchent${left}`, color: '#ff9a1f' };
+      else if (boss.shielded) {
+        const n = (this.frame.fighters || []).filter((fi) => fi.kind === 'cristal' && fi.alive).length;
+        status = { text: `🛡️ BOUCLIER — détruisez les cristaux (${n} restant${n > 1 ? 's' : ''})`, color: '#c88bff' };
+      }
+      if (status) {
+        ctx.font = '800 16px "Segoe UI", system-ui, sans-serif';
+        const tw = ctx.measureText(status.text).width + 28;
+        ctx.fillStyle = 'rgba(8,5,28,.85)';
+        ctx.fillRect(W / 2 - tw / 2, y + bh + 22, tw, 26);
+        ctx.fillStyle = status.color;
+        ctx.fillRect(W / 2 - tw / 2, y + bh + 22, 3, 26);
+        ctx.fillText(status.text, W / 2, y + bh + 36);
       }
       ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
       ctx.lineWidth = 3;
@@ -1248,7 +1442,8 @@
         const k = bd.t / 1.3;
         const jx = (Math.random() - 0.5) * 10 * k;
         const jy = (Math.random() - 0.5) * 6 * k;
-        drawMonster(ctx, d.x + jx, d.y - TROLL_LIFT + jy, fi, { scale: TROLL_SCALE, facing: d.facing, t, phase: 2, flash: Math.sin(t / 40) > 0 ? 0.4 + k : 0 });
+        const BD = BOSS_DRAW[fi.kind];
+        drawMonster(ctx, d.x + jx, d.y - BD.lift + jy, fi, { scale: BD.scale, facing: d.facing, t, phase: 2, flash: Math.sin(t / 40) > 0 ? 0.4 + k : 0 });
         if (Math.random() < 0.5) this.spark(d.x + (Math.random() - 0.5) * 80, d.y - 40 + (Math.random() - 0.5) * 80, '#ffe9a0', 2);
         // lumière qui grandit
         ctx.save();
@@ -1375,6 +1570,7 @@
         if (has('potion_berserker')) aura('rgba(255,60,40,.55)', 34);
         if (has('potion_vie')) aura('rgba(80,255,120,.45)', 30);
         if (has('potion_ronces')) aura('rgba(190,80,255,.45)', 30);
+        if (has('curse')) aura(`rgba(120,20,200,${0.5 + Math.sin(t / 100) * 0.15})`, 32); // malédiction du Magicien
         if (has('potion_celerite')) aura('rgba(255,230,60,.45)', 30);
       } else {
         if (has('rempart') || has('potion_defense') || has('priere')) {
@@ -1607,7 +1803,7 @@
     // Écran de fin des modes coopératifs : victoire / défaite commune, récompense et meilleurs combattants.
     drawCoopResult(t, r) {
       const ctx = this.ctx;
-      // Victoire contre le Troll : on laisse d'abord l'explosion et la pluie de butin se jouer.
+      // Victoire contre le boss : on laisse d'abord l'explosion et la pluie de butin se jouer.
       let a = 1;
       if (r.mode === 'boss' && r.victory && this.bossDeath) a = Math.max(0, Math.min(1, (this.bossDeath.t - 2.8) / 0.6));
       if (a <= 0) return;
@@ -1621,8 +1817,9 @@
       ctx.scale(s, s);
       ctx.translate(-W / 2, -130);
       if (r.mode === 'boss') {
-        if (r.victory) this.title('🏆 LE TROLL EST VAINCU ! 🏆', 130, 54, '#ffc21a', '#ff9a00');
-        else this.title('💀 LE TROLL A GAGNÉ…', 130, 54, '#ff4d6d', '#ff2a2a');
+        const short = (Rules.BOSSES[r.boss.id] || Rules.BOSS).short.toUpperCase();
+        if (r.victory) this.title(`🏆 ${short} EST VAINCU ! 🏆`, 130, 54, '#ffc21a', '#ff9a00');
+        else this.title(`💀 ${short} A GAGNÉ…`, 130, 54, '#ff4d6d', '#ff2a2a');
       } else {
         this.title(`🏰 FIN DU RAID : SALLE ${r.room}`, 130, 54, '#5fd3ff', '#29e7ff');
       }

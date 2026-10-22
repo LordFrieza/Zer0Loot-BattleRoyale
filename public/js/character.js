@@ -799,15 +799,36 @@ $('fuse-go').onclick = async () => {
   const D = Rules.DUNGEON;
   const pct = (x) => Math.round(x * 100) + ' %';
   const ex = Rules.bossStats(10);
-  $('boss-intro').innerHTML = `Tout le monde s'allie contre <b>${B.name}</b>, un troll géant très résistant. Assez difficile : il faut une équipe solide !`;
+  $('boss-intro').innerHTML = `Tout le monde s'allie contre un boss géant, choisi par le streamer : <b>${Object.values(Rules.BOSSES).map((x) => x.icon + ' ' + x.short).join('</b>, <b>')}</b>. Assez difficile : il faut une équipe solide !`;
   $('boss-rules').innerHTML = [
     `Personne ne se tape dessus : <b>tous les combattants attaquent le Troll</b>. Le <b>Guerriloot</b> attire son attention et protège les autres.`,
     `Sa vie et ses dégâts dépendent du <b>nombre de combattants au lancement</b> : ${B.hpBase} PV + ${B.hpPerPlayer} PV par combattant (10 combattants → ${ex.maxHp.toLocaleString('fr-FR')} PV).`,
     `Son coup de massue touche aussi les combattants proches de sa cible (${pct(B.cleaveRatio)} des dégâts).`,
     `Toutes les ${String(B.slam.every).replace('.', ',')} s, une attaque spéciale : <b>onde de choc</b> autour de lui, puis <b>rocher</b> lancé sur le plus gros groupe. La zone rouge au sol prévient ${String(B.slam.warn).replace('.', ',')} s avant.`,
     `Sa grosse barre de vie a <b>2 coches, à 66 % et 33 %</b> : à chaque coche franchie, il frappe <b>+${pct(B.phases[0].damageMult - 1)}</b> plus fort, attaque <b>+${pct(B.phases[0].attackSpeedMult - 1)}</b> plus vite et ses attaques spéciales reviennent plus souvent.`,
-    `Après ${Math.floor(B.enrageAt / 60)} min ${B.enrageAt % 60} s, c'est la <b>rage finale</b> : dégâts ×${B.enrageMult}.`,
+    `Après ${Math.floor(B.enrageAt / 60)} min ${B.enrageAt % 60} s, c'est la <b>rage finale</b> : dégâts ×${B.enrageMult} (comme les autres boss).`,
   ].map((x) => `<li>${x}</li>`).join('');
+  const Dr = Rules.BOSSES.dragon;
+  const So = Rules.BOSSES.sorcier;
+  const exD = Rules.bossStats(10, 'dragon');
+  const exS = Rules.bossStats(10, 'sorcier');
+  const block = (Bx, items) => `<div class="boss-block" style="--c:${Bx.color}"><canvas class="boss-mini" data-kind="${Bx.kind}" width="120" height="110"></canvas>
+    <div><h4>${Bx.icon} ${Bx.name}</h4><ul class="rules-list">${items.map((x) => `<li>${x}</li>`).join('')}</ul></div></div>`;
+  $('boss-others').innerHTML = block(Dr, [
+    `${Dr.hpBase} PV + ${Dr.hpPerPlayer} par combattant (10 → ${exD.maxHp.toLocaleString('fr-FR')} PV). Ses griffes touchent aussi les voisins de sa cible.`,
+    `Toutes les ${Dr.specialEvery} s : <b>souffle de feu</b> en cône vers le plus gros groupe, puis <b>coup de queue</b> tout autour de lui.`,
+    `À <b>75 %</b> et <b>30 %</b>, il <b>s'envole</b> ${Dr.flight.duration} s : seuls les combattants <b>à distance</b> (Archer, Mage) peuvent le toucher. Il bombarde le sol de boules de feu, puis atterrit lourdement sur le plus gros groupe.`,
+    `À <b>50 %</b>, il part <b>pondre</b> : 1 œuf pour ${Dr.nest.eggsPer} combattants (${Dr.nest.eggsMin} à ${Dr.nest.eggsMax}). Il faut les détruire en ${Dr.nest.duration} s, sinon ils éclosent en <b>dragonnets</b>. Il revient furieux (+${pct(Dr.nest.returnDamageMult - 1)} de dégâts).`,
+  ]) + block(So, [
+    `${So.hpBase} PV + ${So.hpPerPlayer} par combattant (10 → ${exS.maxHp.toLocaleString('fr-FR')} PV). Il attaque <b>de loin</b> avec des traits d'ombre et se <b>téléporte</b> toutes les ${So.blinkEvery} s.`,
+    `Toutes les ${So.specialEvery} s : <b>malédiction</b> sur quelques combattants (${pct(So.curse.dps)} de leur vie par seconde pendant ${So.curse.duration} s), puis <b>zones d'ombre</b> sous leurs pieds. Un <b>Prêtre</b> à côté d'un maudit le <b>purifie</b> aussitôt.`,
+    `À <b>70 %</b> et <b>20 %</b>, il s'enferme dans un <b>bouclier</b> : il faut détruire ses ${So.shield.crystals} <b>cristaux</b>, qui le soignent tant qu'ils tiennent.`,
+    `À <b>45 %</b>, il se <b>dédouble</b> : ${So.clones.count} illusions fragiles (mais qui attaquent aussi). Les dégâts de zone (Mage) font des merveilles !`,
+  ]);
+  $('boss-others').querySelectorAll('.boss-mini').forEach((cv) => {
+    const kind = cv.dataset.kind;
+    drawMonster(cv.getContext('2d'), kind === 'dragon' ? 52 : 60, kind === 'dragon' ? 86 : 84, { kind }, { scale: kind === 'dragon' ? 0.62 : 0.8, t: 0 });
+  });
   const R = B.reward;
   $('boss-rewards').innerHTML = `<tr><th>Résultat</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>
     <tr><td><b>🏆 Troll vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
@@ -1266,13 +1287,14 @@ function renderQueue() {
     box.innerHTML = `<b>⏳ File fermée — ${n} combattant(s). Le streamer va lancer la bataille !</b> ${inQueue ? '<span class="up">Tu en fais partie.</span>' : ''}`;
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
-    const what = queue.mode === 'boss' ? '👹 Combat de Boss en cours !' : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    const QB = Rules.BOSSES[queue.boss];
+    const what = queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
     if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
     const r = queue.result;
     let text;
-    if (r.mode === 'boss') text = r.victory ? `🏆 ${Rules.BOSS.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${Rules.BOSS.name} a gagné… Retentez votre chance !`;
+    if (r.mode === 'boss') text = r.victory ? `🏆 ${r.boss.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${r.boss.name} a gagné… Retentez votre chance !`;
     else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
     else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
     box.innerHTML = `<b>${text}</b>`;
@@ -1411,7 +1433,7 @@ const REWARD_LABELS = {
   win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
-  boss: '👹 LE TROLL EST VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
+  boss: '👹 BOSS VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',

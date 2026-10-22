@@ -403,6 +403,40 @@
       timpani(ctx.currentTime + 0.7, 41, 0.6);
     },
 
+    // Souffle du Dragon : grondement grave et rafale de flammes.
+    fireBreath() {
+      noise(0.9, { filter: 'bandpass', freq: 700, sweep: 2600, q: 0.8, vol: 0.22, attack: 0.05 });
+      tone(70, 0.8, { type: 'sawtooth', vol: 0.06, to: 45 });
+    },
+
+    // Zone d'ombre du Magicien : implosion grave.
+    voidBlast() {
+      tone(220, 0.5, { type: 'sine', vol: 0.12, to: 55 });
+      noise(0.4, { filter: 'lowpass', freq: 600, vol: 0.1 });
+    },
+
+    // Téléportation du Magicien : « bloup » descendant puis scintillement.
+    blink() {
+      tone(1200, 0.18, { type: 'sine', vol: 0.08, to: 300 });
+      [0, 7, 12].forEach((st, i) => tone(midi(84 + st), 0.12, { type: 'triangle', vol: 0.04, delay: 0.15 + i * 0.04 }));
+    },
+
+    // Malédiction : accord dissonant.
+    curse() {
+      tone(midi(58), 0.5, { type: 'sawtooth', vol: 0.04 });
+      tone(midi(59), 0.5, { type: 'sawtooth', vol: 0.04 });
+    },
+
+    // Bouclier d'ombre levé, puis brisé.
+    shieldUp() {
+      tone(110, 1.2, { type: 'triangle', vol: 0.1, to: 220, attack: 0.3 });
+      noise(0.8, { filter: 'bandpass', freq: 1800, q: 4, vol: 0.06, attack: 0.3 });
+    },
+    shieldDown() {
+      noise(0.5, { filter: 'highpass', freq: 3000, vol: 0.2 });
+      [79, 76, 72, 67].forEach((n, i) => tone(midi(n), 0.2, { type: 'triangle', vol: 0.06, delay: i * 0.05 }));
+    },
+
     // Ouverture du sondage du donjon : carillon à deux notes et roulement.
     pollOpen() {
       [[76, 0], [72, 0.35], [79, 0.7]].forEach(([n, d]) => tone(midi(n), 0.6, { type: 'triangle', vol: 0.12, delay: d }));

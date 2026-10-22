@@ -1,5 +1,6 @@
 /*
- * Dessin des monstres du donjon (gobelin, slime, chauve-souris, squelette) et du Troll (Combat de Boss).
+ * Dessin des monstres du donjon (gobelin, slime, chauve-souris, squelette) et des boss (Troll, Dragon, Magicien des
+ * ténèbres) avec leurs créatures (œufs, dragonnets, cristaux d'ombre).
  * Même repère que drawFighter : (x, y) au centre du corps, ombre au sol vers y + 18.
  * o = { scale, facing (1|-1), bob, flash (0..1), swing (0..1), t (ms, pour les animations), alpha }
  */
@@ -344,20 +345,302 @@
     });
   }
 
+  /*
+   * Pyrax le Dragon, vu de profil (tourné vers la droite), dans le même repère « taille réelle » que le Troll.
+   * o.flying : ailes déployées, sans ombre (l'arène dessine l'ombre au sol) ; o.swing : gueule ouverte ;
+   * o.whelp : petit dragonnet (couleurs plus claires) ; o.phase / o.enraged : flammes aux naseaux.
+   */
+  function dragon(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const whelp = !!o.whelp;
+    const flying = !!o.flying;
+    const swing = o.swing || 0;
+    const red = whelp ? '#e0702c' : o.enraged ? '#d02820' : '#b8322a';
+    const dark = shade(red, -0.35);
+    const belly = whelp ? '#ffd27a' : '#f2b45a';
+    const membrane = whelp ? 'rgba(255,170,90,.85)' : 'rgba(120,28,24,.92)';
+    const flap = Math.sin(t * (flying ? 7 : 2.4) + (o.seed || 0)) * (flying ? 0.55 : 0.18);
+    const breathe = Math.sin(t * 2) * 1.5;
+    if (!flying) shadow(ctx, 62, 50);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(0,0,0,.45)';
+    ctx.lineWidth = 2.5;
+    // queue qui ondule, terminée par une pointe
+    ctx.fillStyle = red;
+    ctx.beginPath();
+    const tw = Math.sin(t * 2.2) * 8;
+    ctx.moveTo(-34, 4);
+    ctx.quadraticCurveTo(-70, 30 + tw, -104, 8 - tw);
+    ctx.lineTo(-96, 0 - tw);
+    ctx.quadraticCurveTo(-66, 14 + tw, -36, -14);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.moveTo(-104, 8 - tw); ctx.lineTo(-122, -2 - tw); ctx.lineTo(-100, -6 - tw); ctx.closePath(); ctx.fill();
+    // aile arrière
+    const wing = (dir, alpha) => {
+      ctx.save();
+      ctx.translate(-6, -26);
+      ctx.rotate(-0.35 - flap * dir);
+      ctx.globalAlpha *= alpha;
+      ctx.fillStyle = membrane;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-30, -70);
+      ctx.lineTo(-10, -58); ctx.lineTo(-4, -84); ctx.lineTo(14, -60); ctx.lineTo(30, -76); ctx.lineTo(40, -40);
+      ctx.quadraticCurveTo(26, -10, 0, 0);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = dark; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-30, -70); ctx.moveTo(0, 0); ctx.lineTo(-4, -84); ctx.moveTo(0, 0); ctx.lineTo(30, -76); ctx.stroke();
+      ctx.restore();
+    };
+    wing(-1, 0.7);
+    // pattes
+    ctx.fillStyle = dark;
+    const legs = flying ? 10 : 0;
+    rr(ctx, -30, 14 + legs * 0.5, 16, 34 - legs, 7); ctx.fill(); ctx.stroke();
+    rr(ctx, 14, 14 + legs * 0.5, 16, 34 - legs, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f2ead2';
+    for (const x of [-28, -22, 16, 22]) { ctx.beginPath(); ctx.moveTo(x, 46 - legs * 0.5); ctx.lineTo(x + 3, 52 - legs * 0.5); ctx.lineTo(x + 6, 46 - legs * 0.5); ctx.fill(); }
+    // corps
+    const body = ctx.createRadialGradient(0, -14, 8, 0, 0, 60);
+    body.addColorStop(0, shade(red, 0.18));
+    body.addColorStop(1, dark);
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(0, 0 + breathe * 0.4, 50, 32, -0.08, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // ventre écaillé
+    ctx.fillStyle = belly;
+    ctx.beginPath(); ctx.ellipse(8, 14 + breathe * 0.4, 34, 15, -0.08, 0, Math.PI); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,60,10,.45)'; ctx.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(8 + i * 12, 15); ctx.lineTo(8 + i * 12, 27); ctx.stroke(); }
+    // crête dorsale
+    ctx.fillStyle = dark;
+    for (let i = 0; i < 6; i++) {
+      const x = -40 + i * 13;
+      const y = -26 - Math.sin((i / 5) * Math.PI) * 6;
+      ctx.beginPath(); ctx.moveTo(x - 5, y + 4); ctx.lineTo(x, y - 10); ctx.lineTo(x + 5, y + 4); ctx.fill();
+    }
+    // cou et tête
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 2.5;
+    ctx.fillStyle = red;
+    ctx.beginPath();
+    ctx.moveTo(26, -18); ctx.quadraticCurveTo(48, -40, 52, -62); ctx.lineTo(72, -58); ctx.quadraticCurveTo(64, -24, 44, 6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    const hx = 66;
+    const hy = -66 + breathe;
+    const jaw = 0.12 + swing * 0.5;
+    // mâchoire inférieure
+    ctx.save();
+    ctx.translate(hx - 4, hy + 6);
+    ctx.rotate(jaw);
+    ctx.fillStyle = dark;
+    rr(ctx, 0, -4, 38, 10, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(8 + i * 8, -4); ctx.lineTo(11 + i * 8, -10); ctx.lineTo(14 + i * 8, -4); ctx.fill(); }
+    ctx.restore();
+    // crâne et museau
+    ctx.fillStyle = red;
+    ctx.beginPath(); ctx.ellipse(hx, hy, 20, 15, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    rr(ctx, hx + 2, hy - 8, 40, 16, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(hx + 12 + i * 8, hy + 8); ctx.lineTo(hx + 15 + i * 8, hy + 14); ctx.lineTo(hx + 18 + i * 8, hy + 8); ctx.fill(); }
+    // cornes
+    ctx.fillStyle = '#efe2c0';
+    ctx.beginPath(); ctx.moveTo(hx - 12, hy - 8); ctx.quadraticCurveTo(hx - 34, hy - 26, hx - 30, hy - 40); ctx.quadraticCurveTo(hx - 18, hy - 24, hx - 4, hy - 13); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx - 2, hy - 12); ctx.quadraticCurveTo(hx - 12, hy - 32, hx - 4, hy - 42); ctx.quadraticCurveTo(hx, hy - 26, hx + 8, hy - 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // œil qui brille
+    ctx.save();
+    ctx.shadowColor = '#ffd23f';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffe35a';
+    ctx.beginPath(); ctx.ellipse(hx + 6, hy - 4, 5, 3.5, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(hx + 6, hy - 7, 1.8, 6);
+    // naseaux fumants
+    ctx.fillStyle = '#3a0d0a';
+    ctx.beginPath(); ctx.arc(hx + 38, hy - 3, 2, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 2; i++) {
+      const k = (t * 1.2 + i / 2) % 1;
+      ctx.fillStyle = o.enraged || o.phase ? `rgba(255,140,40,${0.5 * (1 - k)})` : `rgba(200,200,200,${0.3 * (1 - k)})`;
+      ctx.beginPath(); ctx.arc(hx + 44 + k * 16, hy - 6 - k * 14, 3 + k * 5, 0, Math.PI * 2); ctx.fill();
+    }
+    // aile avant
+    wing(1, 1);
+    flashOver(ctx, o.flash, () => {
+      ctx.beginPath(); ctx.ellipse(0, 0, 50, 32, -0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(hx, hy, 20, 15, 0, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  // Dragonnet : un petit dragon (même dessin, réduit) qui sort d'un œuf.
+  function dragonnet(ctx, o) {
+    ctx.save();
+    ctx.scale(0.3, 0.3);
+    ctx.translate(0, 4);
+    dragon(ctx, Object.assign({}, o, { whelp: true, flash: o.flash }));
+    ctx.restore();
+    shadow(ctx, 16, 17);
+  }
+
+  // Œuf de dragon : se fissure à l'approche de l'éclosion (o.crack de 0 à 1).
+  function oeuf(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const crack = o.crack || 0;
+    const wobble = crack > 0.6 ? Math.sin(t * 30) * crack * 0.12 : 0;
+    shadow(ctx, 15, 17);
+    ctx.save();
+    ctx.translate(0, 16);
+    ctx.rotate(wobble);
+    const g = ctx.createRadialGradient(-5, -26, 3, 0, -16, 26);
+    g.addColorStop(0, '#fff1c7');
+    g.addColorStop(0.55, '#e7a94a');
+    g.addColorStop(1, '#8a4a16');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = 'rgba(0,0,0,.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -18, 15, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(150,40,20,.55)';
+    for (const [x, y, r] of [[-6, -26, 3], [5, -16, 4], [-3, -9, 2.5], [7, -30, 2]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    if (crack > 0.2) {
+      ctx.save();
+      ctx.shadowColor = '#ff8a1f';
+      ctx.shadowBlur = 8 * crack;
+      ctx.strokeStyle = `rgba(255,${200 - crack * 120},60,${0.5 + crack * 0.5})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-12, -22); ctx.lineTo(-5, -18); ctx.lineTo(-8, -12); ctx.lineTo(0, -8);
+      if (crack > 0.5) { ctx.moveTo(-5, -18); ctx.lineTo(3, -24); ctx.lineTo(10, -20); }
+      if (crack > 0.8) { ctx.moveTo(0, -8); ctx.lineTo(6, -6); ctx.lineTo(12, -12); }
+      ctx.stroke();
+      ctx.restore();
+    }
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -18, 15, 20, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  /*
+   * Malvorath le Magicien des ténèbres (et ses illusions) : longue robe, capuche, yeux violets, bâton à orbe.
+   * Il flotte au-dessus du sol. o.swing : il lève son bâton pour lancer un sort.
+   */
+  function sorcier(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const float = Math.sin(t * 2.4 + (o.seed || 0)) * 4;
+    shadow(ctx, 30, 42);
+    ctx.save();
+    ctx.translate(0, float - 6);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
+    ctx.lineWidth = 2;
+    // cape qui flotte
+    ctx.fillStyle = '#160a26';
+    ctx.beginPath();
+    const wave = Math.sin(t * 3) * 5;
+    ctx.moveTo(-14, -34); ctx.quadraticCurveTo(-40, 0, -34 + wave, 40); ctx.lineTo(26, 40); ctx.quadraticCurveTo(30, 0, 14, -34);
+    ctx.closePath(); ctx.fill();
+    // robe étoilée
+    const robe = ctx.createLinearGradient(0, -30, 0, 44);
+    robe.addColorStop(0, '#4a2478');
+    robe.addColorStop(1, '#1f0d38');
+    ctx.fillStyle = robe;
+    ctx.beginPath();
+    ctx.moveTo(-14, -30); ctx.lineTo(14, -30); ctx.lineTo(26, 38);
+    ctx.lineTo(16, 34); ctx.lineTo(8, 40); ctx.lineTo(0, 34); ctx.lineTo(-8, 40); ctx.lineTo(-16, 34); ctx.lineTo(-26, 38);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(214,170,255,.8)';
+    for (const [x, y] of [[-8, 0], [6, 14], [-12, 24], [12, -10], [2, 28]]) {
+      ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x + 1, y - 1); ctx.lineTo(x + 3, y); ctx.lineTo(x + 1, y + 1); ctx.lineTo(x, y + 3); ctx.lineTo(x - 1, y + 1); ctx.lineTo(x - 3, y); ctx.lineTo(x - 1, y - 1); ctx.closePath(); ctx.fill();
+    }
+    // ceinture et bras arrière
+    ctx.fillStyle = '#c9a646';
+    ctx.fillRect(-15, 2, 30, 4);
+    ctx.fillStyle = '#2d1550';
+    ctx.beginPath(); ctx.ellipse(-16, -12, 7, 16, 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // capuche pointue
+    ctx.fillStyle = '#2a1148';
+    ctx.beginPath();
+    ctx.moveTo(-17, -30); ctx.quadraticCurveTo(-18, -58, 0, -66); ctx.quadraticCurveTo(10, -76, 24, -86);
+    ctx.quadraticCurveTo(14, -66, 18, -52); ctx.quadraticCurveTo(20, -38, 17, -30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // visage dans l'ombre, yeux qui brillent
+    ctx.fillStyle = '#05020a';
+    ctx.beginPath(); ctx.ellipse(1, -44, 11, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#c56bff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#e7b8ff';
+    ctx.beginPath(); ctx.ellipse(-3, -46, 2.6, 1.6, -0.15, 0, Math.PI * 2); ctx.ellipse(6, -46, 2.6, 1.6, 0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // barbe grise
+    ctx.fillStyle = '#9a95a8';
+    ctx.beginPath(); ctx.moveTo(-7, -36); ctx.lineTo(9, -36); ctx.lineTo(4, -18); ctx.lineTo(1, -24); ctx.lineTo(-2, -16); ctx.closePath(); ctx.fill();
+    // bâton à orbe (levé pour lancer un sort)
+    ctx.save();
+    ctx.translate(18, -6);
+    ctx.rotate(0.12 - swing * 0.5);
+    ctx.fillStyle = '#3b2412';
+    rr(ctx, -2, -56, 4, 84, 2); ctx.fill();
+    ctx.fillStyle = '#5c3a1c';
+    ctx.beginPath(); ctx.moveTo(-6, -58); ctx.quadraticCurveTo(0, -72, 6, -58); ctx.lineTo(3, -54); ctx.lineTo(-3, -54); ctx.closePath(); ctx.fill();
+    const glow = 0.6 + Math.sin(t * 5) * 0.2 + swing * 0.4;
+    const orb = ctx.createRadialGradient(0, -64, 1, 0, -64, 12);
+    orb.addColorStop(0, '#fff');
+    orb.addColorStop(0.4, `rgba(200,120,255,${glow})`);
+    orb.addColorStop(1, 'rgba(110,30,200,0)');
+    ctx.fillStyle = orb;
+    ctx.beginPath(); ctx.arc(0, -64, 12 + swing * 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // main osseuse
+    ctx.fillStyle = '#cfc6d8';
+    ctx.beginPath(); ctx.arc(18, -6, 4, 0, Math.PI * 2); ctx.fill();
+    flashOver(ctx, o.flash, () => {
+      ctx.beginPath(); ctx.moveTo(-14, -30); ctx.lineTo(14, -30); ctx.lineTo(26, 38); ctx.lineTo(-26, 38); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(1, -46, 16, 18, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Cristal d'ombre : nourrit le bouclier du Magicien tant qu'il tient debout.
+  function cristal(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const hover = Math.sin(t * 2.5 + (o.seed || 0)) * 3;
+    shadow(ctx, 14, 18);
+    ctx.save();
+    ctx.translate(0, hover - 4);
+    ctx.save();
+    ctx.shadowColor = '#b06bff';
+    ctx.shadowBlur = 16 + Math.sin(t * 6) * 6;
+    const g = ctx.createLinearGradient(-12, -36, 12, 10);
+    g.addColorStop(0, '#f0d8ff');
+    g.addColorStop(0.45, '#9b59ff');
+    g.addColorStop(1, '#3a1470');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -38); ctx.lineTo(12, -16); ctx.lineTo(8, 10); ctx.lineTo(-8, 10); ctx.lineTo(-12, -16);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(0, 10); ctx.moveTo(-12, -16); ctx.lineTo(12, -16); ctx.stroke();
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(12, -16); ctx.lineTo(8, 10); ctx.lineTo(-8, 10); ctx.lineTo(-12, -16); ctx.closePath(); ctx.fill(); });
+    ctx.restore();
+  }
+
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
     const f = (c) => Math.max(0, Math.min(255, Math.round(k >= 0 ? c + (255 - c) * k : c * (1 + k))));
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll };
+  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal };
+  // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
+  const BOSS_KINDS = ['troll', 'dragon', 'sorcier'];
 
   function drawMonster(ctx, x, y, m, o = {}) {
     const draw = DRAW[m.kind];
     if (!draw) return;
     ctx.save();
     ctx.translate(x, y + (o.bob || 0));
-    const s = (o.scale || 1) * (m.kind === 'troll' ? 1 : (m.scale || 1));
+    const s = (o.scale || 1) * (BOSS_KINDS.includes(m.kind) ? 1 : (m.scale || 1));
     ctx.scale(s * (o.facing || 1), s);
     ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
     draw(ctx, o, !!m.elite);

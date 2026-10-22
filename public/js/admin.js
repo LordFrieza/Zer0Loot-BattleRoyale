@@ -20,7 +20,9 @@ async function run(url, body = {}) {
 
 // ---------- Mode de jeu ----------
 let selectedMode = 'br';
+let selectedBoss = 'troll';
 try { if (Rules.GAME_MODES[localStorage.getItem('zl_admin_mode')]) selectedMode = localStorage.getItem('zl_admin_mode'); } catch (e) { /* ignore */ }
+try { if (Rules.BOSSES[localStorage.getItem('zl_admin_boss')]) selectedBoss = localStorage.getItem('zl_admin_boss'); } catch (e) { /* ignore */ }
 
 function renderModes() {
   $('mode-btns').innerHTML = Object.entries(Rules.GAME_MODES).map(([k, m]) =>
@@ -32,8 +34,23 @@ function renderModes() {
       renderModes();
     };
   });
+  // Choix du boss, une fois « Combat de Boss » sélectionné
+  $('boss-pick').style.display = selectedMode === 'boss' ? '' : 'none';
+  $('boss-pick').innerHTML = '<div class="boss-pick-title">Boss à affronter</div>' + Object.values(Rules.BOSSES).map((B) =>
+    `<button class="${selectedBoss === B.id ? 'active' : ''}" data-boss="${B.id}" style="--c:${B.color}" title="${esc(B.desc)}">${B.icon} ${esc(B.name)}</button>`).join('');
+  $('boss-pick').querySelectorAll('[data-boss]').forEach((b) => {
+    b.onclick = () => {
+      selectedBoss = b.dataset.boss;
+      try { localStorage.setItem('zl_admin_boss', selectedBoss); } catch (e) { /* ignore */ }
+      renderModes();
+    };
+  });
   const m = Rules.GAME_MODES[selectedMode];
   let desc = `<b style="color:${m.color}">${m.icon} ${m.label}</b> — ${m.desc}`;
+  if (selectedMode === 'boss') desc += `<br><b style="color:${Rules.BOSSES[selectedBoss].color}">${Rules.BOSSES[selectedBoss].name}</b> : ${Rules.BOSSES[selectedBoss].desc}`;
+  if (queue && ['queue', 'ready'].includes(queue.phase) && queue.mode === 'boss' && selectedMode === 'boss' && queue.boss !== selectedBoss) {
+    desc += `<br>⚠️ La file ouverte est contre <b>${Rules.BOSSES[queue.boss].name}</b> : rouvre la file pour changer de boss.`;
+  }
   if (queue && ['queue', 'ready'].includes(queue.phase) && queue.mode !== selectedMode) {
     desc += `<br>⚠️ La file ouverte est en mode <b>${Rules.GAME_MODES[queue.mode].label}</b> : rouvre la file pour changer de mode.`;
   }
@@ -41,10 +58,11 @@ function renderModes() {
   $('open').textContent = `Ouvrir la file (${m.label})`;
   // Le bouton de lancement suit le mode de la file ouverte (ou le mode choisi s'il n'y a pas de file).
   const live = queue && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.mode : selectedMode;
-  $('start').textContent = live === 'boss' ? '👹 LANCER LE COMBAT DE BOSS' : live === 'dungeon' ? '🏰 LANCER LE RAID' : '⚔️ LANCER LA BATAILLE';
+  const liveBoss = Rules.BOSSES[queue && queue.boss && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.boss : selectedBoss];
+  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : '⚔️ LANCER LA BATAILLE';
 }
 
-$('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode });
+$('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
 $('close').onclick = () => run('/api/admin/queue/close');
 $('reset').onclick = () => {
   if (queue && queue.phase === 'battle' && !confirm('Annuler la bataille en cours ? Aucune récompense de victoire ne sera donnée.')) return;
