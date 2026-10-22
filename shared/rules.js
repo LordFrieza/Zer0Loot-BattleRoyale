@@ -356,6 +356,24 @@
       label: 'Raid de Donjon', icon: '🏰', color: '#5fd3ff', coop: true, minPlayers: 1,
       desc: 'Salle après salle, les aventuriers affrontent des monstres de plus en plus forts. Pas de réapparition !',
     },
+    koth: {
+      label: 'Roi de la Colline', icon: '👑', color: '#ffd23f', coop: false, minPlayers: 2,
+      desc: 'Chacun pour soi, mais personne n\'est éliminé : tenez la colline pour marquer des points. Les morts reviennent au combat.',
+    },
+  };
+
+  /*
+   * Roi de la Colline : 2 min 30 de combat, chacun pour soi. Une colline (cercle au sol) change de place toutes les
+   * 30 s (annoncée 5 s avant). Chaque seconde passée dessus rapporte 1 point, 3 points si l'on y est SEUL (le Roi) ;
+   * un kill rapporte 5 points. Les morts reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s.
+   * Le meilleur score gagne (égalité : le plus de kills, puis au hasard).
+   */
+  const KOTH = {
+    duration: 150,
+    hill: { radius: 120, moveEvery: 30, warn: 5, margin: 200, minJump: 300 },
+    points: { hill: 1, king: 3, kill: 3 },
+    respawn: 4,
+    protect: 1.5,
   };
 
   /*
@@ -1070,7 +1088,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, GAME_MODES, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    BATTLE_EVENTS, GAME_MODES, KOTH, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

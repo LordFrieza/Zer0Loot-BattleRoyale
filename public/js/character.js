@@ -827,11 +827,11 @@ $('fuse-go').onclick = async () => {
   ]);
   $('boss-others').querySelectorAll('.boss-mini').forEach((cv) => {
     const kind = cv.dataset.kind;
-    drawMonster(cv.getContext('2d'), kind === 'dragon' ? 52 : 60, kind === 'dragon' ? 86 : 84, { kind }, { scale: kind === 'dragon' ? 0.62 : 0.8, t: 0 });
+    drawMonster(cv.getContext('2d'), kind === 'dragon' ? 66 : 60, kind === 'dragon' ? 76 : 84, { kind }, { scale: kind === 'dragon' ? 0.48 : 0.8, t: 0 });
   });
   const R = B.reward;
   $('boss-rewards').innerHTML = `<tr><th>Résultat</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>
-    <tr><td><b>🏆 Troll vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
+    <tr><td><b>🏆 Boss vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
       <td>+${R.xp} XP</td><td>+${R.gold} 🪙</td><td>+${R.chests} <i class="ico-chest"></i></td></tr>
     <tr><td><b>💀 Tout le monde est tombé</b><div class="muted" style="font-size:12px">Seulement l'XP de participation</div></td>
       <td>+${Rules.REWARDS.participation.xp} XP</td><td>—</td><td>—</td></tr>`;
@@ -854,6 +854,24 @@ $('fuse-go').onclick = async () => {
     + `<tr><td><b>Salles 1 à 4</b></td><td>+${Rules.REWARDS.participation.xp} XP <span class="muted">(participation)</span></td><td>—</td><td>—</td></tr>`
     + tiers.map((r) => `<tr><td><b>Salle ${r.tier}${r.tier === 30 ? ' et +' : ` à ${r.tier + 4}`}</b></td><td>+${r.xp} XP</td><td>+${r.gold} 🪙</td><td>${r.chests ? '+' + r.chests + ' <i class="ico-chest"></i>' : '—'}</td></tr>`).join('')
     + '<tr><td colspan="4" class="muted" style="font-size:12px">Puis +1 coffre et +250 XP / golds toutes les 5 salles.</td></tr>';
+
+  const K = Rules.KOTH;
+  $('koth-rules').innerHTML = [
+    `Une <b>colline</b> (cercle doré au sol) au centre de l'arène. Chaque seconde passée dessus rapporte <b>${K.points.hill} point</b>, et <b>${K.points.king} points</b> si tu y es <b>seul</b> : tu es alors le <b>Roi 👑</b>.`,
+    `Chaque kill rapporte <b>${K.points.kill} points</b>. Les morts <b>reviennent au combat</b> au bord de l'arène au bout de ${K.respawn} s, protégés ${String(K.protect).replace('.', ',')} s.`,
+    `Toutes les ${K.hill.moveEvery} s, la colline <b>change de place</b> : le nouvel endroit s'affiche en pointillés ${K.hill.warn} s avant.`,
+    `Au bout de ${Math.floor(K.duration / 60)} min ${K.duration % 60} s, le <b>meilleur score gagne</b> (égalité : le plus de kills). Le vainqueur reçoit la récompense de victoire du Battle Royale, et <b>les paris sont ouverts</b>.`,
+    `Les Guerriers et les Prêtres, solides, tiennent bien la colline ; les Mages nettoient les groupes qui s'y entassent.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const kc = $('koth-portrait').getContext('2d');
+  kc.fillStyle = 'rgba(255,210,63,.25)';
+  kc.strokeStyle = '#ffd23f';
+  kc.lineWidth = 3;
+  kc.beginPath(); kc.ellipse(75, 82, 62, 22, 0, 0, Math.PI * 2); kc.fill(); kc.stroke();
+  drawFighter(kc, 75, 62, { name: 'Roi', cls: 'guerrier', look: {} }, { scale: 1.5 });
+  kc.font = '26px "Segoe UI Emoji", sans-serif';
+  kc.textAlign = 'center';
+  kc.fillText('👑', 75, 20);
 
   // Portraits
   const bc = $('boss-portrait').getContext('2d');
@@ -1189,7 +1207,7 @@ function renderBets() {
   const box = $('bet-box');
   if (queue && ['idle', 'queue', 'ready'].includes(queue.phase)) lastBetResult = null; // nouvelle bataille
   // Pas de paris dans les modes coopératifs (Combat de Boss, Raid de Donjon).
-  const coop = queue && queue.mode && queue.mode !== 'br';
+  const coop = queue && queue.mode && Rules.GAME_MODES[queue.mode] && Rules.GAME_MODES[queue.mode].coop;
   if (!queue || !queue.bets || coop || queue.phase === 'idle' || (queue.phase === 'ended' && !queue.bets.lastResult && !lastBetResult)) {
     box.style.display = 'none';
     return;
@@ -1288,7 +1306,7 @@ function renderQueue() {
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const QB = Rules.BOSSES[queue.boss];
-    const what = queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    const what = queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
     if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
@@ -1296,6 +1314,7 @@ function renderQueue() {
     let text;
     if (r.mode === 'boss') text = r.victory ? `🏆 ${r.boss.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${r.boss.name} a gagné… Retentez votre chance !`;
     else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
+    else if (r.mode === 'koth') text = r.winner ? `👑 ${esc(r.winner.name)} est le Roi de la Colline (${r.winner.score} points, ${r.winner.kills} kill(s)) !` : 'Partie terminée.';
     else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
     box.innerHTML = `<b>${text}</b>`;
   }

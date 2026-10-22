@@ -437,6 +437,11 @@
       [79, 76, 72, 67].forEach((n, i) => tone(midi(n), 0.2, { type: 'triangle', vol: 0.06, delay: i * 0.05 }));
     },
 
+    // Roi de la Colline : la colline change de place.
+    hillMove() {
+      [72, 76, 79].forEach((n, i) => tone(midi(n), 0.16, { type: 'square', vol: 0.05, delay: i * 0.07 }));
+    },
+
     // Ouverture du sondage du donjon : carillon à deux notes et roulement.
     pollOpen() {
       [[76, 0], [72, 0.35], [79, 0.7]].forEach(([n, d]) => tone(midi(n), 0.6, { type: 'triangle', vol: 0.12, delay: d }));

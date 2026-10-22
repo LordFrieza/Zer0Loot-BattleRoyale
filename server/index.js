@@ -534,9 +534,10 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
   if (battle.mode !== 'br') {
     // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
     battle.start(refreshParticipant, null);
-    twitch.say(battle.mode === 'boss'
-      ? `${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name} débarque ! Tous ensemble contre lui !`
-      : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
+    const B = Rules.BOSSES[battle.bossId];
+    twitch.say(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
+      : battle.mode === 'koth' ? `👑 Roi de la Colline : tenez la colline pendant ${Math.round(Rules.KOTH.duration / 60 * 10) / 10} min ! Les morts reviennent au combat.`
+        : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
     return { event: null, pendingEvent };
   }
   const keys = Object.keys(Rules.BATTLE_EVENTS);
@@ -603,7 +604,8 @@ battle.on('end', (winner, fighters) => {
     pushMe(user);
   }
   db.save();
-  if (winner) twitch.say(`🏆 ${winner.name} remporte le Battle Royale avec ${winner.kills} kill(s) !`);
+  if (winner && battle.mode === 'koth') twitch.say(`👑 ${winner.name} est le Roi de la Colline avec ${Math.floor(winner.score)} points (${winner.kills} kill(s)) !`);
+  else if (winner) twitch.say(`🏆 ${winner.name} remporte le Battle Royale avec ${winner.kills} kill(s) !`);
 
   const betResults = bets.settle(winner ? winner.key : null, winner ? winner.name : null);
   notifyBets(betResults);

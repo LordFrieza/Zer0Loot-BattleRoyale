@@ -8,6 +8,7 @@
  *  - Si personne n'a parié sur le gagnant, ou si la bataille est annulée : tout le monde est remboursé.
  */
 const db = require('./db');
+const Rules = require('../shared/rules');
 
 function state() {
   if (!db.state.bets) db.state.bets = { list: {}, lastResult: null };
@@ -53,9 +54,9 @@ class Bets {
     return state().list;
   }
 
-  // Paris uniquement en Battle Royale (il n'y a pas de gagnant unique dans les modes coopératifs).
+  // Paris seulement dans les modes à gagnant unique (Battle Royale, Roi de la Colline), jamais en coopération.
   open() {
-    return (this.battle.phase === 'queue' || this.battle.phase === 'ready') && this.battle.mode === 'br';
+    return (this.battle.phase === 'queue' || this.battle.phase === 'ready') && !Rules.GAME_MODES[this.battle.mode].coop;
   }
 
   myBet(userId) {

@@ -195,6 +195,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
     de 120 px purifie aussitôt, lui compris) et **zones d'ombre** sous les pieds des combattants. À **70 %** et **20 %**,
     **bouclier** : il est intouchable tant que ses 4 **cristaux** tiennent (et ils le soignent). À **45 %**, il se
     **dédouble** en 3 illusions fragiles qui attaquent aussi : les dégâts de zone font la différence.
+  - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline
+    (cercle doré) se tient au sol ; chaque seconde dessus rapporte 1 point, **3 points si l'on y est seul** (le Roi 👑),
+    et chaque kill 3 points. Toutes les 30 s, la colline change de place (annoncée en pointillés 5 s avant). Les morts
+    reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s. Le meilleur score gagne (égalité : le plus de kills) et
+    reçoit la récompense de victoire du Battle Royale ; les paris sont ouverts comme en Battle Royale, pas les
+    événements de bataille ni les récompenses de kill. Classement en direct dans l'arène.
   - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
     squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
     gauche, sortie par la droite, fondu au noir et grand « SALLE X ». L'ambiance change toutes les 5 salles : Cachots,

@@ -117,6 +117,7 @@ class Battle extends EventEmitter {
     this.players = [];
     this.boss = null;
     this.dungeon = null;
+    this.koth = null;
     this.slams = [];
     this.result = null;
     this.changed();
@@ -150,6 +151,7 @@ class Battle extends EventEmitter {
     this.fighters = [...this.players];
     this.boss = null;
     this.dungeon = null;
+    this.koth = null;
     this.firstBlood = false;
     this.event = event;
     this.fogs = [];
@@ -162,9 +164,14 @@ class Battle extends EventEmitter {
     this.events = [];
     this.result = null;
 
-    if (this.mode === 'br') {
+    if (this.mode === 'br' || this.mode === 'koth') {
       const positions = spawnPositions(this.players.length);
       this.players.forEach((f, i) => Object.assign(f, positions[i]));
+      if (this.mode === 'koth') {
+        const K = Rules.KOTH;
+        this.koth = { hill: { x: ARENA.w / 2, y: ARENA.h / 2, r: K.hill.radius }, next: null, moveAt: K.hill.moveEvery, king: null };
+        for (const f of this.players) f.score = 0;
+      }
     } else if (this.mode === 'boss') {
       this.setupBoss();
     } else {
@@ -196,7 +203,7 @@ class Battle extends EventEmitter {
       look: p.look,
       level: p.level,
       kind: 'player',
-      team: this.mode === 'br' ? p.key : HEROES,
+      team: Rules.GAME_MODES[this.mode].coop ? HEROES : p.key, // Battle Royale, Roi de la Colline : chacun pour soi
       hp: s.maxHp,
       maxHp: s.maxHp,
       damage: s.damage,
@@ -286,7 +293,7 @@ class Battle extends EventEmitter {
 
   // Intouchable pour cet attaquant ? (Dragon en vol ou parti, Magicien protégé par son bouclier)
   immune(target, attacker) {
-    if (target.away || target.shielded) return true;
+    if (target.away || target.shielded || target.protectUntil > this.time) return true;
     return !!(target.flying && attacker && attacker.range < target.flyMinRange);
   }
 
@@ -855,14 +862,20 @@ class Battle extends EventEmitter {
         // Un ennemi invisible (potion) ne peut pas être ciblé.
         if (o.team === f.team || !o.alive || this.isInvisible(o) || this.immune(o, f)) continue;
         const d = Math.hypot(o.x - f.x, o.y - f.y);
-        const score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
+        let score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
+        // Roi de la Colline : on se bat de préférence pour la colline.
+        if (this.koth) score += Math.hypot(o.x - this.koth.hill.x, o.y - this.koth.hill.y) * (f.hunter ? 3 : 1.5);
         if (score < fallbackScore) { fallbackScore = score; fallback = o; }
         // Brouillard : un ennemi caché n'est visible que de près.
         if (d > FOG_SEE_RANGE && this.inFog(o)) continue;
         if (score < bestScore) { bestScore = score; best = o; }
       }
       best = best || fallback;
-      if (!best) { f.targetKey = null; continue; }
+      if (!best) {
+        f.targetKey = null;
+        if (this.koth) this.walkTo(f, this.koth.hill, dt);
+        continue;
+      }
       f.targetKey = best.key;
 
       // Barre de stamina pleine : l'ultime part tout seul.
@@ -936,9 +949,77 @@ class Battle extends EventEmitter {
       }
     }
 
+    if (this.koth) this.updateKoth(dt);
+
     if (this.mode === 'br') this.checkBrEnd();
+    else if (this.mode === 'koth') this.checkKothEnd();
     else if (this.mode === 'boss') this.checkBossEnd();
     else this.checkDungeonEnd();
+  }
+
+  // ---------- Roi de la Colline ----------
+
+  walkTo(f, p, dt) {
+    const dx = p.x - f.x;
+    const dy = p.y - f.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 4) return;
+    const step = Math.min(dist, f.speed * this.buffMult(f, 'speed') * dt);
+    f.x += (dx / dist) * step;
+    f.y += (dy / dist) * step;
+  }
+
+  updateKoth(dt) {
+    const K = Rules.KOTH;
+    const k = this.koth;
+    // Réapparition au bord de l'arène, protégé un court instant
+    for (const f of this.players) {
+      if (f.alive || f.respawnAt == null || this.time < f.respawnAt) continue;
+      const side = Math.floor(Math.random() * 4);
+      const along = Math.random();
+      const x = side === 0 ? 50 : side === 1 ? ARENA.w - 50 : 60 + along * (ARENA.w - 120);
+      const y = side === 2 ? 50 : side === 3 ? ARENA.h - 50 : 60 + along * (ARENA.h - 120);
+      Object.assign(f, {
+        alive: true, hp: f.maxHp, x, y, buffs: [], stunUntil: 0, targetKey: null, cd: 0.5,
+        respawnAt: null, diedAt: null, protectUntil: this.time + K.protect,
+      });
+      this.events.push({ t: 'respawn', to: f.key, x: Math.round(x), y: Math.round(y) });
+    }
+    // La colline change de place (annoncée quelques secondes avant)
+    if (!k.next && this.time >= k.moveAt - K.hill.warn) {
+      let spot = null;
+      for (let i = 0; i < 20 && !spot; i++) {
+        const c = { x: K.hill.margin + Math.random() * (ARENA.w - 2 * K.hill.margin), y: K.hill.margin * 0.75 + Math.random() * (ARENA.h - 1.5 * K.hill.margin) };
+        if (Math.hypot(c.x - k.hill.x, c.y - k.hill.y) >= K.hill.minJump) spot = c;
+      }
+      k.next = spot || { x: ARENA.w - k.hill.x, y: ARENA.h - k.hill.y };
+      this.events.push({ t: 'hillWarn', x: Math.round(k.next.x), y: Math.round(k.next.y) });
+    }
+    if (this.time >= k.moveAt) {
+      k.hill.x = k.next.x;
+      k.hill.y = k.next.y;
+      k.next = null;
+      k.moveAt += K.hill.moveEvery;
+      this.events.push({ t: 'hillMove', x: Math.round(k.hill.x), y: Math.round(k.hill.y) });
+    }
+    // Points : 1 par seconde sur la colline, 3 si l'on y est seul (le Roi)
+    const inside = this.players.filter((f) => f.alive && Math.hypot(f.x - k.hill.x, f.y - k.hill.y) <= k.hill.r);
+    const king = inside.length === 1 ? inside[0] : null;
+    for (const f of inside) f.score += (king ? K.points.king : K.points.hill) * dt;
+    const kingKey = king ? king.key : null;
+    if (kingKey !== k.king) {
+      k.king = kingKey;
+      if (king) this.events.push({ t: 'king', to: king.key });
+    }
+  }
+
+  // Fin du temps : le meilleur score gagne (égalité : le plus de kills, puis au hasard).
+  checkKothEnd() {
+    if (this.time < Rules.KOTH.duration) return;
+    const sorted = [...this.players].sort((a, b) => Math.floor(b.score) - Math.floor(a.score) || b.kills - a.kills || Math.random() - 0.5);
+    const winner = sorted[0];
+    if (!winner.alive) { winner.alive = true; winner.hp = winner.maxHp; } // le vainqueur est debout pour la photo
+    this.finish(winner);
   }
 
   checkBrEnd() {
@@ -1324,6 +1405,10 @@ class Battle extends EventEmitter {
     victim.diedAt = this.time;
     if (this.dungeon) victim.diedRoom = this.dungeon.room;
     this.events.push({ t: 'kill', from: killer ? killer.key : null, to: victim.key });
+    if (this.koth) {
+      victim.respawnAt = this.time + Rules.KOTH.respawn;
+      if (killer && killer.team !== victim.team) killer.score += Rules.KOTH.points.kill;
+    }
     if (victim === this.boss) this.events.push({ t: 'bossDown', x: Math.round(victim.x), y: Math.round(victim.y) });
     if (!killer) return;
     killer.kills += 1;
@@ -1350,15 +1435,18 @@ class Battle extends EventEmitter {
   finish(winner) {
     this.stopLoop();
     this.phase = 'ended';
+    const koth = this.mode === 'koth';
     const ranking = [...this.fighters].sort((a, b) => {
       if (a === winner) return -1;
       if (b === winner) return 1;
+      if (koth) return Math.floor(b.score) - Math.floor(a.score) || b.kills - a.kills;
       return (b.diedAt || 0) - (a.diedAt || 0);
     });
+    const score = (f) => (koth ? { score: Math.floor(f.score) } : {});
     this.result = {
-      mode: 'br',
-      winner: winner ? { key: winner.key, name: winner.name, kills: winner.kills } : null,
-      ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, kills: f.kills })),
+      mode: koth ? 'koth' : 'br',
+      winner: winner ? { key: winner.key, name: winner.name, kills: winner.kills, ...score(winner) } : null,
+      ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, kills: f.kills, ...score(f) })),
       duration: Math.round(this.time),
     };
     if (winner) this.events.push({ t: 'win', to: winner.key });
@@ -1414,6 +1502,13 @@ class Battle extends EventEmitter {
         fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
         a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
       })),
+      koth: this.koth ? {
+        hill: { x: Math.round(this.koth.hill.x), y: Math.round(this.koth.hill.y), r: this.koth.hill.r },
+        next: this.koth.next ? { x: Math.round(this.koth.next.x), y: Math.round(this.koth.next.y) } : null,
+        moveIn: Math.round((this.koth.moveAt - this.time) * 10) / 10,
+        left: Math.max(0, Math.round((Rules.KOTH.duration - this.time) * 10) / 10),
+        king: this.koth.king,
+      } : null,
       dungeon: d ? {
         room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged,
         poll: d.poll ? { options: this.pollCounts(), left: Math.max(0, Math.round((Rules.DUNGEON_POLL.duration - d.stageT) * 10) / 10) } : null,
@@ -1434,6 +1529,9 @@ class Battle extends EventEmitter {
         ult: f.ult ? f.ult.id : undefined,
         st: f.ult ? Math.round(f.stamina * 100) / 100 : undefined, // barre de stamina (0 à 1)
         potion: f.consumable && !f.potionUsed ? f.consumable : undefined,
+        score: this.koth && f.score !== undefined ? Math.floor(f.score) : undefined, // Roi de la Colline
+        respawn: !f.alive && f.respawnAt != null ? Math.max(0, Math.round((f.respawnAt - this.time) * 10) / 10) : undefined,
+        protect: f.protectUntil > this.time || undefined,
         fx: fxOf(f, this.time),
       })),
       events: this.events,

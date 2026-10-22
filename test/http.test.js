@@ -402,6 +402,32 @@ test('[BOSS-8, BOSS-7] Combat de Boss : l\'admin choisit le boss (Dragon, Magici
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[KOTH-6, BET-1, PRG-4] Roi de la Colline : paris ouverts, récompense de victoire au meilleur score', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const a = client();
+  const b = client();
+  const ida = (await register(a, 'pl_koth_a')).id;
+  const idb = (await register(b, 'pl_koth_b')).id;
+  await give(ida, { gold: 100 });
+  await give(idb, { gold: 100 });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'koth' });
+  await a.post('/api/queue/join');
+  await b.post('/api/queue/join');
+  assert.strictEqual((await b.post('/api/bet', { target: 'u' + ida, amount: 10 })).status, 200, 'paris ouverts');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  const fa = battle.players.find((f) => f.userId === ida);
+  fa.score = 50;
+  battle.time = Rules.KOTH.duration;
+  battle.tick(0.05);
+  assert.strictEqual(battle.result.mode, 'koth');
+  assert.strictEqual(battle.result.winner.key, fa.key);
+  const ch = (await meOf(a)).character;
+  assert.strictEqual(ch.record.wins, 1);
+  assert.strictEqual(ch.gold, 100 + Rules.REWARDS.win.gold);
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
   const a = client();
   const ida = (await register(a, 'pl_dungeon')).id;

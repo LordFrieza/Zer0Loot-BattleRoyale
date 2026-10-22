@@ -360,6 +360,9 @@
           this.announces.push({ text: `${ev.icon} ${ev.label.toUpperCase()} !`, sub: ev.desc, subSize: 20, color: ev.color, life: 4, age: 0 });
           setTimeout(() => Sound.play('eventStart', q.event), Math.max(0, fanfare * 1000 - 200));
         }
+        if (q.mode === 'koth') {
+          this.announces.push({ text: '👑 ROI DE LA COLLINE !', sub: 'Tenez la colline pour marquer des points. Seul dessus, c\'est ×3 !', subSize: 24, color: '#ffd23f', life: 3.5, age: 0 });
+        }
         if (q.mode === 'boss') {
           const B = Rules.BOSSES[q.boss] || Rules.BOSS;
           this.announces.push({ text: `${B.icon} COMBAT DE BOSS !`, sub: `Tous ensemble contre ${B.name} !`, subSize: 26, color: B.color, life: 3.5, age: 0 });
@@ -463,6 +466,18 @@
           }
           // Souffle de feu : la gerbe de flammes reste visible un instant
           if (e.kind === 'cone') { const s = (this.frame && this.frame.slams || []).find((x) => x.kind === 'cone'); this.flames = { x: e.x, y: e.y, r: e.r, a: s ? s.a : 0, half: s ? s.half : 0.5, life: 0.6 }; }
+        } else if (e.t === 'king' && to) {
+          this.floaters.push({ x: to.x, y: to.y - 92, text: '👑 Roi de la colline !', color: '#ffd23f', life: 1.6, size: 15 });
+        } else if (e.t === 'hillWarn') {
+          this.announces.push({ text: 'LA COLLINE VA BOUGER !', sub: 'Dans 5 secondes : suivez les pointillés !', subSize: 22, color: '#ffd23f', life: 2.2, age: 0 });
+        } else if (e.t === 'hillMove') {
+          this.spark(e.x, e.y, '#ffd23f', 40);
+          if (window.Sound) Sound.play('hillMove');
+        } else if (e.t === 'respawn' && to) {
+          const dd = this.disp.get(e.to);
+          if (dd) { dd.x = e.x; dd.y = e.y; dd.deathT = 0; }
+          this.spark(e.x, e.y - 20, '#9ff6ff', 22);
+          this.floaters.push({ x: e.x, y: e.y - 70, text: '↻ De retour !', color: '#9ff6ff', life: 1.2, size: 14 });
         } else if (e.t === 'bossFly') {
           const B = this.bossInfo();
           this.announces.push({ text: `🪽 ${B.short.toUpperCase()} S'ENVOLE !`, sub: 'Seuls les combattants à distance peuvent le toucher !', subSize: 24, color: '#ff9a1f', life: 3, age: 0 });
@@ -580,7 +595,7 @@
           else if (!isBossKind(to) && to.kind !== 'oeuf' && to.kind !== 'cristal') this.floaters.push({ x: to.x, y: to.y - 50, text: '💀', color: '#fff', life: 1.4, size: 28 });
           // En coopération, le fil n'affiche que les aventuriers tombés et les chefs vaincus.
           let text = null;
-          if (f.mode === 'br' || !f.mode) text = from ? `${from.name}  ⚔  ${to.name}` : `☠ ${to.name} (zone)`;
+          if (f.mode === 'br' || f.mode === 'koth' || !f.mode) text = from ? `${from.name}  ⚔  ${to.name}` : `☠ ${to.name} (zone)`;
           else if (to.kind === 'player') text = `☠ ${to.name} est tombé(e)`;
           else if (to.elite && from) text = `👑 ${from.name} a vaincu ${to.name}`;
           if (text) {
@@ -680,7 +695,7 @@
         this.title(formatCountdown(left), 188, 50, left < 10000 ? '#ff4d6d' : '#ffc21a', left < 10000 ? '#ff4d6d' : '#ff9a00');
       } else {
         this.title('FILE FERMÉE', 70, 56, '#fff', '#b83cff', W - 360);
-        this.title(q.mode === 'br' ? 'La bataille va commencer !' : 'L\'aventure va commencer !', 188, 30, '#ffc21a', '#ff9a00');
+        this.title(q.mode === 'br' || q.mode === 'koth' ? 'La bataille va commencer !' : 'L\'aventure va commencer !', 188, 30, '#ffc21a', '#ff9a00');
       }
       // Mode de jeu choisi par le streamer
       const QB = q.mode === 'boss' && Rules.BOSSES[q.boss];
@@ -801,6 +816,7 @@
         if (fl.life <= 0) this.flames = null;
       }
 
+      if (f.koth) this.drawHill(f, t);
       this.drawZones(f.zones || [], t, 'ground');
       // Morts d'abord (au sol)
       for (const fi of order) {
@@ -943,10 +959,19 @@
           ctx.fillRect(x - bw / 2, y - 41.5, bw * fi.st, 2.5);
           ctx.restore();
         }
+        if (fi.protect) {
+          ctx.save();
+          ctx.strokeStyle = `rgba(160,240,255,${0.5 + Math.sin(t / 80) * 0.3})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y - 12, 30, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+        }
+        if (f.koth && f.koth.king === fi.key) this.label('👑', x, (fi.title ? y - 67 : y - 58) - 20 + Math.sin(t / 200) * 2, 22, '#ffd23f');
         const nameY = fi.title ? y - 67 : y - 58;
         const icon = fi.spec ? fi.spec.icon + ' ' : classIcon(fi.cls);
         const potion = fi.potion && Rules.CONSUMABLES[fi.potion] ? ' ' + Rules.CONSUMABLES[fi.potion].icon : '';
-        this.label(icon + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : ''), x, nameY, 12, '#fff');
+        const pts = fi.score !== undefined ? ` · ${fi.score} pts` : '';
+        this.label(icon + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : '') + pts, x, nameY, 12, '#fff');
         if (fi.title) this.label(fi.title, x, y - 56, 10, '#ffcf5a');
       }
 
@@ -1086,6 +1111,31 @@
           ctx.fillText(tg.text, 30, hudY + 21);
           hudY += 34;
         }
+      } else if (f.mode === 'koth' && f.koth) {
+        this.hudBox(16, 16, 250, 64, '#ffd23f');
+        ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText('👑 Roi de la Colline', 30, 40);
+        ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
+        const leftS = Math.ceil(f.koth.left);
+        ctx.fillStyle = leftS <= 10 ? '#ff8fa3' : '#cfc6ff';
+        ctx.fillText(`⏱ ${Math.floor(leftS / 60)}:${String(leftS % 60).padStart(2, '0')} restantes`, 30, 66);
+        // Tableau des scores (top 5)
+        const top = f.fighters.filter((x) => x.score !== undefined).sort((a, b) => b.score - a.score || b.kills - a.kills).slice(0, 5);
+        this.hudBox(16, 88, 250, 26 + top.length * 22, '#ffd23f');
+        ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText('CLASSEMENT', 30, 106);
+        top.forEach((x, i) => {
+          ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
+          ctx.fillStyle = x.key === f.koth.king ? '#ffd23f' : i === 0 ? '#fff3a0' : '#fff';
+          const name = x.name.length > 16 ? x.name.slice(0, 15) + '…' : x.name;
+          ctx.fillText(`${i + 1}. ${x.key === f.koth.king ? '👑 ' : ''}${name}`, 30, 128 + i * 22);
+          ctx.textAlign = 'right';
+          ctx.fillText(`${x.score}`, 254, 128 + i * 22);
+          ctx.textAlign = 'left';
+        });
+        hudY = 88 + 30 + top.length * 22;
       } else if (f.mode === 'boss') {
         this.hudBox(16, 16, 230, 64, '#7ccf6a');
         ctx.font = '900 24px "Segoe UI", system-ui, sans-serif';
@@ -1254,6 +1304,47 @@
      * Grosse barre de vie du Troll en haut de l'écran, avec les coches à 66 % et 33 %
      * (à chaque coche franchie, il devient plus fort). Une traînée blanche montre les dégâts récents.
      */
+    /*
+     * Roi de la Colline : la colline au sol (dorée quand un Roi la tient seul, rouge quand elle est disputée),
+     * et la prochaine en pointillés avec son compte à rebours.
+     */
+    drawHill(f, t) {
+      const ctx = this.ctx;
+      const k = f.koth;
+      const h = k.hill;
+      const inside = f.fighters.filter((x) => x.alive && x.score !== undefined && Math.hypot(x.x - h.x, x.y - h.y) <= h.r).length;
+      const rgb = k.king ? '255,210,63' : inside > 1 ? '255,77,109' : '230,230,255';
+      const pulse = 0.5 + Math.sin(t / (k.king ? 160 : 260)) * 0.25;
+      ctx.save();
+      const g = ctx.createRadialGradient(h.x, h.y + 10, 10, h.x, h.y + 10, h.r);
+      g.addColorStop(0, `rgba(${rgb},${0.08 + pulse * 0.12})`);
+      g.addColorStop(1, `rgba(${rgb},${0.22 + pulse * 0.15})`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(h.x, h.y + 10, h.r, h.r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(${rgb},${0.7 + pulse * 0.3})`;
+      ctx.lineWidth = 4;
+      ctx.shadowColor = `rgb(${rgb})`;
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.35;
+      ctx.font = '48px "Segoe UI Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👑', h.x, h.y + 10);
+      ctx.restore();
+      if (k.next) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,210,63,${0.5 + Math.sin(t / 90) * 0.35})`;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([14, 10]);
+        ctx.lineDashOffset = -t / 30;
+        ctx.beginPath(); ctx.ellipse(k.next.x, k.next.y + 10, h.r, h.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        this.label(`👑 dans ${Math.max(0, Math.ceil(k.moveIn))} s`, k.next.x, k.next.y + 10, 18, '#ffd23f');
+      }
+    }
+
     bossInfo() {
       const b = this.frame && this.frame.boss;
       return Rules.BOSSES[b && b.id] || Rules.BOSSES[this.queue && this.queue.boss] || Rules.BOSS;
@@ -1769,6 +1860,7 @@
       const r = this.queue && this.queue.result;
       if (!r) return;
       if (r.mode === 'boss' || r.mode === 'dungeon') { this.drawCoopResult(t, r); return; }
+      const koth = r.mode === 'koth';
       const ctx = this.ctx;
       ctx.fillStyle = 'rgba(0,0,0,.55)';
       ctx.fillRect(0, 0, W, H);
@@ -1778,18 +1870,18 @@
         ctx.translate(W / 2, 150);
         ctx.scale(s, s);
         ctx.translate(-W / 2, -150);
-        this.title(this.queue.training ? '🏋️ FIN DE L\'ENTRAÎNEMENT' : '🏆 VICTOIRE ROYALE 🏆', 150, 56, '#ffc21a', '#ff9a00');
+        this.title(this.queue.training ? '🏋️ FIN DE L\'ENTRAÎNEMENT' : koth ? '👑 ROI DE LA COLLINE 👑' : '🏆 VICTOIRE ROYALE 🏆', 150, 56, '#ffc21a', '#ff9a00');
         ctx.restore();
         this.title(r.winner.name, 240, 64, '#fff', '#ff3fd8');
         this.title(this.queue.training
           ? `remporte le duel en ${formatCountdown(r.duration * 1000)} · aucune récompense en entraînement`
-          : `${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
+          : `${koth ? `${r.winner.score} points · ` : ''}${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
         const fighter = this.frame && this.frame.fighters.find((f) => f.key === r.winner.key);
         if (fighter) drawFighter(ctx, W / 2, 420, fighter, { scale: 3, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
       }
       const top = r.ranking.slice(1, 6);
       top.forEach((p, i) => {
-        this.label(`#${p.rank}  ${p.name}  —  ${p.kills} kill(s)`, W / 2, 540 + i * 30, 18, '#ddd');
+        this.label(`#${p.rank}  ${p.name}  —  ${koth ? `${p.score} pts · ` : ''}${p.kills} kill(s)`, W / 2, 540 + i * 30, 18, '#ddd');
       });
       const br = this.queue.bets && this.queue.bets.lastResult;
       if (br) {

@@ -39,7 +39,7 @@ function freeze(b) {
 // ---------- Modes ----------
 
 test('[MODE-1, MODE-2] modes : liste, mode par défaut, mode inconnu refusé, mode diffusé dans la file', () => {
-  assert.deepStrictEqual(Object.keys(Rules.GAME_MODES), ['br', 'boss', 'dungeon']);
+  assert.deepStrictEqual(Object.keys(Rules.GAME_MODES), ['br', 'boss', 'dungeon', 'koth']);
   assert.strictEqual(Rules.GAME_MODES.br.coop, false);
   assert.ok(Rules.GAME_MODES.boss.coop && Rules.GAME_MODES.dungeon.coop);
   const b = new Battle();
