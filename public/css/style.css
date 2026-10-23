@@ -703,3 +703,8 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .boss-block .rules-list { margin: 0; }
 .boss-mini { flex: none; }
 @media (max-width: 600px) { .boss-block { flex-direction: column; } }
+
+/* ---------- Guerre des clans ---------- */
+.clan-btns { margin-top: 8px; gap: 10px; }
+.clan-btn { flex: 1; min-width: 200px; justify-content: center; background: color-mix(in srgb, var(--c) 18%, rgba(14, 10, 38, .9)); border: 2px solid var(--c); color: #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 35%, transparent); }
+.clan-btn.mine { background: color-mix(in srgb, var(--c) 45%, rgba(14, 10, 38, .9)); opacity: 1; }

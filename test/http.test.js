@@ -428,6 +428,77 @@ test('[KOTH-6, BET-1, PRG-4] Roi de la Colline : paris ouverts, récompense de v
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[CLAN-1, CLAN-8, CLAN-9] Guerre des clans : !rouge / !bleu, changement de camp, récompenses et paris d\'équipe', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const a = client();
+  const b = client();
+  const ida = (await register(a, 'pl_clan_a')).id;
+  const idb = (await register(b, 'pl_clan_b')).id;
+  await give(idb, { gold: 100 });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'clans' });
+  // Site : on choisit son équipe, puis on change d'avis
+  assert.strictEqual((await a.post('/api/queue/join', { clan: 'bleu' })).data.clan, 'bleu');
+  assert.strictEqual((await a.post('/api/queue/join', { clan: 'rouge' })).data.switched, true);
+  await b.post('/api/queue/join', { clan: 'bleu' });
+  // Chat : !rouge inscrit chez les Rouges, !bleu fait changer de camp
+  chatCommand('!rouge', { login: 'clan_viewer', displayName: 'Clan_Viewer' });
+  const viewer = db.findUserByTwitch('clan_viewer');
+  assert.strictEqual(battle.participants.get('u' + viewer.id).clan, 'rouge');
+  chatCommand('!bleu', { login: 'clan_viewer', displayName: 'Clan_Viewer' });
+  assert.strictEqual(battle.participants.get('u' + viewer.id).clan, 'bleu');
+  const q = (await alice.get('/api/queue')).data;
+  assert.strictEqual(q.participants.find((p) => p.key === 'u' + ida).clan, 'rouge');
+  // Paris : sur une équipe
+  assert.strictEqual((await b.post('/api/bet', { target: 'u' + ida, amount: 10 })).status, 400);
+  assert.strictEqual((await b.post('/api/bet', { target: 'clan:rouge', amount: 10 })).status, 200);
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  const fa = battle.players.find((f) => f.userId === ida);
+  assert.strictEqual(fa.clan, 'rouge', 'l\'équipe choisie survit au recalcul des stats du lancement');
+  fa.dealt = 9999; // MVP
+  battle.kill(fa, battle.clans.crystals.bleu);
+  battle.tick(0.05);
+  assert.strictEqual(battle.result.winner, 'rouge');
+  const ca = (await meOf(a)).character;
+  assert.strictEqual(ca.gold, Rules.CLANS.reward.gold);
+  assert.strictEqual(ca.chests, Rules.CLANS.reward.chests + Rules.CLANS.mvpChests, 'victoire + MVP');
+  assert.strictEqual(ca.record.wins, 1);
+  const cb = (await meOf(b)).character;
+  assert.strictEqual(cb.chests, 0, 'perdant : pas de coffre');
+  assert.strictEqual(cb.gold, 100, 'pari gagné : sa mise lui revient (seul parieur)');
+  assert.strictEqual(cb.record.battles, 1);
+  await admin.post('/api/admin/battle/reset');
+});
+
+test('[GOLD-5, GOLD-1] Ruée vers l\'or : chacun garde son butin, +1 coffre au meilleur, potion gardée', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const a = client();
+  const b = client();
+  const ida = (await register(a, 'pl_gold_a')).id;
+  const idb = (await register(b, 'pl_gold_b')).id;
+  await give(ida, { gold: 60 });
+  await a.post('/api/consumable/buy', { id: 'vie' });
+  await a.post('/api/consumable/equip', { id: 'vie' });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'gold' });
+  await a.post('/api/queue/join');
+  await b.post('/api/queue/join');
+  assert.strictEqual((await b.post('/api/bet', { target: 'u' + ida, amount: 1 })).status, 400, 'pas de paris');
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  const fa = battle.players.find((f) => f.userId === ida);
+  const fb = battle.players.find((f) => f.userId === idb);
+  Object.assign(fa, { goldGot: 120, chestsGot: 2 });
+  Object.assign(fb, { goldGot: 30, chestsGot: 0 });
+  battle.finishGold();
+  const ca = (await meOf(a)).character;
+  assert.strictEqual(ca.gold, 120);
+  assert.strictEqual(ca.chests, 3, '2 ramassés + 1 pour le meilleur');
+  assert.strictEqual(ca.consumableSlot, 'vie', 'la potion n\'est pas consommée');
+  const cb = (await meOf(b)).character;
+  assert.deepStrictEqual([cb.gold, cb.chests, cb.xp, cb.record.battles], [30, 0, 25, 1]);
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
   const a = client();
   const ida = (await register(a, 'pl_dungeon')).id;

@@ -59,7 +59,7 @@ function renderModes() {
   // Le bouton de lancement suit le mode de la file ouverte (ou le mode choisi s'il n'y a pas de file).
   const live = queue && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.mode : selectedMode;
   const liveBoss = Rules.BOSSES[queue && queue.boss && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.boss : selectedBoss];
-  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : '⚔️ LANCER LA BATAILLE';
+  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : '⚔️ LANCER LA BATAILLE';
 }
 
 $('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
@@ -87,7 +87,7 @@ function render() {
   renderPoll();
   $('count').textContent = q.participants.length;
   $('plist').innerHTML = q.participants.length
-    ? q.participants.map((p) => `<div><span>${p.bot ? '🤖' : '👤'} ${p.cls ? Rules.CLASS_INFO[p.cls].icon + ' ' : ''}${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>`).join('')
+    ? q.participants.map((p) => `<div><span>${p.clan ? Rules.CLANS.teams[p.clan].icon + ' ' : ''}${p.bot ? '🤖' : '👤'} ${p.cls ? Rules.CLASS_INFO[p.cls].icon + ' ' : ''}${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>`).join('')
     : '<span class="muted">Personne pour l\'instant.</span>';
 }
 

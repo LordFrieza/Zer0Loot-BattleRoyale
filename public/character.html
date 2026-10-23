@@ -36,7 +36,7 @@
         <button class="secondary small" data-quick="half">½</button>
         <button class="secondary small" data-quick="max">Max</button>
         <span class="spacer"></span>
-        <span class="muted" style="font-size:13px">Choisis ensuite ton combattant ci-dessous.</span>
+        <span class="muted" style="font-size:13px" id="bet-hint">Choisis ensuite ton combattant ci-dessous.</span>
       </div>
       <div class="bet-list" id="bet-list"></div>
       <p class="muted bet-rules help">Un seul pari par bataille, sur n'importe quel combattant sauf toi. La mise est retirée tout de suite.
@@ -319,6 +319,16 @@
           <div class="mode-head"><canvas id="koth-portrait" width="150" height="110"></canvas>
             <div><h3>👑 Roi de la Colline</h3><p class="muted">Chacun pour soi, mais <b>personne n'est éliminé</b> : celui qui tient la colline le plus longtemps gagne.</p></div></div>
           <ul class="rules-list" id="koth-rules"></ul>
+        </div>
+        <div class="mode-card" style="--c:#ff6b9a">
+          <div class="mode-head"><canvas id="clans-portrait" width="170" height="110"></canvas>
+            <div><h3>⚔️ Guerre des clans</h3><p class="muted"><b>🔴 Rouges contre Bleus 🔵</b> : détruisez le cristal adverse, protégez le vôtre !</p></div></div>
+          <ul class="rules-list" id="clans-rules"></ul>
+        </div>
+        <div class="mode-card" style="--c:#ffd23f">
+          <div class="mode-head"><canvas id="gold-portrait" width="150" height="110"></canvas>
+            <div><h3>🪙 Ruée vers l'or <span class="muted" style="font-size:13px">(mode bonus)</span></h3><p class="muted">Pas de combat : une pluie de pièces et de coffres, <b>chacun garde ce qu'il ramasse</b> !</p></div></div>
+          <ul class="rules-list" id="gold-rules"></ul>
         </div>
       </div>
     </div>

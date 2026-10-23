@@ -1,5 +1,5 @@
 /*
- * Paris sur le vainqueur d'une bataille.
+ * Paris sur le vainqueur d'une bataille (ou sur l'équipe gagnante en Guerre des clans).
  *  - Les paris sont ouverts tant que la file est ouverte / fermée, et se ferment au lancement du combat.
  *  - Un seul pari par joueur (modifiable ou annulable avant la fermeture), jamais sur soi-même.
  *  - La mise est retirée tout de suite (et sauvegardée) pour qu'on ne puisse pas la dépenser deux fois.
@@ -54,9 +54,10 @@ class Bets {
     return state().list;
   }
 
-  // Paris seulement dans les modes à gagnant unique (Battle Royale, Roi de la Colline), jamais en coopération.
+  // Paris seulement dans les modes où l'on s'affronte (pas en coopération ni dans le mode bonus).
   open() {
-    return (this.battle.phase === 'queue' || this.battle.phase === 'ready') && !Rules.GAME_MODES[this.battle.mode].coop;
+    const m = Rules.GAME_MODES[this.battle.mode];
+    return (this.battle.phase === 'queue' || this.battle.phase === 'ready') && !m.coop && !m.bonus;
   }
 
   myBet(userId) {
@@ -67,9 +68,13 @@ class Bets {
     if (!this.open()) throw new Error('Les paris sont fermés');
     amount = Math.floor(Number(amount));
     if (!Number.isFinite(amount) || amount < 1) throw new Error('Mise invalide (1 gold minimum)');
-    const target = this.battle.participants.get(targetKey);
+    // Guerre des clans : on parie sur une équipe (clé « clan:rouge » / « clan:bleu »), même la sienne.
+    const clans = this.battle.mode === 'clans';
+    const clan = clans && /^clan:(rouge|bleu)$/.exec(String(targetKey));
+    if (clans && !clan) throw new Error('Choisis une équipe : les Rouges ou les Bleus');
+    const target = clan ? { name: `les ${Rules.CLANS.teams[clan[1]].label}` } : this.battle.participants.get(targetKey);
     if (!target) throw new Error('Ce combattant ne participe pas à la bataille');
-    if (target.userId === user.id) throw new Error('Tu ne peux pas parier sur toi-même');
+    if (!clan && target.userId === user.id) throw new Error('Tu ne peux pas parier sur toi-même');
     const c = user.character;
     const previous = this.list[user.id];
     const available = c.gold + (previous ? previous.amount : 0);

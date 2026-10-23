@@ -360,6 +360,14 @@
       label: 'Roi de la Colline', icon: '👑', color: '#ffd23f', coop: false, minPlayers: 2,
       desc: 'Chacun pour soi, mais personne n\'est éliminé : tenez la colline pour marquer des points. Les morts reviennent au combat.',
     },
+    clans: {
+      label: 'Guerre des clans', icon: '⚔️', color: '#ff6b9a', coop: false, minPlayers: 2,
+      desc: 'Rouges contre Bleus (!rouge ou !bleu) : détruisez le cristal adverse et protégez le vôtre. Les morts reviennent, de plus en plus tard.',
+    },
+    gold: {
+      label: 'Ruée vers l\'or', icon: '🪙', color: '#ffd23f', coop: false, bonus: true, minPlayers: 1,
+      desc: 'Mode bonus, sans combat : une pluie de pièces d\'or et de coffres s\'abat sur l\'arène. Chacun garde ce qu\'il ramasse !',
+    },
   };
 
   /*
@@ -368,6 +376,69 @@
    * (le Roi) ; un kill rapporte 2 points. Les combattants hors de la colline y retournent dès qu'ils n'ont personne à portée. Les morts reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s.
    * Le meilleur score gagne (égalité : le plus de kills, puis au hasard).
    */
+  /*
+   * Guerre des clans : deux équipes (choisies avec !rouge / !bleu, sinon dans la plus petite), chacune protège son
+   * cristal. Le cristal se défend (il tire sur les ennemis proches). Les morts reviennent dans leur camp au bout de
+   * 5 s, puis 5 s de plus à chaque nouvelle mort (30 s au plus). L'équipe la moins nombreuse est renforcée.
+   * Fin : cristal détruit, ou au bout de 3 min le cristal le plus entamé perd (dès 1 min 30, les cristaux prennent ×3).
+   */
+  const CLANS = {
+    teams: {
+      rouge: { label: 'Rouges', icon: '🔴', color: '#ff4d6d', cmd: '!rouge' },
+      bleu: { label: 'Bleus', icon: '🔵', color: '#3fa0ff', cmd: '!bleu' },
+    },
+    duration: 180,
+    overtimeAt: 90, // « mort subite » : les cristaux subissent ×3
+    overtimeMult: 3,
+    crystal: { hpBase: 400, hpPerEnemy: 60, radius: 34, damage: 10, cooldown: 1.2, range: 170 },
+    respawn: { base: 5, step: 5, max: 30 },
+    protect: 1.5,
+    underdog: 1.5, // bonus max (vie et dégâts) de l'équipe la moins nombreuse : √(grande / petite)
+    // Ciblage : un cristal « paraît » plus proche ; un ennemi près de notre cristal ou collé à nous passe avant.
+    aggro: { crystal: 0.35, defendRadius: 260, defend: 0.5, selfDefense: 90, close: 0.3 },
+    reward: { xp: 200, gold: 40, chests: 1 }, // pour chaque humain de l'équipe gagnante
+    mvpChests: 1, // + 1 coffre pour le meilleur combattant (le plus de dégâts)
+  };
+  function clanUnderdog(big, small) {
+    if (!small || !big || small >= big) return 1;
+    return Math.min(CLANS.underdog, Math.sqrt(big / small));
+  }
+  function clanRespawnDelay(deaths) {
+    const R = CLANS.respawn;
+    return Math.min(R.max, R.base + R.step * Math.max(0, deaths - 1));
+  }
+
+  /*
+   * Ruée vers l'or (mode bonus) : pas de combat. Pendant 75 s, les combattants se baladent au hasard et ramassent ce
+   * qui tombe du ciel : pièces (1 gold, 2 pendant le Jackpot), coffres (plus rares), sacs d'or et bonus. Ils foncent
+   * vers un coffre ou un bonus tout proche. La Chance agrandit le rayon de ramassage (l'aimant naturel).
+   * Les 15 dernières secondes : JACKPOT, pluie ×3 et pièces doublées.
+   */
+  const GOLD = {
+    duration: 75,
+    jackpotAt: 60,
+    jackpot: { rain: 3, value: 2 },
+    coins: { base: 12, perPlayer: 1, max: 40, fall: 0.7, life: 4 }, // pièces par seconde ; chute et durée au sol (s)
+    chests: { every: 6, perPlayers: 15, fall: 1.4, life: 8 }, // 1 coffre toutes les 6 s (+1 par tranche de 15 joueurs)
+    items: {
+      every: 5, fall: 1, life: 7,
+      kinds: {
+        sac: { icon: '💰', label: 'Sac d\'or', gold: 25 },
+        aimant: { icon: '🧲', label: 'Aimant', duration: 8, pickupMult: 3 },
+        etoile: { icon: '⭐', label: 'Étoile', duration: 6, speedMult: 1.7 },
+      },
+    },
+    pickup: 22, // rayon de ramassage (px)…
+    luckPickup: 1.5, // … +1,5 px par point de Chance, 60 px au plus
+    pickupMax: 60,
+    speed: 95, // vitesse de balade, proportionnelle à la Vitesse du personnage (×1,6 au plus)
+    lure: 160, // un coffre ou un bonus à moins de 160 px attire
+    bestChests: 1, // + 1 coffre pour le meilleur ramasseur (Roi du butin)
+  };
+  function goldPickup(luck) {
+    return Math.min(GOLD.pickupMax, GOLD.pickup + GOLD.luckPickup * Math.max(0, luck || 0));
+  }
+
   const KOTH = {
     duration: 150,
     hill: { radius: 170, moveEvery: 30, warn: 5, margin: 220, minJump: 320 },
@@ -1091,7 +1162,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, GAME_MODES, KOTH, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

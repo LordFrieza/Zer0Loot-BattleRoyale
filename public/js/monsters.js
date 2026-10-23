@@ -625,6 +625,43 @@
     ctx.restore();
   }
 
+  // Cristal de clan (Guerre des clans) : grand cristal aux couleurs de l'équipe (o.color), qui se défend.
+  function cristalClan(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const c = o.color || '#ff4d6d';
+    shadow(ctx, 30, 30);
+    ctx.save();
+    // socle de pierre
+    ctx.fillStyle = '#4a4458';
+    ctx.strokeStyle = 'rgba(0,0,0,.5)';
+    ctx.lineWidth = 2;
+    rr(ctx, -26, 14, 52, 16, 6); ctx.fill(); ctx.stroke();
+    ctx.translate(0, Math.sin(t * 2) * 2);
+    ctx.save();
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 22 + Math.sin(t * 4) * 8;
+    const g = ctx.createLinearGradient(-20, -70, 20, 14);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.35, c);
+    g.addColorStop(1, shade(c, -0.55));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -74); ctx.lineTo(20, -36); ctx.lineTo(14, 14); ctx.lineTo(-14, 14); ctx.lineTo(-20, -36);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, -74); ctx.lineTo(0, 14); ctx.moveTo(-20, -36); ctx.lineTo(20, -36); ctx.stroke();
+    // petits éclats en orbite
+    for (let i = 0; i < 3; i++) {
+      const a = t * 1.6 + i * 2.1;
+      ctx.fillStyle = shade(c, 0.4);
+      ctx.beginPath(); ctx.arc(Math.cos(a) * 30, -30 + Math.sin(a) * 10, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.moveTo(0, -74); ctx.lineTo(20, -36); ctx.lineTo(14, 14); ctx.lineTo(-14, 14); ctx.lineTo(-20, -36); ctx.closePath(); ctx.fill(); });
+    ctx.restore();
+  }
+
   // Cristal d'ombre : nourrit le bouclier du Magicien tant qu'il tient debout.
   function cristal(ctx, o) {
     const t = (o.t || 0) / 1000;
@@ -657,7 +694,7 @@
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche };
+  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan };
   // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
   const BOSS_KINDS = ['troll', 'dragon', 'sorcier'];
 

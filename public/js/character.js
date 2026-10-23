@@ -863,6 +863,33 @@ $('fuse-go').onclick = async () => {
     `Au bout de ${Math.floor(K.duration / 60)} min ${K.duration % 60} s, le <b>meilleur score gagne</b> (égalité : le plus de kills). Le vainqueur reçoit la récompense de victoire du Battle Royale, et <b>les paris sont ouverts</b>.`,
     `Les Guerriers et les Prêtres, solides, tiennent bien la colline ; les Mages nettoient les groupes qui s'y entassent.`,
   ].map((x) => `<li>${x}</li>`).join('');
+  const CL = Rules.CLANS;
+  $('clans-rules').innerHTML = [
+    `Tape <b>!rouge</b> ou <b>!bleu</b> dans le chat (ou clique sur le bouton de l'équipe) pour choisir ton camp ; <b>!join</b> te place dans l'équipe la moins nombreuse. On peut changer d'avis tant que la bataille n'a pas commencé.`,
+    `Chaque équipe a un <b>cristal</b> dans son camp, qui tire sur les ennemis proches. Détruire le cristal adverse = <b>victoire</b>.`,
+    `Les combattants foncent vers le cristal adverse, mais défendent le leur et répondent à qui les attaque.`,
+    `Les morts <b>reviennent</b> dans leur camp : 5 s après la première mort, puis <b>5 s de plus à chaque mort</b> (${CL.respawn.max} s au plus).`,
+    `L'équipe la moins nombreuse est renforcée (vie et dégâts, jusqu'à ×${String(CL.underdog).replace('.', ',')}).`,
+    `À ${Math.floor(CL.overtimeAt / 60)} min ${CL.overtimeAt % 60} s, <b>mort subite</b> : les cristaux prennent ×${CL.overtimeMult}. Au bout de ${CL.duration / 60} min, le cristal le moins entamé gagne.`,
+    `Chaque membre de l'équipe gagnante : <b>+${CL.reward.xp} XP, +${CL.reward.gold} golds, +${CL.reward.chests} coffre</b> ; le <b>MVP</b> (le plus de dégâts) gagne 1 coffre de plus. Les paris se font sur une <b>équipe</b>.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const cc = $('clans-portrait').getContext('2d');
+  drawMonster(cc, 34, 92, { kind: 'cristal_clan' }, { scale: 0.8, t: 0, color: CL.teams.rouge.color });
+  drawMonster(cc, 136, 92, { kind: 'cristal_clan' }, { scale: 0.8, t: 0, color: CL.teams.bleu.color });
+  drawFighter(cc, 70, 80, { name: 'Rouge', cls: 'guerrier', look: {} }, { scale: 1.3 });
+  drawFighter(cc, 100, 80, { name: 'Bleu', cls: 'assassin', look: {} }, { scale: 1.3, facing: -1 });
+  const G = Rules.GOLD;
+  $('gold-rules').innerHTML = [
+    `<b>Mode bonus de ${G.duration} s</b>, sans combat : les personnages se baladent sur l'arène et ramassent tout ce qui tombe du ciel. Chaque pièce = <b>1 gold</b>.`,
+    `Plus rares : des <b>coffres</b> en parachute, et des bonus : 💰 <b>Sac d'or</b> (+${G.items.kinds.sac.gold} golds), 🧲 <b>Aimant</b> (ramassage ×${G.items.kinds.aimant.pickupMult}), ⭐ <b>Étoile</b> (vitesse ×${String(G.items.kinds.etoile.speedMult).replace('.', ',')}).`,
+    `Ta <b>Chance</b> agrandit ton rayon de ramassage, ta <b>Vitesse</b> te fait parcourir plus de terrain.`,
+    `Les ${G.duration - G.jackpotAt} dernières secondes : <b>JACKPOT</b>, pluie ×${G.jackpot.rain} et pièces à ${G.jackpot.value} golds !`,
+    `À la fin, chacun <b>garde tout ce qu'il a ramassé</b> ; le meilleur ramasseur gagne 1 coffre de plus. Pas de paris, et ta potion n'est pas consommée.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const gc = $('gold-portrait').getContext('2d');
+  drawFighter(gc, 75, 78, { name: 'Riche', cls: 'mage', look: {} }, { scale: 1.5 });
+  gc.font = '20px "Segoe UI Emoji", sans-serif';
+  [[20, 30], [120, 24], [40, 70], [118, 66], [70, 18], [96, 96], [28, 100]].forEach(([x, y]) => gc.fillText('🪙', x, y));
   const kc = $('koth-portrait').getContext('2d');
   kc.fillStyle = 'rgba(255,210,63,.25)';
   kc.strokeStyle = '#ffd23f';
@@ -1217,6 +1244,7 @@ function renderBets() {
   const open = s.open;
   const mine = me.bet;
   $('bet-controls').style.display = open ? '' : 'none';
+  $('bet-hint').textContent = queue.mode === 'clans' ? 'Choisis ensuite ton équipe ci-dessous.' : 'Choisis ensuite ton combattant ci-dessous.';
   $('bet-status').textContent = open ? 'Ouverts jusqu\'au lancement du combat' : queue.phase === 'battle' ? '🔒 Fermés : combat en cours' : 'Bataille terminée';
 
   let summary = `<div class="bet-summary"><span class="bet-pot">💰 ${s.pool} 🪙</span><span class="muted">misés par ${s.bettors} parieur${s.bettors > 1 ? 's' : ''}</span>`;
@@ -1248,7 +1276,11 @@ function renderBetList() {
   if (queue.phase === 'ended') { $('bet-list').innerHTML = ''; return; }
   if (!queue.participants.length) { $('bet-list').innerHTML = '<div class="muted">En attente des combattants… (ils s\'inscrivent avec !join)</div>'; return; }
   const amount = betAmount();
-  $('bet-list').innerHTML = queue.participants.map((p) => {
+  // Guerre des clans : on parie sur une équipe (la sienne comprise), pas sur un combattant.
+  const targets = queue.mode === 'clans'
+    ? Object.entries(Rules.CLANS.teams).map(([c, T]) => ({ key: 'clan:' + c, name: `les ${T.label}`, icon: T.icon, clanTarget: true, count: queue.participants.filter((p) => p.clan === c).length }))
+    : queue.participants;
+  $('bet-list').innerHTML = targets.map((p) => {
     const t = s.targets[p.key] || { total: 0, bettors: 0 };
     const self = p.key === 'u' + me.id;
     const isMine = mine && mine.target === p.key;
@@ -1260,7 +1292,9 @@ function renderBetList() {
     }
     const gain = !self && (open || isMine) ? `<span class="bet-gain">Si victoire : +${estimateGain(p.key, isMine ? mine.amount : amount)} 🪙${isMine ? '' : ' (estimation)'}</span>` : '';
     return `<div class="bet-row ${isMine ? 'mine' : ''} ${self ? 'self' : ''}">
-      <div class="bet-name"><span>${p.bot ? '🤖' : ''}${p.cls ? Rules.CLASS_INFO[p.cls].icon : '⚔️'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span></div>
+      <div class="bet-name">${p.clanTarget
+    ? `<span>${p.icon} ${esc(p.name)}</span><span class="muted">${p.count} combattant${p.count > 1 ? 's' : ''}</span>`
+    : `<span>${p.bot ? '🤖' : ''}${p.cls ? Rules.CLASS_INFO[p.cls].icon : '⚔️'} ${esc(p.name)}</span><span class="muted">Niv. ${p.level}</span>`}</div>
       <div class="muted">${t.total} 🪙 misés · ${t.bettors} parieur${t.bettors > 1 ? 's' : ''}${isMine ? ` · <b class="c-legendaire">ton pari : ${mine.amount} 🪙</b>` : ''}</div>
       ${gain}
       ${action ? `<div class="row">${action}</div>` : ''}
@@ -1295,7 +1329,22 @@ function renderQueue() {
   box.style.display = '';
   const inQueue = queue.participants.some((p) => p.key === 'u' + me.id);
   const n = queue.participants.length;
-  if (queue.phase === 'queue') {
+  if (queue.phase === 'queue' && queue.mode === 'clans') {
+    // Guerre des clans : on choisit (ou change) son équipe
+    const mineP = queue.participants.find((p) => p.key === 'u' + me.id);
+    const teams = Object.entries(Rules.CLANS.teams).map(([c, T]) => {
+      const count = queue.participants.filter((p) => p.clan === c).length;
+      const here = mineP && mineP.clan === c;
+      return `<button class="clan-btn ${here ? 'mine' : ''}" data-clan="${c}" style="--c:${T.color}" ${here ? 'disabled' : ''}>${T.icon} ${here ? 'Tu es chez les' : mineP ? 'Passer chez les' : 'Rejoindre les'} ${T.label} <span class="muted">(${count})</span></button>`;
+    }).join('');
+    box.innerHTML = `<div class="row"><b style="font-size:18px">⚔️ La file est ouverte !</b>
+      <span class="countdown" id="cd"></span><span class="muted">${n} combattant(s) inscrit(s) · tape <b>!rouge</b> ou <b>!bleu</b> sur le stream</span></div>
+      <div class="row clan-btns">${teams}</div>`;
+    box.querySelectorAll('[data-clan]').forEach((b) => {
+      b.onclick = () => act('/api/queue/join', { clan: b.dataset.clan }, 'join');
+    });
+    tickCountdown();
+  } else if (queue.phase === 'queue') {
     box.innerHTML = `<div class="row"><b style="font-size:18px">⚔️ La file est ouverte !</b>
       <span class="countdown" id="cd"></span><span class="muted">${n} combattant(s) inscrit(s)</span><span class="spacer"></span>
       ${inQueue ? '<b class="up">✅ Tu es inscrit !</b>' : '<span class="muted">Tape <b>!join</b> sur le stream ou</span> <button id="join">Rejoindre</button>'}</div>`;
@@ -1306,7 +1355,7 @@ function renderQueue() {
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const QB = Rules.BOSSES[queue.boss];
-    const what = queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    const what = queue.mode === 'gold' ? '🪙 Ruée vers l\'or en cours : il pleut des pièces !' : queue.mode === 'clans' ? '⚔️ Guerre des clans en cours !' : queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
     if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
@@ -1314,6 +1363,8 @@ function renderQueue() {
     let text;
     if (r.mode === 'boss') text = r.victory ? `🏆 ${r.boss.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${r.boss.name} a gagné… Retentez votre chance !`;
     else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
+    else if (r.mode === 'gold') text = `🪙 Fin de la Ruée vers l'or : ${r.totals.gold} golds ramassés !${r.best ? ` Roi du butin : ${esc(r.best.name)} (${r.best.gold} golds).` : ''}`;
+    else if (r.mode === 'clans') text = `${Rules.CLANS.teams[r.winner].icon} Victoire des ${Rules.CLANS.teams[r.winner].label} !${r.mvp ? ` MVP : ${esc(r.mvp.name)}.` : ''}`;
     else if (r.mode === 'koth') text = r.winner ? `👑 ${esc(r.winner.name)} est le Roi de la Colline (${r.winner.score} points, ${r.winner.kills} kill(s)) !` : 'Partie terminée.';
     else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
     box.innerHTML = `<b>${text}</b>`;
@@ -1453,10 +1504,11 @@ const REWARD_LABELS = {
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
   boss: '👹 BOSS VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
+  clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin de la Ruée vers l\'or :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
-  boss: 'victory', dungeon: 'victory', poll: 'reward',
+  boss: 'victory', dungeon: 'victory', poll: 'reward', clans: 'victory', mvp: 'reward', gold: 'victory',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
 socket.on('trainingQueue', (q) => {

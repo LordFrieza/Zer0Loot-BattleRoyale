@@ -360,6 +360,12 @@
           this.announces.push({ text: `${ev.icon} ${ev.label.toUpperCase()} !`, sub: ev.desc, subSize: 20, color: ev.color, life: 4, age: 0 });
           setTimeout(() => Sound.play('eventStart', q.event), Math.max(0, fanfare * 1000 - 200));
         }
+        if (q.mode === 'gold') {
+          this.announces.push({ text: '🎉 BONUS GAME ! 🎉', sub: 'Ruée vers l\'or : ramassez un max de pièces et de coffres !', subSize: 24, color: '#ffd23f', life: 3.5, age: 0 });
+        }
+        if (q.mode === 'clans') {
+          this.announces.push({ text: '⚔️ GUERRE DES CLANS !', sub: '🔴 Rouges contre Bleus 🔵 : détruisez le cristal adverse !', subSize: 24, color: '#ff6b9a', life: 3.5, age: 0 });
+        }
         if (q.mode === 'koth') {
           this.announces.push({ text: '👑 ROI DE LA COLLINE !', sub: 'Tenez la colline pour marquer des points. Seul dessus, c\'est ×3 !', subSize: 24, color: '#ffd23f', life: 3.5, age: 0 });
         }
@@ -389,6 +395,7 @@
         // (les annonces ne sont pas effacées : celle de l'événement arrive juste avant cette image)
         this.projectiles = []; this.blasts = []; this.beams = []; this.pillars = []; this.slashes = [];
         this.bossDeath = null; this.loot = []; this.bossHpShown = null;
+        this.coins = new Map(); this.flyingCoins = []; this.confetti = [];
       }
       if (f.phase === 'idle') { this.bossDeath = null; this.loot = []; }
       // Nouvelle salle du donjon : on oublie les monstres de la salle précédente.
@@ -419,7 +426,7 @@
         }
         // Projectiles (archer, mage) : purement visuels, les dégâts sont déjà calculés.
         if ((e.t === 'hit' || e.t === 'dodge') && e.proj && from && to) {
-          this.projectiles.push({ x0: from.x, y0: from.y - 12, x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' || e.proj === 'shadow' ? 0.3 : 0.16, kind: e.proj });
+          this.projectiles.push({ x0: from.x, y0: from.y - (from.kind === 'cristal_clan' ? 50 : 12), x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' || e.proj === 'shadow' ? 0.3 : 0.16, kind: e.proj, color: from.clan && Rules.CLANS.teams[from.clan].color });
           const now = performance.now();
           if (window.Sound && now - this.lastShotSound > 110) { this.lastShotSound = now; Sound.play('shoot', e.proj); }
         }
@@ -466,6 +473,36 @@
           }
           // Souffle de feu : la gerbe de flammes reste visible un instant
           if (e.kind === 'cone') { const s = (this.frame && this.frame.slams || []).find((x) => x.kind === 'cone'); this.flames = { x: e.x, y: e.y, r: e.r, a: s ? s.a : 0, half: s ? s.half : 0.5, life: 0.6 }; }
+        } else if (e.t === 'coins') {
+          // Ruée vers l'or : les pièces qui viennent d'apparaître dans le ciel
+          const now = performance.now();
+          if (!this.coins) this.coins = new Map();
+          for (const [id, x, y, v] of e.list) this.coins.set(id, { x, y, v, born: now, seed: id * 1.7 });
+        } else if (e.t === 'pick' && to) {
+          const c = this.coins && this.coins.get(e.id);
+          if (c) {
+            this.coins.delete(e.id);
+            (this.flyingCoins = this.flyingCoins || []).push({ x: c.x, y: c.y, to: e.to, life: 0.35, v: e.v });
+          }
+          const now = performance.now();
+          if (window.Sound && now - (this.lastCoinSound || 0) > 55) { this.lastCoinSound = now; Sound.play('coin'); }
+        } else if (e.t === 'pickChest' && to) {
+          this.floaters.push({ x: to.x, y: to.y - 80, text: '🎁 +1 coffre !', color: '#ffd23f', life: 1.6, size: 18 });
+          this.spark(to.x, to.y - 20, '#ffd23f', 40);
+          if (window.Sound) Sound.play('chestPick');
+        } else if (e.t === 'pickItem' && to) {
+          const K = Rules.GOLD.items.kinds[e.kind];
+          this.floaters.push({ x: to.x, y: to.y - 80, text: `${K.icon} ${K.label}${K.gold ? ` +${K.gold}` : ''} !`, color: '#fff3a0', life: 1.6, size: 17 });
+          this.spark(to.x, to.y - 20, '#fff3a0', 30);
+          if (window.Sound) Sound.play('itemPick');
+        } else if (e.t === 'jackpot') {
+          this.announces.push({ text: '💥 JACKPOT ! 💥', sub: 'Pluie de pièces ×3 · chaque pièce vaut 2 golds !', subSize: 26, color: '#ffd23f', life: 3.4, age: 0 });
+          this.shake = Math.max(this.shake || 0, 0.6);
+          if (window.Sound) Sound.play('jackpot');
+        } else if (e.t === 'overtime') {
+          this.announces.push({ text: '⚡ MORT SUBITE !', sub: 'Les cristaux subissent 3 fois plus de dégâts !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
+          this.shake = Math.max(this.shake || 0, 0.5);
+          if (window.Sound) Sound.play('roar', false);
         } else if (e.t === 'king' && to) {
           this.floaters.push({ x: to.x, y: to.y - 92, text: '👑 Roi de la colline !', color: '#ffd23f', life: 1.6, size: 15 });
         } else if (e.t === 'hillWarn') {
@@ -600,7 +637,9 @@
           else if (!isBossKind(to) && to.kind !== 'oeuf' && to.kind !== 'cristal') this.floaters.push({ x: to.x, y: to.y - 50, text: '💀', color: '#fff', life: 1.4, size: 28 });
           // En coopération, le fil n'affiche que les aventuriers tombés et les chefs vaincus.
           let text = null;
-          if (f.mode === 'br' || f.mode === 'koth' || !f.mode) text = from ? `${from.name}  ⚔  ${to.name}` : `☠ ${to.name} (zone)`;
+          const ci = (x) => (x && x.clan ? Rules.CLANS.teams[x.clan].icon + ' ' : '');
+          if (to.kind === 'cristal_clan') text = `💥 ${to.name} est détruit !`;
+          else if (f.mode === 'br' || f.mode === 'koth' || f.mode === 'clans' || !f.mode) text = from ? `${ci(from)}${from.name}  ⚔  ${ci(to)}${to.name}` : `☠ ${to.name} (zone)`;
           else if (to.kind === 'player') text = `☠ ${to.name} est tombé(e)`;
           else if (to.elite && from) text = `👑 ${from.name} a vaincu ${to.name}`;
           if (text) {
@@ -639,6 +678,7 @@
       const theme = dungeon && this.frame && this.frame.dungeon ? Rules.dungeonTheme(this.frame.dungeon.room) : 0;
       ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.bg, 0, 0);
       if (dungeon) this.drawTorches(t, theme);
+      if (phase !== 'idle' && this.queue && this.queue.mode === 'gold') this.drawGoldSky(t);
 
       if (phase === 'battle' || (phase === 'ended' && this.frame && this.frame.fighters.length)) {
         this.drawBattle(dt, t);
@@ -694,7 +734,7 @@
         this.ctx.translate(W / 2, 70);
         this.ctx.scale(pulse, pulse);
         this.ctx.translate(-W / 2, -70);
-        this.title('TAPEZ !join DANS LE CHAT', 70, 56, '#fff', '#b83cff', W - 360);
+        this.title(q.mode === 'clans' ? 'TAPEZ !rouge OU !bleu' : 'TAPEZ !join DANS LE CHAT', 70, 56, '#fff', '#b83cff', W - 360);
         this.ctx.restore();
         const left = q.queueEndsAt ? q.queueEndsAt - Date.now() : 0;
         this.title(formatCountdown(left), 188, 50, left < 10000 ? '#ff4d6d' : '#ffc21a', left < 10000 ? '#ff4d6d' : '#ff9a00');
@@ -709,7 +749,10 @@
       this.drawLogo(100, 80, 110);
       const pot = q.bets && q.bets.pool ? `   ·   💰 ${q.bets.pool} golds pariés sur le site` : '';
       const who = q.mode === 'dungeon' ? 'aventurier' : 'combattant';
-      this.title(`${n} ${who}${n > 1 ? 's' : ''}${pot}`, 240, 24, '#cfc6ff');
+      if (q.mode === 'clans') {
+        const cnt = (c) => q.participants.filter((p) => p.clan === c).length;
+        this.title(`🔴 ${cnt('rouge')} Rouges   ⚔   ${cnt('bleu')} Bleus 🔵${pot}`, 240, 24, '#cfc6ff');
+      } else this.title(`${n} ${who}${n > 1 ? 's' : ''}${pot}`, 240, 24, '#cfc6ff');
 
       // Grille des inscrits
       const cols = n > 40 ? 12 : 10;
@@ -724,7 +767,7 @@
         const x = cellW * (col + 1);
         const y = 310 + row * cellH;
         drawFighter(this.ctx, x, y, p, { scale, bob: Math.sin(t / 300 + i) * 2 });
-        this.label(classIcon(p.cls) + p.name, x, y + 32 * scale, 13, '#fff');
+        this.label((p.clan ? Rules.CLANS.teams[p.clan].icon + ' ' : '') + classIcon(p.cls) + p.name, x, y + 32 * scale, 13, p.clan ? shade(Rules.CLANS.teams[p.clan].color, 0.45) : '#fff');
         if (p.title) this.label(p.title, x, y + 32 * scale + 14, 11, '#ffcf5a');
       });
     }
@@ -822,6 +865,8 @@
       }
 
       if (f.koth) this.drawHill(f, t);
+      if (f.clans) this.drawBases(t);
+      if (f.gold) this.drawGoldLoot(f, t, 'ground');
       this.drawZones(f.zones || [], t, 'ground');
       // Morts d'abord (au sol)
       for (const fi of order) {
@@ -838,6 +883,8 @@
         if (isMonster(fi)) drawMonster(ctx, 0, 0, fi, { scale: FIGHTER_SCALE, facing: d.facing, t });
         else drawFighter(ctx, 0, 0, fi, { scale: FIGHTER_SCALE, facing: d.facing });
         ctx.restore();
+        // Roi de la Colline, Guerre des clans : compte à rebours avant le retour au combat
+        if (fi.respawn !== undefined) this.label(`↻ ${Math.ceil(fi.respawn)} s`, d.x, d.y - 40, 13, '#9ff6ff');
       }
 
       for (const fi of order) {
@@ -859,8 +906,17 @@
         } else if (isMonster(fi)) {
           const nest = f.boss && f.boss.timer && f.boss.timer.kind === 'nest' ? f.boss.timer : null;
           const crack = fi.kind === 'oeuf' && nest ? 1 - nest.left / Rules.BOSSES.dragon.nest.duration : 0;
-          drawMonster(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, t, seed: fi.x, crack });
+          const color = fi.clan && Rules.CLANS.teams[fi.clan].color;
+          drawMonster(ctx, fi.kind === 'cristal_clan' ? d.x : d.x + lunge, fi.kind === 'cristal_clan' ? d.y : d.y, fi, { scale: FIGHTER_SCALE, facing: fi.kind === 'cristal_clan' ? 1 : d.facing, flash: d.flash, swing, bob: fi.kind === 'cristal_clan' ? 0 : bob, t, seed: fi.x, crack, color });
         } else {
+          if (fi.clan) {
+            ctx.save();
+            ctx.strokeStyle = Rules.CLANS.teams[fi.clan].color;
+            ctx.fillStyle = Rules.CLANS.teams[fi.clan].color + '40';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.ellipse(d.x, d.y + 18, 17, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.restore();
+          }
           this.drawFx(fi, d.x, d.y, t, 'under');
           const invisible = fi.fx && fi.fx.includes('invisible');
           drawFighter(ctx, d.x + lunge, d.y, fi, { scale: FIGHTER_SCALE, facing: d.facing, flash: d.flash, swing, bob, alpha: invisible ? 0.28 + Math.sin(t / 120) * 0.08 : 1 });
@@ -941,6 +997,7 @@
         if (isMonster(fi)) {
           // Monstres : petite barre de vie rouge, nom seulement pour les chefs.
           const top = y - fi.r * FIGHTER_SCALE - (fi.kind === 'chauve_souris' ? 42 : 30);
+          if (fi.kind === 'cristal_clan') continue; // sa vie est affichée en haut de l'écran
           const mw = fi.elite ? 56 : 30;
           ctx.fillStyle = 'rgba(0,0,0,.7)';
           ctx.fillRect(x - mw / 2 - 1, top - 1, mw + 2, 6);
@@ -975,8 +1032,8 @@
         const nameY = fi.title ? y - 67 : y - 58;
         const icon = fi.spec ? fi.spec.icon + ' ' : classIcon(fi.cls);
         const potion = fi.potion && Rules.CONSUMABLES[fi.potion] ? ' ' + Rules.CONSUMABLES[fi.potion].icon : '';
-        const pts = fi.score !== undefined ? ` · ${fi.score} pts` : '';
-        this.label(icon + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : '') + pts, x, nameY, 12, '#fff');
+        const pts = fi.score !== undefined ? ` · ${fi.score} pts` : fi.gold !== undefined ? ` · 🪙 ${fi.gold}${fi.chests ? ` · 🎁${fi.chests}` : ''}` : '';
+        this.label(icon + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : '') + pts, x, nameY, 12, fi.clan ? shade(Rules.CLANS.teams[fi.clan].color, 0.5) : '#fff');
         if (fi.title) this.label(fi.title, x, y - 56, 10, '#ffcf5a');
       }
 
@@ -1016,6 +1073,13 @@
           ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(4, -3); ctx.lineTo(4, 3); ctx.closePath(); ctx.fill();
           ctx.fillStyle = '#ff6b4a';
           ctx.fillRect(-12, -2.5, 4, 5);
+        } else if (p.kind === 'shard') {
+          // tir d'un cristal de clan : éclat aux couleurs de l'équipe
+          ctx.rotate(ang);
+          ctx.fillStyle = p.color || '#fff';
+          ctx.shadowColor = p.color || '#fff';
+          ctx.shadowBlur = 12;
+          ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(0, -4); ctx.lineTo(-10, 0); ctx.lineTo(0, 4); ctx.closePath(); ctx.fill();
         } else if (p.kind === 'shadow') {
           // trait d'ombre du Magicien : orbe violette avec une traînée
           ctx.globalCompositeOperation = 'lighter';
@@ -1116,6 +1180,12 @@
           ctx.fillText(tg.text, 30, hudY + 21);
           hudY += 34;
         }
+      } else if (f.mode === 'gold' && f.gold) {
+        this.drawGoldHud(f, t);
+        hudY = 90;
+      } else if (f.mode === 'clans' && f.clans) {
+        this.drawClansHud(f, t);
+        hudY = 16;
       } else if (f.mode === 'koth' && f.koth) {
         this.hudBox(16, 16, 250, 64, '#ffd23f');
         ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
@@ -1182,10 +1252,11 @@
         ctx.globalAlpha = a;
         ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
         const w = ctx.measureText(item.text).width + 24;
-        this.hudBox(W - w - 16, 16 + i * 30, w, 26, '#ff3fd8');
+        const fy = f.mode === 'clans' ? 96 : 16; // sous le bandeau des cristaux en Guerre des clans
+        this.hudBox(W - w - 16, fy + i * 30, w, 26, '#ff3fd8');
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'right';
-        ctx.fillText(item.text, W - 28, 30 + i * 30);
+        ctx.fillText(item.text, W - 28, fy + 14 + i * 30);
       });
       ctx.globalAlpha = 1;
       this.feed = this.feed.filter((x) => x.life > 0);
@@ -1347,6 +1418,297 @@
         ctx.beginPath(); ctx.ellipse(k.next.x, k.next.y + 10, h.r, h.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
         this.label(`👑 dans ${Math.max(0, Math.ceil(k.moveIn))} s`, k.next.x, k.next.y + 10, 18, '#ffd23f');
+      }
+    }
+
+    // ---------- Ruée vers l'or ----------
+
+    // Ambiance « bonus game » : lumière dorée, rayons qui tournent, étoiles ; arc-en-ciel pendant le JACKPOT.
+    drawGoldSky(t) {
+      const ctx = this.ctx;
+      const jackpot = this.frame && this.frame.gold && this.frame.gold.jackpot;
+      ctx.save();
+      ctx.fillStyle = jackpot ? `hsla(${(t / 8) % 360},90%,55%,.16)` : 'rgba(255,200,60,.13)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(W / 2, -60);
+      ctx.rotate(t / 6000);
+      for (let i = 0; i < 14; i++) {
+        ctx.rotate((Math.PI * 2) / 14);
+        ctx.fillStyle = jackpot ? `hsla(${(i * 26 + t / 6) % 360},100%,65%,.07)` : 'rgba(255,230,140,.06)';
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-60, 1100); ctx.lineTo(60, 1100); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      // étoiles scintillantes
+      ctx.save();
+      for (let i = 0; i < 26; i++) {
+        const x = (i * 197.3) % W;
+        const y = (i * 131.7) % H;
+        const a = 0.25 + 0.75 * Math.max(0, Math.sin(t / 300 + i * 1.3));
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = '#fff6c0';
+        ctx.font = '14px "Segoe UI Emoji", sans-serif';
+        ctx.fillText('✦', x, y);
+      }
+      ctx.restore();
+    }
+
+    coinSprite(x, y, t, seed, scale = 1, v = 1) {
+      const ctx = this.ctx;
+      const spin = Math.abs(Math.cos(t / 160 + seed));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = v > 1 ? '#ff9a1f' : '#e0a400';
+      ctx.beginPath(); ctx.ellipse(0, 0, 8 * Math.max(0.15, spin), 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = v > 1 ? '#ffd27a' : '#ffe066';
+      ctx.beginPath(); ctx.ellipse(0, 0, 6 * Math.max(0.12, spin), 6, 0, 0, Math.PI * 2); ctx.fill();
+      if (spin > 0.5) { ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillRect(-1.5 * spin, -4, 2 * spin, 3); }
+      ctx.restore();
+    }
+
+    drawGoldLoot(f, t) {
+      const ctx = this.ctx;
+      const G = Rules.GOLD;
+      const now = performance.now();
+      // Pièces : elles tombent du ciel (ombre qui grossit), tournent au sol puis clignotent avant de disparaître
+      if (this.coins) {
+        for (const [id, c] of this.coins) {
+          const age = (now - c.born) / 1000;
+          if (age > G.coins.fall + G.coins.life) { this.coins.delete(id); continue; }
+          const fall = Math.max(0, 1 - age / G.coins.fall);
+          ctx.fillStyle = `rgba(0,0,0,${0.25 * (1 - fall)})`;
+          ctx.beginPath(); ctx.ellipse(c.x, c.y + 8, 7 * (1 - fall * 0.6), 2.5, 0, 0, Math.PI * 2); ctx.fill();
+          const left = G.coins.fall + G.coins.life - age;
+          if (left < 1 && Math.sin(t / 50) < 0) continue;
+          this.coinSprite(c.x, c.y - fall * fall * 420, t, c.seed, 1, c.v);
+        }
+      }
+      // Coffres (en parachute) et bonus
+      for (const ch of f.gold.chests) {
+        const lift = ch.fall * 260;
+        ctx.fillStyle = 'rgba(0,0,0,.3)';
+        ctx.beginPath(); ctx.ellipse(ch.x, ch.y + 12, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.save();
+        ctx.translate(ch.x + (ch.fall ? Math.sin(t / 200 + ch.id) * 8 : 0), ch.y - lift);
+        if (ch.fall > 0) {
+          ctx.fillStyle = '#ff4d6d';
+          ctx.beginPath(); ctx.arc(0, -46, 26, Math.PI, 0); ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(0, -46, 26, Math.PI, Math.PI * 1.33); ctx.lineTo(0, -46); ctx.fill();
+          ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(-24, -46); ctx.lineTo(-10, -10); ctx.moveTo(24, -46); ctx.lineTo(10, -10); ctx.stroke();
+        }
+        ctx.shadowColor = '#ffd23f';
+        ctx.shadowBlur = 14 + Math.sin(t / 120) * 6;
+        ctx.fillStyle = '#8a5a2b';
+        ctx.fillRect(-15, -12, 30, 22);
+        ctx.fillStyle = '#a8703a';
+        ctx.fillRect(-15, -16, 30, 8);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(-15, -9, 30, 3);
+        ctx.fillRect(-3, -12, 6, 8);
+        ctx.restore();
+      }
+      for (const it of f.gold.items) {
+        const K = G.items.kinds[it.kind];
+        const lift = it.fall * 220;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        ctx.beginPath(); ctx.ellipse(it.x, it.y + 12, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+        const g = ctx.createRadialGradient(it.x, it.y - lift - 4, 2, it.x, it.y - lift - 4, 30);
+        g.addColorStop(0, 'rgba(255,255,255,.7)');
+        g.addColorStop(1, 'rgba(255,220,100,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(it.x, it.y - lift - 4, 30, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '30px "Segoe UI Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(K.icon, it.x, it.y - lift - 4 + Math.sin(t / 200 + it.id) * 4);
+        ctx.restore();
+      }
+      // Pièces ramassées qui volent vers le joueur
+      if (this.flyingCoins) {
+        for (const c of this.flyingCoins) {
+          c.life -= 1 / 60;
+          const d = this.disp.get(c.to);
+          if (!d) continue;
+          const k = 1 - c.life / 0.35;
+          this.coinSprite(c.x + (d.x - c.x) * k, c.y + (d.y - 30 - c.y) * k - Math.sin(k * Math.PI) * 30, t, 0, 0.8 * (1 - k * 0.5), c.v);
+        }
+        this.flyingCoins = this.flyingCoins.filter((c) => c.life > 0);
+      }
+    }
+
+    drawGoldHud(f, t) {
+      const ctx = this.ctx;
+      const g = f.gold;
+      this.hudBox(16, 16, 250, 64, '#ffd23f');
+      ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#ffd23f';
+      ctx.textAlign = 'left';
+      ctx.fillText('🪙 Ruée vers l\'or', 30, 40);
+      const left = Math.ceil(g.left);
+      ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = left <= 15 ? '#ff8fa3' : '#fff';
+      ctx.fillText(`⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} · ${g.rain} pièces/s`, 30, 66);
+      // Total ramassé, en gros au centre
+      const total = f.fighters.reduce((a, x) => a + (x.gold || 0), 0);
+      const pulse = g.jackpot ? 1 + Math.sin(t / 80) * 0.06 : 1;
+      ctx.save();
+      ctx.translate(W / 2, 46); ctx.scale(pulse, pulse); ctx.translate(-W / 2, -46);
+      this.title(`💰 ${total.toLocaleString('fr-FR')} golds ramassés`, 46, 32, g.jackpot ? `hsl(${(t / 5) % 360},100%,65%)` : '#ffe066', '#ff9a00');
+      ctx.restore();
+      if (g.jackpot) this.title('💥 JACKPOT ×2 💥', 88, 22, '#fff', '#ff3fd8');
+      // Top 5 à droite
+      const top = f.fighters.filter((x) => x.gold !== undefined).sort((a, b) => b.gold - a.gold || b.chests - a.chests).slice(0, 5);
+      this.hudBox(W - 266, 16, 250, 26 + top.length * 22, '#ffd23f');
+      ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#ffd23f';
+      ctx.textAlign = 'left';
+      ctx.fillText('MEILLEURS RAMASSEURS', W - 252, 34);
+      top.forEach((x, i) => {
+        ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = i === 0 ? '#ffe066' : '#fff';
+        const name = x.name.length > 14 ? x.name.slice(0, 13) + '…' : x.name;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${name}`, W - 252, 56 + i * 22);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${x.gold} 🪙${x.chests ? ' · ' + x.chests + ' 🎁' : ''}`, W - 26, 56 + i * 22);
+      });
+      ctx.textAlign = 'left';
+    }
+
+    drawGoldResult(t, r) {
+      const ctx = this.ctx;
+      ctx.fillStyle = 'rgba(20,10,0,.72)';
+      ctx.fillRect(0, 0, W, H);
+      // confettis
+      if (!this.confetti || !this.confetti.length) {
+        this.confetti = Array.from({ length: 120 }, () => ({ x: Math.random() * W, y: -Math.random() * H, vy: 60 + Math.random() * 90, h: Math.random() * 360, r: Math.random() * 6, s: 4 + Math.random() * 5 }));
+      }
+      ctx.save();
+      for (const c of this.confetti) {
+        c.y += c.vy / 60;
+        if (c.y > H + 10) c.y = -10;
+        ctx.fillStyle = `hsl(${c.h},90%,60%)`;
+        ctx.save(); ctx.translate(c.x + Math.sin(c.y / 30 + c.r) * 8, c.y); ctx.rotate(c.y / 40 + c.r); ctx.fillRect(-c.s / 2, -c.s / 4, c.s, c.s / 2); ctx.restore();
+      }
+      ctx.restore();
+      const s = 1 + Math.sin(t / 300) * 0.04;
+      ctx.save();
+      ctx.translate(W / 2, 110); ctx.scale(s, s); ctx.translate(-W / 2, -110);
+      this.title('🎉 FIN DE LA RUÉE VERS L\'OR ! 🎉', 110, 50, '#ffe066', '#ff9a00');
+      ctx.restore();
+      this.title(`${r.totals.gold.toLocaleString('fr-FR')} golds et ${r.totals.chests} coffre${r.totals.chests > 1 ? 's' : ''} ramassés · chacun garde son butin !`, 165, 24, '#fff', '#b83cff');
+      // Podium
+      const podium = [{ i: 1, x: W / 2 - 220, h: 90 }, { i: 0, x: W / 2, h: 130 }, { i: 2, x: W / 2 + 220, h: 60 }];
+      for (const p of podium) {
+        const e = r.ranking[p.i];
+        if (!e) continue;
+        const base = 560;
+        ctx.fillStyle = ['#ffd23f', '#c9d3e0', '#d08a4a'][p.i];
+        ctx.fillRect(p.x - 80, base - p.h, 160, p.h);
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        ctx.fillRect(p.x - 80, base - p.h, 160, 8);
+        this.label(['🥇', '🥈', '🥉'][p.i], p.x, base - p.h / 2, 34, '#fff');
+        const fighter = this.frame && this.frame.fighters.find((x) => x.key === e.key);
+        if (fighter) drawFighter(ctx, p.x, base - p.h - 34, fighter, { scale: p.i === 0 ? 2.2 : 1.8, bob: Math.sin(t / 250 + p.i) * 3 });
+        this.label(e.name, p.x, base - p.h - 100 - (p.i === 0 ? 14 : 0), 18, '#fff');
+        this.label(`${e.gold} 🪙${e.chests ? ` · ${e.chests} 🎁` : ''}`, p.x, base - p.h - 78 - (p.i === 0 ? 14 : 0), 17, '#ffe066');
+      }
+      if (r.best) this.title(`👑 Roi du butin : ${r.best.name} (+${Rules.GOLD.bestChests} coffre bonus)`, 610, 22, '#ffd23f', '#ff9a00');
+      const rest = r.ranking.slice(3, 8).map((e) => `#${e.rank} ${e.name} ${e.gold} 🪙`).join('   ·   ');
+      if (rest) this.label(rest, W / 2, 660, 15, '#ddd');
+    }
+
+    // Guerre des clans : les deux camps teintés aux couleurs des équipes.
+    drawBases(t) {
+      const ctx = this.ctx;
+      for (const [c, x0] of [['rouge', 0], ['bleu', W]]) {
+        const col = Rules.CLANS.teams[c].color;
+        const g = ctx.createLinearGradient(x0, 0, x0 === 0 ? 460 : W - 460, 0);
+        g.addColorStop(0, col + '38');
+        g.addColorStop(1, col + '00');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0 === 0 ? 0 : W - 460, 0, 460, H);
+      }
+    }
+
+    // Bandeau du haut : la vie des deux cristaux face à face, les kills et le temps.
+    drawClansHud(f, t) {
+      const ctx = this.ctx;
+      const k = f.clans;
+      const bw = 420;
+      const y = 22;
+      const T = Rules.CLANS.teams;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8,5,28,.85)';
+      ctx.fillRect(W / 2 - bw - 70, y - 8, 2 * bw + 140, 66);
+      for (const [c, dir] of [['rouge', -1], ['bleu', 1]]) {
+        const cr = k.crystals[c];
+        const ratio = Math.max(0, cr.hp / cr.maxHp);
+        const x0 = dir < 0 ? W / 2 - 60 - bw : W / 2 + 60;
+        ctx.fillStyle = 'rgba(255,255,255,.1)';
+        ctx.fillRect(x0, y, bw, 24);
+        ctx.fillStyle = T[c].color;
+        ctx.shadowColor = T[c].color;
+        ctx.shadowBlur = 10;
+        // la barre se vide vers l'extérieur, comme dans un jeu de combat
+        if (dir < 0) ctx.fillRect(x0 + bw * (1 - ratio), y, bw * ratio, 24);
+        else ctx.fillRect(x0, y, bw * ratio, 24);
+        ctx.shadowBlur = 0;
+        ctx.font = '900 15px Orbitron, "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = dir < 0 ? 'left' : 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${T[c].icon} ${T[c].label.toUpperCase()}  ${Math.round(ratio * 100)} %`, dir < 0 ? x0 + 8 : x0 + bw - 8, y + 12);
+        ctx.font = '700 14px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = T[c].color;
+        const alive = f.fighters.filter((x) => x.clan === c && x.alive && x.kind !== 'cristal_clan').length;
+        const total = f.fighters.filter((x) => x.clan === c && x.kind !== 'cristal_clan').length;
+        const bonus = k.mult[c] > 1 ? `  ·  bonus ×${String(Math.round(k.mult[c] * 100) / 100).replace('.', ',')}` : '';
+        ctx.fillText(`⚔ ${k.kills[c]} kills  ·  👥 ${alive}/${total} debout${bonus}`, dir < 0 ? x0 + 8 : x0 + bw - 8, y + 42);
+      }
+      const left = Math.ceil(k.left);
+      ctx.textAlign = 'center';
+      ctx.font = '900 22px Orbitron, "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = k.overtime ? (Math.sin(t / 120) > 0 ? '#ff4d6d' : '#ffb000') : '#fff';
+      ctx.fillText(`${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`, W / 2, y + 12);
+      ctx.font = '800 12px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = k.overtime ? '#ff8fa3' : '#cfc6ff';
+      ctx.fillText(k.overtime ? 'MORT SUBITE' : 'VS', W / 2, y + 40);
+      ctx.restore();
+    }
+
+    drawClansResult(t, r) {
+      const ctx = this.ctx;
+      const T = Rules.CLANS.teams[r.winner];
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(0, 0, W, H);
+      const s = 1 + Math.sin(t / 300) * 0.03;
+      ctx.save();
+      ctx.translate(W / 2, 140); ctx.scale(s, s); ctx.translate(-W / 2, -140);
+      this.title(`${T.icon} VICTOIRE DES ${T.label.toUpperCase()} ! ${T.icon}`, 140, 56, T.color, T.color);
+      ctx.restore();
+      const pct = (x) => `${Math.round(x * 100)} %`;
+      this.title(`Cristal rouge ${pct(r.teams.rouge.crystal)}  ·  ${r.teams.rouge.kills} – ${r.teams.bleu.kills} kills  ·  Cristal bleu ${pct(r.teams.bleu.crystal)}`, 205, 22, '#fff', '#b83cff');
+      this.title(`🎁 Chaque ${T.label.slice(0, -1)} : +${r.reward.xp} XP · +${r.reward.gold} golds · +${r.reward.chests} coffre`, 252, 24, '#3ddc5a', '#3ddc5a');
+      if (r.mvp) {
+        this.title(`🌟 MVP : ${r.mvp.name} — ${r.mvp.dealt.toLocaleString('fr-FR')} dégâts · ${r.mvp.kills} kill(s) · +${Rules.CLANS.mvpChests} coffre`, 300, 22, '#ffd23f', '#ff9a00');
+        const fighter = this.frame && this.frame.fighters.find((x) => x.key === r.mvp.key);
+        if (fighter) drawFighter(ctx, W / 2, 400, Object.assign({}, fighter), { scale: 2.6, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
+      }
+      r.ranking.slice(0, 5).forEach((p, i) => {
+        const icon = Rules.CLANS.teams[p.clan] ? Rules.CLANS.teams[p.clan].icon : '';
+        this.label(`#${p.rank}  ${icon} ${p.name}  —  ${p.dealt.toLocaleString('fr-FR')} dégâts · ${p.kills} kill(s) · ${p.deaths} mort(s)`, W / 2, 500 + i * 28, 17, i === 0 ? '#ffe27a' : '#ddd');
+      });
+      const br = this.queue.bets && this.queue.bets.lastResult;
+      if (br) {
+        const text = br.refund ? `💰 Personne n'avait parié sur ${br.winnerName} : ${br.pool} golds remboursés`
+          : `💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds !`;
+        this.label(text, W / 2, 700, 20, '#ffb000');
       }
     }
 
@@ -1666,6 +2028,8 @@
         if (has('potion_berserker')) aura('rgba(255,60,40,.55)', 34);
         if (has('potion_vie')) aura('rgba(80,255,120,.45)', 30);
         if (has('potion_ronces')) aura('rgba(190,80,255,.45)', 30);
+        if (has('gold_aimant')) aura(`rgba(200,80,255,${0.35 + Math.sin(t / 90) * 0.15})`, 46);
+        if (has('gold_etoile')) aura(`hsla(${(t / 4) % 360},100%,60%,.5)`, 36);
         if (has('curse')) aura(`rgba(120,20,200,${0.5 + Math.sin(t / 100) * 0.15})`, 32); // malédiction du Magicien
         if (has('potion_celerite')) aura('rgba(255,230,60,.45)', 30);
       } else {
@@ -1865,6 +2229,8 @@
       const r = this.queue && this.queue.result;
       if (!r) return;
       if (r.mode === 'boss' || r.mode === 'dungeon') { this.drawCoopResult(t, r); return; }
+      if (r.mode === 'clans') { this.drawClansResult(t, r); return; }
+      if (r.mode === 'gold') { this.drawGoldResult(t, r); return; }
       const koth = r.mode === 'koth';
       const ctx = this.ctx;
       ctx.fillStyle = 'rgba(0,0,0,.55)';

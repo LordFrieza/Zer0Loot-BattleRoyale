@@ -405,13 +405,18 @@ function makeBot() {
   return makeNpc('bot' + botCount, BOT_NAMES[botCount % BOT_NAMES.length] + '_' + botCount, level, cls);
 }
 
-function joinFromTwitch(login, displayName) {
-  if (battle.phase !== 'queue') return { ok: false, reason: 'closed' };
+// clan : équipe demandée en Guerre des clans (!rouge / !bleu) ; un inscrit qui la redemande change d'équipe.
+function joinFromTwitch(login, displayName, clan = null) {
+  if (battle.phase !== 'queue' && !(clan && battle.phase === 'ready')) return { ok: false, reason: 'closed' };
   const user = game.getOrCreateTwitchUser(login, displayName);
   if (user.banned) return { ok: false, reason: 'banned', user };
-  const joined = battle.join(participantFromUser(user));
+  if (clan && battle.participants.has('u' + user.id)) return { ok: false, switched: battle.setClan('u' + user.id, clan), user };
+  if (battle.phase !== 'queue') return { ok: false, reason: 'closed', user };
+  const joined = battle.join({ ...participantFromUser(user), clan });
   return { ok: joined, user };
 }
+
+const clanText = (clan) => `${Rules.CLANS.teams[clan].icon} ${Rules.CLANS.teams[clan].label}`;
 
 // ---------- Abonnements Twitch : 300 golds pour celui qui s'abonne / offre l'abonnement ----------
 
@@ -432,12 +437,14 @@ function rewardSub(login, displayName, kind) {
 
 // Commandes du chat Twitch : !join, et les votes du sondage du donjon (!vie, !or… ou !1 / !2).
 function chatCommand(command, from) {
-  if (command === '!join') {
-    const r = joinFromTwitch(from.login, from.displayName);
+  const clan = battle.mode === 'clans' && Object.keys(Rules.CLANS.teams).find((c) => Rules.CLANS.teams[c].cmd === command);
+  if (command === '!join' || clan) {
+    const r = joinFromTwitch(from.login, from.displayName, clan || null);
+    const p = r.user && battle.participants.get('u' + r.user.id);
     if (r.ok) {
       const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
-      twitch.say(`@${from.displayName} rejoint la bataille ⚔️${hint}`);
-    }
+      twitch.say(`@${from.displayName} rejoint ${p && p.clan ? 'les ' + clanText(p.clan) : 'la bataille'} ⚔️${hint}`);
+    } else if (r.switched) twitch.say(`@${from.displayName} passe chez les ${clanText(p.clan)} !`);
     return;
   }
   const login = String(from.login || '').toLowerCase();
@@ -452,9 +459,16 @@ function startTwitch() {
 }
 
 app.post('/api/queue/join', requirePlayer, (req, res) => {
+  const clan = battle.mode === 'clans' && Rules.CLANS.teams[req.body.clan] ? req.body.clan : null;
+  const key = 'u' + req.user.id;
+  // Guerre des clans : un inscrit peut changer d'équipe tant que la bataille n'a pas commencé.
+  if (clan && battle.participants.has(key) && (battle.phase === 'queue' || battle.phase === 'ready')) {
+    return res.json({ ok: true, joined: false, switched: battle.setClan(key, clan), clan });
+  }
   if (battle.phase !== 'queue') return res.status(400).json({ error: 'La file n\'est pas ouverte' });
-  const joined = battle.join(participantFromUser(req.user));
-  res.json({ ok: true, joined });
+  const joined = battle.join({ ...participantFromUser(req.user), clan });
+  const p = battle.participants.get(key);
+  res.json({ ok: true, joined, clan: p && p.clan });
 });
 
 app.get('/api/queue', (req, res) => res.json(queueView()));
@@ -536,6 +550,8 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
     battle.start(refreshParticipant, null);
     const B = Rules.BOSSES[battle.bossId];
     twitch.say(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
+      : battle.mode === 'gold' ? `🪙 RUÉE VERS L'OR ! Il pleut des pièces et des coffres pendant ${Rules.GOLD.duration} s : chacun garde ce qu'il ramasse !`
+      : battle.mode === 'clans' ? '⚔️ Guerre des clans : détruisez le cristal adverse ! 🔴 Rouges contre 🔵 Bleus !'
       : battle.mode === 'koth' ? `👑 Roi de la Colline : tenez la colline pendant ${Math.round(Rules.KOTH.duration / 60 * 10) / 10} min ! Les morts reviennent au combat.`
         : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
     return { event: null, pendingEvent };
@@ -649,6 +665,61 @@ battle.on('coopEnd', (result, fighters) => {
     twitch.say(`🏰 Le raid s'arrête en salle ${result.room} !${r ? ` Tous les aventuriers gagnent ${[r.chests ? r.chests + ' coffre(s)' : '', r.xp + ' XP', r.gold + ' golds'].filter(Boolean).join(', ')}.` : ' Il faut atteindre la salle 5 pour une récompense.'}`);
   }
   notifyBets(bets.refundAll());
+  io.emit('leaderboard', leaderboard());
+});
+
+// ---------- Ruée vers l'or ----------
+
+// Chacun garde ce qu'il a ramassé (golds, coffres) ; le meilleur ramasseur gagne un coffre de plus.
+battle.on('goldEnd', (result, fighters) => {
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user) continue;
+    user.character.record.battles += 1;
+    const best = result.best && result.best.key === f.key ? Rules.GOLD.bestChests : 0;
+    const reward = { xp: Rules.REWARDS.participation.xp, gold: f.goldGot, chests: f.chestsGot + best };
+    const levels = game.grant(user.character, reward);
+    io.to('user:' + user.id).emit('reward', { type: 'gold', reward, levels, best: !!best });
+    pushMe(user);
+  }
+  db.save();
+  const b = result.best;
+  twitch.say(`🪙 Fin de la Ruée vers l'or : ${result.totals.gold} golds et ${result.totals.chests} coffre(s) ramassés !${b ? ` Roi du butin : ${b.name} avec ${b.gold} golds (+1 coffre).` : ''}`);
+  notifyBets(bets.refundAll());
+  io.emit('leaderboard', leaderboard());
+});
+
+// ---------- Guerre des clans ----------
+
+// Participation pour tous ; l'équipe gagnante est récompensée, le meilleur combattant gagne un coffre de plus.
+battle.on('clansEnd', (result, fighters) => {
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user) continue;
+    user.character.record.battles += 1;
+    const participation = { ...Rules.REWARDS.participation };
+    const pl = game.grant(user.character, participation);
+    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
+    if (f.clan === result.winner) {
+      user.character.record.wins += 1;
+      const reward = { ...result.reward };
+      const levels = game.grant(user.character, reward);
+      io.to('user:' + user.id).emit('reward', { type: 'clans', reward, levels, clan: result.winner });
+    }
+    if (result.mvp && result.mvp.key === f.key) {
+      const mvp = { xp: 0, gold: 0, chests: Rules.CLANS.mvpChests };
+      game.grant(user.character, mvp);
+      io.to('user:' + user.id).emit('reward', { type: 'mvp', reward: mvp, levels: 0 });
+    }
+    pushMe(user);
+  }
+  db.save();
+  const T = Rules.CLANS.teams[result.winner];
+  twitch.say(`${T.icon} Victoire des ${T.label} ! Chaque membre gagne ${result.reward.xp} XP, ${result.reward.gold} golds et ${result.reward.chests} coffre.${result.mvp ? ` MVP : ${result.mvp.name} (+1 coffre).` : ''}`);
+  notifyBets(bets.settle('clan:' + result.winner, `les ${T.label}`));
+  const br = bets.summary().lastResult;
+  if (br && !br.refund && br.winners) twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
+  db.save();
   io.emit('leaderboard', leaderboard());
 });
 
@@ -785,6 +856,7 @@ battle.on('frame', (f) => io.emit('frame', f));
 
 // Au lancement d'une partie, la potion équipée par chaque joueur est utilisée (elle quitte son emplacement).
 battle.on('start', (fighters) => {
+  if (battle.mode === 'gold') return; // pas de combat dans le mode bonus : la potion reste pour la prochaine partie
   for (const f of fighters) {
     const user = f.userId && db.state.users[f.userId];
     if (!user || !f.consumable) continue;

@@ -66,6 +66,7 @@ class Battle extends EventEmitter {
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
         key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, app: p.app || null, title: p.title || null,
+        clan: p.clan || undefined,
       })),
       // L'événement n'est révélé qu'au lancement de la bataille.
       event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
@@ -118,6 +119,8 @@ class Battle extends EventEmitter {
     this.boss = null;
     this.dungeon = null;
     this.koth = null;
+    this.clans = null;
+    this.gold = null;
     this.slams = [];
     this.result = null;
     this.changed();
@@ -131,7 +134,27 @@ class Battle extends EventEmitter {
   join(participant) {
     if (this.phase !== 'queue') return false;
     if (this.participants.has(participant.key)) return false;
+    // Guerre des clans : l'équipe demandée (!rouge / !bleu), sinon la moins nombreuse.
+    if (this.mode === 'clans') participant.clan = Rules.CLANS.teams[participant.clan] ? participant.clan : this.smallerClan();
+    else delete participant.clan;
     this.participants.set(participant.key, participant);
+    this.changed();
+    return true;
+  }
+
+  smallerClan() {
+    const n = { rouge: 0, bleu: 0 };
+    for (const p of this.participants.values()) if (n[p.clan] !== undefined) n[p.clan] += 1;
+    if (n.rouge === n.bleu) return Math.random() < 0.5 ? 'rouge' : 'bleu';
+    return n.rouge < n.bleu ? 'rouge' : 'bleu';
+  }
+
+  // Changer d'équipe tant que la file est ouverte ou fermée (pas pendant la bataille).
+  setClan(key, clan) {
+    const p = this.participants.get(key);
+    if (this.mode !== 'clans' || !p || !Rules.CLANS.teams[clan] || (this.phase !== 'queue' && this.phase !== 'ready')) return false;
+    if (p.clan === clan) return false;
+    p.clan = clan;
     this.changed();
     return true;
   }
@@ -146,12 +169,15 @@ class Battle extends EventEmitter {
     this.queueEndsAt = null;
     if (this.mode !== 'br') event = null; // les événements ne concernent que le Battle Royale
 
-    const list = [...this.participants.values()].map((p) => (refresh ? refresh(p) : p));
+    // Stats recalculées au lancement ; l'équipe choisie (Guerre des clans) est conservée.
+    const list = [...this.participants.values()].map((p) => (refresh ? { ...refresh(p), clan: p.clan } : p));
     this.players = list.map((p) => this.makePlayer(p, event));
     this.fighters = [...this.players];
     this.boss = null;
     this.dungeon = null;
     this.koth = null;
+    this.clans = null;
+    this.gold = null;
     this.firstBlood = false;
     this.event = event;
     this.fogs = [];
@@ -172,6 +198,10 @@ class Battle extends EventEmitter {
         this.koth = { hill: { x: ARENA.w / 2, y: ARENA.h / 2, r: K.hill.radius }, next: null, moveAt: K.hill.moveEvery, king: null };
         for (const f of this.players) f.score = 0;
       }
+    } else if (this.mode === 'gold') {
+      this.setupGold();
+    } else if (this.mode === 'clans') {
+      this.setupClans();
     } else if (this.mode === 'boss') {
       this.setupBoss();
     } else {
@@ -213,6 +243,8 @@ class Battle extends EventEmitter {
       crit: s.crit || 0,
       cooldown: s.cooldown || Rules.BASE_ATTACK_COOLDOWN,
       lifesteal: s.lifesteal || 0,
+      clan: p.clan || null,
+      luck: s.luck || 0, // Ruée vers l'or : agrandit le rayon de ramassage
       precision: s.precision || 0,
       thorns: s.thorns || 0,
       // Comportement de classe
@@ -845,6 +877,7 @@ class Battle extends EventEmitter {
   tick(dt) {
     this.time += dt;
     if (this.mode === 'dungeon' && this.dungeon.stage !== 'fight') this.tickDungeonStage(dt);
+    else if (this.mode === 'gold') this.tickGold(dt);
     else this.tickFight(dt);
     this.emit('frame', this.frame());
     this.events = [];
@@ -887,6 +920,14 @@ class Battle extends EventEmitter {
         let score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
         // Roi de la Colline : on se bat de préférence pour la colline.
         if (this.koth) score += Math.hypot(o.x - this.koth.hill.x, o.y - this.koth.hill.y) * (f.hunter ? 3 : 1.5);
+        // Guerre des clans : le cristal adverse attire, mais on défend le sien et on répond à qui nous colle.
+        if (this.clans) {
+          const A = Rules.CLANS.aggro;
+          const mine = this.clans.crystals[f.clan];
+          if (o.isCrystal) score *= A.crystal;
+          if (mine && Math.hypot(o.x - mine.x, o.y - mine.y) < A.defendRadius) score *= A.defend;
+          if (d < A.selfDefense) score *= A.close;
+        }
         if (score < fallbackScore) { fallbackScore = score; fallback = o; }
         // Brouillard : un ennemi caché n'est visible que de près.
         if (d > FOG_SEE_RANGE && this.inFog(o)) continue;
@@ -950,10 +991,13 @@ class Battle extends EventEmitter {
         const min = a.r + b.r;
         if (d < min) {
           const overlap = min - d;
+          // Les plus gros poussent les petits ; un cristal ne bouge jamais.
           const ma = a.r * a.r;
           const mb = b.r * b.r;
-          a.x -= (dx / d) * overlap * (mb / (ma + mb)); a.y -= (dy / d) * overlap * (mb / (ma + mb));
-          b.x += (dx / d) * overlap * (ma / (ma + mb)); b.y += (dy / d) * overlap * (ma / (ma + mb));
+          const shareA = a.isCrystal ? 0 : b.isCrystal ? 1 : mb / (ma + mb);
+          const shareB = 1 - shareA;
+          a.x -= (dx / d) * overlap * shareA; a.y -= (dy / d) * overlap * shareA;
+          b.x += (dx / d) * overlap * shareB; b.y += (dy / d) * overlap * shareB;
         }
       }
     }
@@ -978,11 +1022,237 @@ class Battle extends EventEmitter {
     }
 
     if (this.koth) this.updateKoth(dt);
+    if (this.clans) this.updateClans(dt);
 
     if (this.mode === 'br') this.checkBrEnd();
     else if (this.mode === 'koth') this.checkKothEnd();
+    else if (this.mode === 'clans') this.checkClansEnd();
     else if (this.mode === 'boss') this.checkBossEnd();
     else this.checkDungeonEnd();
+  }
+
+  // ---------- Ruée vers l'or (mode bonus, sans combat) ----------
+
+  setupGold() {
+    const pos = spawnPositions(this.players.length);
+    this.players.forEach((f, i) => Object.assign(f, pos[i], { goldGot: 0, chestsGot: 0, itemsGot: 0, wander: null, wanderUntil: 0 }));
+    this.gold = { coins: [], chests: [], items: [], seq: 0, coinAcc: 0, chestIn: 2, itemIn: 3, jackpot: false };
+  }
+
+  goldRain() {
+    const C = Rules.GOLD.coins;
+    const rate = Math.min(C.max, C.base + C.perPlayer * this.players.length);
+    return this.gold.jackpot ? rate * Rules.GOLD.jackpot.rain : rate;
+  }
+
+  dropSpot() {
+    return { x: 40 + Math.random() * (ARENA.w - 80), y: 60 + Math.random() * (ARENA.h - 100) };
+  }
+
+  // Prochaine destination de balade (au hasard sur l'arène).
+  wanderSpot() {
+    return this.dropSpot();
+  }
+
+  tickGold(dt) {
+    const G = Rules.GOLD;
+    const g = this.gold;
+    if (!g.jackpot && this.time >= G.jackpotAt) {
+      g.jackpot = true;
+      this.events.push({ t: 'jackpot' });
+    }
+    for (const f of this.players) this.updateBuffs(f, dt);
+    // Ce qui tombe du ciel
+    g.coinAcc += this.goldRain() * dt;
+    const spawned = [];
+    while (g.coinAcc >= 1) {
+      g.coinAcc -= 1;
+      const p = this.dropSpot();
+      const c = { id: ++g.seq, x: p.x, y: p.y, land: this.time + G.coins.fall, die: this.time + G.coins.fall + G.coins.life, v: g.jackpot ? G.jackpot.value : 1 };
+      g.coins.push(c);
+      spawned.push([c.id, Math.round(c.x), Math.round(c.y), c.v]);
+    }
+    if (spawned.length) this.events.push({ t: 'coins', list: spawned });
+    g.chestIn -= dt;
+    if (g.chestIn <= 0) {
+      g.chestIn = G.chests.every;
+      const n = 1 + Math.floor(this.players.length / G.chests.perPlayers);
+      for (let i = 0; i < n; i++) {
+        const p = this.dropSpot();
+        g.chests.push({ id: ++g.seq, x: p.x, y: p.y, land: this.time + G.chests.fall, die: this.time + G.chests.fall + G.chests.life });
+      }
+    }
+    g.itemIn -= dt;
+    if (g.itemIn <= 0) {
+      g.itemIn = G.items.every;
+      const kinds = Object.keys(G.items.kinds);
+      const p = this.dropSpot();
+      g.items.push({ id: ++g.seq, kind: kinds[Math.floor(Math.random() * kinds.length)], x: p.x, y: p.y, land: this.time + G.items.fall, die: this.time + G.items.fall + G.items.life });
+    }
+    g.coins = g.coins.filter((c) => c.die > this.time);
+    g.chests = g.chests.filter((c) => c.die > this.time);
+    g.items = g.items.filter((c) => c.die > this.time);
+
+    for (const f of this.players) {
+      // Balade au hasard ; on fonce vers un coffre ou un bonus tout proche (posé ou sur le point de l'être).
+      const lure = [...g.chests, ...g.items]
+        .map((o) => ({ o, d: Math.hypot(o.x - f.x, o.y - f.y) }))
+        .filter((x) => x.d < G.lure)
+        .sort((a, b) => a.d - b.d)[0];
+      if (lure) f.wander = { x: lure.o.x, y: lure.o.y };
+      else if (!f.wander || this.time >= f.wanderUntil || Math.hypot(f.wander.x - f.x, f.wander.y - f.y) < 10) {
+        f.wander = this.wanderSpot(f);
+        f.wanderUntil = this.time + 1.5 + Math.random() * 2;
+      }
+      const speed = G.speed * Math.min(1.6, Math.max(0.8, f.speed / 60)) * this.buffMult(f, 'speed');
+      const dx = f.wander.x - f.x;
+      const dy = f.wander.y - f.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 1) {
+        const step = Math.min(dist, speed * dt);
+        f.x += (dx / dist) * step;
+        f.y += (dy / dist) * step;
+      }
+      // Ramassage (seulement ce qui a touché le sol)
+      const reach = Rules.goldPickup(f.luck) * this.buffMult(f, 'pickup');
+      const near = (o) => o.land <= this.time && Math.hypot(o.x - f.x, o.y - f.y) <= reach + 6;
+      for (const c of g.coins) {
+        if (c.taken || !near(c)) continue;
+        c.taken = true;
+        f.goldGot += c.v;
+        this.events.push({ t: 'pick', to: f.key, id: c.id, v: c.v });
+      }
+      for (const c of g.chests) {
+        if (c.taken || !near(c)) continue;
+        c.taken = true;
+        f.chestsGot += 1;
+        this.events.push({ t: 'pickChest', to: f.key, id: c.id });
+      }
+      for (const it of g.items) {
+        if (it.taken || !near(it)) continue;
+        it.taken = true;
+        f.itemsGot += 1;
+        const K = G.items.kinds[it.kind];
+        if (K.gold) f.goldGot += K.gold;
+        if (K.pickupMult) this.addBuff(f, 'gold_aimant', K.duration, { pickup: K.pickupMult });
+        if (K.speedMult) this.addBuff(f, 'gold_etoile', K.duration, { speed: K.speedMult });
+        this.events.push({ t: 'pickItem', to: f.key, id: it.id, kind: it.kind });
+      }
+    }
+    g.coins = g.coins.filter((c) => !c.taken);
+    g.chests = g.chests.filter((c) => !c.taken);
+    g.items = g.items.filter((c) => !c.taken);
+    if (this.time >= G.duration) this.finishGold();
+  }
+
+  // Fin : chacun garde ce qu'il a ramassé ; classement par golds puis coffres.
+  finishGold() {
+    this.stopLoop();
+    this.phase = 'ended';
+    const ranking = [...this.players].sort((a, b) => b.goldGot - a.goldGot || b.chestsGot - a.chestsGot);
+    const best = ranking[0] || null;
+    this.result = {
+      mode: 'gold',
+      ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, gold: f.goldGot, chests: f.chestsGot, items: f.itemsGot })),
+      best: best ? { key: best.key, name: best.name, gold: best.goldGot, chests: best.chestsGot } : null,
+      totals: { gold: ranking.reduce((a, f) => a + f.goldGot, 0), chests: ranking.reduce((a, f) => a + f.chestsGot, 0) },
+      duration: Math.round(this.time),
+    };
+    this.emit('goldEnd', this.result, this.players);
+    this.changed();
+  }
+
+  // ---------- Guerre des clans ----------
+
+  setupClans() {
+    const C = Rules.CLANS;
+    // Une équipe vide (tout le monde du même côté) : on répartit au hasard.
+    if (!this.players.some((p) => p.clan === 'rouge') || !this.players.some((p) => p.clan === 'bleu')) {
+      [...this.players].sort(() => Math.random() - 0.5).forEach((p, i) => { p.clan = i % 2 ? 'bleu' : 'rouge'; });
+    }
+    const size = { rouge: 0, bleu: 0 };
+    for (const p of this.players) size[p.clan] += 1;
+    const mult = { rouge: Rules.clanUnderdog(size.bleu, size.rouge), bleu: Rules.clanUnderdog(size.rouge, size.bleu) };
+    const area = { rouge: { x0: 150, y0: 80, x1: 430, y1: ARENA.h - 80 }, bleu: { x0: ARENA.w - 430, y0: 80, x1: ARENA.w - 150, y1: ARENA.h - 80 } };
+    const crystals = {};
+    for (const clan of ['rouge', 'bleu']) {
+      const team = this.players.filter((p) => p.clan === clan);
+      const pos = spawnPositions(team.length, area[clan]);
+      team.forEach((p, i) => {
+        Object.assign(p, pos[i], { team: clan, deaths: 0 });
+        if (mult[clan] > 1) { p.maxHp = Math.round(p.maxHp * mult[clan]); p.hp = p.maxHp; p.damage *= mult[clan]; }
+      });
+      const hp = C.crystal.hpBase + C.crystal.hpPerEnemy * size[clan === 'rouge' ? 'bleu' : 'rouge'];
+      crystals[clan] = fighter({
+        key: 'crystal_' + clan, name: `Cristal des ${C.teams[clan].label}`, kind: 'cristal_clan', clan, team: clan, isCrystal: true,
+        x: clan === 'rouge' ? 90 : ARENA.w - 90, y: ARENA.h / 2, r: C.crystal.radius, hp, maxHp: hp,
+        damage: C.crystal.damage, cooldown: C.crystal.cooldown, range: C.crystal.range, speed: 0, precision: 0.3, projectile: 'shard', cd: 1,
+      });
+      this.fighters.push(crystals[clan]);
+    }
+    this.clans = { crystals, kills: { rouge: 0, bleu: 0 }, overtime: false, mult, area };
+  }
+
+  updateClans() {
+    const C = Rules.CLANS;
+    const k = this.clans;
+    for (const f of this.players) {
+      if (f.alive || f.respawnAt == null || this.time < f.respawnAt) continue;
+      const a = k.area[f.clan];
+      const x = a.x0 + Math.random() * (a.x1 - a.x0);
+      const y = a.y0 + Math.random() * (a.y1 - a.y0);
+      Object.assign(f, {
+        alive: true, hp: f.maxHp, x, y, buffs: [], stunUntil: 0, targetKey: null, cd: 0.5,
+        respawnAt: null, diedAt: null, protectUntil: this.time + C.protect,
+      });
+      this.events.push({ t: 'respawn', to: f.key, x: Math.round(x), y: Math.round(y) });
+    }
+    if (!k.overtime && this.time >= C.overtimeAt) {
+      k.overtime = true;
+      this.events.push({ t: 'overtime' });
+    }
+  }
+
+  // Cristal détruit, ou fin du temps : le cristal le moins entamé gagne (égalité : le plus de kills, puis au hasard).
+  checkClansEnd() {
+    const { crystals, kills } = this.clans;
+    if (!crystals.rouge.alive || !crystals.bleu.alive) {
+      this.finishClans(crystals.rouge.alive ? 'rouge' : 'bleu');
+      return;
+    }
+    if (this.time < Rules.CLANS.duration) return;
+    const ratio = (c) => crystals[c].hp / crystals[c].maxHp;
+    const diff = ratio('rouge') - ratio('bleu');
+    const winner = Math.abs(diff) > 1e-9 ? (diff > 0 ? 'rouge' : 'bleu')
+      : kills.rouge !== kills.bleu ? (kills.rouge > kills.bleu ? 'rouge' : 'bleu') : (Math.random() < 0.5 ? 'rouge' : 'bleu');
+    this.finishClans(winner);
+  }
+
+  finishClans(winner) {
+    this.stopLoop();
+    this.phase = 'ended';
+    const C = Rules.CLANS;
+    const { crystals, kills } = this.clans;
+    const ranking = [...this.players].sort((a, b) => b.dealt - a.dealt);
+    const mvp = ranking[0] || null;
+    const team = (c) => ({
+      crystal: Math.max(0, Math.round((crystals[c].hp / crystals[c].maxHp) * 1000) / 1000),
+      kills: kills[c],
+      players: this.players.filter((p) => p.clan === c).length,
+    });
+    this.result = {
+      mode: 'clans',
+      winner,
+      winnerLabel: C.teams[winner].label,
+      teams: { rouge: team('rouge'), bleu: team('bleu') },
+      mvp: mvp ? { key: mvp.key, name: mvp.name, clan: mvp.clan, dealt: Math.round(mvp.dealt), kills: mvp.kills } : null,
+      ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, clan: f.clan, kills: f.kills, deaths: f.deaths || 0, dealt: Math.round(f.dealt) })),
+      reward: { ...C.reward },
+      duration: Math.round(this.time),
+    };
+    this.events.push({ t: 'clanWin', clan: winner });
+    this.emit('clansEnd', this.result, this.players);
+    this.changed();
   }
 
   // ---------- Roi de la Colline ----------
@@ -1389,6 +1659,7 @@ class Battle extends EventEmitter {
   // Applique des dégâts (après défense), puis vol de vie et épines.
   hit(attacker, target, raw, opts = {}) {
     if (!target.alive || this.immune(target, attacker)) return;
+    if (target.isCrystal && this.clans && this.clans.overtime) raw *= Rules.CLANS.overtimeMult; // mort subite
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
@@ -1433,6 +1704,12 @@ class Battle extends EventEmitter {
     victim.diedAt = this.time;
     if (this.dungeon) victim.diedRoom = this.dungeon.room;
     this.events.push({ t: 'kill', from: killer ? killer.key : null, to: victim.key });
+    if (this.clans && !victim.isCrystal) {
+      // Chaque mort allonge l'attente avant de revenir (5 s, 10 s, 15 s… 30 s au plus).
+      victim.deaths = (victim.deaths || 0) + 1;
+      victim.respawnAt = this.time + Rules.clanRespawnDelay(victim.deaths);
+      if (killer && killer.team !== victim.team && this.clans.kills[killer.team] !== undefined) this.clans.kills[killer.team] += 1;
+    }
     if (this.koth) {
       victim.respawnAt = this.time + Rules.KOTH.respawn;
       if (killer && killer.team !== victim.team) killer.score += Rules.KOTH.points.kill;
@@ -1537,6 +1814,23 @@ class Battle extends EventEmitter {
         fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
         a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
       })),
+      gold: this.gold ? {
+        chests: this.gold.chests.map((c) => ({ id: c.id, x: Math.round(c.x), y: Math.round(c.y), fall: Math.max(0, Math.round((c.land - this.time) * 100) / 100) })),
+        items: this.gold.items.map((c) => ({ id: c.id, kind: c.kind, x: Math.round(c.x), y: Math.round(c.y), fall: Math.max(0, Math.round((c.land - this.time) * 100) / 100) })),
+        jackpot: this.gold.jackpot,
+        left: Math.max(0, Math.round((Rules.GOLD.duration - this.time) * 10) / 10),
+        rain: Math.round(this.goldRain()),
+      } : null,
+      clans: this.clans ? {
+        crystals: Object.fromEntries(['rouge', 'bleu'].map((c) => {
+          const x = this.clans.crystals[c];
+          return [c, { key: x.key, hp: Math.max(0, Math.round(x.hp)), maxHp: x.maxHp, x: Math.round(x.x), y: Math.round(x.y) }];
+        })),
+        kills: this.clans.kills,
+        overtime: this.clans.overtime,
+        left: Math.max(0, Math.round((Rules.CLANS.duration - this.time) * 10) / 10),
+        mult: this.clans.mult,
+      } : null,
       koth: this.koth ? {
         hill: { x: Math.round(this.koth.hill.x), y: Math.round(this.koth.hill.y), r: this.koth.hill.r },
         next: this.koth.next ? { x: Math.round(this.koth.next.x), y: Math.round(this.koth.next.y) } : null,
@@ -1555,7 +1849,7 @@ class Battle extends EventEmitter {
       })),
       fighters: shown.map((f) => ({
         key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, app: f.app, level: f.level,
-        kind: f.kind, elite: f.elite || undefined, clone: f.clone || undefined, r: f.r, scale: f.scale,
+        kind: f.kind, elite: f.elite || undefined, clone: f.clone || undefined, r: f.r, scale: f.scale, clan: f.clan || undefined,
         hidden: this.event === 'fog' && f.alive && this.inFog(f),
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,
@@ -1565,6 +1859,8 @@ class Battle extends EventEmitter {
         st: f.ult ? Math.round(f.stamina * 100) / 100 : undefined, // barre de stamina (0 à 1)
         potion: f.consumable && !f.potionUsed ? f.consumable : undefined,
         score: this.koth && f.score !== undefined ? Math.floor(f.score) : undefined, // Roi de la Colline
+        gold: this.gold ? f.goldGot : undefined, // Ruée vers l'or
+        chests: this.gold ? f.chestsGot : undefined,
         respawn: !f.alive && f.respawnAt != null ? Math.max(0, Math.round((f.respawnAt - this.time) * 10) / 10) : undefined,
         protect: f.protectUntil > this.time || undefined,
         fx: fxOf(f, this.time),

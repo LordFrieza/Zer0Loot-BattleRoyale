@@ -437,6 +437,22 @@
       [79, 76, 72, 67].forEach((n, i) => tone(midi(n), 0.2, { type: 'triangle', vol: 0.06, delay: i * 0.05 }));
     },
 
+    // Ruée vers l'or : pièce ramassée (le « bling » des vieux jeux), coffre, bonus, jackpot.
+    coin() {
+      tone(midi(83), 0.06, { type: 'square', vol: 0.035 });
+      tone(midi(88), 0.18, { type: 'square', vol: 0.035, delay: 0.06 });
+    },
+    chestPick() {
+      [72, 76, 79, 84, 88].forEach((n, i) => tone(midi(n), 0.14, { type: 'square', vol: 0.05, delay: i * 0.06 }));
+    },
+    itemPick() {
+      [79, 83, 86, 91].forEach((n, i) => tone(midi(n), 0.1, { type: 'triangle', vol: 0.08, delay: i * 0.04 }));
+    },
+    jackpot() {
+      fanfare([[72, 0, 0.5], [76, 0.5, 0.5], [79, 1, 0.5], [84, 1.5, 0.5], [88, 2, 3]], 0.09, 0.13);
+      for (let i = 0; i < 16; i++) tone(midi(84 + (i % 4) * 3), 0.08, { type: 'square', vol: 0.03, delay: 0.2 + i * 0.05 });
+    },
+
     // Roi de la Colline : la colline change de place.
     hillMove() {
       [72, 76, 79].forEach((n, i) => tone(midi(n), 0.16, { type: 'square', vol: 0.05, delay: i * 0.07 }));
@@ -569,6 +585,7 @@
     br: '/audio/battle-royale.mp3', // « Not dead YET! » (remix chiptune)
     boss: '/audio/boss.mp3', // BOSSFIGHT — Milky Ways
     dungeon: '/audio/donjon.mp3', // Mattashi — The Final Battle
+    gold: '/audio/ruee.mp3', // YV Remix (Ruée vers l'or)
   };
 
   const music = (function () {

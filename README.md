@@ -202,6 +202,21 @@ de la file, confirme les `!join` et annonce le vainqueur.
     reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s. Le meilleur score gagne (égalité : le plus de kills) et
     reçoit la récompense de victoire du Battle Royale ; les paris sont ouverts comme en Battle Royale, pas les
     événements de bataille ni les récompenses de kill. Classement en direct dans l'arène.
+  - **Guerre des clans** (deux équipes, dès 2 joueurs, 3 min) : **🔴 Rouges contre Bleus 🔵**. On choisit son camp avec
+    `!rouge` / `!bleu` dans le chat ou les boutons de la fiche personnage (`!join` place dans l'équipe la moins nombreuse) ;
+    on peut changer d'équipe tant que la bataille n'a pas commencé. Chaque équipe a un **cristal** dans son camp (400 PV +
+    60 par adversaire), qui tire sur les ennemis proches : détruire le cristal adverse = victoire. Les combattants foncent
+    vers le cristal adverse, mais défendent le leur et répondent à qui les colle. Les morts reviennent dans leur camp au
+    bout de 5 s, puis **5 s de plus à chaque mort** (30 s au plus). L'équipe la moins nombreuse est renforcée (jusqu'à
+    ×1,5 en vie et dégâts). À 1 min 30, **mort subite** : les cristaux prennent ×3 ; à 3 min, le cristal le moins entamé
+    gagne. Chaque membre de l'équipe gagnante reçoit 200 XP, 40 golds et 1 coffre, le **MVP** (le plus de dégâts) 1 coffre
+    de plus. Les **paris** se font sur une équipe.
+  - **Ruée vers l'or** (mode bonus, dès 1 joueur, 75 s) : **pas de combat**. Les personnages se baladent au hasard et
+    ramassent ce qui tombe du ciel : une pluie de pièces (1 gold chacune), des **coffres** en parachute (plus rares) et
+    des bonus (💰 sac de 25 golds, 🧲 aimant, ⭐ étoile de vitesse). La **Chance** agrandit le rayon de ramassage, la
+    **Vitesse** fait parcourir plus de terrain. Les 15 dernières secondes : **JACKPOT** (pluie ×3, pièces à 2 golds).
+    Ambiance « bonus game » : lumière dorée et rayons, arc-en-ciel pendant le jackpot, compteur géant, podium et
+    confettis à la fin. Chacun **garde son butin** (+1 coffre pour le meilleur ramasseur) ; ni paris ni potion consommée.
   - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
     squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
     gauche, sortie par la droite, fondu au noir et grand « SALLE X ». L'ambiance change toutes les 5 salles : Cachots,
@@ -271,6 +286,9 @@ jouées en boucle pendant le combat, une par mode :
 | Battle Royale | « Not dead YET! » (battle theme, remix chiptune) | `battle-royale.mp3` |
 | Combat de Boss | BOSSFIGHT — « Milky Ways » | `boss.mp3` |
 | Raid de Donjon | Mattashi — « The Final Battle » (Epic 8-Bit Orchestral Battle) | `donjon.mp3` |
+| Ruée vers l'or | « YV Remix » | `ruee.mp3` |
+
+Le Roi de la Colline et la Guerre des clans reprennent la musique du Battle Royale.
 
 Pour changer une musique, il suffit de remplacer le fichier (même nom) ; la liste est dans `TRACKS` (`sound.js`).
 
