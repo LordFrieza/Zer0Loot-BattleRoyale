@@ -365,7 +365,7 @@
       desc: 'Rouges contre Bleus (!rouge ou !bleu) : détruisez le cristal adverse et protégez le vôtre. Les morts reviennent, de plus en plus tard.',
     },
     gold: {
-      label: 'Ruée vers l\'or', icon: '🪙', color: '#ffd23f', coop: false, bonus: true, minPlayers: 1,
+      label: 'Golden Shower', icon: '🪙', color: '#ffd23f', coop: false, bonus: true, minPlayers: 1,
       desc: 'Mode bonus, sans combat : une pluie de pièces d\'or et de coffres s\'abat sur l\'arène. Chacun garde ce qu\'il ramasse !',
     },
   };
