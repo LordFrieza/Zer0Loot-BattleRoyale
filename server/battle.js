@@ -414,6 +414,9 @@ class Battle extends EventEmitter {
         b.y += (dy / dist) * step;
       }
       if (st.landing) return;
+      // Une flammèche de plus toutes les 3 s
+      st.spriteIn -= dt;
+      if (st.spriteIn <= 0) { st.spriteIn = B.sprites.every; this.spawnSprites(B, 1); }
       st.fireIn -= dt;
       if (st.fireIn <= 0 && heroes.length) {
         st.fireIn = st.fireEvery;
@@ -465,12 +468,31 @@ class Battle extends EventEmitter {
       kind: 'flight', until: landingOnly ? this.time : this.time + F.duration,
       fireIn: 0.8, fireEvery: F.fireballEvery * (flights > 1 ? 0.75 : 1), tx: b.x, ty: b.y, retarget: 0, landing: false,
     };
-    if (!landingOnly) this.events.push({ t: 'bossFly', duration: F.duration });
+    if (!landingOnly) {
+      this.events.push({ t: 'bossFly', duration: F.duration });
+      const S = B.sprites;
+      b.stage.spriteIn = S.every;
+      this.spawnSprites(B, Math.max(S.min, Math.min(S.max, Math.ceil(this.players.length / S.per))));
+    } else b.stage.spriteIn = Infinity;
+  }
+
+  spawnSprites(B, count) {
+    const S = B.sprites;
+    const pos = spawnPositions(count, { x0: 220, y0: 160, x1: ARENA.w - 220, y1: ARENA.h - 80 });
+    for (const p of pos) {
+      this.addMonster({
+        kind: 'flammeche', name: 'Flammèche', x: p.x, y: p.y, r: S.radius,
+        hp: Math.round(S.hpBase + S.hpPerPlayer * this.players.length), damage: this.boss.damage * S.damageRatio,
+        speed: S.speed, cooldown: S.cooldown, range: S.range,
+      });
+    }
   }
 
   land(s) {
     const b = this.boss;
     if (!b.stage || b.stage.kind !== 'flight') return;
+    // Les flammèches restantes s'éteignent quand le dragon se pose.
+    for (const a of this.adds) if (a.kind === 'flammeche' && a.alive) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
     b.flying = false;
     b.stage = null;
     b.x = s.x;
@@ -894,7 +916,13 @@ class Battle extends EventEmitter {
       f.cd -= dt;
       if (reach <= f.range && !f.engaged) { f.engaged = true; this.triggerPotion(f, 'engage'); }
 
-      if (reach > f.range) {
+      // Roi de la Colline : hors de la colline et personne à portée → on y retourne au lieu de courir après les autres.
+      const toHill = this.koth && reach > f.range
+        && Math.hypot(f.x - this.koth.hill.x, f.y - this.koth.hill.y) > this.koth.hill.r * 0.8
+        && Math.hypot(best.x - this.koth.hill.x, best.y - this.koth.hill.y) > this.koth.hill.r;
+      if (toHill) {
+        this.walkTo(f, this.koth.hill, dt);
+      } else if (reach > f.range) {
         const step = Math.min(speed * dt, reach - f.range + 1);
         f.x += (dx / dist) * step;
         f.y += (dy / dist) * step;
@@ -1410,6 +1438,13 @@ class Battle extends EventEmitter {
       if (killer && killer.team !== victim.team) killer.score += Rules.KOTH.points.kill;
     }
     if (victim === this.boss) this.events.push({ t: 'bossDown', x: Math.round(victim.x), y: Math.round(victim.y) });
+    // Flammèche abattue pendant l'envol : le dragon brûle et devra se poser plus tôt.
+    if (victim.kind === 'flammeche' && this.boss && this.boss.alive && this.boss.flying && this.boss.stage) {
+      const S = Rules.BOSSES.dragon.sprites;
+      this.boss.hp = Math.max(1, this.boss.hp - this.boss.maxHp * S.burn);
+      if (!this.boss.stage.landing) this.boss.stage.until -= S.shorten;
+      this.events.push({ t: 'spriteDown', x: Math.round(victim.x), y: Math.round(victim.y), to: 'boss' });
+    }
     if (!killer) return;
     killer.kills += 1;
     // Récompenses de kill et séries : seulement en Battle Royale (les monstres ne rapportent rien en eux-mêmes).

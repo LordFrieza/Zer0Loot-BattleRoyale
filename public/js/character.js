@@ -817,7 +817,7 @@ $('fuse-go').onclick = async () => {
   $('boss-others').innerHTML = block(Dr, [
     `${Dr.hpBase} PV + ${Dr.hpPerPlayer} par combattant (10 → ${exD.maxHp.toLocaleString('fr-FR')} PV). Ses griffes touchent aussi les voisins de sa cible.`,
     `Toutes les ${Dr.specialEvery} s : <b>souffle de feu</b> en cône vers le plus gros groupe, puis <b>coup de queue</b> tout autour de lui.`,
-    `À <b>75 %</b> et <b>30 %</b>, il <b>s'envole</b> ${Dr.flight.duration} s : seuls les combattants <b>à distance</b> (Archer, Mage) peuvent le toucher. Il bombarde le sol de boules de feu, puis atterrit lourdement sur le plus gros groupe.`,
+    `À <b>75 %</b> et <b>30 %</b>, il <b>s'envole</b> ${Dr.flight.duration} s : seuls les combattants <b>à distance</b> (Archer, Mage) peuvent le toucher. Il bombarde le sol de boules de feu et lâche des <b>flammèches</b> : chacune abattue (le travail du corps à corps !) le brûle de ${pct(Dr.sprites.burn)} et le fait atterrir 1 s plus tôt. Il atterrit ensuite lourdement sur le plus gros groupe.`,
     `À <b>50 %</b>, il part <b>pondre</b> : 1 œuf pour ${Dr.nest.eggsPer} combattants (${Dr.nest.eggsMin} à ${Dr.nest.eggsMax}). Il faut les détruire en ${Dr.nest.duration} s, sinon ils éclosent en <b>dragonnets</b>. Il revient furieux (+${pct(Dr.nest.returnDamageMult - 1)} de dégâts).`,
   ]) + block(So, [
     `${So.hpBase} PV + ${So.hpPerPlayer} par combattant (10 → ${exS.maxHp.toLocaleString('fr-FR')} PV). Il attaque <b>de loin</b> avec des traits d'ombre et se <b>téléporte</b> toutes les ${So.blinkEvery} s.`,
@@ -857,7 +857,7 @@ $('fuse-go').onclick = async () => {
 
   const K = Rules.KOTH;
   $('koth-rules').innerHTML = [
-    `Une <b>colline</b> (cercle doré au sol) au centre de l'arène. Chaque seconde passée dessus rapporte <b>${K.points.hill} point</b>, et <b>${K.points.king} points</b> si tu y es <b>seul</b> : tu es alors le <b>Roi 👑</b>.`,
+    `Une <b>colline</b> (cercle doré au sol) au centre de l'arène. Chaque seconde passée dessus rapporte <b>${K.points.hill} points</b> à chacun, et <b>${K.points.king} points</b> si tu y es <b>seul</b> : tu es alors le <b>Roi 👑</b>.`,
     `Chaque kill rapporte <b>${K.points.kill} points</b>. Les morts <b>reviennent au combat</b> au bord de l'arène au bout de ${K.respawn} s, protégés ${String(K.protect).replace('.', ',')} s.`,
     `Toutes les ${K.hill.moveEvery} s, la colline <b>change de place</b> : le nouvel endroit s'affiche en pointillés ${K.hill.warn} s avant.`,
     `Au bout de ${Math.floor(K.duration / 60)} min ${K.duration % 60} s, le <b>meilleur score gagne</b> (égalité : le plus de kills). Le vainqueur reçoit la récompense de victoire du Battle Royale, et <b>les paris sont ouverts</b>.`,

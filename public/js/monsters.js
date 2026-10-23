@@ -599,6 +599,32 @@
     ctx.restore();
   }
 
+  // Flammèche : petit esprit de feu lâché par le Dragon en vol (cible du corps à corps).
+  function flammeche(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const flick = Math.sin(t * 14 + (o.seed || 0)) * 2;
+    shadow(ctx, 10, 16);
+    ctx.save();
+    ctx.translate(0, Math.sin(t * 4 + (o.seed || 0)) * 2 - 2);
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(0, -4, 1, 0, -6, 18);
+    g.addColorStop(0, '#fff6c0');
+    g.addColorStop(0.45, '#ff9a1f');
+    g.addColorStop(1, 'rgba(255,40,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -26 - flick);
+    ctx.quadraticCurveTo(12, -10, 9, 4);
+    ctx.quadraticCurveTo(0, 12, -9, 4);
+    ctx.quadraticCurveTo(-12, -10, 0, -26 - flick);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    eye(ctx, -3.5, -4, 2.2, '#3a0d0a', null);
+    eye(ctx, 3.5, -4, 2.2, '#3a0d0a', null);
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.arc(0, -4, 10, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
   // Cristal d'ombre : nourrit le bouclier du Magicien tant qu'il tient debout.
   function cristal(ctx, o) {
     const t = (o.t || 0) / 1000;
@@ -631,7 +657,7 @@
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal };
+  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche };
   // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
   const BOSS_KINDS = ['troll', 'dragon', 'sorcier'];
 

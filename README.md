@@ -185,10 +185,11 @@ de la file, confirme les `!join` et annonce le vainqueur.
     33 % : à chaque coche, +30 % de dégâts et +35 % de vitesse d'attaque. Rage finale à 2 min 30 (dégâts ×3).
     Victoire : **3 coffres, 500 XP et 500 golds pour TOUS les participants** (morts compris), avec explosion du Troll
     et pluie de coffres et de golds. Défaite : XP de participation seulement.
-  - **Pyrax le Dragon** (200 PV + 330 par combattant) : griffes qui touchent les voisins, souffle de feu en cône vers le
+  - **Pyrax le Dragon** (200 PV + 370 par combattant) : griffes qui touchent les voisins, souffle de feu en cône vers le
     plus gros groupe et coup de queue tout autour. À **75 %** et **30 %**, il **s'envole** 12 s : seuls les combattants
-    à distance (portée ≥ 150 : Archer, Mage) peuvent le toucher, il bombarde le sol de boules de feu puis atterrit
-    lourdement sur le plus gros groupe. À **50 %**, il part **pondre** : 1 œuf pour 4 combattants (3 à 10) à détruire en
+    à distance (portée ≥ 150 : Archer, Mage) peuvent le toucher, il bombarde le sol de boules de feu et lâche des
+    **flammèches** : le corps à corps les chasse, chacune abattue brûle le dragon (1 % de sa vie) et le fait atterrir
+    1 s plus tôt. Il atterrit ensuite lourdement sur le plus gros groupe. À **50 %**, il part **pondre** : 1 œuf pour 4 combattants (3 à 10) à détruire en
     16 s, sinon ils éclosent en **dragonnets** ; il revient furieux (dégâts +25 %, attaques +20 %).
   - **Malvorath le Magicien des ténèbres** (180 PV + 200 par combattant) : attaque de loin (traits d'ombre) et se
     téléporte toutes les 15 s. Alterne **malédictions** (2,5 % de la vie par seconde pendant 8 s ; un **Prêtre** à moins
@@ -196,8 +197,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
     **bouclier** : il est intouchable tant que ses 4 **cristaux** tiennent (et ils le soignent). À **45 %**, il se
     **dédouble** en 3 illusions fragiles qui attaquent aussi : les dégâts de zone font la différence.
   - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline
-    (cercle doré) se tient au sol ; chaque seconde dessus rapporte 1 point, **3 points si l'on y est seul** (le Roi 👑),
-    et chaque kill 3 points. Toutes les 30 s, la colline change de place (annoncée en pointillés 5 s avant). Les morts
+    (grand cercle doré) se tient au sol ; chaque seconde dessus rapporte 2 points à chacun, **5 points si l'on y est
+    seul** (le Roi 👑), et chaque kill 2 points. Hors de la colline, un combattant sans ennemi à portée y retourne. Toutes les 30 s, la colline change de place (annoncée en pointillés 5 s avant). Les morts
     reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s. Le meilleur score gagne (égalité : le plus de kills) et
     reçoit la récompense de victoire du Battle Royale ; les paris sont ouverts comme en Battle Royale, pas les
     événements de bataille ni les récompenses de kill. Classement en direct dans l'arène.

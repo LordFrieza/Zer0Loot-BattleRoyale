@@ -480,7 +480,7 @@
           this.floaters.push({ x: e.x, y: e.y - 70, text: '↻ De retour !', color: '#9ff6ff', life: 1.2, size: 14 });
         } else if (e.t === 'bossFly') {
           const B = this.bossInfo();
-          this.announces.push({ text: `🪽 ${B.short.toUpperCase()} S'ENVOLE !`, sub: 'Seuls les combattants à distance peuvent le toucher !', subSize: 24, color: '#ff9a1f', life: 3, age: 0 });
+          this.announces.push({ text: `🪽 ${B.short.toUpperCase()} S'ENVOLE !`, sub: 'Les tireurs le visent, le corps à corps chasse les flammèches pour le faire tomber !', subSize: 22, color: '#ff9a1f', life: 3.2, age: 0 });
           if (window.Sound) Sound.play('roar', true);
         } else if (e.t === 'bossAway') {
           const B = this.bossInfo();
@@ -490,6 +490,11 @@
           this.announces.push({ text: e.label, sub: e.hatched ? `${e.hatched} dragonnet${e.hatched > 1 ? 's' : ''} ${e.hatched > 1 ? 'ont' : 'a'} éclos !` : 'Tous les œufs ont été détruits !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
           this.shake = Math.max(this.shake || 0, 0.6);
           if (window.Sound) Sound.play('roar', true);
+        } else if (e.t === 'spriteDown') {
+          // la flammèche abattue remonte brûler le dragon
+          const boss = this.disp.get('boss');
+          if (boss) this.beams.push({ path: [{ x: e.x, y: e.y }, { x: boss.x, y: boss.y - FLY_HEIGHT - 20 }], width: 6, color: '#ff9a1f', t: 0, dur: 0.45 });
+          this.spark(e.x, e.y - 10, '#ffb347', 18);
         } else if (e.t === 'hatch') {
           this.spark(e.x, e.y - 10, '#ffc46b', 24);
           this.floaters.push({ x: e.x, y: e.y - 40, text: '🐣', color: '#fff', life: 1.4, size: 24 });

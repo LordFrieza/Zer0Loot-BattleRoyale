@@ -180,9 +180,10 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 #### Pyrax le Dragon
 
-- **DRG-1** Le Dragon doit avoir `200 + 330 × n` PV, `6 + 0,2 × n` dégâts, un rayon de 60 px, 1,6 s de recharge et des coups de griffes qui touchent aussi à 40 % les combattants à moins de 70 px de la cible.
+- **DRG-1** Le Dragon doit avoir `200 + 370 × n` PV, `6 + 0,2 × n` dégâts, un rayon de 60 px, 1,6 s de recharge et des coups de griffes qui touchent aussi à 40 % les combattants à moins de 70 px de la cible.
 - **DRG-2** Toutes les 7 s, il doit alterner le souffle de feu (cône de 340 px et ±0,5 rad vers le combattant le plus entouré, annoncé 1,4 s avant, dégâts ×1,2) et le coup de queue (cercle de 140 px autour de lui, annoncé 1,1 s avant, dégâts ×0,9).
 - **DRG-3** Quand sa vie passe sous 75 % puis sous 30 %, il doit s'envoler 12 s (BOSS-9), lancer une boule de feu (70 px, annoncée 1,2 s avant, dégâts ×0,8) sur un combattant au hasard toutes les 1,2 s (0,9 s au second envol), puis atterrir sur le plus gros groupe (160 px, annoncé 1,4 s avant, dégâts ×1,1).
+- **DRG-5** Au début de chaque envol (pas au retour du nid), le Dragon doit lâcher `clamp(⌈n / 3⌉, 2, 8)` flammèches (`40 + 5 × n` PV, 35 % de ses dégâts, portée 26 px), puis une de plus toutes les 3 s tant qu'il vole ; chaque flammèche tuée pendant le vol lui retire 1 % de sa vie max (sans descendre sous 1 PV) et avance son atterrissage d'1 s ; les flammèches restantes s'éteignent quand il se pose.
 - **DRG-4** Quand sa vie passe sous 50 %, il doit quitter l'arène 16 s et laisser `clamp(⌈n / 4⌉, 3, 10)` œufs immobiles de `60 + 8 × n` PV ; à son retour (fin du délai, ou plus tôt si tous les œufs sont détruits), chaque œuf restant éclot en dragonnet (`80 + 6 × n` PV, 60 % des dégâts du Dragon), puis il revient en volant, furieux (dégâts ×1,25, attaques ×1,2) et atterrit comme en DRG-3.
 
 #### Malvorath le Magicien des ténèbres
@@ -212,11 +213,11 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ### 7.10 Roi de la Colline
 
-- **KOTH-1** Le Roi de la Colline doit durer 150 s, chacun pour soi (comme le Battle Royale : pas de zone, pas d'événement de bataille), et commencer avec une colline de 120 px de rayon au centre de l'arène ; chaque combattant démarre à 0 point.
-- **KOTH-2** Toutes les 30 s, la colline doit changer de place (à plus de 300 px de l'ancienne, à 200 px des bords) ; le nouvel emplacement est annoncé 5 s avant (événement `hillWarn`, puis `hillMove`).
-- **KOTH-3** Chaque seconde passée sur la colline doit rapporter 1 point à chaque combattant présent, ou 3 points à celui qui y est seul (le Roi, événement `king` quand il change) ; un kill doit rapporter 3 points (aucune récompense de kill ni de série, comme en coopération).
+- **KOTH-1** Le Roi de la Colline doit durer 150 s, chacun pour soi (comme le Battle Royale : pas de zone, pas d'événement de bataille), et commencer avec une colline de 170 px de rayon au centre de l'arène ; chaque combattant démarre à 0 point.
+- **KOTH-2** Toutes les 30 s, la colline doit changer de place (à plus de 320 px de l'ancienne, à 220 px des bords sur les côtés, 165 px en haut et en bas) ; le nouvel emplacement est annoncé 5 s avant (événement `hillWarn`, puis `hillMove`).
+- **KOTH-3** Chaque seconde passée sur la colline doit rapporter 2 points à chaque combattant présent, ou 5 points à celui qui y est seul (le Roi, événement `king` quand il change) ; un kill doit rapporter 2 points (aucune récompense de kill ni de série, comme en coopération).
 - **KOTH-4** Un combattant tué doit réapparaître au bord de l'arène au bout de 4 s, avec toute sa vie, et être intouchable et non ciblable pendant 1,5 s (événement `respawn`).
-- **KOTH-5** Les combattants doivent viser de préférence les ennemis proches de la colline, et marcher vers la colline quand ils n'ont personne à viser.
+- **KOTH-5** Les combattants doivent viser de préférence les ennemis proches de la colline ; un combattant hors de la colline (au-delà de 80 % de son rayon) dont la cible est hors de portée et hors de la colline doit marcher vers la colline au lieu de la poursuivre, de même quand il n'a personne à viser.
 - **KOTH-6** À 150 s, le meilleur score doit gagner (égalité : le plus de kills, puis au hasard) : le résultat (`mode: 'koth'`) classe tout le monde par score, et le vainqueur reçoit les récompenses et les paris comme en Battle Royale (`end`).
 
 ## 8. Classes

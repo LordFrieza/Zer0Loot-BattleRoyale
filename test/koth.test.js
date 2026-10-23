@@ -25,12 +25,12 @@ function freeze(b) {
 const tickFor = (b, seconds) => { for (let i = 0; i < Math.round(seconds / 0.05); i++) b.tick(0.05); };
 
 test('[KOTH-1, MODE-3] roi de la colline : 150 s, chacun pour soi, colline au centre, sans zone ni événement', () => {
-  assert.deepStrictEqual(Rules.KOTH.points, { hill: 1, king: 3, kill: 3 });
+  assert.deepStrictEqual(Rules.KOTH.points, { hill: 2, king: 5, kill: 2 });
   const solo = koth(1);
   assert.throws(() => solo.start(), /au moins 2/);
   const b = started(koth(3));
   assert.strictEqual(b.event, null);
-  assert.deepStrictEqual(b.koth.hill, { x: 640, y: 360, r: 120 });
+  assert.deepStrictEqual(b.koth.hill, { x: 640, y: 360, r: 170 });
   assert.strictEqual(new Set(b.players.map((p) => p.team)).size, 3, 'chacun son équipe');
   assert.ok(b.players.every((p) => p.score === 0));
   const fr = b.frame();
@@ -39,29 +39,29 @@ test('[KOTH-1, MODE-3] roi de la colline : 150 s, chacun pour soi, colline au ce
   assert.ok(fr.fighters.every((f) => f.score === 0));
 });
 
-test('[KOTH-3] roi de la colline : 1 point par seconde sur la colline, 3 si l\'on est seul', () => {
+test('[KOTH-3] roi de la colline : 2 points par seconde sur la colline, 5 si l\'on est seul', () => {
   const b = started(koth(3));
   freeze(b);
   const [a, c, out] = b.players;
   Object.assign(a, { x: 640, y: 360 });
-  Object.assign(c, { x: 1100, y: 600 });
+  Object.assign(c, { x: 1150, y: 650 });
   Object.assign(out, { x: 100, y: 100 });
   const kings = [];
   b.on('frame', (f) => kings.push(...f.events.filter((e) => e.t === 'king')));
   tickFor(b, 2);
-  assert.ok(Math.abs(a.score - 6) < 0.2, 'seul : 3 points par seconde');
+  assert.ok(Math.abs(a.score - 10) < 0.3, 'seul : 5 points par seconde');
   assert.strictEqual(b.koth.king, a.key);
   assert.strictEqual(kings.length, 1);
   Object.assign(c, { x: 660, y: 380 });
   const before = a.score;
   tickFor(b, 2);
-  assert.ok(Math.abs(a.score - before - 2) < 0.2, 'à deux : 1 point par seconde chacun');
-  assert.ok(Math.abs(c.score - 2) < 0.2);
+  assert.ok(Math.abs(a.score - before - 4) < 0.3, 'à deux : 2 points par seconde chacun');
+  assert.ok(Math.abs(c.score - 4) < 0.3);
   assert.strictEqual(b.koth.king, null);
   assert.strictEqual(out.score, 0);
 });
 
-test('[KOTH-3, KOTH-4] roi de la colline : un kill rapporte 3 points, réapparition au bord après 4 s, protégé 1,5 s', () => {
+test('[KOTH-3, KOTH-4] roi de la colline : un kill rapporte 2 points, réapparition au bord après 4 s, protégé 1,5 s', () => {
   const b = started(koth(2));
   freeze(b);
   const [killer, victim] = b.players;
@@ -71,7 +71,7 @@ test('[KOTH-3, KOTH-4] roi de la colline : un kill rapporte 3 points, réapparit
   b.on('kill', () => { rewards += 1; });
   b.on('streak', () => { rewards += 1; });
   b.kill(killer, victim);
-  assert.strictEqual(killer.score, 3);
+  assert.strictEqual(killer.score, 2);
   assert.strictEqual(killer.kills, 1);
   assert.strictEqual(rewards, 0, 'pas de récompense de kill ni de série');
   tickFor(b, 3.9);
@@ -104,8 +104,8 @@ test('[KOTH-2] roi de la colline : la colline change de place toutes les 30 s, a
   tickFor(b, 0.2);
   assert.strictEqual(events[0].t, 'hillWarn');
   const next = b.koth.next;
-  assert.ok(Math.hypot(next.x - 640, next.y - 360) >= 300);
-  assert.ok(next.x >= 200 && next.x <= 1080 && next.y >= 150 && next.y <= 570);
+  assert.ok(Math.hypot(next.x - 640, next.y - 360) >= 320);
+  assert.ok(next.x >= 220 && next.x <= 1060 && next.y >= 165 && next.y <= 555);
   assert.deepStrictEqual(b.frame().koth.next, { x: Math.round(next.x), y: Math.round(next.y) });
   tickFor(b, 5);
   assert.strictEqual(events[1].t, 'hillMove');
@@ -150,4 +150,17 @@ test('[KOTH-6, BET-1] roi de la colline : le meilleur score gagne à 150 s, clas
   assert.strictEqual(b.result.mode, 'koth');
   assert.deepStrictEqual(b.result.winner, { key: d.key, name: d.name, kills: 3, score: 25 });
   assert.deepStrictEqual(b.result.ranking.map((r) => [r.key, r.score]), [[d.key, 25], [c.key, 25], [a.key, 10]]);
+});
+
+test('[KOTH-5] roi de la colline : hors de la colline, on y retourne plutôt que de poursuivre un ennemi éloigné', () => {
+  const b = started(koth(2));
+  const [me, foe] = b.players;
+  for (const f of b.players) { f.cd = 99; f.speed = 100; }
+  foe.speed = 0;
+  Object.assign(me, { x: 200, y: 600 });
+  Object.assign(foe, { x: 100, y: 120 }); // loin de moi et loin de la colline
+  const d0 = Math.hypot(me.x - 640, me.y - 360);
+  tickFor(b, 1);
+  assert.strictEqual(me.targetKey, foe.key, 'il le vise toujours…');
+  assert.ok(Math.hypot(me.x - 640, me.y - 360) < d0 - 60, '… mais marche vers la colline');
 });

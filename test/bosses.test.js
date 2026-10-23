@@ -51,7 +51,7 @@ test('[BOSS-8] boss : choix du boss à l\'ouverture de la file, Troll par défau
 
 test('[DRG-1] dragon : statistiques et coups de griffes', () => {
   const b = fight('dragon', 10);
-  assert.strictEqual(b.boss.maxHp, 200 + 330 * 10);
+  assert.strictEqual(b.boss.maxHp, 200 + 370 * 10);
   assert.strictEqual(b.boss.damage, 6 + 0.2 * 10);
   assert.strictEqual(b.boss.r, 60);
   assert.strictEqual(b.boss.cooldown, 1.6);
@@ -109,10 +109,12 @@ test('[DRG-3, BOSS-9] dragon : envol à 75 %, intouchable au corps à corps, bou
   b.tick(0.05);
   assert.strictEqual(b.boss.flying, true);
   assert.ok(b.frame().boss.flying);
-  // Ciblage : le Guerrier ne peut plus le viser, l'Archer si
+  // Ciblage : le Guerrier ne peut plus le viser (il s'occupe des flammèches, DRG-5), l'Archer si
   b.tick(0.05);
-  assert.strictEqual(warrior.targetKey, null);
-  assert.strictEqual(archer.targetKey, 'boss');
+  assert.strictEqual(b.immune(b.boss, warrior), true);
+  assert.strictEqual(b.immune(b.boss, archer), false);
+  assert.notStrictEqual(warrior.targetKey, 'boss');
+  assert.strictEqual(b.fighters.find((f) => f.key === warrior.targetKey).kind, 'flammeche');
   const hp = b.boss.hp;
   b.hit(warrior, b.boss, 100);
   assert.strictEqual(b.boss.hp, hp, 'les coups au corps à corps ne le touchent pas');
@@ -134,9 +136,47 @@ test('[DRG-3, BOSS-9] dragon : envol à 75 %, intouchable au corps à corps, bou
   assert.ok(land && land.r === 160);
   tickFor(b, 1.5);
   assert.strictEqual(b.boss.flying, false);
-  assert.strictEqual(b.boss.x, land.x);
+  assert.ok(Math.hypot(b.boss.x - land.x, b.boss.y - land.y) < land.r, 'posé dans la zone annoncée (les combattants le poussent un peu)');
   b.tick(0.05);
   assert.strictEqual(warrior.targetKey, 'boss');
+});
+
+test('[DRG-5] dragon : les flammèches de l\'envol, à abattre pour le faire tomber plus tôt', () => {
+  const b = fight('dragon', 10);
+  freeze(b);
+  b.boss.script = b.boss.script.filter((s) => s.kind === 'flight');
+  b.boss.hp = b.boss.maxHp * 0.74;
+  b.tick(0.05);
+  const sprites = () => b.adds.filter((a) => a.kind === 'flammeche' && a.alive);
+  assert.strictEqual(sprites().length, 4, '⌈10 / 3⌉');
+  const s0 = sprites()[0];
+  assert.strictEqual(s0.maxHp, 40 + 5 * 10);
+  assert.ok(Math.abs(s0.damage - b.boss.damage * 0.35) < 1e-9);
+  assert.strictEqual(s0.range, 26);
+  tickFor(b, 3);
+  assert.strictEqual(sprites().length, 5, 'une de plus toutes les 3 s');
+  // Une flammèche abattue : le dragon brûle et atterrira 1 s plus tôt
+  const until = b.boss.stage.until;
+  const hp = b.boss.hp;
+  const warrior = byCls(b, 'guerrier');
+  const events = [];
+  b.on('frame', (f) => events.push(...f.events));
+  b.kill(warrior, sprites()[0]);
+  assert.ok(Math.abs(hp - b.boss.hp - b.boss.maxHp * 0.01) < 1e-6);
+  assert.strictEqual(b.boss.stage.until, until - 1);
+  b.tick(0.05);
+  assert.ok(events.some((e) => e.t === 'spriteDown'));
+  // À l'atterrissage, les flammèches restantes s'éteignent
+  while (b.boss.flying) b.tick(0.05);
+  assert.strictEqual(sprites().length, 0);
+  // Jamais sous 1 PV
+  b.boss.hp = 2;
+  b.boss.flying = true;
+  b.boss.stage = { kind: 'flight', until: b.time + 5, landing: false };
+  const extra = b.addMonster({ kind: 'flammeche', name: 'Flammèche', x: 100, y: 100, r: 14, hp: 10 });
+  b.kill(warrior, extra);
+  assert.strictEqual(b.boss.hp, 1);
+  assert.strictEqual(b.boss.alive, true);
 });
 
 test('[DRG-4, BOSS-9] dragon : le nid, les œufs, l\'éclosion et le retour furieux', () => {

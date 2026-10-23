@@ -363,15 +363,15 @@
   };
 
   /*
-   * Roi de la Colline : 2 min 30 de combat, chacun pour soi. Une colline (cercle au sol) change de place toutes les
-   * 30 s (annoncée 5 s avant). Chaque seconde passée dessus rapporte 1 point, 3 points si l'on y est SEUL (le Roi) ;
-   * un kill rapporte 5 points. Les morts reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s.
+   * Roi de la Colline : 2 min 30 de combat, chacun pour soi. Une grande colline (cercle au sol) change de place toutes
+   * les 30 s (annoncée 5 s avant). Chaque seconde passée dessus rapporte 2 points à chacun, 5 points si l'on y est SEUL
+   * (le Roi) ; un kill rapporte 2 points. Les combattants hors de la colline y retournent dès qu'ils n'ont personne à portée. Les morts reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s.
    * Le meilleur score gagne (égalité : le plus de kills, puis au hasard).
    */
   const KOTH = {
     duration: 150,
-    hill: { radius: 120, moveEvery: 30, warn: 5, margin: 200, minJump: 300 },
-    points: { hill: 1, king: 3, kill: 3 },
+    hill: { radius: 170, moveEvery: 30, warn: 5, margin: 220, minJump: 320 },
+    points: { hill: 2, king: 5, kill: 2 },
     respawn: 4,
     protect: 1.5,
   };
@@ -428,7 +428,7 @@
     desc: 'Crache le feu, s\'envole hors de portée du corps à corps et pond des œufs à détruire avant l\'éclosion.',
     marks: [0.75, 0.5, 0.3],
     hpBase: 200,
-    hpPerPlayer: 330,
+    hpPerPlayer: 370,
     damageBase: 6,
     damagePerPlayer: 0.2,
     cooldown: 1.6, // coups de griffes
@@ -446,6 +446,9 @@
     // En vol : intouchable au corps à corps (portée < minRange), boules de feu sur des combattants au hasard,
     // puis atterrissage brutal sur le plus gros groupe.
     flight: { at: [0.75, 0.3], duration: 12, minRange: 150, fireballEvery: 1.2, fireballRadius: 70, fireballWarn: 1.2, fireballRatio: 0.8, landWarn: 1.4, landRadius: 160, landRatio: 1.1 },
+    // Pendant l'envol, des flammèches (morceaux de son feu) tombent au sol : le travail du corps à corps.
+    // Chacune abattue brûle le dragon (1 % de sa vie max) et le fait atterrir 1 s plus tôt ; elles s'éteignent à l'atterrissage.
+    sprites: { per: 3, min: 2, max: 8, every: 3, hpBase: 40, hpPerPlayer: 5, damageRatio: 0.35, speed: 80, radius: 14, cooldown: 1.2, range: 26, burn: 0.01, shorten: 1 },
     // Le nid : le dragon quitte l'arène et laisse 1 œuf pour 4 combattants (3 à 10) ; ceux qui restent à son retour
     // éclosent en dragonnets. S'ils sont tous détruits, il revient plus tôt.
     // À son retour du nid, il est furieux : dégâts ×1,25 et attaques ×1,2.
