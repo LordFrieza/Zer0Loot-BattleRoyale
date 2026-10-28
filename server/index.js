@@ -106,7 +106,7 @@ function queueView() {
   return { ...battle.publicQueue(), bets: bets.summary() };
 }
 
-// Derrière l'hébergeur (Railway, Render…), le HTTPS est géré par un proxy.
+// Derrière l'hébergeur (Fly.io…), le HTTPS est géré par un proxy.
 app.set('trust proxy', 1);
 app.use(express.json());
 

@@ -1,5 +1,5 @@
 /*
- * Configuration et déploiement : variables d'environnement, Dockerfile, railway.json, convention des tests.
+ * Configuration et déploiement : variables d'environnement, Dockerfile, fly.toml, convention des tests.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -28,13 +28,34 @@ test('[DEP-3] Dockerfile : Node 22 Alpine, production, /data, sans dépendances 
   assert.doesNotMatch(docker, /COPY test/);
 });
 
-test('[DEP-4] Railway : sonde /healthz, redémarrage sur échec, une seule réplique', () => {
-  const cfg = JSON.parse(read('railway.json'));
-  assert.strictEqual(cfg.build.builder, 'DOCKERFILE');
-  assert.strictEqual(cfg.deploy.healthcheckPath, '/healthz');
-  assert.strictEqual(cfg.deploy.restartPolicyType, 'ON_FAILURE');
-  assert.strictEqual(cfg.deploy.numReplicas, 1);
-  // Le volume sur /data se règle dans l'interface Railway : à vérifier à la main (voir DEPLOIEMENT.md).
+test('[DEP-4] Fly.io : Dockerfile, Paris, HTTPS, sonde /healthz, toujours allumé, volume sur /data', () => {
+  const toml = read('fly.toml');
+  // Valeur d'une clé dans une section donnée du fichier TOML (sans dépendance : simple lecture ligne à ligne).
+  const value = (section, key) => {
+    let current = null;
+    for (const raw of toml.split('\n')) {
+      const line = raw.replace(/#.*$/, '').trim();
+      const head = /^\[\[?([^\]]+)\]\]?$/.exec(line);
+      if (head) { current = head[1]; continue; }
+      const kv = /^(\w+)\s*=\s*(.+)$/.exec(line);
+      if (kv && current === section && kv[1] === key) return kv[2].replace(/^"(.*)"$/, '$1');
+    }
+    return undefined;
+  };
+  assert.match(toml, /^primary_region = "cdg"/m);
+  assert.strictEqual(value('build', 'dockerfile'), 'Dockerfile');
+  assert.strictEqual(value('env', 'DATA_DIR'), '/data');
+  assert.strictEqual(value('mounts', 'destination'), '/data');
+  assert.strictEqual(value('mounts', 'source'), 'zer0loot_data');
+  assert.strictEqual(value('http_service', 'internal_port'), '3000');
+  assert.strictEqual(value('http_service', 'force_https'), 'true');
+  assert.strictEqual(value('http_service', 'auto_stop_machines'), 'off');
+  assert.strictEqual(value('http_service', 'min_machines_running'), '1');
+  assert.strictEqual(value('http_service.concurrency', 'type'), 'connections');
+  assert.strictEqual(value('http_service.checks', 'path'), '/healthz');
+  assert.strictEqual(value('restart', 'policy'), 'always');
+  assert.match(read('server', 'index.js'), /app\.get\('\/healthz'/);
+  // Le volume se crée et la machine unique se vérifie à la main (voir DEPLOIEMENT.md).
 });
 
 test('[NFR-4] convention : tous les tests portent des identifiants connus de la spécification', () => {
