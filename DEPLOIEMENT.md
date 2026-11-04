@@ -46,16 +46,16 @@ il suffit de taper quelques commandes. Compte une demi-heure la première fois.
 
 ## Étape 3 : créer l'application
 
-1. Ouvre `fly.toml` et regarde la ligne `app = "zer0loot-battleroyale"`. Ce nom doit être **unique sur tout Fly.io**.
+1. Ouvre `fly.toml` et regarde la ligne `app = 'minilooteur'`. Ce nom doit être **unique sur tout Fly.io**.
 2. Crée l'application :
    ```bash
-   fly apps create zer0loot-battleroyale
+   fly apps create minilooteur
    ```
    Si Fly répond que le nom est déjà pris, choisis-en un autre (par exemple `zer0loot-br`), recommence la commande
    avec ce nom, puis **remplace-le aussi dans `fly.toml`**.
 
 L'adresse de ton site sera `https://<nom-de-l-application>.fly.dev`, par exemple
-`https://zer0loot-battleroyale.fly.dev`.
+`https://minilooteur.fly.dev`.
 
 ## Étape 4 : créer le disque permanent (très important)
 
@@ -75,7 +75,7 @@ Le nom de la chaîne (`zer0loot`) est déjà dans `fly.toml`. Il reste deux rég
 (ils ne sont jamais visibles dans le code) :
 
 ```bash
-fly secrets set ADMIN_PASSWORD="un-mot-de-passe-solide" PUBLIC_URL="https://zer0loot-battleroyale.fly.dev"
+fly secrets set ADMIN_PASSWORD="un-mot-de-passe-solide" PUBLIC_URL="https://minilooteur.fly.dev"
 ```
 
 | Nom | Valeur |
@@ -116,7 +116,7 @@ un autre viewer et récupérer son loot. Les joueurs lient donc leur compte via 
 1. Active la **double authentification** sur ton compte Twitch (Twitch l'exige pour créer une application).
 2. Va sur <https://dev.twitch.tv/console/apps> → **Register Your Application** (*Enregistrer votre application*).
    - **Nom** : `Zer0Loot Battle Royale` (doit être unique sur Twitch, ajoute un mot si le nom est pris)
-   - **OAuth Redirect URLs** : `https://zer0loot-battleroyale.fly.dev/auth/twitch/callback`
+   - **OAuth Redirect URLs** : `https://minilooteur.fly.dev/auth/twitch/callback`
      (avec ton adresse, si tu as choisi un autre nom)
    - **Catégorie** : *Website Integration*
    - **Client Type** : *Confidential*
@@ -134,7 +134,7 @@ Fly redémarre le site tout seul ; le bouton **« Se connecter avec Twitch »** 
 ## Étape 8 : OBS
 
 Dans OBS : **Sources** → **+** → **Navigateur** :
-- URL : `https://zer0loot-battleroyale.fly.dev/arena.html`
+- URL : `https://minilooteur.fly.dev/arena.html`
 - Largeur `1280`, hauteur `720` (ou `1920` × `1080`)
 
 Garde la page admin ouverte dans ton navigateur pour piloter la file et lancer les batailles.
@@ -212,12 +212,12 @@ Fais-le en dehors d'une bataille : elle serait interrompue.
 
 - **Une seule machine** : ne lance jamais `fly scale count 2` ; le combat et la file sont calculés en mémoire, et le
   disque ne peut être branché qu'à une machine.
-- **La machine reste toujours allumée** : `fly.toml` désactive l'arrêt automatique (`auto_stop_machines = "off"`)
+- **La machine reste toujours allumée** : `fly.toml` désactive l'arrêt automatique (`auto_stop_machines = 'off'`), la rallume à la première visite si elle s'est éteinte (`auto_start_machines = true`)
   et redémarre le serveur s'il s'arrête (`[[restart]] policy = "always"`, visible avec `fly machine status -d`).
 - **Bot dans le chat (optionnel)** : `fly secrets set TWITCH_BOT_USERNAME="…" TWITCH_BOT_OAUTH="oauth:…"` pour que
   le bot annonce l'ouverture de la file, les inscriptions et le vainqueur.
 - **Nom de domaine perso** (ex. `jeu.zer0loot.fr`) : `fly certs add jeu.zer0loot.fr`, puis crée chez ton registraire
-  l'enregistrement DNS indiqué par Fly (un `CNAME` vers `zer0loot-battleroyale.fly.dev`). Pense ensuite à mettre à
+  l'enregistrement DNS indiqué par Fly (un `CNAME` vers `minilooteur.fly.dev`). Pense ensuite à mettre à
   jour `PUBLIC_URL` (`fly secrets set PUBLIC_URL="https://jeu.zer0loot.fr"`) et l'URL de redirection dans la
   console Twitch.
 - **Mot de passe admin oublié** : `fly secrets set ADMIN_PASSWORD="nouveau-mot-de-passe"`.

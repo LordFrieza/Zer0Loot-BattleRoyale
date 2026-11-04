@@ -38,11 +38,12 @@ test('[DEP-4] Fly.io : Dockerfile, Paris, HTTPS, sonde /healthz, toujours allum√
       const head = /^\[\[?([^\]]+)\]\]?$/.exec(line);
       if (head) { current = head[1]; continue; }
       const kv = /^(\w+)\s*=\s*(.+)$/.exec(line);
-      if (kv && current === section && kv[1] === key) return kv[2].replace(/^"(.*)"$/, '$1');
+      // Guillemets simples ou doubles (Fly r√©√©crit le fichier avec des simples)
+      if (kv && current === section && kv[1] === key) return kv[2].replace(/^(["'])(.*)\1$/, '$2');
     }
     return undefined;
   };
-  assert.match(toml, /^primary_region = "cdg"/m);
+  assert.match(toml, /^primary_region = ["']cdg["']/m);
   assert.strictEqual(value('build', 'dockerfile'), 'Dockerfile');
   assert.strictEqual(value('env', 'DATA_DIR'), '/data');
   assert.strictEqual(value('mounts', 'destination'), '/data');
@@ -50,6 +51,7 @@ test('[DEP-4] Fly.io : Dockerfile, Paris, HTTPS, sonde /healthz, toujours allum√
   assert.strictEqual(value('http_service', 'internal_port'), '3000');
   assert.strictEqual(value('http_service', 'force_https'), 'true');
   assert.strictEqual(value('http_service', 'auto_stop_machines'), 'off');
+  assert.strictEqual(value('http_service', 'auto_start_machines'), 'true', 'une visite rallume la machine si elle s\'est √©teinte');
   assert.strictEqual(value('http_service', 'min_machines_running'), '1');
   assert.strictEqual(value('http_service.concurrency', 'type'), 'connections');
   assert.strictEqual(value('http_service.checks', 'path'), '/healthz');
