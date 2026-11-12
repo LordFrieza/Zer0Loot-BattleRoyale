@@ -51,7 +51,7 @@ test('[BOSS-8] boss : choix du boss à l\'ouverture de la file, Troll par défau
 
 test('[DRG-1] dragon : statistiques et coups de griffes', () => {
   const b = fight('dragon', 10);
-  assert.strictEqual(b.boss.maxHp, 200 + 370 * 10);
+  assert.strictEqual(b.boss.maxHp, 200 + 400 * 10); // combattants de niveau 1 : pas de bonus de niveau (BOSS-10)
   assert.strictEqual(b.boss.damage, 6 + 0.2 * 10);
   assert.strictEqual(b.boss.r, 60);
   assert.strictEqual(b.boss.cooldown, 1.6);
@@ -327,4 +327,21 @@ test('[SRC-5, BOSS-9] magicien : illusions fragiles, qui disparaissent avec lui'
   assert.deepStrictEqual(out.reward, Rules.BOSSES.sorcier.reward);
   assert.strictEqual(out.boss.id, 'sorcier');
   assert.ok(b.adds.every((a) => !a.alive));
+});
+
+test('[BOSS-10] boss : plus de vie face à des combattants expérimentés', () => {
+  assert.strictEqual(Rules.bossLevelScale(1), 1);
+  assert.ok(Math.abs(Rules.bossLevelScale(11) - 1.6) < 1e-9);
+  assert.strictEqual(Rules.bossLevelScale(60), 2.5, 'plafond');
+  for (const [id, perPlayer] of [['troll', 300], ['dragon', 400], ['sorcier', 200]]) {
+    const b = new Battle();
+    b.openQueue(60, 'boss', id);
+    clearTimeout(b.queueTimer);
+    // 2 combattants de niveau 6 et 2 de niveau 16 : niveau moyen 11
+    [6, 6, 16, 16].forEach((level, i) => b.join({ key: 'p' + i, name: 'P' + i, level, cls: 'guerrier', stats: Rules.derive({}, {}, 'guerrier'), look: {} }));
+    b.start(null, null);
+    b.stopLoop();
+    const base = Rules.BOSSES[id].hpBase + perPlayer * 4;
+    assert.strictEqual(b.boss.maxHp, Math.round(base * 1.6), id);
+  }
 });

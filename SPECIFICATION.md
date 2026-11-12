@@ -176,11 +176,12 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **BOSS-6** Quand le Troll meurt, la partie doit se terminer par une victoire ; si tous les combattants sont morts ou que la durée dépasse 300 s, par une défaite.
 - **BOSS-7** Quand le boss est vaincu, chaque combattant humain (mort ou vivant) doit gagner 3 coffres, 500 XP et 500 golds, et +1 au compteur `bossWins` ; en cas de défaite, seulement l'XP de participation. Les règles BOSS-5 à BOSS-7 valent pour les trois boss.
 - **BOSS-8** L'admin doit choisir le boss (`troll`, `dragon` ou `sorcier`, Troll par défaut) en ouvrant une file en mode Combat de Boss (`boss` dans `/api/admin/queue/open`) ; un boss inconnu est refusé ; la file publique indique le boss (`queue.boss`).
+- **BOSS-10** La vie de chaque boss (BOSS-1, DRG-1, SRC-1) doit être multipliée par `min(2,5, 1 + 0,06 × (niveau moyen des combattants − 1))` : face à des combattants de niveau 1 elle ne change pas, face à une équipe de niveau 11 elle vaut ×1,6.
 - **BOSS-9** Un boss en vol ne doit être ni ciblé ni blessé par un combattant dont la portée est inférieure à 150 px ; un boss parti (nid) ou protégé (bouclier) ne doit être ni ciblé ni blessé par personne, et ne subit pas les épines. Les ennemis ajoutés par le boss (œufs, dragonnets, cristaux, illusions) disparaissent quand il meurt.
 
 #### Pyrax le Dragon
 
-- **DRG-1** Le Dragon doit avoir `200 + 370 × n` PV, `6 + 0,2 × n` dégâts, un rayon de 60 px, 1,6 s de recharge et des coups de griffes qui touchent aussi à 40 % les combattants à moins de 70 px de la cible.
+- **DRG-1** Le Dragon doit avoir `200 + 400 × n` PV (avant BOSS-10), `6 + 0,2 × n` dégâts, un rayon de 60 px, 1,6 s de recharge et des coups de griffes qui touchent aussi à 40 % les combattants à moins de 70 px de la cible.
 - **DRG-2** Toutes les 7 s, il doit alterner le souffle de feu (cône de 340 px et ±0,5 rad vers le combattant le plus entouré, annoncé 1,4 s avant, dégâts ×1,2) et le coup de queue (cercle de 140 px autour de lui, annoncé 1,1 s avant, dégâts ×0,9).
 - **DRG-3** Quand sa vie passe sous 75 % puis sous 30 %, il doit s'envoler 12 s (BOSS-9), lancer une boule de feu (70 px, annoncée 1,2 s avant, dégâts ×0,8) sur un combattant au hasard toutes les 1,2 s (0,9 s au second envol), puis atterrir sur le plus gros groupe (160 px, annoncé 1,4 s avant, dégâts ×1,1).
 - **DRG-5** Au début de chaque envol (pas au retour du nid), le Dragon doit lâcher `clamp(⌈n / 3⌉, 2, 8)` flammèches (`40 + 5 × n` PV, 35 % de ses dégâts, portée 26 px), puis une de plus toutes les 3 s tant qu'il vole ; chaque flammèche tuée pendant le vol lui retire 1 % de sa vie max (sans descendre sous 1 PV) et avance son atterrissage d'1 s ; les flammèches restantes s'éteignent quand il se pose.
@@ -234,7 +235,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ### 7.12 Ruée vers l'or (mode bonus)
 
-- **GOLD-1** La Ruée vers l'or doit durer 75 s, sans aucun combat (ni ciblage, ni dégâts, ni ultime, ni potion consommée), dès 1 combattant ; les paris y sont fermés.
+- **GOLD-1** La Ruée vers l'or doit durer 75 s, sans aucun combat (ni ciblage, ni dégâts, ni ultime), dès 1 combattant ; les combattants y entrent sans potion (la potion équipée n'est ni consommée ni affichée et reste pour la partie suivante) ; les paris y sont fermés.
 - **GOLD-2** Des pièces doivent tomber au hasard sur l'arène : `min(40, 12 + n)` par seconde (`n` = combattants), qu'on ne peut ramasser qu'une fois au sol (0,7 s de chute) et qui disparaissent 4 s après. Un coffre doit tomber toutes les 6 s (+1 par tranche de 15 combattants), et un bonus toutes les 5 s : Sac d'or (+25 golds), Aimant (rayon de ramassage ×3 pendant 8 s) ou Étoile (vitesse ×1,7 pendant 6 s).
 - **GOLD-3** À partir de 60 s (JACKPOT, événement `jackpot`), la pluie de pièces doit être triplée et chaque pièce valoir 2 golds au lieu de 1.
 - **GOLD-4** Les combattants doivent se balader au hasard (nouvelle destination toutes les 1,5 à 3,5 s), foncer vers un coffre ou un bonus à moins de 160 px, et ramasser tout ce qui est au sol dans un rayon de `min(60, 22 + 1,5 × Chance)` px ; leur vitesse de balade vaut 95 px/s × `clamp(vitesse / 60, 0,8, 1,6)`.
@@ -286,7 +287,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 - **LOOT-1** Il doit exister 8 emplacements : casque, plastron, gants, ceinture, pantalon, boucles, arme, secondaire.
 - **LOOT-2** Il doit exister 5 raretés avec lignes de stats, fourchette de valeur et clics d'ouverture : Commun (1 ligne, 1-3, 3 clics), Peu commun (2, 4-6, 5), Rare (3, 7-10, 10), Épique (4, 11-15, 20), Légendaire (5, 15-25, 30).
-- **LOOT-3** La table de loot doit valoir, pour une chance `l` bornée à [0 ; 85], `[90, 6, 3, 0,9, 0,1] + l × [−1, +0,4, +0,3, +0,21, +0,09]` (%), arrondie à 0,01.
+- **LOOT-3** La table de loot doit valoir, pour une chance `l` bornée à [0 ; 85], `[90, 6,5, 2,8, 0,65, 0,05] + l × [−1, +0,5, +0,35, +0,12, +0,03]` (%), arrondie à 0,01 (à 85 de chance : 2,6 % de Légendaire et 10,85 % d'Épique).
 - **LOOT-4** Quand un objet est créé, le serveur doit tirer ses stats sans doublon selon les poids de prédilection de l'emplacement ou du type d'arme, avec un générateur cryptographique.
 - **LOOT-5** Pour les emplacements `arme` et `secondaire`, le serveur doit choisir le type de l'objet : celui de la classe du joueur avec 50 % de chance (100 % à la fusion), sinon un type aléatoire de l'emplacement.
 - **LOOT-6** Quand un objet est créé, il doit appartenir à une panoplie avec la probabilité 5 / 8 / 12 / 18 / 25 % selon la rareté.
@@ -308,7 +309,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 12 ter. Potions et consommables
 
-- **CON-1** La boutique doit proposer 9 consommables : Potion de vie (60 golds, sous 50 % : +4 % de vie max par seconde pendant 6 s), Potion de berserker (80, sous 50 % : dégâts ×1,5 pendant 8 s), Potion de défense (80, sous 50 % : dégâts subis ×0,4 pendant 4 s), Potion de célérité (70, premier ennemi à portée : vitesse et vitesse d'attaque ×1,4 pendant 10 s), Potion de téléportation d'urgence (90, sous 20 % : téléportation), Potion d'invisibilité (100, sous 20 % : invisible 5 s), Potion de ronces (70, sous 50 % : +40 % d'épines pendant 8 s), Élixir d'endurance (120, début du combat : barre de stamina à 50 %), Plume de phénix (250, en tombant : renaît avec 30 % de sa vie).
+- **CON-1** La boutique doit proposer 9 consommables : Potion de vie (90 golds, sous 50 % : +4 % de vie max par seconde pendant 6 s), Potion de berserker (120, sous 50 % : dégâts ×1,5 pendant 8 s), Potion de défense (120, sous 50 % : dégâts subis ×0,4 pendant 4 s), Potion de célérité (105, premier ennemi à portée : vitesse et vitesse d'attaque ×1,4 pendant 10 s), Potion de téléportation d'urgence (135, sous 20 % : téléportation), Potion d'invisibilité (150, sous 20 % : invisible 5 s), Potion de ronces (105, sous 50 % : +40 % d'épines pendant 8 s), Élixir d'endurance (180, début du combat : barre de stamina à 50 %), Plume de phénix (375, en tombant : renaît avec 30 % de sa vie).
 - **CON-2** Quand un joueur achète un consommable, le serveur doit débiter `prix × quantité` (quantité bornée entre 1 et 99) et l'ajouter au stock ; il doit refuser si les golds manquent ou si le stock (emplacement compris) dépasserait 99.
 - **CON-3** Le joueur doit pouvoir placer une potion de son stock dans son unique emplacement de consommable ; la potion qui y était retourne au stock, et `null` vide l'emplacement ; une potion absente du stock est refusée.
 - **CON-4** Quand une partie (Battle Royale, Boss ou Donjon) est lancée, la potion équipée par chaque combattant humain doit être consommée (l'emplacement est vidé), qu'elle se déclenche ou non.
@@ -347,9 +348,9 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 12. Forge
 
-- **FRG-1** Quand un joueur fusionne, le serveur doit exiger exactement 3 objets distincts de son inventaire, de même rareté.
-- **FRG-2** Le serveur doit monter d'une rareté avec la probabilité `base + min(25, 0,5 × chance effective)` où la base vaut 40 / 30 / 20 / 10 / 0 % (Commun → Légendaire) ; un Légendaire reste Légendaire.
-- **FRG-3** Quand la fusion réussit, le serveur doit détruire les 3 objets, créer un objet pour la classe du joueur, incrémenter `fused` (et `legendary` si Légendaire) et renvoyer l'objet, le succès de la montée, la chance et la rareté d'origine.
+- **FRG-1** Quand un joueur fusionne, le serveur doit exiger exactement 3 objets distincts de son inventaire, de même rareté, et retirer le prix de la fusion : 10 / 20 / 40 / 80 / 150 golds (Commun → Légendaire).
+- **FRG-2** Le serveur doit monter d'une rareté avec la probabilité `base + min(20, 0,5 × chance effective)` (bonus de chance divisé par 2 pour un Épique) où la base vaut 40 / 30 / 15 / 5 / 0 % (Commun → Légendaire) ; un Légendaire reste Légendaire.
+- **FRG-3** Quand la fusion réussit, le serveur doit détruire les 3 objets, créer un objet pour la classe du joueur, incrémenter `fused` (et `legendary` si Légendaire) et renvoyer l'objet, le succès de la montée, la chance, la rareté d'origine et le prix payé.
 - **FRG-4** Si les 3 objets fusionnés appartiennent à la même panoplie, alors l'objet créé doit en faire partie.
 - **FRG-5** Quand un joueur relance une ligne (objet équipé ou en inventaire), le serveur doit débiter 10 / 20 / 40 / 80 / 150 golds selon la rareté, remplacer la ligne par une stat absente de l'objet avec une nouvelle valeur dans la fourchette de rareté, et incrémenter `rerolled`.
 - **FRG-6** Si la ligne est invalide, que les golds manquent ou qu'aucune autre stat n'est possible, alors le serveur doit refuser sans débiter.

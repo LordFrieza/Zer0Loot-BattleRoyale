@@ -1,0 +1,1456 @@
+{
+ "users": {
+  "1": {
+   "id": "1",
+   "username": "Alpha",
+   "passwordHash": "x",
+   "role": "player",
+   "character": {
+    "level": 17,
+    "xp": 1200,
+    "skillPoints": 0,
+    "cls": "guerrier",
+    "stats": {
+     "vie": 6,
+     "force": 5,
+     "defense": 0,
+     "vitesse": 0,
+     "esquive": 0,
+     "critique": 0,
+     "vitesse_attaque": 0,
+     "vol_de_vie": 0,
+     "precision": 0,
+     "epines": 0,
+     "chance": 5,
+     "stamina": 0
+    },
+    "gold": 4150,
+    "chests": 14,
+    "inventory": [
+     {
+      "id": "c6226f64-7d98-482e-9f5d-d15738af7c94",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 1
+       }
+      ],
+      "kind": "bouclier",
+      "set": "fortune",
+      "base": "Bouclier",
+      "name": "Bouclier de Fortune"
+     },
+     {
+      "id": "307080e0-3656-4cde-ac49-74ec96ac971e",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vol_de_vie",
+        "value": 2
+       }
+      ],
+      "base": "Mitaines",
+      "name": "Mitaines du Vampire"
+     },
+     {
+      "id": "a6f0ee65-1149-4b82-bfcf-7517648ae2bb",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 1
+       }
+      ],
+      "base": "Pendants",
+      "name": "Pendants de Vitalité"
+     },
+     {
+      "id": "cdf71213-667d-484e-8b5a-75269f62523f",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 2
+       }
+      ],
+      "kind": "epee",
+      "base": "Glaive",
+      "name": "Glaive du Vent"
+     },
+     {
+      "id": "689d0ad5-0722-4d8b-bfa7-cf8b9aa617e9",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 3
+       }
+      ],
+      "kind": "baton",
+      "base": "Sceptre",
+      "name": "Sceptre du Bourreau"
+     },
+     {
+      "id": "5a869e8f-6bf1-402c-a394-cd635b59e498",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vol_de_vie",
+        "value": 2
+       }
+      ],
+      "kind": "masse",
+      "base": "Masse",
+      "name": "Masse du Vampire"
+     },
+     {
+      "id": "f362b512-0c75-4fbf-b9aa-0ee80dc5d09d",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 3
+       }
+      ],
+      "base": "Couronne",
+      "name": "Couronne du Vent"
+     },
+     {
+      "id": "f2a9e760-a3c3-457e-b0f1-a01784b68d90",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 1
+       }
+      ],
+      "set": "ronces",
+      "base": "Grègues",
+      "name": "Grègues des Ronces"
+     },
+     {
+      "id": "74398260-a2c0-49c6-8eb5-2628b1fcb740",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 2
+       }
+      ],
+      "base": "Ceinturon",
+      "name": "Ceinturon du Rempart"
+     },
+     {
+      "id": "03ac4b6d-e36d-4338-93bd-68387b9b51a2",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "esquive",
+        "value": 1
+       }
+      ],
+      "base": "Cuissardes",
+      "name": "Cuissardes de l'Ombre"
+     },
+     {
+      "id": "0924ad2e-372c-4051-aeff-23ac6b500124",
+      "slot": "pantalon",
+      "rarity": "peu_commun",
+      "lines": [
+       {
+        "stat": "vol_de_vie",
+        "value": 5
+       },
+       {
+        "stat": "vie",
+        "value": 5
+       }
+      ],
+      "base": "Pantalon",
+      "name": "Pantalon Solide du Vampire"
+     },
+     {
+      "id": "057b44e8-cc42-4dfa-ae71-15412d19f5d7",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 3
+       }
+      ],
+      "base": "Jambières",
+      "name": "Jambières du Bourreau"
+     },
+     {
+      "id": "8d4685ca-867d-44e6-b665-a516e02fb06a",
+      "slot": "secondaire",
+      "rarity": "peu_commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 6
+       },
+       {
+        "stat": "chance",
+        "value": 4
+       }
+      ],
+      "kind": "grimoire",
+      "base": "Codex",
+      "name": "Codex Solide du Faucon"
+     },
+     {
+      "id": "f5ee7d42-d39b-42d1-9094-7c7d6a472dcf",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 2
+       }
+      ],
+      "base": "Écharpe",
+      "name": "Écharpe du Colosse"
+     }
+    ],
+    "equipment": {
+     "pantalon": {
+      "id": "b8f3e17b-8551-405c-9e0b-a63196b6b079",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 2
+       }
+      ],
+      "base": "Cuissardes",
+      "name": "Cuissardes du Vent"
+     },
+     "casque": {
+      "id": "40c7f46e-2ba2-4ade-a9f1-8e0317e0aa93",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "esquive",
+        "value": 3
+       }
+      ],
+      "base": "Capuche",
+      "name": "Capuche de l'Ombre"
+     },
+     "boucles": {
+      "id": "6fea860a-1301-41f7-b57e-da6963898d8e",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 3
+       }
+      ],
+      "base": "Clous",
+      "name": "Clous du Bourreau"
+     },
+     "gants": {
+      "id": "cab07b08-cc17-422e-92a8-49cd1b64a357",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 1
+       }
+      ],
+      "base": "Gantelets",
+      "name": "Gantelets du Bourreau"
+     }
+    },
+    "record": {
+     "battles": 0,
+     "kills": 0,
+     "wins": 0
+    },
+    "lootStats": {
+     "commun": 16,
+     "peu_commun": 2,
+     "rare": 0,
+     "epique": 0,
+     "legendaire": 0
+    },
+    "counters": {
+     "chests": 6,
+     "legendary": 0,
+     "recycled": 0,
+     "fused": 0,
+     "rerolled": 0,
+     "betsWon": 0,
+     "firstblood": 0,
+     "double": 0,
+     "massacre": 0,
+     "subs": 0,
+     "bossWins": 2,
+     "dungeonBest": 12
+    },
+    "claimed": [],
+    "title": null,
+    "look": {
+     "color": null,
+     "eyes": "points",
+     "brows": "aucun",
+     "mouth": "aucune",
+     "hat": "pirate",
+     "cape": null,
+     "shoes": null,
+     "aura": null,
+     "face": null
+    },
+    "owned": [
+     "pirate"
+    ],
+    "consumables": {
+     "phenix": 1
+    },
+    "consumableSlot": "phenix",
+    "presets": [
+     {
+      "id": "4c34017d-5a3b-410c-9158-607ad26fb6d7",
+      "name": "Principal",
+      "items": {
+       "casque": "40c7f46e-2ba2-4ade-a9f1-8e0317e0aa93",
+       "plastron": null,
+       "gants": "cab07b08-cc17-422e-92a8-49cd1b64a357",
+       "ceinture": null,
+       "pantalon": "b8f3e17b-8551-405c-9e0b-a63196b6b079",
+       "boucles": "6fea860a-1301-41f7-b57e-da6963898d8e",
+       "arme": null,
+       "secondaire": null
+      }
+     }
+    ],
+    "talents": [
+     "left.ult"
+    ],
+    "migratedSlots": 2
+   },
+   "createdAt": 1794451319773
+  },
+  "2": {
+   "id": "2",
+   "username": "Beta",
+   "passwordHash": "x",
+   "role": "player",
+   "character": {
+    "level": 9,
+    "xp": 1000,
+    "skillPoints": 0,
+    "cls": "mage",
+    "stats": {
+     "vie": 3,
+     "force": 2,
+     "defense": 0,
+     "vitesse": 0,
+     "esquive": 0,
+     "critique": 0,
+     "vitesse_attaque": 0,
+     "vol_de_vie": 0,
+     "precision": 0,
+     "epines": 0,
+     "chance": 3,
+     "stamina": 0
+    },
+    "gold": 4150,
+    "chests": 14,
+    "inventory": [
+     {
+      "id": "20d0d5e5-ea91-4a6b-b0ed-be3384841f1e",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 1
+       }
+      ],
+      "kind": "arc",
+      "base": "Arc",
+      "name": "Arc du Bourreau"
+     },
+     {
+      "id": "5388d585-b2a7-4687-9283-e5ba2ddabb83",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 3
+       }
+      ],
+      "kind": "epee",
+      "base": "Épée",
+      "name": "Épée du Colosse"
+     },
+     {
+      "id": "98b3cfce-dca8-4e3a-84f6-630929407794",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 1
+       }
+      ],
+      "base": "Heaume",
+      "name": "Heaume du Colosse"
+     },
+     {
+      "id": "01f15a1e-2f17-4264-90f3-71c7747e0ec1",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 1
+       }
+      ],
+      "base": "Anneaux",
+      "name": "Anneaux du Hérisson"
+     },
+     {
+      "id": "3b5147b6-f581-4ec0-a13e-168cb36dcd99",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse_attaque",
+        "value": 1
+       }
+      ],
+      "kind": "grimoire",
+      "base": "Codex",
+      "name": "Codex de la Tempête"
+     },
+     {
+      "id": "b9b2ffff-63ea-400a-a5f4-ea3ca1740189",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "esquive",
+        "value": 1
+       }
+      ],
+      "base": "Boucles",
+      "name": "Boucles de l'Ombre"
+     },
+     {
+      "id": "936158cc-00d6-47e4-8b69-c21836eb8d6b",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 3
+       }
+      ],
+      "base": "Heaume",
+      "name": "Heaume du Colosse"
+     },
+     {
+      "id": "3b1fb1d4-f170-4f2e-92c9-9aaf665877a1",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 3
+       }
+      ],
+      "base": "Ceinture",
+      "name": "Ceinture du Hérisson"
+     },
+     {
+      "id": "aa7b40e2-7604-40ee-8431-70463bf0fba0",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 1
+       }
+      ],
+      "kind": "dague",
+      "base": "Dague de parade",
+      "name": "Dague de parade du Bourreau"
+     },
+     {
+      "id": "eafb56c3-754b-4c5c-89af-17ddeb053820",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 2
+       }
+      ],
+      "base": "Mitaines",
+      "name": "Mitaines du Faucon"
+     },
+     {
+      "id": "1a29e52e-4866-480d-a4f5-f885077090ea",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse_attaque",
+        "value": 1
+       }
+      ],
+      "kind": "bouclier",
+      "base": "Pavois",
+      "name": "Pavois de la Tempête"
+     },
+     {
+      "id": "12462d78-8cfc-495f-b2f6-512713274db4",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 3
+       }
+      ],
+      "base": "Jambières",
+      "name": "Jambières du Bourreau"
+     },
+     {
+      "id": "c458ece4-cb68-4cc2-a8d8-e2e3bebec74f",
+      "slot": "arme",
+      "rarity": "peu_commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 5
+       },
+       {
+        "stat": "vol_de_vie",
+        "value": 4
+       }
+      ],
+      "kind": "arc",
+      "base": "Arc court",
+      "name": "Arc court Solide du Bourreau"
+     },
+     {
+      "id": "d261ac6a-8e97-4065-8d90-27681ed7b638",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "esquive",
+        "value": 3
+       }
+      ],
+      "base": "Heaume",
+      "name": "Heaume de l'Ombre"
+     },
+     {
+      "id": "d9f2ceb9-19f2-4b2e-a86b-2cf59fe69ea2",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 2
+       }
+      ],
+      "base": "Cotte de mailles",
+      "name": "Cotte de mailles du Hérisson"
+     },
+     {
+      "id": "101ee521-c791-4594-aba4-831bd686a10f",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 1
+       }
+      ],
+      "kind": "grimoire",
+      "base": "Tome",
+      "name": "Tome du Vent"
+     },
+     {
+      "id": "c02a33b5-643c-4486-800d-4f09e320673f",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 3
+       }
+      ],
+      "base": "Couronne",
+      "name": "Couronne de Vitalité"
+     }
+    ],
+    "equipment": {
+     "casque": {
+      "id": "7cfbfd33-a895-41f7-a727-e30e4328a3ca",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 2
+       }
+      ],
+      "base": "Capuche",
+      "name": "Capuche du Vent"
+     }
+    },
+    "record": {
+     "battles": 0,
+     "kills": 0,
+     "wins": 0
+    },
+    "lootStats": {
+     "commun": 17,
+     "peu_commun": 1,
+     "rare": 0,
+     "epique": 0,
+     "legendaire": 0
+    },
+    "counters": {
+     "chests": 6,
+     "legendary": 0,
+     "recycled": 0,
+     "fused": 0,
+     "rerolled": 0,
+     "betsWon": 0,
+     "firstblood": 0,
+     "double": 0,
+     "massacre": 0,
+     "subs": 0,
+     "bossWins": 2,
+     "dungeonBest": 12
+    },
+    "claimed": [],
+    "title": null,
+    "look": {
+     "color": null,
+     "eyes": "points",
+     "brows": "aucun",
+     "mouth": "aucune",
+     "hat": "pirate",
+     "cape": null,
+     "shoes": null,
+     "aura": null,
+     "face": null
+    },
+    "owned": [
+     "pirate"
+    ],
+    "consumables": {
+     "phenix": 1
+    },
+    "consumableSlot": "phenix",
+    "presets": [
+     {
+      "id": "b2b540c9-d19e-416b-990a-da99efefa9d2",
+      "name": "Principal",
+      "items": {
+       "casque": "7cfbfd33-a895-41f7-a727-e30e4328a3ca",
+       "plastron": null,
+       "gants": null,
+       "ceinture": null,
+       "pantalon": null,
+       "boucles": null,
+       "arme": null,
+       "secondaire": null
+      }
+     }
+    ],
+    "talents": [
+     "left.ult"
+    ],
+    "migratedSlots": 2
+   },
+   "createdAt": 1794451319780
+  },
+  "3": {
+   "id": "3",
+   "username": "Gamma",
+   "passwordHash": "x",
+   "role": "player",
+   "character": {
+    "level": 4,
+    "xp": 500,
+    "skillPoints": 0,
+    "cls": "archer",
+    "stats": {
+     "vie": 1,
+     "force": 1,
+     "defense": 0,
+     "vitesse": 0,
+     "esquive": 0,
+     "critique": 0,
+     "vitesse_attaque": 0,
+     "vol_de_vie": 0,
+     "precision": 0,
+     "epines": 0,
+     "chance": 1,
+     "stamina": 0
+    },
+    "gold": 4150,
+    "chests": 14,
+    "inventory": [
+     {
+      "id": "0f511918-7956-4f7e-abbb-91c456c9430e",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 1
+       }
+      ],
+      "base": "Brigandine",
+      "name": "Brigandine du Rempart"
+     },
+     {
+      "id": "8bbf3a10-e686-4612-9ee7-bbd2b512a146",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "chance",
+        "value": 1
+       }
+      ],
+      "base": "Grègues",
+      "name": "Grègues du Trèfle"
+     },
+     {
+      "id": "769e20a0-b48e-4a5c-b8f9-04b5634052e2",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 2
+       }
+      ],
+      "base": "Cuirasse",
+      "name": "Cuirasse du Rempart"
+     },
+     {
+      "id": "a956cc4b-1cc9-4ab1-85fd-8ebb41cb589c",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 2
+       }
+      ],
+      "kind": "carquois",
+      "base": "Carquois",
+      "name": "Carquois de Vitalité"
+     },
+     {
+      "id": "ff42efe3-d765-4cc3-b605-102600f696d2",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse_attaque",
+        "value": 2
+       }
+      ],
+      "base": "Gants",
+      "name": "Gants de la Tempête"
+     },
+     {
+      "id": "ee629e71-4099-4e09-912a-9867b97b497f",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 1
+       }
+      ],
+      "base": "Ceinture",
+      "name": "Ceinture du Colosse"
+     },
+     {
+      "id": "c3f0d918-5a8f-484f-b3f5-0a74488d5070",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 1
+       }
+      ],
+      "base": "Mitaines",
+      "name": "Mitaines du Bourreau"
+     },
+     {
+      "id": "cdaf29a0-eb90-43fb-9529-aa4aee6e26d8",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 1
+       }
+      ],
+      "base": "Capuche",
+      "name": "Capuche du Rempart"
+     },
+     {
+      "id": "989e2eb6-fa3a-43d1-9baf-6b14becaf1f1",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 3
+       }
+      ],
+      "base": "Cuirasse",
+      "name": "Cuirasse du Rempart"
+     },
+     {
+      "id": "9e99784f-84d0-43ac-8838-9a2184def88c",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 2
+       }
+      ],
+      "base": "Pantalon",
+      "name": "Pantalon du Colosse"
+     },
+     {
+      "id": "7e26f86e-3eeb-4c22-bc62-85c5e892fcf8",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "esquive",
+        "value": 2
+       }
+      ],
+      "base": "Grègues",
+      "name": "Grègues de l'Ombre"
+     },
+     {
+      "id": "571571e8-cf94-4d11-a081-61f0d554955c",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 1
+       }
+      ],
+      "base": "Sangle",
+      "name": "Sangle du Colosse"
+     },
+     {
+      "id": "cccbf14d-d991-4e05-9ffe-d80973c8b59d",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 3
+       }
+      ],
+      "kind": "arc",
+      "base": "Arbalète",
+      "name": "Arbalète du Faucon"
+     },
+     {
+      "id": "4accdc9b-ca87-473e-b78b-ab4ab5597f83",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 1
+       }
+      ],
+      "base": "Capuche",
+      "name": "Capuche du Vent"
+     },
+     {
+      "id": "0845cb4a-ca4f-4dd9-bd05-48b52db7fff8",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 3
+       }
+      ],
+      "base": "Poignes",
+      "name": "Poignes du Hérisson"
+     },
+     {
+      "id": "c45c6655-b4d4-482f-b62e-a3fe0816f324",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 1
+       }
+      ],
+      "base": "Gantelets",
+      "name": "Gantelets du Bourreau"
+     }
+    ],
+    "equipment": {
+     "secondaire": {
+      "id": "17257494-7643-4599-90bb-2dd0507315b3",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse_attaque",
+        "value": 3
+       }
+      ],
+      "kind": "carquois",
+      "base": "Carquois",
+      "name": "Carquois de la Tempête"
+     },
+     "gants": {
+      "id": "cf94da16-8a2e-4f7a-9503-8f1b205776d7",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse_attaque",
+        "value": 1
+       }
+      ],
+      "base": "Poignes",
+      "name": "Poignes de la Tempête"
+     }
+    },
+    "record": {
+     "battles": 0,
+     "kills": 0,
+     "wins": 0
+    },
+    "lootStats": {
+     "commun": 18,
+     "peu_commun": 0,
+     "rare": 0,
+     "epique": 0,
+     "legendaire": 0
+    },
+    "counters": {
+     "chests": 6,
+     "legendary": 0,
+     "recycled": 0,
+     "fused": 0,
+     "rerolled": 0,
+     "betsWon": 0,
+     "firstblood": 0,
+     "double": 0,
+     "massacre": 0,
+     "subs": 0,
+     "bossWins": 2,
+     "dungeonBest": 12
+    },
+    "claimed": [],
+    "title": null,
+    "look": {
+     "color": null,
+     "eyes": "points",
+     "brows": "aucun",
+     "mouth": "aucune",
+     "hat": "pirate",
+     "cape": null,
+     "shoes": null,
+     "aura": null,
+     "face": null
+    },
+    "owned": [
+     "pirate"
+    ],
+    "consumables": {
+     "phenix": 1
+    },
+    "consumableSlot": "phenix",
+    "presets": [
+     {
+      "id": "1f2faec1-2c0f-4501-aa2d-91e57090ab99",
+      "name": "Principal",
+      "items": {
+       "casque": null,
+       "plastron": null,
+       "gants": "cf94da16-8a2e-4f7a-9503-8f1b205776d7",
+       "ceinture": null,
+       "pantalon": null,
+       "boucles": null,
+       "arme": null,
+       "secondaire": "17257494-7643-4599-90bb-2dd0507315b3"
+      }
+     }
+    ],
+    "talents": [
+     "left.ult"
+    ],
+    "migratedSlots": 2
+   },
+   "createdAt": 1794451319782
+  },
+  "4": {
+   "id": "4",
+   "username": "Delta",
+   "passwordHash": "x",
+   "role": "player",
+   "character": {
+    "level": 1,
+    "xp": 0,
+    "skillPoints": 0,
+    "cls": null,
+    "stats": {
+     "vie": 0,
+     "force": 0,
+     "defense": 0,
+     "vitesse": 0,
+     "esquive": 0,
+     "critique": 0,
+     "vitesse_attaque": 0,
+     "vol_de_vie": 0,
+     "precision": 0,
+     "epines": 0,
+     "chance": 0,
+     "stamina": 0
+    },
+    "gold": 4150,
+    "chests": 14,
+    "inventory": [
+     {
+      "id": "7992e8e0-d32c-4f88-90de-f46623a2384f",
+      "slot": "arme",
+      "rarity": "peu_commun",
+      "lines": [
+       {
+        "stat": "force",
+        "value": 6
+       },
+       {
+        "stat": "critique",
+        "value": 5
+       }
+      ],
+      "kind": "baton",
+      "base": "Sceptre",
+      "name": "Sceptre Solide du Colosse"
+     },
+     {
+      "id": "fa1cab3c-b39c-478a-b865-72519fbf0705",
+      "slot": "pantalon",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 3
+       }
+      ],
+      "base": "Pantalon",
+      "name": "Pantalon du Rempart"
+     },
+     {
+      "id": "afdd7179-7dd4-43ed-b4e5-f76b95c4263e",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 2
+       }
+      ],
+      "base": "Gants",
+      "name": "Gants du Hérisson"
+     },
+     {
+      "id": "fa17de7b-0c6e-4d4d-aaa8-26dd2f85e81c",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 2
+       }
+      ],
+      "kind": "relique",
+      "base": "Relique",
+      "name": "Relique du Rempart"
+     },
+     {
+      "id": "b9166f18-3111-4fff-a1a1-839f916477f1",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 3
+       }
+      ],
+      "base": "Cuirasse",
+      "name": "Cuirasse de Vitalité"
+     },
+     {
+      "id": "d78041c1-266a-4b7c-9e8e-c7b2085b7284",
+      "slot": "gants",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "defense",
+        "value": 1
+       }
+      ],
+      "base": "Gantelets",
+      "name": "Gantelets du Rempart"
+     },
+     {
+      "id": "864442fc-5d4f-48c7-8e09-bb8155a3d382",
+      "slot": "pantalon",
+      "rarity": "peu_commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 5
+       },
+       {
+        "stat": "vitesse",
+        "value": 5
+       }
+      ],
+      "base": "Pantalon",
+      "name": "Pantalon Solide du Faucon"
+     },
+     {
+      "id": "33b765b3-b9a2-4539-9e4f-b0f4927adc4f",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 1
+       }
+      ],
+      "kind": "bouclier",
+      "base": "Rondache",
+      "name": "Rondache du Hérisson"
+     },
+     {
+      "id": "c5cd3e70-6caf-469d-a5b7-c8ad708f6501",
+      "slot": "casque",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vitesse",
+        "value": 1
+       }
+      ],
+      "base": "Couronne",
+      "name": "Couronne du Vent"
+     },
+     {
+      "id": "b4d7befd-91d6-40a2-9001-622da0857760",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 2
+       }
+      ],
+      "base": "Écharpe",
+      "name": "Écharpe de Vitalité"
+     },
+     {
+      "id": "640caa2c-4731-40b4-ac67-1184dd4f716f",
+      "slot": "secondaire",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "chance",
+        "value": 1
+       }
+      ],
+      "kind": "grimoire",
+      "base": "Codex",
+      "name": "Codex du Trèfle"
+     },
+     {
+      "id": "9b133af1-c6f3-469e-84c4-f7b69db8b57a",
+      "slot": "arme",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "critique",
+        "value": 3
+       }
+      ],
+      "kind": "baton",
+      "base": "Bâton",
+      "name": "Bâton du Bourreau"
+     },
+     {
+      "id": "3aabd667-f832-43f1-b277-1144d45c2cac",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 1
+       }
+      ],
+      "base": "Plastron",
+      "name": "Plastron du Faucon"
+     },
+     {
+      "id": "c819c8ef-b38b-4b1f-9a24-ffc3293cd562",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "precision",
+        "value": 1
+       }
+      ],
+      "base": "Pendants",
+      "name": "Pendants du Faucon"
+     },
+     {
+      "id": "203469be-5408-4701-90a4-f67ba4c2cb44",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "epines",
+        "value": 3
+       }
+      ],
+      "base": "Pendants",
+      "name": "Pendants du Hérisson"
+     }
+    ],
+    "equipment": {
+     "plastron": {
+      "id": "f03981a4-4688-47d5-a2d1-0660fe515e76",
+      "slot": "plastron",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 2
+       }
+      ],
+      "base": "Brigandine",
+      "name": "Brigandine de Vitalité"
+     },
+     "ceinture": {
+      "id": "83afce94-dca1-4424-9f39-f52ab38c2fb9",
+      "slot": "ceinture",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "vie",
+        "value": 2
+       }
+      ],
+      "base": "Écharpe",
+      "name": "Écharpe de Vitalité"
+     },
+     "boucles": {
+      "id": "2b8870a9-baab-443c-95f2-41113160ed66",
+      "slot": "boucles",
+      "rarity": "commun",
+      "lines": [
+       {
+        "stat": "chance",
+        "value": 1
+       }
+      ],
+      "base": "Clous",
+      "name": "Clous du Trèfle"
+     }
+    },
+    "record": {
+     "battles": 0,
+     "kills": 0,
+     "wins": 0
+    },
+    "lootStats": {
+     "commun": 16,
+     "peu_commun": 2,
+     "rare": 0,
+     "epique": 0,
+     "legendaire": 0
+    },
+    "counters": {
+     "chests": 6,
+     "legendary": 0,
+     "recycled": 0,
+     "fused": 0,
+     "rerolled": 0,
+     "betsWon": 0,
+     "firstblood": 0,
+     "double": 0,
+     "massacre": 0,
+     "subs": 0,
+     "bossWins": 2,
+     "dungeonBest": 12
+    },
+    "claimed": [],
+    "title": null,
+    "look": {
+     "color": null,
+     "eyes": "points",
+     "brows": "aucun",
+     "mouth": "aucune",
+     "hat": "pirate",
+     "cape": null,
+     "shoes": null,
+     "aura": null,
+     "face": null
+    },
+    "owned": [
+     "pirate"
+    ],
+    "consumables": {
+     "phenix": 1
+    },
+    "consumableSlot": "phenix",
+    "presets": [
+     {
+      "id": "59210239-1c0e-4a6a-a35d-9732edff72d5",
+      "name": "Principal",
+      "items": {
+       "casque": null,
+       "plastron": "f03981a4-4688-47d5-a2d1-0660fe515e76",
+       "gants": null,
+       "ceinture": "83afce94-dca1-4424-9f39-f52ab38c2fb9",
+       "pantalon": null,
+       "boucles": "2b8870a9-baab-443c-95f2-41113160ed66",
+       "arme": null,
+       "secondaire": null
+      }
+     }
+    ],
+    "talents": [],
+    "migratedSlots": 2
+   },
+   "createdAt": 1794451319783
+  },
+  "5": {
+   "id": "5",
+   "username": "Fantome_V1",
+   "passwordHash": null,
+   "role": "player",
+   "ghost": true,
+   "twitchLogin": "fantome_v1",
+   "twitchDisplayName": "Fantome_V1",
+   "createdAt": 1794451319788,
+   "character": {
+    "level": 2,
+    "xp": 200,
+    "skillPoints": 1,
+    "cls": null,
+    "stats": {
+     "vie": 0,
+     "force": 0,
+     "defense": 0,
+     "vitesse": 0,
+     "esquive": 0,
+     "critique": 0,
+     "vitesse_attaque": 0,
+     "vol_de_vie": 0,
+     "precision": 0,
+     "epines": 0,
+     "chance": 0,
+     "stamina": 0
+    },
+    "gold": 120,
+    "chests": 3,
+    "inventory": [],
+    "equipment": {},
+    "record": {
+     "battles": 0,
+     "kills": 0,
+     "wins": 0
+    },
+    "lootStats": {
+     "commun": 0,
+     "peu_commun": 0,
+     "rare": 0,
+     "epique": 0,
+     "legendaire": 0
+    },
+    "counters": {
+     "chests": 0,
+     "legendary": 0,
+     "recycled": 0,
+     "fused": 0,
+     "rerolled": 0,
+     "betsWon": 0,
+     "firstblood": 0,
+     "double": 0,
+     "massacre": 0,
+     "subs": 0,
+     "bossWins": 0,
+     "dungeonBest": 0
+    },
+    "claimed": [],
+    "title": null,
+    "look": {
+     "color": null,
+     "eyes": "points",
+     "brows": "aucun",
+     "mouth": "aucune",
+     "hat": null,
+     "cape": null,
+     "shoes": null,
+     "aura": null,
+     "face": null
+    },
+    "owned": [],
+    "consumables": {},
+    "consumableSlot": null,
+    "presets": [],
+    "talents": []
+   }
+  }
+ },
+ "sessions": {},
+ "nextId": 6
+}

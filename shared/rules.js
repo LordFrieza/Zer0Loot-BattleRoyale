@@ -104,15 +104,16 @@
   }
 
   /*
-   * Table de loot.
-   * Chance 0  : 90 / 6 / 3 / 0.9 / 0.1
-   * Chance 10 : 80 / 10 / 6 / 3 / 1
+   * Table de loot (V2 : Épique et Légendaire plus rares, surtout pour les gros chanceux).
+   * Chance 0  : 90 / 6,5 / 2,8 / 0,65 / 0,05
+   * Chance 10 : 80 / 11,5 / 6,3 / 1,85 / 0,35
+   * Chance 85 : 5 / 49 / 32,55 / 10,85 / 2,6
    * Chaque point de chance déplace linéairement les probabilités (−1 % commun,
-   * +0.4 % peu commun, +0.3 % rare, +0.21 % épique, +0.09 % légendaire).
+   * +0,5 % peu commun, +0,35 % rare, +0,12 % épique, +0,03 % légendaire).
    * Plafond à 85 de chance effective pour garder un minimum de communs.
    */
-  const LOOT_BASE = [90, 6, 3, 0.9, 0.1];
-  const LOOT_PER_LUCK = [-1, 0.4, 0.3, 0.21, 0.09];
+  const LOOT_BASE = [90, 6.5, 2.8, 0.65, 0.05];
+  const LOOT_PER_LUCK = [-1, 0.5, 0.35, 0.12, 0.03];
   const LUCK_CAP = 85;
 
   function lootTable(luck) {
@@ -211,17 +212,20 @@
 
   // ---------- Forge ----------
   /*
-   * Fusion : 3 objets de même rareté → 1 nouvel objet pour ta classe.
-   * Chance de monter d'une rareté : FUSE_UPGRADE[rareté] + 0,5 % par point de chance effective (bonus max +25 %).
-   * Sinon : un nouvel objet de même rareté. 3 légendaires → un nouveau légendaire.
+   * Fusion : 3 objets de même rareté → 1 nouvel objet pour ta classe, contre quelques golds (FUSE_PRICE).
+   * Chance de monter d'une rareté : FUSE_UPGRADE[rareté] + 0,5 % par point de chance effective (bonus max +20 %,
+   * réduit de moitié pour passer d'Épique à Légendaire). Sinon : un nouvel objet de même rareté.
+   * 3 légendaires → un nouveau légendaire.
    */
   const FUSE_COUNT = 3;
-  const FUSE_UPGRADE = { commun: 40, peu_commun: 30, rare: 20, epique: 10, legendaire: 0 };
+  const FUSE_UPGRADE = { commun: 40, peu_commun: 30, rare: 15, epique: 5, legendaire: 0 };
   const FUSE_LUCK_BONUS = 0.5;
-  const FUSE_LUCK_BONUS_CAP = 25;
+  const FUSE_LUCK_BONUS_CAP = 20;
+  const FUSE_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
   function fuseUpgradeChance(rarity, luck) {
     if (!FUSE_UPGRADE[rarity]) return 0;
-    return FUSE_UPGRADE[rarity] + Math.min(FUSE_LUCK_BONUS_CAP, (luck || 0) * FUSE_LUCK_BONUS);
+    const bonus = Math.min(FUSE_LUCK_BONUS_CAP, (luck || 0) * FUSE_LUCK_BONUS);
+    return FUSE_UPGRADE[rarity] + (rarity === 'epique' ? bonus / 2 : bonus);
   }
   // Relance d'une ligne : prix en golds selon la rareté de l'objet.
   const REROLL_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
@@ -499,7 +503,7 @@
     desc: 'Crache le feu, s\'envole hors de portée du corps à corps et pond des œufs à détruire avant l\'éclosion.',
     marks: [0.75, 0.5, 0.3],
     hpBase: 200,
-    hpPerPlayer: 370,
+    hpPerPlayer: 400,
     damageBase: 6,
     damagePerPlayer: 0.2,
     cooldown: 1.6, // coups de griffes
@@ -571,11 +575,19 @@
 
   const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER };
 
-  function bossStats(players, id = 'troll') {
+  /*
+   * V2 : les boss sont plus résistants (×1,25), et encore plus face à des combattants expérimentés :
+   * +3,5 % de vie par niveau moyen au-dessus de 1 (×2,2 au plus pour cette partie).
+   */
+  const BOSS_SCALE = { hpMult: 1, perLevel: 0.06, levelCap: 2.5 };
+  function bossLevelScale(avgLevel) {
+    return Math.min(BOSS_SCALE.levelCap, 1 + BOSS_SCALE.perLevel * Math.max(0, (avgLevel || 1) - 1));
+  }
+  function bossStats(players, id = 'troll', avgLevel = 1) {
     const B = BOSSES[id] || BOSS;
     const n = Math.max(1, players);
     return {
-      maxHp: Math.round(B.hpBase + B.hpPerPlayer * n),
+      maxHp: Math.round((B.hpBase + B.hpPerPlayer * n) * BOSS_SCALE.hpMult * bossLevelScale(avgLevel)),
       damage: Math.round((B.damageBase + B.damagePerPlayer * n) * 10) / 10,
     };
   }
@@ -718,47 +730,47 @@
    */
   const CONSUMABLES = {
     vie: {
-      label: 'Potion de vie', icon: '🧪', color: '#ff4d6d', price: 60, trigger: 'hp50',
+      label: 'Potion de vie', icon: '🧪', color: '#ff4d6d', price: 90, trigger: 'hp50',
       desc: 'Sous 50 % de vie : régénère 4 % de ta vie max par seconde pendant 6 s.',
       effect: { regen: 0.04, duration: 6 },
     },
     berserker: {
-      label: 'Potion de berserker', icon: '🍷', color: '#ff6b2a', price: 80, trigger: 'hp50',
+      label: 'Potion de berserker', icon: '🍷', color: '#ff6b2a', price: 120, trigger: 'hp50',
       desc: 'Sous 50 % de vie : +50 % de dégâts pendant 8 s.',
       effect: { damage: 1.5, duration: 8 },
     },
     defense: {
-      label: 'Potion de défense', icon: '🧴', color: '#5fd3ff', price: 80, trigger: 'hp50',
+      label: 'Potion de défense', icon: '🧴', color: '#5fd3ff', price: 120, trigger: 'hp50',
       desc: 'Sous 50 % de vie : −60 % de dégâts subis pendant 4 s.',
       effect: { taken: 0.4, duration: 4 },
     },
     celerite: {
-      label: 'Potion de célérité', icon: '💨', color: '#ffd23f', price: 70, trigger: 'engage',
+      label: 'Potion de célérité', icon: '💨', color: '#ffd23f', price: 105, trigger: 'engage',
       desc: 'Dès que le premier ennemi est à portée : +40 % de vitesse et de vitesse d\'attaque pendant 10 s.',
       effect: { speed: 1.4, attackSpeed: 1.4, duration: 10 },
     },
     teleportation: {
-      label: 'Potion de téléportation d\'urgence', icon: '🌀', color: '#b14dff', price: 90, trigger: 'hp20',
+      label: 'Potion de téléportation d\'urgence', icon: '🌀', color: '#b14dff', price: 135, trigger: 'hp20',
       desc: 'Sous 20 % de vie : téléportation à un endroit aléatoire de l\'arène, le plus loin possible des ennemis.',
       effect: { teleport: true },
     },
     invisibilite: {
-      label: 'Potion d\'invisibilité', icon: '👻', color: '#cfd8e3', price: 100, trigger: 'hp20',
+      label: 'Potion d\'invisibilité', icon: '👻', color: '#cfd8e3', price: 150, trigger: 'hp20',
       desc: 'Sous 20 % de vie : invisible pendant 5 s. Les ennemis te perdent de vue, mais les attaques de zone te touchent toujours.',
       effect: { invisible: true, duration: 5 },
     },
     ronces: {
-      label: 'Potion de ronces', icon: '🌹', color: '#b14dff', price: 70, trigger: 'hp50',
+      label: 'Potion de ronces', icon: '🌹', color: '#b14dff', price: 105, trigger: 'hp50',
       desc: 'Sous 50 % de vie : +40 % d\'épines (dégâts renvoyés) pendant 8 s.',
       effect: { thorns: 0.4, duration: 8 },
     },
     endurance: {
-      label: 'Élixir d\'endurance', icon: '🔋', color: '#29e7ff', price: 120, trigger: 'start',
+      label: 'Élixir d\'endurance', icon: '🔋', color: '#29e7ff', price: 180, trigger: 'start',
       desc: 'La barre de stamina démarre à moitié remplie : ton ultime arrive bien plus tôt (il faut avoir un ultime).',
       effect: { stamina: 0.5 },
     },
     phenix: {
-      label: 'Plume de phénix', icon: '🪶', color: '#ff9a1f', price: 250, trigger: 'death',
+      label: 'Plume de phénix', icon: '🪶', color: '#ff9a1f', price: 375, trigger: 'death',
       desc: 'Quand tu tombes, tu renais aussitôt avec 30 % de ta vie (une seule fois).',
       effect: { revive: 0.3 },
     },
@@ -1155,14 +1167,14 @@
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
-    FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, REROLL_PRICE,
+    FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE,
     LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

@@ -262,7 +262,8 @@ class Battle extends EventEmitter {
       ult: p.ult && Rules.ULTS[p.ult.id] ? p.ult : null,
       staminaTime: s.staminaTime || Rules.STAMINA.baseTime.none,
       // Potion équipée pour cette partie (déclenchée au plus une fois)
-      consumable: p.consumable && Rules.CONSUMABLES[p.consumable] ? p.consumable : null,
+      // Pas de potion dans le mode bonus (rien à consommer ni à afficher)
+      consumable: this.mode !== 'gold' && p.consumable && Rules.CONSUMABLES[p.consumable] ? p.consumable : null,
     });
   }
 
@@ -270,7 +271,8 @@ class Battle extends EventEmitter {
 
   setupBoss() {
     const B = Rules.BOSSES[this.bossId];
-    const st = Rules.bossStats(this.players.length, B.id);
+    const avgLevel = this.players.reduce((a, p) => a + (p.level || 1), 0) / Math.max(1, this.players.length);
+    const st = Rules.bossStats(this.players.length, B.id, avgLevel);
     const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
     this.players.forEach((f, i) => Object.assign(f, positions[i]));
     this.boss = fighter({

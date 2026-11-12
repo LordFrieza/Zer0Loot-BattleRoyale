@@ -307,6 +307,9 @@ function fuse(character, itemIds) {
   if (ids.some((id) => locked.has(id))) throw new Error('Un objet protégé par un preset ne peut pas être fusionné');
   const rarity = items[0].rarity;
   if (items.some((i) => i.rarity !== rarity)) throw new Error('Les 3 objets doivent être de la même rareté');
+  const price = Rules.FUSE_PRICE[rarity];
+  if (character.gold < price) throw new Error(`La fusion coûte ${price} golds`);
+  character.gold -= price;
   const chance = Rules.fuseUpgradeChance(rarity, derived(character).luck);
   const upgraded = random() * 100 < chance;
   const resultRarity = upgraded ? Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1] : rarity;
@@ -317,7 +320,7 @@ function fuse(character, itemIds) {
   character.inventory.push(item);
   bump(character, 'fused');
   if (item.rarity === 'legendaire') bump(character, 'legendary');
-  return { item, upgraded, chance, from: rarity };
+  return { item, upgraded, chance, from: rarity, price };
 }
 
 function findItem(character, itemId) {

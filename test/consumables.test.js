@@ -10,7 +10,7 @@ const player = (key, extra = {}) => ({ key, name: key, level: 1, look: {}, stats
 test('[CON-1] potions : catalogue, prix et déclencheurs', () => {
   const C = Rules.CONSUMABLES;
   assert.deepStrictEqual(Object.keys(C), ['vie', 'berserker', 'defense', 'celerite', 'teleportation', 'invisibilite', 'ronces', 'endurance', 'phenix']);
-  assert.deepStrictEqual(Object.values(C).map((c) => c.price), [60, 80, 80, 70, 90, 100, 70, 120, 250]);
+  assert.deepStrictEqual(Object.values(C).map((c) => c.price), [90, 120, 120, 105, 135, 150, 105, 180, 375]);
   assert.deepStrictEqual(Object.values(C).map((c) => c.trigger), ['hp50', 'hp50', 'hp50', 'engage', 'hp20', 'hp20', 'hp50', 'start', 'death']);
   assert.deepStrictEqual(C.vie.effect, { regen: 0.04, duration: 6 });
   assert.deepStrictEqual(C.berserker.effect, { damage: 1.5, duration: 8 });
@@ -25,12 +25,12 @@ test('[CON-1] potions : catalogue, prix et déclencheurs', () => {
 
 test('[CON-2] potions : achat, quantité bornée, stock maximum', () => {
   const c = game.newCharacter();
-  assert.throws(() => game.buyConsumable(c, 'vie'), /60 golds/);
+  assert.throws(() => game.buyConsumable(c, 'vie'), /90 golds/);
   c.gold = 10000;
-  assert.deepStrictEqual(game.buyConsumable(c, 'vie', 3), { price: 180, count: 3 });
-  assert.strictEqual(c.gold, 10000 - 180);
+  assert.deepStrictEqual(game.buyConsumable(c, 'vie', 3), { price: 270, count: 3 });
+  assert.strictEqual(c.gold, 10000 - 270);
   assert.strictEqual(c.consumables.vie, 3);
-  assert.deepStrictEqual(game.buyConsumable(c, 'phenix', 0), { price: 250, count: 1 }, 'quantité au moins 1');
+  assert.deepStrictEqual(game.buyConsumable(c, 'phenix', 0), { price: 375, count: 1 }, 'quantité au moins 1');
   assert.throws(() => game.buyConsumable(c, 'inconnue'), /inconnu/);
   c.gold = 1e6;
   game.buyConsumable(c, 'vie', 96);

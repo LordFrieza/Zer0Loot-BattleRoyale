@@ -3,8 +3,9 @@ const assert = require('node:assert');
 const { Rules, game } = require('./helpers');
 
 test('[LOOT-3] table de loot : valeurs du cahier des charges', () => {
-  assert.deepStrictEqual(Rules.lootTable(0), { commun: 90, peu_commun: 6, rare: 3, epique: 0.9, legendaire: 0.1 });
-  assert.deepStrictEqual(Rules.lootTable(10), { commun: 80, peu_commun: 10, rare: 6, epique: 3, legendaire: 1 });
+  assert.deepStrictEqual(Rules.lootTable(0), { commun: 90, peu_commun: 6.5, rare: 2.8, epique: 0.65, legendaire: 0.05 });
+  assert.deepStrictEqual(Rules.lootTable(10), { commun: 80, peu_commun: 11.5, rare: 6.3, epique: 1.85, legendaire: 0.35 });
+  assert.deepStrictEqual(Rules.lootTable(85), { commun: 5, peu_commun: 49, rare: 32.55, epique: 10.85, legendaire: 2.6 });
 });
 
 test('[LOOT-3] table de loot : total à 100 % et plafond', () => {

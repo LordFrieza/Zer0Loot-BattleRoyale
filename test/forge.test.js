@@ -10,23 +10,31 @@ test('[FRG-1, FRG-3] forge : fusion de 3 objets de même rareté', () => {
   const items = [0, 1, 2].map(() => game.makeItem('rare'));
   const other = game.makeItem('commun');
   c.inventory.push(...items, other);
+  c.gold = 39;
+  assert.throws(() => game.fuse(c, items.map((i) => i.id)), /40 golds/, 'la fusion est payante');
+  c.gold = 100;
   assert.throws(() => game.fuse(c, [items[0].id, items[1].id]), /exactement 3/);
   assert.throws(() => game.fuse(c, [items[0].id, items[1].id, other.id]), /même rareté/);
   assert.throws(() => game.fuse(c, [items[0].id, items[1].id, 'x']), /introuvables/);
   const r = game.fuse(c, items.map((i) => i.id));
   assert.ok(['rare', 'epique'].includes(r.item.rarity));
   assert.strictEqual(r.upgraded, r.item.rarity === 'epique');
-  assert.strictEqual(r.chance, 20);
+  assert.strictEqual(r.chance, 15);
+  assert.strictEqual(r.price, 40);
+  assert.strictEqual(c.gold, 60);
   assert.deepStrictEqual(c.inventory.map((i) => i.id).sort(), [other.id, r.item.id].sort());
   if (r.item.kind) assert.strictEqual(Rules.itemClass(r.item), 'archer');
 });
 
 test('[FRG-2] forge : taux d\'amélioration selon la rareté et la chance', () => {
   assert.strictEqual(Rules.fuseUpgradeChance('commun', 0), 40);
-  assert.strictEqual(Rules.fuseUpgradeChance('epique', 20), 20);
-  assert.strictEqual(Rules.fuseUpgradeChance('rare', 999), 45);
+  assert.strictEqual(Rules.fuseUpgradeChance('epique', 20), 10, 'bonus de chance réduit de moitié vers Légendaire');
+  assert.strictEqual(Rules.fuseUpgradeChance('epique', 999), 15);
+  assert.strictEqual(Rules.fuseUpgradeChance('rare', 999), 35);
   assert.strictEqual(Rules.fuseUpgradeChance('legendaire', 85), 0);
+  assert.deepStrictEqual(Rules.FUSE_PRICE, { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 });
   const c = game.newCharacter();
+  c.gold = 1e9;
   let up = 0;
   const N = 3000;
   for (let i = 0; i < N; i++) {

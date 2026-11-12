@@ -34,6 +34,9 @@ test('[GOLD-1, MODE-3] ruée vers l\'or : 75 s, sans combat, dès 1 joueur, sans
   tickFor(b, 5);
   assert.ok(!events.some((e) => ['hit', 'kill', 'dodge', 'ult', 'potion'].includes(e.t)), 'aucun combat');
   assert.ok(b.players.every((f) => f.hp === f.maxHp && f.alive));
+  // Les combattants entrent sans potion : rien ne peut être consommé ni affiché
+  assert.ok(b.players.every((f) => f.consumable === null));
+  assert.ok(b.frame().fighters.every((f) => f.potion === undefined));
   let res = null;
   b.on('goldEnd', (r) => { res = r; });
   b.time = 74.96;

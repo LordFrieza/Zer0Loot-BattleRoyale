@@ -35,6 +35,7 @@ test('[LOOT-6, FRG-4] panoplies : taux d\'apparition et fusion de 3 pièces iden
   assert.ok(Math.abs(n / 5000 - Rules.SET_DROP_CHANCE.legendaire) < 0.03, `${n / 5000}`);
   const c = game.newCharacter();
   game.chooseClass(c, 'mage');
+  c.gold = 1e6;
   for (let k = 0; k < 20; k++) {
     c.inventory = [0, 1, 2].map(() => game.makeItem('rare', null, { set: 'ouragan' }));
     assert.strictEqual(game.fuse(c, c.inventory.map((i) => i.id)).item.set, 'ouragan');

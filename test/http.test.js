@@ -476,7 +476,7 @@ test('[GOLD-5, GOLD-1] Ruée vers l\'or : chacun garde son butin, +1 coffre au m
   const b = client();
   const ida = (await register(a, 'pl_gold_a')).id;
   const idb = (await register(b, 'pl_gold_b')).id;
-  await give(ida, { gold: 60 });
+  await give(ida, { gold: 90 });
   await a.post('/api/consumable/buy', { id: 'vie' });
   await a.post('/api/consumable/equip', { id: 'vie' });
   await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'gold' });
