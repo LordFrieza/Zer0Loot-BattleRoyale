@@ -35,8 +35,14 @@ const HEROES = 'heroes';
 const MONSTERS = 'monsters';
 
 class Battle extends EventEmitter {
-  constructor() {
+  /*
+   * opts.solo : partie du mode Solo (V2), { kind: 'expedition' | 'boss', level, difficulty } — un seul joueur,
+   * sans potion ; l'Expédition remplace les salles et le sondage du donjon par des profondeurs et des reliques.
+   */
+  constructor(opts = {}) {
     super();
+    this.solo = opts.solo || null;
+    this.speed = 1; // vitesse de la simulation (mode Solo : ×1 ou ×2)
     this.phase = 'idle'; // idle | queue | ready | battle | ended
     this.mode = 'br';
     this.bossId = 'troll'; // boss choisi par l'admin pour le Combat de Boss (voir Rules.BOSSES)
@@ -72,6 +78,7 @@ class Battle extends EventEmitter {
       event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
       result: this.result,
       poll: this.publicPoll(),
+      solo: this.soloInfo(),
     };
   }
 
@@ -172,6 +179,14 @@ class Battle extends EventEmitter {
     // Stats recalculées au lancement ; l'équipe choisie (Guerre des clans) est conservée.
     const list = [...this.participants.values()].map((p) => (refresh ? { ...refresh(p), clan: p.clan } : p));
     this.players = list.map((p) => this.makePlayer(p, event));
+    if (this.solo && this.solo.kind === 'expedition') {
+      for (const f of this.players) {
+        const cm = Rules.EXPEDITION.classMult[f.cls || 'none'] || Rules.EXPEDITION.classMult.none;
+        f.maxHp = Math.round(f.maxHp * cm.hp);
+        f.hp = f.maxHp;
+        f.damage *= cm.damage;
+      }
+    }
     this.fighters = [...this.players];
     this.boss = null;
     this.dungeon = null;
@@ -207,8 +222,9 @@ class Battle extends EventEmitter {
     } else {
       // Écran noir « SALLE 1 », puis les aventuriers entrent par la gauche.
       this.dungeon = {
-        room: 0, stage: 'dark', stageT: Rules.DUNGEON.stages.dark * 0.35, fightStart: 0, enraged: false,
+        room: 0, stage: 'dark', stageT: (this.solo ? Rules.EXPEDITION.stages : Rules.DUNGEON.stages).dark * 0.35, fightStart: 0, enraged: false,
         poll: null, lastPoll: null, boons: [], monsterMult: 1, rewardMult: 1, // sondages (voir DUNGEON_POLL)
+        cleared: 0, relics: [], relicChoice: null, // Expédition (mode Solo)
       };
       this.monsters = [];
       for (const p of this.players) { p.x = -60; p.y = ARENA.h / 2; }
@@ -217,7 +233,38 @@ class Battle extends EventEmitter {
     this.phase = 'battle';
     this.changed();
     this.emit('start', this.fighters);
-    this.interval = setInterval(() => this.tick(TICK_MS / 1000), TICK_MS);
+    this.interval = setInterval(() => this.loopStep(), TICK_MS);
+  }
+
+  // Un intervalle de la boucle : plusieurs pas de simulation en accéléré (mode Solo), chacun diffuse sa frame.
+  loopStep() {
+    for (let i = 0; i < (this.speed || 1) && this.phase === 'battle'; i++) this.tick(TICK_MS / 1000);
+  }
+
+  // Résumé du mode Solo pour l'affichage (null hors Solo).
+  soloInfo() {
+    if (!this.solo) return undefined;
+    const d = this.dungeon;
+    return {
+      kind: this.solo.kind,
+      speed: this.speed,
+      difficulty: this.solo.difficulty || undefined,
+      // Gains déjà assurés (Expédition) : les étages nettoyés
+      reward: this.solo.kind === 'expedition' && d ? Rules.expeditionReward(d.cleared, d.rewardMult) : undefined,
+    };
+  }
+
+  setSpeed(speed) {
+    this.speed = Rules.SOLO.speeds.includes(speed) ? speed : 1;
+    this.changed();
+  }
+
+  // Mode Solo : le joueur abandonne (l'Expédition rapporte les étages déjà nettoyés).
+  abandon() {
+    if (this.phase !== 'battle') return false;
+    this.abandoned = true;
+    this.finishCoop(false);
+    return true;
   }
 
   makePlayer(p, event) {
@@ -268,7 +315,7 @@ class Battle extends EventEmitter {
       staminaTime: s.staminaTime || Rules.STAMINA.baseTime.none,
       // Potion équipée pour cette partie (déclenchée au plus une fois)
       // Pas de potion dans le mode bonus (rien à consommer ni à afficher)
-      consumable: this.mode !== 'gold' && p.consumable && Rules.CONSUMABLES[p.consumable] ? p.consumable : null,
+      consumable: this.mode !== 'gold' && !this.solo && p.consumable && Rules.CONSUMABLES[p.consumable] ? p.consumable : null,
     });
   }
 
@@ -278,6 +325,12 @@ class Battle extends EventEmitter {
     const B = Rules.BOSSES[this.bossId];
     const avgLevel = this.players.reduce((a, p) => a + (p.level || 1), 0) / Math.max(1, this.players.length);
     const st = Rules.bossStats(this.players.length, B.id, avgLevel);
+    if (this.solo) { // Défi des boss : renforcé selon la difficulté choisie
+      const D = Rules.BOSS_CHALLENGE[this.solo.difficulty] || Rules.BOSS_CHALLENGE.normal;
+      const sc = Rules.BOSS_SOLO_SCALE[B.id];
+      st.maxHp = Math.round(st.maxHp * sc.hp * D.hp);
+      st.damage = Math.round(st.damage * sc.damage * D.damage * 10) / 10;
+    }
     const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
     this.players.forEach((f, i) => Object.assign(f, positions[i]));
     this.boss = fighter({
@@ -656,7 +709,8 @@ class Battle extends EventEmitter {
     const heroes = this.players.filter((p) => p.alive);
     const slots = spawnPositions(heroes.length, { x0: 80, y0: DUNGEON_TOP + 40, x1: 380, y1: ARENA.h - 50 });
     heroes.forEach((p, i) => {
-      if (d.room > 1) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * Rules.DUNGEON.healBetweenRooms);
+      const heal = this.solo ? Rules.EXPEDITION.healBetweenFloors : Rules.DUNGEON.healBetweenRooms;
+      if (d.room > 1) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * heal);
       p.slot = slots[i];
       p.x = -30 - Math.random() * 90;
       p.y = slots[i].y;
@@ -664,9 +718,9 @@ class Battle extends EventEmitter {
       p.targetKey = null;
     });
     // Le nombre de monstres dépend du nombre d'aventuriers au départ du raid.
-    const base = Rules.dungeonMultipliers(d.room);
+    const base = this.solo ? Rules.expeditionMultipliers(d.room, this.solo.level) : Rules.dungeonMultipliers(d.room);
     const mult = { hp: base.hp * d.monsterMult, damage: base.damage * d.monsterMult }; // « Quitte ou double »
-    const spec = Rules.dungeonRoom(d.room, this.players.length);
+    const spec = this.solo ? Rules.expeditionRoom(d.room) : Rules.dungeonRoom(d.room, this.players.length);
     const pos = spawnPositions(spec.length, { x0: 720, y0: DUNGEON_TOP + 40, x1: ARENA.w - 80, y1: ARENA.h - 50 });
     this.monsters = spec.map((s, i) => this.makeMonster(s.type, s.elite, mult, pos[i], i));
     this.fighters = this.players.concat(this.monsters);
@@ -710,7 +764,7 @@ class Battle extends EventEmitter {
   // Entrée dans la salle, pause après la victoire, sortie à droite, écran noir.
   tickDungeonStage(dt) {
     const d = this.dungeon;
-    const S = Rules.DUNGEON.stages;
+    const S = this.solo ? Rules.EXPEDITION.stages : Rules.DUNGEON.stages;
     d.stageT += dt;
     const heroes = this.players.filter((p) => p.alive);
     if (d.stage === 'enter') {
@@ -728,9 +782,15 @@ class Battle extends EventEmitter {
     } else if (d.stage === 'clear') {
       for (const p of heroes) if (p.regen) this.heal(p, p.maxHp * p.regen * dt);
       if (d.stageT >= S.clear) {
-        if (d.room % Rules.DUNGEON_POLL.every === 0) this.openPoll();
+        if (this.solo) {
+          if (d.room % Rules.EXPEDITION.relicEvery === 0) this.openRelics();
+          else this.setStage('exit');
+        } else if (d.room % Rules.DUNGEON_POLL.every === 0) this.openPoll();
         else this.setStage('exit');
       }
+    } else if (d.stage === 'relic') {
+      for (const p of heroes) if (p.regen) this.heal(p, p.maxHp * p.regen * dt);
+      if (d.stageT >= Rules.EXPEDITION.relicTimeout) this.chooseRelic(d.relicChoice[Math.floor(Math.random() * d.relicChoice.length)]);
     } else if (d.stage === 'poll') {
       // Les votes sont renvoyés aux pages au plus une fois par seconde.
       if (d.poll.dirty && this.time >= d.poll.pushAt) {
@@ -853,6 +913,47 @@ class Battle extends EventEmitter {
     const reward = { xp: (e.xpPerRoom || 0) * d.room, gold: (e.goldPerRoom || 0) * d.room, chests: e.chests || 0 };
     if (reward.xp || reward.gold || reward.chests) out.reward = reward;
     return out;
+  }
+
+  // ---------- Expédition (mode Solo) : reliques ----------
+
+  openRelics() {
+    const d = this.dungeon;
+    const hero = this.players[0];
+    const pool = Object.keys(Rules.RELICS).filter((id) => !Rules.RELICS[id].needsUlt || (hero && hero.ult));
+    const options = [];
+    while (options.length < Rules.EXPEDITION.relicChoices && pool.length) options.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    d.relicChoice = options;
+    this.setStage('relic');
+    this.events.push({ t: 'relics', options });
+    this.changed();
+  }
+
+  // Choix du joueur (ou tirage au sort à la fin du délai). Retourne la relique, ou null si refusée.
+  chooseRelic(id) {
+    const d = this.dungeon;
+    if (this.phase !== 'battle' || !d || d.stage !== 'relic' || !d.relicChoice.includes(id)) return null;
+    this.applyRelic(id);
+    d.relics.push(id);
+    d.relicChoice = null;
+    this.events.push({ t: 'relic', id });
+    this.setStage('exit');
+    this.changed();
+    return id;
+  }
+
+  applyRelic(id) {
+    const d = this.dungeon;
+    const e = Rules.RELICS[id].effect;
+    for (const p of this.players.filter((h) => h.alive)) {
+      const mods = { damage: e.damage, taken: e.taken, speed: e.speed, attackSpeed: e.attackSpeed, lifesteal: e.lifesteal, thorns: e.thorns, regen: e.regen };
+      if (Object.values(mods).some((v) => v)) this.addBuff(p, `relic_${id}_${d.relics.length}`, Infinity, { relic: true, ...mods });
+      if (e.crit) p.crit += e.crit;
+      if (e.heal) this.heal(p, p.maxHp * e.heal);
+      if (e.stamina && p.ult) p.stamina = Math.min(1, p.stamina + e.stamina);
+      if (e.life) { p.extraLives = (p.extraLives || 0) + 1; p.reviveRatio = e.life; }
+    }
+    if (e.reward) d.rewardMult *= e.reward;
   }
 
   // Au-delà de DUNGEON.enrageAt secondes dans une salle, les monstres frappent de plus en plus fort.
@@ -1369,6 +1470,7 @@ class Battle extends EventEmitter {
     if (!this.players.some((p) => p.alive)) this.finishCoop(false);
     else if (!this.monsters.some((m) => m.alive)) {
       this.events.push({ t: 'roomClear', room: this.dungeon.room });
+      this.dungeon.cleared = this.dungeon.room;
       this.setStage('clear');
     }
   }
@@ -1885,6 +1987,14 @@ class Battle extends EventEmitter {
 
   kill(killer, victim) {
     if (!victim.alive) return;
+    // Relique « Plume de phénix » (Expédition) : une vie en plus.
+    if (victim.extraLives > 0) {
+      victim.extraLives -= 1;
+      victim.hp = Math.max(1, Math.round(victim.maxHp * (victim.reviveRatio || 0.5)));
+      victim.stunUntil = 0;
+      this.events.push({ t: 'revive', to: victim.key });
+      return;
+    }
     // Plume de phénix : renaît une fois au lieu de tomber.
     const potion = victim.consumable && !victim.potionUsed && Rules.CONSUMABLES[victim.consumable];
     if (potion && potion.trigger === 'death') {
@@ -1975,9 +2085,25 @@ class Battle extends EventEmitter {
       ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, kills: f.kills, dealt: Math.round(f.dealt), alive: f.alive })),
       duration: Math.round(this.time),
     };
+    if (this.solo) {
+      this.result.solo = this.solo.kind;
+      if (this.abandoned) this.result.abandoned = true;
+    }
     if (this.mode === 'boss') {
       this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
       this.result.reward = victory ? { ...Rules.BOSSES[this.boss.bossId].reward } : null;
+      if (this.solo) {
+        const D = Rules.BOSS_CHALLENGE[this.solo.difficulty] || Rules.BOSS_CHALLENGE.normal;
+        this.result.difficulty = this.solo.difficulty;
+        this.result.reward = victory ? { ...D.reward } : null;
+      }
+    } else if (this.solo) {
+      const d = this.dungeon;
+      this.result.room = d.room;
+      this.result.depth = d.cleared;
+      this.result.relics = [...d.relics];
+      this.result.reward = Rules.expeditionReward(d.cleared, d.rewardMult);
+      if (d.rewardMult !== 1) this.result.rewardMult = Math.round(d.rewardMult * 1000) / 1000;
     } else {
       this.result.room = this.dungeon.room;
       this.result.reward = Rules.dungeonReward(this.dungeon.room, this.dungeon.rewardMult);
@@ -2040,7 +2166,11 @@ class Battle extends EventEmitter {
         room: d.room, stage: d.stage, stageT: Math.round(d.stageT * 100) / 100, enraged: d.enraged,
         poll: d.poll ? { options: this.pollCounts(), left: Math.max(0, Math.round((Rules.DUNGEON_POLL.duration - d.stageT) * 10) / 10) } : null,
         boons: d.boons, monsterMult: d.monsterMult, rewardMult: d.rewardMult,
+        cleared: this.solo ? d.cleared : undefined,
+        relics: this.solo ? d.relics : undefined,
+        relicChoice: d.relicChoice ? { options: d.relicChoice, left: Math.max(0, Math.round((Rules.EXPEDITION.relicTimeout - d.stageT) * 10) / 10) } : undefined,
       } : null,
+      solo: this.soloInfo(),
       zones: (this.zones || []).map((z) => ({
         kind: z.kind, x: Math.round(z.x), y: Math.round(z.y), r: z.r,
         p: z.kind === 'poison' ? Math.round((z.t / z.life) * 100) / 100 : Math.round((1 - z.t / z.warn) * 100) / 100,
@@ -2110,7 +2240,7 @@ function fighter(fields) {
 // Effets visibles d'un combattant (pour l'affichage) : potions, ultimes, gel, invisibilité.
 function fxOf(f, time) {
   if (!f.alive) return undefined;
-  const fx = f.buffs.filter((b) => !b.boon).map((b) => b.kind); // les bonus de sondage s'affichent dans le bandeau du donjon
+  const fx = f.buffs.filter((b) => !b.boon && !b.relic).map((b) => b.kind); // les bonus de sondage s'affichent dans le bandeau du donjon
   if (time < f.stunUntil) fx.push(f.stunKind || 'frozen');
   if (f.buffs.some((b) => b.invisible)) fx.push('invisible');
   return fx.length ? fx : undefined;

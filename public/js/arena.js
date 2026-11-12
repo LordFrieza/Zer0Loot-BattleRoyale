@@ -588,8 +588,15 @@
         } else if (e.t === 'roomClear') {
           const reward = Rules.dungeonReward(e.room + 1);
           const next = (e.room + 1) % 5 === 0 && reward ? `Prochaine salle : palier de récompense !` : 'En route vers la salle suivante…';
-          this.announces.push({ text: `SALLE ${e.room} TERMINÉE !`, sub: next, subSize: 24, color: '#3ddc5a', life: 2.4, age: 0 });
+          if (f.solo) {
+            const relic = e.room % Rules.EXPEDITION.relicEvery === 0;
+            this.announces.push({ text: `PROFONDEUR ${e.room} NETTOYÉE !`, sub: relic ? '🔮 Une relique apparaît…' : 'On descend encore…', subSize: 24, color: '#b98cff', life: 1.6, age: 0 });
+          } else this.announces.push({ text: `SALLE ${e.room} TERMINÉE !`, sub: next, subSize: 24, color: '#3ddc5a', life: 2.4, age: 0 });
           if (window.Sound) Sound.play('roomClear');
+        } else if (e.t === 'relic' && Rules.RELICS[e.id]) {
+          const R = Rules.RELICS[e.id];
+          this.announces.push({ text: `${R.icon} ${R.label.toUpperCase()}`, sub: R.desc, subSize: 24, color: '#ffd98a', life: 2, age: 0 });
+          if (window.Sound) Sound.play('reroll');
         } else if (e.t === 'ult' && from) {
           this.onUlt(e, from, byKey);
         } else if (e.t === 'potion' && to) {
@@ -731,9 +738,10 @@
       if (!this.drawLogo(W / 2, H / 2, 260, 1, 30 + Math.sin(t / 600) * 14)) this.title('ZER0LOOT', H / 2, 110, '#fff');
       this.ctx.globalAlpha = Math.random() < 0.015 ? 0.5 : 1; // petit grésillement de néon
       const training = this.queue && this.queue.training;
-      this.title(training ? 'ENTRAÎNEMENT' : 'BATTLE ROYALE', H / 2 + 185, 46, '#fff', '#ff3fd8');
+      const solo = this.queue && this.queue.soloView;
+      this.title(solo ? 'MODE SOLO' : training ? 'ENTRAÎNEMENT' : 'BATTLE ROYALE', H / 2 + 185, 46, '#fff', '#ff3fd8');
       this.ctx.globalAlpha = 0.6 + Math.sin(t / 500) * 0.3;
-      this.title(training ? 'Choisis un adversaire et lance le duel' : 'En attente du prochain combat…', H / 2 + 245, 24, '#cfc6ff', '#29e7ff');
+      this.title(solo ? 'Choisis une aventure et lance-toi !' : training ? 'Choisis un adversaire et lance le duel' : 'En attente du prochain combat…', H / 2 + 245, 24, '#cfc6ff', '#29e7ff');
       this.ctx.globalAlpha = 1;
     }
 
@@ -1170,7 +1178,9 @@
       const clock = `⏱ ${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`;
       ctx.textAlign = 'left';
       let hudY = 84;
-      if (f.mode === 'dungeon' && f.dungeon) {
+      if (f.mode === 'dungeon' && f.dungeon && f.solo) {
+        hudY = this.drawExpeditionHud(f, clock);
+      } else if (f.mode === 'dungeon' && f.dungeon) {
         this.hudBox(16, 16, 250, 92, '#5fd3ff');
         ctx.font = '900 28px Orbitron, "Segoe UI", system-ui, sans-serif';
         ctx.fillStyle = '#ffc21a';
@@ -1867,7 +1877,8 @@
      * puis retour de la lumière quand ils entrent par la gauche.
      */
     drawRoomTransition(dg) {
-      const S = Rules.DUNGEON.stages;
+      const solo = this.frame && this.frame.solo;
+      const S = solo ? Rules.EXPEDITION.stages : Rules.DUNGEON.stages;
       const st = dg.stageT + Math.min(0.06, (performance.now() - this.frameAt) / 1000);
       let black = 0;
       let showText = false;
@@ -1886,6 +1897,15 @@
         ctx.translate(W / 2, H / 2);
         ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k);
         ctx.translate(-W / 2, -H / 2);
+        if (solo) {
+          this.title(`PROFONDEUR ${room}`, H / 2 - 20, 100, '#b98cff', '#7a3cff');
+          let sub = room === 1 ? 'L\'expédition commence…' : 'Les monstres sont plus coriaces…';
+          if (room % Rules.ELITE.every === 0) sub = '👑 Un chef rôde à cette profondeur !';
+          this.title(sub, H / 2 + 60, 28, '#fff', '#b83cff');
+          if (room % Rules.EXPEDITION.relicEvery === 0) this.title('🔮 Une relique t\'attend au bout de cet étage', H / 2 + 108, 22, '#ffd98a', '#ff9a00');
+          ctx.restore();
+          return;
+        }
         this.title(`SALLE ${room}`, H / 2 - 20, 110, '#ffc21a', '#ff9a00');
         const zone = Rules.DUNGEON_THEMES[Rules.dungeonTheme(room)];
         const P = DUNGEON_PALETTES[Rules.dungeonTheme(room)];
@@ -2262,6 +2282,7 @@
     drawResult(t) {
       const r = this.queue && this.queue.result;
       if (!r) return;
+      if (r.solo) { this.drawSoloResult(t, r); return; }
       if (r.mode === 'boss' || r.mode === 'dungeon') { this.drawCoopResult(t, r); return; }
       if (r.mode === 'clans') { this.drawClansResult(t, r); return; }
       if (r.mode === 'gold') { this.drawGoldResult(t, r); return; }
@@ -2295,6 +2316,87 @@
           : `💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds !`;
         this.label(text, W / 2, 700, 20, '#ffb000');
       }
+    }
+
+    // Expédition (mode Solo) : profondeur, reliques ramassées, gains déjà assurés.
+    drawExpeditionHud(f, clock) {
+      const ctx = this.ctx;
+      const dg = f.dungeon;
+      this.hudBox(16, 16, 270, 96, '#9b59ff');
+      ctx.font = '900 26px Orbitron, "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#c9a8ff';
+      ctx.fillText(`🕳️ Profondeur ${Math.max(1, dg.room)}`, 30, 44);
+      ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
+      const rw = f.solo.reward;
+      ctx.fillStyle = '#3ddc5a';
+      ctx.fillText(rw ? `🎁 ${rw.gold} golds · ${rw.xp} XP${rw.chests ? ` · ${rw.chests} 🎁` : ''}` : '🎁 Nettoie un étage pour gagner', 30, 72);
+      ctx.fillStyle = dg.enraged ? '#ff8fa3' : '#cfc6ff';
+      ctx.fillText(`${clock}${f.solo.speed > 1 ? `  ⏩ ×${f.solo.speed}` : ''}${dg.enraged ? '  😡' : ''}`, 30, 98);
+      let y = 120;
+      const relics = dg.relics || [];
+      if (relics.length) {
+        const counts = {};
+        for (const id of relics) counts[id] = (counts[id] || 0) + 1;
+        const ids = Object.keys(counts);
+        this.hudBox(16, y, 270, 14 + Math.ceil(ids.length / 6) * 36, '#ffd98a');
+        ctx.font = '24px "Segoe UI Emoji", "Segoe UI", sans-serif';
+        ids.forEach((id, i) => {
+          const x = 30 + (i % 6) * 42;
+          const yy = y + 34 + Math.floor(i / 6) * 36;
+          ctx.fillText(Rules.RELICS[id].icon, x, yy);
+          if (counts[id] > 1) { ctx.font = '800 12px "Segoe UI", sans-serif'; ctx.fillStyle = '#ffd98a'; ctx.fillText('×' + counts[id], x + 22, yy + 4); ctx.font = '24px "Segoe UI Emoji", "Segoe UI", sans-serif'; }
+        });
+        y += 18 + Math.ceil(ids.length / 6) * 36;
+      }
+      return y;
+    }
+
+    drawSoloResult(t, r) {
+      const ctx = this.ctx;
+      let a = 1;
+      if (r.mode === 'boss' && r.victory && this.bossDeath) a = Math.max(0, Math.min(1, (this.bossDeath.t - 2.8) / 0.6));
+      if (a <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(0,0,0,.62)';
+      ctx.fillRect(0, 0, W, H);
+      const s = 1 + Math.sin(t / 300) * 0.03;
+      ctx.save();
+      ctx.translate(W / 2, 140); ctx.scale(s, s); ctx.translate(-W / 2, -140);
+      if (r.solo === 'expedition') {
+        this.title(`🕳️ PROFONDEUR ${r.depth} ATTEINTE`, 140, 56, '#c9a8ff', '#7a3cff');
+      } else {
+        const short = (Rules.BOSSES[r.boss.id] || Rules.BOSS).short.toUpperCase();
+        if (r.victory) this.title(`🏆 ${short} EST VAINCU ! 🏆`, 140, 56, '#ffc21a', '#ff9a00');
+        else this.title(`💀 ${short} A GAGNÉ…`, 140, 56, '#ff4d6d', '#ff2a2a');
+      }
+      ctx.restore();
+      let sub;
+      if (r.solo === 'expedition') {
+        sub = r.abandoned ? 'Tu es remonté à la surface avec ton butin.' : `Tombé à la profondeur ${r.room} après ${formatCountdown(r.duration * 1000)}.`;
+      } else {
+        const D = Rules.BOSS_CHALLENGE[r.difficulty];
+        sub = r.victory
+          ? `Défi ${D.label} ${D.icon} réussi en ${formatCountdown(r.duration * 1000)} !`
+          : r.abandoned ? 'Tu as abandonné le défi.' : `Il lui restait ${Math.round((r.boss.hp / r.boss.maxHp) * 100)} % de vie (${D.label}).`;
+      }
+      this.title(sub, 220, 26, '#fff', '#b83cff');
+      if (r.reward) {
+        const gains = [r.reward.chests ? `+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}` : '', `+${r.reward.xp} XP`, `+${r.reward.gold} golds`].filter(Boolean).join(' · ');
+        this.title(`🎁 ${gains}`, 290, 34, '#3ddc5a', '#3ddc5a');
+      } else {
+        this.title(r.solo === 'expedition' ? 'Aucun étage nettoyé : pas de butin cette fois.' : 'Pas de récompense cette fois. Retente ta chance !', 290, 24, '#cfc6ff', '#b83cff');
+      }
+      if (r.relics && r.relics.length) {
+        this.title('Reliques de l\'expédition', 370, 22, '#ffd98a', '#ff9a00');
+        ctx.font = '34px "Segoe UI Emoji", "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        const n = r.relics.length;
+        r.relics.forEach((id, i) => ctx.fillText(Rules.RELICS[id].icon, W / 2 + (i - (n - 1) / 2) * 46, 420));
+      }
+      const hero = this.frame && this.frame.fighters.find((x) => x.kind === 'player');
+      if (hero) drawFighter(ctx, W / 2, 560, { ...hero }, { scale: 2.6, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
+      ctx.restore();
     }
 
     // Écran de fin des modes coopératifs : victoire / défaite commune, récompense et meilleurs combattants.

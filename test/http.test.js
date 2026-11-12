@@ -8,7 +8,7 @@ const { before, after } = test;
 const { Rules, db, game } = require('./helpers');
 
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
-const { server, io, battle, chatCommand } = require('../server/index');
+const { server, io, battle, chatCommand, solos, refundSoloRuns } = require('../server/index');
 
 let base = '';
 
@@ -708,6 +708,79 @@ test('[LOOK-5, LOOK-8] bots sans skin interdit ; visage dessiné : enregistremen
   assert.strictEqual((await client().get('/api/drawing/' + id)).status, 404);
   const ch = (await meOf(d)).character;
   assert.deepStrictEqual([ch.drawing, ch.look.drawing, ch.owned.includes('dessin')], ['', null, true]);
+});
+
+test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ADM-3] mode Solo via l\'API : énergie, expédition, défi, redémarrage', async () => {
+  const s = client();
+  const id = (await register(s, 'pl_solo_v2')).id;
+  assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /classe/);
+  await s.post('/api/class', { cls: 'mage' });
+  assert.match((await s.post('/api/solo/start', { kind: 'nage' })).data.error, /inconnu/);
+  assert.match((await s.post('/api/solo/start', { kind: 'boss', boss: 'licorne' })).data.error, /Boss inconnu/);
+  assert.match((await s.post('/api/solo/start', { kind: 'boss', difficulty: 'facile' })).data.error, /Difficulté inconnue/);
+  assert.strictEqual((await meOf(s)).character.energyState.value, 3);
+
+  // Expédition : potion gardée, vitesse, abandon avec le butin des profondeurs nettoyées
+  const user = db.state.users[id];
+  user.character.consumables = { vie: 1 };
+  user.character.consumableSlot = 'vie';
+  const r = await s.post('/api/solo/start', { kind: 'expedition', speed: 2 });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.data));
+  assert.strictEqual(r.data.energy.value, 2);
+  const b = solos.get(id);
+  b.stopLoop();
+  assert.strictEqual(b.speed, 2);
+  assert.strictEqual(b.players[0].consumable, null);
+  assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /déjà/);
+  assert.match((await s.post('/api/solo/relic', { id: 'fiole' })).data.error, /pas proposée/);
+  assert.strictEqual((await s.post('/api/solo/speed', { speed: 3 })).status, 400);
+  assert.strictEqual((await s.post('/api/solo/speed', { speed: 1 })).data.speed, 1);
+  const st = (await s.get('/api/solo/state')).data;
+  assert.strictEqual(st.queue.solo.kind, 'expedition');
+  for (let i = 0; i < 20 * 120 && b.dungeon.cleared < 2; i++) {
+    if (b.dungeon.stage === 'fight') for (const m of b.monsters) if (m.alive) b.kill(b.players[0], m);
+    if (b.dungeon.stage === 'relic') b.chooseRelic(b.dungeon.relicChoice[0]);
+    b.tick(0.05);
+  }
+  const before = (await meOf(s)).character;
+  assert.ok(before.soloActive);
+  assert.strictEqual((await s.post('/api/solo/abandon')).status, 200);
+  let ch = (await meOf(s)).character;
+  const rw = Rules.expeditionReward(2);
+  assert.strictEqual(ch.gold, before.gold + rw.gold);
+  assert.deepStrictEqual([ch.counters.expeditionBest, ch.soloActive, ch.consumableSlot], [2, null, 'vie'], 'record, partie terminée, potion intacte');
+  assert.strictEqual(solos.has(id), false);
+  assert.strictEqual((await s.post('/api/solo/abandon')).status, 400);
+
+  // Défi des boss : le Magicien vaincu seul → exploit et butin
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'boss', boss: 'sorcier', difficulty: 'normal' })).status, 200);
+  const bb = solos.get(id);
+  bb.stopLoop();
+  bb.kill(bb.players[0], bb.boss);
+  bb.tick(0.05);
+  ch = (await meOf(s)).character;
+  assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value], [1, before.gold + rw.gold + 250, 1]);
+
+  // Redémarrage pendant une partie : énergie rendue
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'expedition' })).status, 200);
+  const run = solos.get(id);
+  run.stopLoop();
+  run.removeAllListeners();
+  solos.delete(id);
+  assert.strictEqual(game.energyOf(user.character).value, 0);
+  assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /déjà/, 'partie encore marquée en cours');
+  assert.strictEqual(refundSoloRuns(), 1);
+  ch = (await meOf(s)).character;
+  assert.deepStrictEqual([ch.energyState.value, ch.soloActive], [1, null]);
+  // Sans énergie
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'expedition' })).status, 200);
+  const last = solos.get(id);
+  last.stopLoop();
+  last.abandon();
+  assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /Plus d'énergie/);
+  // L'admin peut rendre de l'énergie (sans dépasser le maximum)
+  assert.strictEqual((await give(id, { energy: 9 })).status, 200);
+  assert.strictEqual((await meOf(s)).character.energyState.value, 3);
 });
 
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {

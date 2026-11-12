@@ -59,6 +59,7 @@ function render() {
   renderPresets();
   renderTalents();
   renderCombatStyle();
+  renderSolo();
   if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
   renderBadges();
   $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
@@ -617,6 +618,172 @@ function renderCombatStyle() {
   }
 }
 
+// ---------- Mode Solo ----------
+const soloBus = { h: {}, on(ev, fn) { (this.h[ev] = this.h[ev] || []).push(fn); }, emit(ev, d) { (this.h[ev] || []).forEach((fn) => fn(d)); } };
+let soloView = null;
+let soloQueue = null;
+let soloFrame = null;
+let soloBoss = 'troll';
+let soloDiff = 'normal';
+let soloSpeed = (() => { try { return Number(localStorage.getItem('zl_solo_speed')) || 1; } catch (e) { return 1; } })();
+
+function ensureSoloView() {
+  if (soloView) return;
+  soloView = new ArenaView($('solo-arena'), soloBus);
+  soloBus.emit('queue', { phase: 'idle', mode: 'dungeon', soloView: true, participants: [], result: null });
+}
+
+function energyText(st) {
+  if (st.nextAt === null) return 'pleine';
+  const ms = Math.max(0, st.nextAt - Date.now());
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  return `+1 dans ${h} h ${String(m).padStart(2, '0')}`;
+}
+
+// Énergie recalculée côté client entre deux mises à jour du serveur (même formule que le serveur).
+function myEnergy() {
+  return Rules.energyState(me.character.energy, Date.now());
+}
+
+function renderEnergy() {
+  if (!me || !me.character) return;
+  const st = myEnergy();
+  const max = Rules.SOLO.energyMax;
+  $('energy-chip').innerHTML = `⚡ ${st.value}/${max}`;
+  $('energy-chip').title = `Énergie du mode Solo : ${st.value}/${max} (${energyText(st)})`;
+  $('energy-bar').innerHTML = `<div class="pips">${Array.from({ length: max }, (_, i) => `<span class="pip ${i < st.value ? 'on' : ''}">⚡</span>`).join('')}</div>
+    <div><b>${st.value} / ${max}</b> énergie${st.value > 1 ? 's' : ''} · <span class="muted">${st.nextAt === null ? 'Énergie au maximum' : `Prochaine recharge dans ${energyText(st).replace('+1 dans ', '')}`}</span></div>`;
+  const busy = soloRunning();
+  const none = st.value < 1;
+  for (const id of ['exp-start', 'boss-start']) {
+    $(id).disabled = busy || none || !me.character.cls;
+    $(id).title = !me.character.cls ? 'Choisis d\'abord une classe' : busy ? 'Une partie solo est déjà en cours' : none ? 'Plus d\'énergie' : '';
+  }
+}
+
+function soloRunning() {
+  return !!(soloQueue && soloQueue.phase === 'battle') || !!(me && me.character.soloActive);
+}
+
+function renderSolo() {
+  const c = me.character;
+  renderEnergy();
+  $('exp-rewards').innerHTML = '<b>Butin selon la profondeur :</b> ' + [5, 10, 20, 30].map((n) => {
+    const r = Rules.expeditionReward(n);
+    return `<span class="chip-info">${n} : ${r.gold} 🪙 · ${r.xp} XP · ${r.chests} 🎁</span>`;
+  }).join(' ');
+  const best = c.counters.expeditionBest || 0;
+  const mask = Rules.COSMETICS.masque_abysses.unlock.goal;
+  $('exp-record').innerHTML = `🏅 Record : <b>profondeur ${best}</b>${best < mask ? ` · <span class="muted">profondeur ${mask} pour débloquer le Masque des abysses</span>` : ' · 🎭 Masque des abysses débloqué !'}`;
+  $('solo-boss-pick').innerHTML = Object.entries(Rules.BOSSES).map(([id, B]) => {
+    const won = c.counters[Rules.SOLO_BOSS_COUNTER[id]] > 0;
+    return `<button class="solo-boss ${soloBoss === id ? 'active' : ''}" data-sboss="${id}" style="--c:${B.color}">
+      <span class="ic">${B.icon}</span><b>${esc(B.name)}</b>${won ? '<span class="won" title="Déjà vaincu seul">🏆</span>' : ''}</button>`;
+  }).join('');
+  $('solo-boss-pick').querySelectorAll('[data-sboss]').forEach((b) => { b.onclick = () => { soloBoss = b.dataset.sboss; renderSolo(); }; });
+  $('solo-diff-pick').innerHTML = Object.entries(Rules.BOSS_CHALLENGE).map(([id, D]) => `<button class="solo-diff ${soloDiff === id ? 'active' : ''}" data-sdiff="${id}">
+      <b>${D.icon} ${D.label}</b><small>Boss ×${String(D.hp).replace('.', ',')} vie · ×${String(D.damage).replace('.', ',')} dégâts</small>
+      <small class="up">${D.reward.gold} 🪙 · ${D.reward.xp} XP · ${D.reward.chests} 🎁</small></button>`).join('');
+  $('solo-diff-pick').querySelectorAll('[data-sdiff]').forEach((b) => { b.onclick = () => { soloDiff = b.dataset.sdiff; renderSolo(); }; });
+  renderSoloRun();
+}
+
+function renderSoloRun() {
+  const running = soloQueue && soloQueue.phase === 'battle';
+  const ended = soloQueue && soloQueue.phase === 'ended';
+  $('solo-run').classList.toggle('show', !!(running || ended));
+  document.querySelectorAll('#solo-run [data-speed]').forEach((b) => {
+    const sp = soloQueue && soloQueue.solo ? soloQueue.solo.speed : soloSpeed;
+    b.classList.toggle('active', Number(b.dataset.speed) === sp);
+    b.disabled = !running;
+  });
+  $('solo-abandon').disabled = !running;
+  let status = '';
+  if (soloQueue && soloQueue.solo) {
+    const info = soloQueue.solo;
+    if (info.kind === 'expedition') status = running ? '🕳️ Expédition en cours' : '🕳️ Expédition terminée';
+    else {
+      const B = Rules.BOSSES[soloQueue.boss] || Rules.BOSS;
+      const D = Rules.BOSS_CHALLENGE[info.difficulty];
+      status = `${B.icon} Défi : ${esc(B.name)} — ${D.icon} ${D.label}${running ? '' : ' (terminé)'}`;
+    }
+  }
+  $('solo-status').innerHTML = status;
+  renderRelicChoice();
+}
+
+function renderRelicChoice() {
+  const dg = soloFrame && soloFrame.phase === 'battle' && soloFrame.dungeon;
+  const choice = dg && dg.relicChoice;
+  const box = $('relic-choice');
+  if (!choice) { box.classList.remove('show'); box.dataset.key = ''; return; }
+  const key = choice.options.join(',') + dg.room;
+  $('relic-left') && ($('relic-left').textContent = Math.ceil(choice.left) + ' s');
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.innerHTML = `<div class="relic-title">🔮 Choisis une relique <span id="relic-left">${Math.ceil(choice.left)} s</span></div>
+    <div class="relic-cards">${choice.options.map((id) => {
+      const R = Rules.RELICS[id];
+      return `<button class="relic-card" data-relic="${id}"><span class="ic">${R.icon}</span><b>${esc(R.label)}</b><small>${esc(R.desc)}</small></button>`;
+    }).join('')}</div><div class="muted" style="font-size:12px">Sans choix, une relique est tirée au hasard.</div>`;
+  box.classList.add('show');
+  Sound.play('chestAppear');
+  box.querySelectorAll('[data-relic]').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await api('/api/solo/relic', { id: b.dataset.relic });
+        Sound.play('reroll');
+        box.classList.remove('show');
+      } catch (err) { toast('⚠️ ' + err.message); }
+    };
+  });
+}
+
+async function startSolo(body) {
+  try {
+    ensureSoloView();
+    await api('/api/solo/start', { ...body, speed: soloSpeed });
+    Sound.play('chestHit', 3);
+    $('solo-run').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (err) {
+    toast('⚠️ ' + err.message);
+  }
+}
+
+$('exp-start').onclick = () => startSolo({ kind: 'expedition' });
+$('boss-start').onclick = () => startSolo({ kind: 'boss', boss: soloBoss, difficulty: soloDiff });
+document.querySelectorAll('#solo-run [data-speed]').forEach((b) => {
+  b.onclick = async () => {
+    soloSpeed = Number(b.dataset.speed);
+    try { localStorage.setItem('zl_solo_speed', String(soloSpeed)); } catch (e) { /* ignore */ }
+    try { await api('/api/solo/speed', { speed: soloSpeed }); } catch (err) { toast('⚠️ ' + err.message); }
+  };
+});
+$('solo-abandon').onclick = async () => {
+  const exp = soloQueue && soloQueue.solo && soloQueue.solo.kind === 'expedition';
+  if (!confirm(exp ? 'Remonter à la surface ? Tu gardes le butin des étages déjà nettoyés.' : 'Abandonner le défi ? Tu ne gagneras rien.')) return;
+  try { await api('/api/solo/abandon', {}); } catch (err) { toast('⚠️ ' + err.message); }
+};
+
+async function loadSoloState() {
+  try {
+    const st = await api('/api/solo/state');
+    ensureSoloView();
+    onSoloQueue(st.queue);
+    if (st.frame) { soloFrame = st.frame; soloBus.emit('frame', st.frame); }
+  } catch (e) { /* ignore */ }
+}
+
+function onSoloQueue(q) {
+  soloQueue = q;
+  ensureSoloView();
+  soloBus.emit('queue', { ...q, soloView: true });
+  if (me) renderSolo();
+}
+
+setInterval(() => { if (me) { renderEnergy(); renderRelicChoice(); } }, 1000);
+
 // ---------- Entraînement ----------
 // Mini-bus d'événements : l'arène d'entraînement reçoit ses images comme l'arène du stream reçoit les siennes.
 const trainingBus = { h: {}, on(ev, fn) { (this.h[ev] = this.h[ev] || []).push(fn); }, emit(ev, d) { (this.h[ev] || []).forEach((fn) => fn(d)); } };
@@ -1050,7 +1217,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'entrainement', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'solo', 'entrainement', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1080,6 +1247,7 @@ function renderBadges() {
   set('inventaire', c.chests);
   set('arbre', Math.max(0, c.talentState.available));
   set('combat', Math.max(0, Rules.techSlots(c.level) - c.techs.length));
+  set('solo', c.cls && !c.soloActive ? Rules.energyState(c.energy, Date.now()).value : 0);
   set('succes', claim);
 }
 
@@ -1719,11 +1887,11 @@ const REWARD_LABELS = {
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
   boss: '👹 BOSS VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
-  clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin de la Ruée vers l\'or :',
+  solo_boss: '👹 Défi des boss réussi !', clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin de la Ruée vers l\'or :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
-  boss: 'victory', dungeon: 'victory', poll: 'reward', clans: 'victory', mvp: 'reward', gold: 'victory',
+  boss: 'victory', dungeon: 'victory', solo_boss: 'victory', solo_expedition: 'victory', poll: 'reward', clans: 'victory', mvp: 'reward', gold: 'victory',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
 socket.on('trainingQueue', (q) => {
@@ -1739,6 +1907,8 @@ socket.on('trainingQueue', (q) => {
   }
 });
 socket.on('trainingFrame', (f) => trainingBus.emit('frame', f));
+socket.on('soloQueue', onSoloQueue);
+socket.on('soloFrame', (f) => { soloFrame = f; soloBus.emit('frame', f); });
 socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
 socket.on('bet', (r) => {
   lastBetResult = r;
@@ -1753,7 +1923,8 @@ socket.on('reward', (r) => {
   const gains = [`+${r.reward.xp} XP`];
   if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
   if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
-  const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !` : REWARD_LABELS[r.type];
+  const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !`
+    : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !` : REWARD_LABELS[r.type];
   toast(`${label} ${gains.join(', ')}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });
@@ -1766,6 +1937,7 @@ socket.on('reward', (r) => {
     location.href = '/';
     return;
   }
+  loadSoloState();
   loadLeaderboard();
   const params = new URLSearchParams(location.search);
   if (params.get('twitch') === 'ok') toast('✅ Compte Twitch lié !');

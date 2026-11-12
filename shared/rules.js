@@ -1062,6 +1062,124 @@
     return null;
   }
 
+
+  // ---------- Mode Solo (V2) ----------
+  /*
+   * Énergie : 3 au maximum, +1 toutes les 10 h ; une tentative (Expédition ou Défi des boss) coûte 1 énergie.
+   * Les parties solo sont simulées à part (comme l'entraînement), sans potion, et ne sont vues que par le joueur.
+   */
+  const SOLO = {
+    energyMax: 3,
+    energyEveryMs: 10 * 3600 * 1000,
+    maxConcurrent: 30,
+    speeds: [1, 2],
+    maxDuration: 20 * 60, // garde-fou (s) : au-delà, l'expédition s'arrête avec ses gains
+  };
+
+  // Énergie après recharge : { value, at } → { value, at, nextAt } (at = début de la recharge en cours).
+  function energyState(energy, now) {
+    const e = energy && Number.isFinite(energy.value) ? energy : { value: SOLO.energyMax, at: now };
+    let value = Math.max(0, Math.min(SOLO.energyMax, e.value));
+    let at = Number.isFinite(e.at) ? Math.min(e.at, now) : now;
+    if (value >= SOLO.energyMax) return { value: SOLO.energyMax, at: now, nextAt: null };
+    const gained = Math.floor((now - at) / SOLO.energyEveryMs);
+    value = Math.min(SOLO.energyMax, value + gained);
+    at += gained * SOLO.energyEveryMs;
+    if (value >= SOLO.energyMax) return { value, at: now, nextAt: null };
+    return { value, at, nextAt: at + SOLO.energyEveryMs };
+  }
+
+  /*
+   * Expédition : descente sans fin dans les profondeurs, seul. Les monstres se renforcent à chaque étage
+   * (et un peu avec le niveau du joueur) ; toutes les 3 profondeurs, le joueur choisit une relique parmi 3,
+   * qui reste active jusqu'à la fin de l'expédition. Récompense selon le nombre d'étages nettoyés.
+   */
+  const EXPEDITION = {
+    baseHp: 0.55, // vie et dégâts des monstres à la profondeur 1 (× les stats de Rules.MONSTERS)
+    baseDamage: 0.5,
+    countBase: 2, // monstres à la profondeur 1…
+    countPerFloor: 0.14, // … puis +0,14 par profondeur
+    maxMonsters: 12,
+    hpGrowth: 1.1, // vie des monstres × 1,1 à chaque profondeur (croissance exponentielle : chacun finit par tomber)
+    damageGrowth: 1.07,
+    levelHp: 0.006, // +0,6 % de vie des monstres par niveau du joueur au-delà du 1…
+    levelDamage: 0.004, // … et +0,4 % de dégâts
+    levelCap: 2.6, // multiplicateur de niveau plafonné
+    healBetweenFloors: 0.35,
+    stages: { enter: 1.2, clear: 0.9, exit: 1.2, dark: 1.1 }, // transitions plus courtes que le Raid de Donjon
+    relicEvery: 3,
+    relicChoices: 3,
+    relicTimeout: 30, // s : passé ce délai, une relique est choisie au hasard
+    // Seul face aux monstres, le corps à corps est désavantagé (pas de groupe pour encaisser) : vie et dégâts
+    // ajustés par classe pendant l'Expédition, pour que chaque classe descende à peu près aussi loin.
+    classMult: {
+      guerrier: { hp: 1.6, damage: 1.85 }, archer: { hp: 1, damage: 1 }, mage: { hp: 1, damage: 1 },
+      assassin: { hp: 1.9, damage: 1.7 }, pretre: { hp: 1.5, damage: 1.8 }, none: { hp: 1, damage: 1 },
+    },
+  };
+  function expeditionRoom(depth) {
+    const types = Object.keys(MONSTERS).filter((t) => MONSTERS[t].from <= depth);
+    const count = Math.min(EXPEDITION.maxMonsters, Math.round(EXPEDITION.countBase + EXPEDITION.countPerFloor * (depth - 1)));
+    const list = [];
+    if (depth % ELITE.every === 0) list.push({ type: types[Math.floor(Math.random() * types.length)], elite: true });
+    while (list.length < count) list.push({ type: types[Math.floor(Math.random() * types.length)], elite: false });
+    return list;
+  }
+  function expeditionMultipliers(depth, level = 1) {
+    const lv = Math.max(0, (level || 1) - 1);
+    return {
+        hp: EXPEDITION.baseHp * EXPEDITION.hpGrowth ** (depth - 1) * Math.min(EXPEDITION.levelCap, 1 + EXPEDITION.levelHp * lv),
+      damage: EXPEDITION.baseDamage * EXPEDITION.damageGrowth ** (depth - 1) * Math.min(EXPEDITION.levelCap, 1 + EXPEDITION.levelDamage * lv),
+    };
+  }
+  // Récompense pour `floors` étages nettoyés (× `mult` avec la relique Trésor) : 1 coffre tous les 5 étages.
+  function expeditionReward(floors, mult = 1) {
+    const n = Math.max(0, Math.floor(floors || 0));
+    if (!n) return null;
+    return {
+      floors: n,
+      xp: Math.round((25 * n + 2 * n * n) * mult),
+      gold: Math.round((20 * n + 1.5 * n * n) * mult),
+      chests: Math.floor(n / 5),
+    };
+  }
+  /*
+   * Reliques de l'Expédition (permanentes jusqu'à la fin de l'expédition, cumulables).
+   * effect : damage / taken / speed / attackSpeed (multiplicateurs), lifesteal / thorns / regen / crit (ajouts),
+   * heal (soin immédiat, part de la vie max), stamina (barre d'ultime), life (une vie en plus), reward (gains ×).
+   */
+  const RELICS = {
+    lame_runique: { label: 'Lame runique', icon: '🗡️', desc: '+15 % de dégâts', effect: { damage: 1.15 } },
+    peau_pierre: { label: 'Peau de pierre', icon: '🪨', desc: '−12 % de dégâts subis', effect: { taken: 0.88 } },
+    bottes_vent: { label: 'Bottes du vent', icon: '🌪️', desc: '+15 % de vitesse', effect: { speed: 1.15 } },
+    sablier: { label: 'Sablier fêlé', icon: '⏳', desc: '+15 % de vitesse d\'attaque', effect: { attackSpeed: 1.15 } },
+    calice: { label: 'Calice de sang', icon: '🍷', desc: '+6 % de vol de vie', effect: { lifesteal: 0.06 } },
+    ronces: { label: 'Couronne de ronces', icon: '🌹', desc: 'Renvoie 15 % des dégâts subis', effect: { thorns: 0.15 } },
+    coeur_troll: { label: 'Cœur de troll', icon: '💚', desc: 'Régénère 1 % de vie par seconde', effect: { regen: 0.01 } },
+    oeil_aigle: { label: 'Œil d\'aigle', icon: '🦅', desc: '+8 % de chances de critique', effect: { crit: 0.08 } },
+    fiole: { label: 'Grande fiole', icon: '🧪', desc: 'Soigne 60 % de ta vie tout de suite', effect: { heal: 0.6 } },
+    braise: { label: 'Braise éternelle', icon: '🔥', desc: 'Remplit la moitié de ta barre d\'ultime', effect: { stamina: 0.5 }, needsUlt: true },
+    pacte: { label: 'Pacte sanglant', icon: '🩸', desc: '+30 % de dégâts, mais +15 % de dégâts subis', effect: { damage: 1.3, taken: 1.15 } },
+    plume: { label: 'Plume de phénix', icon: '🪶', desc: 'Une vie en plus (renaît à 50 %)', effect: { life: 0.5 } },
+    tresor: { label: 'Carte au trésor', icon: '🗺️', desc: '+25 % d\'XP et de golds à la fin', effect: { reward: 1.25 } },
+  };
+
+  /*
+   * Défi des boss : un boss au choix contre le joueur seul, calculé pour son niveau (Rules.bossStats pour 1 joueur),
+   * renforcé selon la difficulté. Une victoire compte pour l'exploit « vaincre ce boss seul ».
+   */
+  // Les boss sont pensés pour un groupe : seul, leur vie et leurs dégâts de base sont réduits (puis la difficulté).
+  const BOSS_SOLO_SCALE = { troll: { hp: 0.5, damage: 0.7 }, dragon: { hp: 0.5, damage: 0.75 }, sorcier: { hp: 0.25, damage: 0.4 } };
+  const BOSS_CHALLENGE = {
+    normal: { label: 'Normal', icon: '⭐', hp: 1, damage: 1, reward: { xp: 300, gold: 250, chests: 1 } },
+    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 2.2, damage: 1.4, reward: { xp: 600, gold: 500, chests: 2 } },
+    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 4.2, damage: 2, reward: { xp: 1000, gold: 900, chests: 4 } },
+  };
+  const SOLO_MODES = {
+    expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
+    boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire.' },
+  };
+
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150 };
 
   // ---------- Raid de Donjon : ambiance qui change toutes les 5 salles ----------
@@ -1333,6 +1451,6 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

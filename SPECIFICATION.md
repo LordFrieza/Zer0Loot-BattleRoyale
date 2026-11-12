@@ -356,6 +356,16 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **TRN-3** L'entraînement ne doit donner aucune récompense, ne rien compter (batailles, kills, succès) et ne pas consommer la potion équipée (elle peut tout de même se déclencher).
 - **TRN-4** Un joueur ne doit avoir qu'un entraînement à la fois (en relancer un arrête le précédent) ; au plus 20 entraînements en même temps sur le serveur ; un entraînement dure au plus 150 s (au-delà, le meilleur ratio de vie gagne) ; le joueur peut l'arrêter.
 
+## 12 sexies. Mode Solo (V2)
+
+- **SOLO-1** Chaque personnage doit avoir une énergie de **3 au maximum**, qui remonte de **1 toutes les 10 h** (calcul paresseux à partir de l'instant de début de la recharge ; pleine pour les personnages créés avant la V2). Une tentative du mode Solo coûte 1 énergie ; le serveur doit la refuser sans énergie (« Plus d'énergie : la prochaine revient dans N h »), sans classe, ou si une partie solo est déjà en cours. L'admin peut donner de l'énergie (sans dépasser le maximum).
+- **SOLO-2** Une partie solo doit se jouer sur une bataille séparée (comme l'entraînement), avec le joueur seul, **sans potion** (la potion équipée n'est ni utilisée ni consommée), et n'envoyer son état (`soloQueue`) et ses images (`soloFrame`) qu'au joueur. Le joueur peut régler la vitesse (×1 ou ×2 : deux pas de simulation par intervalle) et abandonner ; une partie dure au plus 20 min (au-delà, elle s'arrête comme un abandon). Au plus 30 parties solo en même temps sur le serveur.
+- **SOLO-3** **Expédition** : profondeurs successives (étapes du Raid de Donjon, transitions plus courtes) ; à la profondeur `p`, `arrondi(2 + 0,14 × (p − 1))` monstres (12 au plus, un chef toutes les 5 profondeurs) dont la vie est multipliée par `0,55 × 1,1^(p−1)` et les dégâts par `0,5 × 1,07^(p−1)`, puis légèrement par le niveau du joueur (+0,6 % / +0,4 % par niveau). Le joueur récupère 35 % de sa vie entre deux profondeurs. Seul face aux monstres, la vie et les dégâts du joueur sont ajustés par classe pendant l'Expédition (Guerrier ×1,6 / ×1,85, Assassin ×1,9 / ×1,7, Prêtre ×1,5 / ×1,8, classes à distance ×1).
+- **SOLO-4** Toutes les **3 profondeurs** nettoyées, le serveur doit proposer **3 reliques** différentes (Braise éternelle seulement avec un ultime) ; le joueur en choisit une (`/api/solo/relic`), sinon une est tirée au hasard après 30 s. Une relique reste active jusqu'à la fin de l'expédition et se cumule : multiplicateurs de dégâts / dégâts subis / vitesse / vitesse d'attaque, vol de vie, épines, régénération, critique, soin immédiat, barre d'ultime, une vie en plus (renaît à 50 %), gains ×1,25. Le serveur doit refuser une relique non proposée.
+- **SOLO-5** À la fin d'une expédition (chute ou abandon), le joueur doit gagner, pour `n` profondeurs nettoyées, `25n + 2n²` XP, `20n + 1,5n²` golds (× la relique Trésor) et `⌊n / 5⌋` coffres ; rien si aucune profondeur n'est nettoyée. Son record `expeditionBest` garde le maximum (y compris lors de la fusion d'un fantôme).
+- **SOLO-6** **Défi des boss** : le joueur choisit le boss (Troll, Dragon, Magicien) et la difficulté. Le boss a les stats de `Rules.bossStats` pour 1 joueur de son niveau, réduites pour le solo (Troll 0,5 vie / 0,7 dégâts, Dragon 0,5 / 0,75, Magicien 0,25 / 0,4), puis multipliées par la difficulté : Normal ×1 / ×1 (300 XP, 250 golds, 1 coffre), Héroïque ×2,2 / ×1,4 (600, 500, 2), Légendaire ×4,2 / ×2 (1000, 900, 4). La récompense n'est donnée qu'en cas de victoire, et une victoire compte pour l'exploit « vaincre ce boss seul » (voir LOOK-7).
+- **SOLO-7** Si le serveur redémarre pendant une partie solo, alors au démarrage la partie doit être annulée et l'énergie rendue (`soloActive` remis à zéro).
+
 ## 12. Forge
 
 - **FRG-1** Quand un joueur fusionne, le serveur doit exiger exactement 3 objets distincts de son inventaire, de même rareté, et retirer le prix de la fusion : 10 / 20 / 40 / 80 / 150 golds (Commun → Légendaire).
@@ -412,7 +422,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 - **ADM-1** L'admin doit pouvoir choisir le mode de jeu avant d'ouvrir la file, ouvrir/fermer la file, lancer ou réinitialiser la bataille, choisir l'événement de la prochaine bataille (aucun, aléatoire ou l'un des quatre), ajouter des bots, simuler `!join` et sub.
 - **ADM-2** L'admin doit pouvoir lister les joueurs (nom, pseudo, Twitch, fantôme, banni, classe, niveau, golds, coffres, record, titre).
-- **ADM-3** Quand l'admin donne des ressources à un joueur, le serveur doit l'appliquer et notifier le joueur.
+- **ADM-3** Quand l'admin donne des ressources à un joueur (golds, coffres, XP ou énergie), le serveur doit l'appliquer et notifier le joueur.
 - **ADM-4** Quand l'admin bannit un joueur, le serveur doit supprimer ses sessions, lui émettre `banned`, et, si une file est en cours, le retirer des participants et rembourser son pari et les paris placés sur lui.
 - **ADM-5** Si le joueur ciblé n'existe pas ou n'est pas un joueur, alors l'admin doit recevoir « Joueur introuvable ».
 

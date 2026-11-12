@@ -15,6 +15,7 @@
     <a class="logo" href="/"><img src="/img/logo.png" alt="Zer0Loot"><small>BATTLE ROYALE</small></a>
     <div class="right">
       <a href="/arena.html" target="_blank">Arène en direct</a>
+      <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
       <span id="who"></span>
       <div id="sound-ctl"></div>
       <button class="secondary small" onclick="logout()">Déconnexion</button>
@@ -51,6 +52,7 @@
       <button data-tab="arbre" id="tab-arbre">🌳 Arbre de compétences <span class="tab-badge" data-badge="arbre"></span></button>
       <button data-tab="combat">⚔️ Style de combat <span class="tab-badge" data-badge="combat"></span></button>
       <button data-tab="boutique">🛍️ Boutique</button>
+      <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
       <button data-tab="classements">🏆 Classements</button>
@@ -289,6 +291,49 @@
         </div>
       </div>
       <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas></div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="solo">
+    <div class="panel solo-panel" id="solo-panel">
+      <h2>🕳️ Mode Solo <span class="sub">Ton aventure à toi, quand tu veux</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Chaque tentative coûte <b>1 ⚡ énergie</b>. Tu en as <b>3 au maximum</b>, et tu en regagnes
+        <b>une toutes les 10 heures</b>. Les potions ne servent pas en solo. Tu peux regarder la partie en vitesse ×1 ou ×2,
+        et même fermer la page : elle continue et tes gains sont crédités à la fin.</p>
+      <div class="energy-bar" id="energy-bar"></div>
+      <div class="solo-modes" id="solo-modes">
+        <div class="solo-card expedition">
+          <h3>🕳️ Expédition</h3>
+          <p>Descends le plus profond possible, seul face aux monstres. Toutes les <b>3 profondeurs</b>, choisis une
+            <b>relique</b> parmi 3 : elle reste active jusqu'à la fin et se cumule avec les autres. Tu gagnes de l'XP et des golds
+            pour chaque étage nettoyé, et <b>1 coffre tous les 5 étages</b> — même si tu tombes.</p>
+          <div class="solo-rewards" id="exp-rewards"></div>
+          <div class="solo-record" id="exp-record"></div>
+          <div class="row"><button class="gold" id="exp-start">🕳️ Partir en expédition (1 ⚡)</button></div>
+        </div>
+        <div class="solo-card bosses">
+          <h3>👹 Défi des boss</h3>
+          <p>Affronte <b>seul</b> un boss calculé pour ton niveau. Plus la difficulté est haute, plus le butin est gros.
+            Vaincre un boss seul débloque sa <b>peau légendaire</b> à la boutique !</p>
+          <div class="solo-boss-pick" id="solo-boss-pick"></div>
+          <div class="solo-diff-pick" id="solo-diff-pick"></div>
+          <div class="row"><button class="gold" id="boss-start">👹 Lancer le défi (1 ⚡)</button></div>
+        </div>
+      </div>
+      <div class="solo-run" id="solo-run">
+        <div class="row solo-controls">
+          <span class="solo-status" id="solo-status"></span>
+          <span class="spacer"></span>
+          <span class="muted">Vitesse</span>
+          <button class="secondary small" data-speed="1">×1</button>
+          <button class="secondary small" data-speed="2">×2</button>
+          <button class="secondary small danger" id="solo-abandon">🏳️ Abandonner</button>
+        </div>
+        <div class="arena-wrap solo-arena">
+          <canvas id="solo-arena"></canvas>
+          <div class="relic-choice" id="relic-choice"></div>
+        </div>
+      </div>
     </div>
     </section>
 

@@ -46,6 +46,9 @@ function upgrade(character) {
   // V2 : visage dessiné (grille de pixels) et sa version (pour le cache des clients)
   if (typeof character.drawing !== 'string') character.drawing = '';
   if (!character.drawingVer) character.drawingVer = 0;
+  // V2 : énergie du mode Solo (pleine pour les anciens personnages) et partie solo en cours
+  if (!character.energy || !Number.isFinite(character.energy.value)) character.energy = { value: Rules.SOLO.energyMax, at: Date.now() };
+  if (character.soloActive === undefined) character.soloActive = null;
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -87,6 +90,8 @@ function newCharacter() {
     techs: [], // techniques signature choisies (1 emplacement au niveau 5, 2 au niveau 15)
     drawing: '', // visage dessiné : une couleur de Rules.DRAWING.palette par case (0 = transparent)
     drawingVer: 0, // version du dessin (les clients le gardent en cache)
+    energy: { value: Rules.SOLO.energyMax, at: Date.now() }, // énergie du mode Solo (voir Rules.energyState)
+    soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
   };
 }
 
@@ -665,12 +670,41 @@ function clearDrawing(character) {
 
 // ---------- Admin ----------
 
-function adminGive(character, { gold = 0, chests = 0, xp = 0 }) {
+function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0 }) {
   const clean = (v) => Math.max(0, Math.min(1e7, Math.floor(Number(v) || 0)));
   const reward = { gold: clean(gold), chests: clean(chests), xp: clean(xp) };
-  if (!reward.gold && !reward.chests && !reward.xp) throw new Error('Rien à donner');
+  const extra = clean(energy);
+  if (!reward.gold && !reward.chests && !reward.xp && !extra) throw new Error('Rien à donner');
+  if (extra) addEnergy(character, extra);
   const levels = grant(character, reward);
-  return { reward, levels };
+  return { reward, levels, energy: extra || undefined };
+}
+
+// ---------- Énergie du mode Solo ----------
+
+// Met à jour la recharge et renvoie { value, at, nextAt }.
+function energyOf(character, now = Date.now()) {
+  upgrade(character);
+  const st = Rules.energyState(character.energy, now);
+  character.energy = { value: st.value, at: st.at };
+  return st;
+}
+
+function spendEnergy(character, now = Date.now()) {
+  const st = energyOf(character, now);
+  if (st.value < 1) {
+    const h = Math.ceil((st.nextAt - now) / 3600000);
+    throw new Error(`Plus d'énergie : la prochaine revient dans ${h} h`);
+  }
+  character.energy.value -= 1;
+  if (st.value === Rules.SOLO.energyMax) character.energy.at = now; // la recharge démarre maintenant
+}
+
+// Rend de l'énergie (remboursement, cadeau de l'admin), sans dépasser le maximum.
+function addEnergy(character, n = 1, now = Date.now()) {
+  energyOf(character, now);
+  character.energy.value = Math.min(Rules.SOLO.energyMax, character.energy.value + n);
+  if (character.energy.value >= Rules.SOLO.energyMax) character.energy.at = now;
 }
 
 function unequip(character, slot) {
@@ -761,13 +795,14 @@ function publicCharacter(user) {
     ult: Rules.ultOf(c.cls, c.talents),
     spec: Rules.specOf(c.cls, c.talents),
     protectedIds: [...protectedIds(c)],
+    energyState: energyOf(c),
   };
 }
 
 module.exports = {
   newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
-  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing,
+  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,

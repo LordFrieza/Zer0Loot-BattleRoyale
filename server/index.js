@@ -102,6 +102,21 @@ const bets = new Bets(battle);
 const leftover = bets.refundAll();
 if (leftover.length) console.log(`[paris] ${leftover.length} pari(s) remboursé(s) après redémarrage`);
 
+// Mode Solo : une partie interrompue par un redémarrage rend son énergie.
+function refundSoloRuns() {
+  let n = 0;
+  for (const u of Object.values(db.state.users)) {
+    const c = u.character;
+    if (!c || !c.soloActive) continue;
+    game.addEnergy(c, 1);
+    c.soloActive = null;
+    n += 1;
+  }
+  if (n) { db.save(); console.log(`[solo] ${n} partie(s) solo interrompue(s) : énergie rendue`); }
+  return n;
+}
+refundSoloRuns();
+
 function queueView() {
   return { ...battle.publicQueue(), bets: bets.summary() };
 }
@@ -989,6 +1004,115 @@ app.post('/api/training/stop', requirePlayer, (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ---------- Mode Solo (V2) ----------
+/*
+ * Expédition (profondeurs + reliques) ou Défi des boss, contre 1 énergie. Simulé sur une Battle à part, diffusé
+ * seulement au joueur (« soloQueue » / « soloFrame »), sans potion. Les gains sont crédités à la fin.
+ */
+const solos = new Map(); // userId → Battle
+
+function soloIdle() {
+  return { phase: 'idle', mode: 'dungeon', solo: null, participants: [], result: null };
+}
+
+function endSolo(userId) {
+  const b = solos.get(userId);
+  if (!b) return;
+  b.stopLoop();
+  clearTimeout(b.soloTimer);
+  b.removeAllListeners();
+  solos.delete(userId);
+}
+
+function soloRewards(user, result) {
+  const c = user.character;
+  game.upgrade(c);
+  c.soloActive = null;
+  let levels = 0;
+  if (result.reward) {
+    const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
+    levels = game.grant(c, reward);
+    io.to('user:' + user.id).emit('reward', { type: 'solo_' + result.solo, reward, levels, depth: result.depth });
+  }
+  if (result.solo === 'expedition') c.counters.expeditionBest = Math.max(c.counters.expeditionBest || 0, result.depth || 0);
+  if (result.solo === 'boss' && result.victory && Rules.SOLO_BOSS_COUNTER[result.boss.id]) game.bump(c, Rules.SOLO_BOSS_COUNTER[result.boss.id]);
+  db.save();
+  pushMe(user);
+}
+
+app.post('/api/solo/start', requirePlayer, (req, res) => {
+  try {
+    const user = req.user;
+    const c = user.character;
+    if (!c.cls) throw new Error('Choisis d\'abord une classe');
+    if (solos.has(user.id) || c.soloActive) throw new Error('Tu as déjà une partie solo en cours');
+    const kind = String(req.body.kind || '');
+    if (!Rules.SOLO_MODES[kind]) throw new Error('Mode solo inconnu');
+    const bossId = kind === 'boss' ? String(req.body.boss || 'troll') : null;
+    if (kind === 'boss' && !Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
+    const difficulty = kind === 'boss' ? String(req.body.difficulty || 'normal') : null;
+    if (kind === 'boss' && !Rules.BOSS_CHALLENGE[difficulty]) throw new Error('Difficulté inconnue');
+    if (solos.size >= Rules.SOLO.maxConcurrent) throw new Error('Trop de parties solo en cours, réessaie dans un instant');
+    game.spendEnergy(c);
+    c.soloActive = { kind, startedAt: Date.now() };
+    db.save();
+
+    const b = new Battle({ solo: { kind, level: c.level, difficulty } });
+    b.openQueue(60, kind === 'boss' ? 'boss' : 'dungeon', bossId || 'troll');
+    clearTimeout(b.queueTimer);
+    b.join({ ...participantFromUser(user), consumable: null });
+    const room = 'user:' + user.id;
+    b.on('queue', (q) => io.to(room).emit('soloQueue', q));
+    b.on('frame', (f) => io.to(room).emit('soloFrame', f));
+    b.on('coopEnd', (result) => {
+      clearTimeout(b.soloTimer);
+      soloRewards(user, result);
+      // La partie reste affichée (résultat) jusqu'à la suivante ; plus rien ne tourne.
+      setImmediate(() => { if (solos.get(user.id) === b) { b.removeAllListeners(); solos.delete(user.id); } });
+    });
+    b.setSpeed(Rules.SOLO.speeds.includes(Number(req.body.speed)) ? Number(req.body.speed) : 1);
+    b.start(null, null);
+    solos.set(user.id, b);
+    // Garde-fou : au-delà de SOLO.maxDuration, la partie s'arrête (l'Expédition garde ses étages).
+    b.soloTimer = setTimeout(() => b.abandon(), Rules.SOLO.maxDuration * 1000);
+    b.soloTimer.unref(); // n'empêche jamais le processus de s'arrêter
+    pushMe(user);
+    res.json({ ok: true, energy: game.energyOf(c) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+function soloOf(req) {
+  const b = solos.get(req.user.id);
+  if (!b || b.phase !== 'battle') throw new Error('Aucune partie solo en cours');
+  return b;
+}
+
+app.post('/api/solo/relic', requirePlayer, action((req) => {
+  const id = soloOf(req).chooseRelic(String(req.body.id || ''));
+  if (!id) throw new Error('Cette relique n\'est pas proposée');
+  return { id };
+}));
+
+app.post('/api/solo/speed', requirePlayer, action((req) => {
+  const b = soloOf(req);
+  const speed = Number(req.body.speed);
+  if (!Rules.SOLO.speeds.includes(speed)) throw new Error('Vitesse inconnue');
+  b.setSpeed(speed);
+  return { speed };
+}));
+
+app.post('/api/solo/abandon', requirePlayer, action((req) => {
+  soloOf(req).abandon();
+}));
+
+app.get('/api/solo/state', requirePlayer, (req, res) => {
+  const b = solos.get(req.user.id);
+  res.json(b ? { queue: b.publicQueue(), frame: b.frame() } : { queue: soloIdle(), frame: null });
+});
+
 // ---------- Temps réel ----------
 
 io.on('connection', (socket) => {
@@ -1023,4 +1147,4 @@ function start(port = PORT) {
 
 if (require.main === module) start();
 
-module.exports = { app, server, io, battle, bets, start, trainings, chatCommand };
+module.exports = { app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };
