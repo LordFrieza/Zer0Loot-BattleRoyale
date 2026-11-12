@@ -1224,11 +1224,16 @@
    * renforcé selon la difficulté. Une victoire compte pour l'exploit « vaincre ce boss seul ».
    */
   // Les boss sont pensés pour un groupe : seul, leur vie et leurs dégâts de base sont réduits (puis la difficulté).
-  const BOSS_SOLO_SCALE = { troll: { hp: 0.5, damage: 0.7 }, dragon: { hp: 0.5, damage: 0.75 }, sorcier: { hp: 0.25, damage: 0.4 } };
+  const BOSS_SOLO_SCALE = { troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 } };
+  // Seul face au boss, les classes fragiles à distance sont désavantagées : vie et dégâts du joueur ajustés par classe.
+  const BOSS_SOLO_CLASS = {
+    guerrier: { hp: 1, damage: 1 }, archer: { hp: 2, damage: 1.5 }, mage: { hp: 1.6, damage: 1.3 },
+    assassin: { hp: 1.3, damage: 1.15 }, pretre: { hp: 1, damage: 1, regen: 0.4 }, none: { hp: 1, damage: 1 },
+  };
   const BOSS_CHALLENGE = {
-    normal: { label: 'Normal', icon: '⭐', hp: 1, damage: 1, reward: { xp: 300, gold: 250, chests: 1 } },
-    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 2.2, damage: 1.4, reward: { xp: 600, gold: 500, chests: 2 } },
-    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 4.2, damage: 2, reward: { xp: 1000, gold: 900, chests: 4 } },
+    normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 300, gold: 250, chests: 1 } },
+    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 600, gold: 500, chests: 2 } },
+    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1000, gold: 900, chests: 4 } },
   };
   const SOLO_MODES = {
     expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
@@ -1506,6 +1511,6 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

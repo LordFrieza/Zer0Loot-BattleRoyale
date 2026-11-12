@@ -228,6 +228,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
     classes à distance.
   - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (300 XP, 250 golds,
     1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
+    Les boss sont nettement renforcés en solo (le Légendaire est réservé aux meilleurs builds) ; la vie et les dégâts du
+    joueur sont ajustés par classe (Archer, Mage et Assassin renforcés, régénération du Prêtre réduite), et un Prêtre seul
+    ne purifie pas sa propre malédiction face au Magicien.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
     « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon ou Malvorath le Magicien des ténèbres.
@@ -246,7 +249,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     16 s, sinon ils éclosent en **dragonnets** ; il revient furieux (dégâts +25 %, attaques +20 %).
   - **Malvorath le Magicien des ténèbres** (180 PV + 200 par combattant) : attaque de loin (traits d'ombre) et se
     téléporte toutes les 15 s. Alterne **malédictions** (2,5 % de la vie par seconde pendant 8 s ; un **Prêtre** à moins
-    de 120 px purifie aussitôt, lui compris) et **zones d'ombre** sous les pieds des combattants. À **70 %** et **20 %**,
+    de 120 px purifie aussitôt, lui compris, sauf seul en Défi des boss) et **zones d'ombre** sous les pieds des combattants. À **70 %** et **20 %**,
     **bouclier** : il est intouchable tant que ses 4 **cristaux** tiennent (et ils le soignent). À **45 %**, il se
     **dédouble** en 3 illusions fragiles qui attaquent aussi : les dégâts de zone font la différence.
   - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline

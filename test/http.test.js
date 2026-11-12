@@ -841,7 +841,7 @@ test('[TRN-5] entraînement : répéter l\'Expédition et le Défi des boss sans
   assert.strictEqual((await t.post('/api/training/start', { opponent: 'boss', boss: 'troll', difficulty: 'legendaire' })).status, 200);
   const bb = trainings.get(id);
   bb.stopLoop();
-  assert.strictEqual(bb.boss.maxHp, Math.round(Rules.bossStats(1, 'troll', 1).maxHp * Rules.BOSS_SOLO_SCALE.troll.hp * 4.2));
+  assert.strictEqual(bb.boss.maxHp, Math.round(Rules.bossStats(1, 'troll', 1).maxHp * Rules.BOSS_SOLO_SCALE.troll.hp * Rules.BOSS_CHALLENGE.legendaire.hp));
   bb.kill(bb.players[0], bb.boss);
   bb.tick(0.05);
   assert.deepStrictEqual([bb.result.victory, bb.result.training], [true, true]);

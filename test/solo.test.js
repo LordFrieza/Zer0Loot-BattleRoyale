@@ -170,12 +170,19 @@ test('[SOLO-6] défi des boss : boss à ta mesure, renforcé selon la difficult�
   assert.deepStrictEqual(Object.keys(Rules.BOSS_CHALLENGE), ['normal', 'heroique', 'legendaire']);
   const st = Rules.bossStats(1, 'troll', 10);
   const normal = soloBattle('boss', { level: 10 }, { boss: 'troll', difficulty: 'normal', level: 10 });
-  assert.strictEqual(normal.boss.maxHp, Math.round(st.maxHp * 0.5));
-  assert.strictEqual(normal.boss.damage, Math.round(st.damage * 0.7 * 10) / 10);
+  assert.deepStrictEqual(Rules.BOSS_SOLO_SCALE, { troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 } });
+  assert.deepStrictEqual(['normal', 'heroique', 'legendaire'].map((d) => [Rules.BOSS_CHALLENGE[d].hp, Rules.BOSS_CHALLENGE[d].damage]), [[0.7, 0.7], [1.4, 1.25], [2.4, 1.6]]);
+  assert.strictEqual(normal.boss.maxHp, Math.round(st.maxHp * 1.1 * 0.7));
+  assert.strictEqual(normal.boss.damage, Math.round(st.damage * 2.1 * 0.7 * 10) / 10);
   const leg = soloBattle('boss', { level: 10 }, { boss: 'troll', difficulty: 'legendaire', level: 10 });
-  assert.strictEqual(leg.boss.maxHp, Math.round(st.maxHp * 0.5 * 4.2));
+  assert.strictEqual(leg.boss.maxHp, Math.round(st.maxHp * 1.1 * 2.4));
   const sorc = soloBattle('boss', {}, { boss: 'sorcier', difficulty: 'heroique' });
-  assert.strictEqual(sorc.boss.maxHp, Math.round(Rules.bossStats(1, 'sorcier', 1).maxHp * 0.25 * 2.2));
+  assert.strictEqual(sorc.boss.maxHp, Math.round(Rules.bossStats(1, 'sorcier', 1).maxHp * 0.6 * 1.4));
+  // Ajustement par classe (le joueur seul face au boss) : les classes fragiles à distance sont renforcées
+  assert.deepStrictEqual([soloBattle('boss', { cls: 'archer' }).players[0].maxHp, soloBattle('boss', { cls: 'archer' }).players[0].damage], [2000, 150]);
+  assert.strictEqual(soloBattle('boss', { cls: 'guerrier' }).players[0].maxHp, 1000);
+  const priest = soloBattle('boss', { cls: 'pretre' }).players[0];
+  assert.ok(Math.abs(priest.regen - Rules.CLASS_INFO.pretre.combat.regen * 0.4) < 1e-12, 'régénération du Prêtre réduite');
   let res = null;
   leg.on('coopEnd', (r) => { res = r; });
   leg.kill(leg.players[0], leg.boss);
@@ -186,4 +193,31 @@ test('[SOLO-6] défi des boss : boss à ta mesure, renforcé selon la difficult�
   normal.kill(normal.boss, normal.players[0]);
   normal.tick(0.05);
   assert.deepStrictEqual([res.victory, res.reward], [false, null]);
+});
+
+test('[SOLO-8] défi du Magicien : un Prêtre seul ne se purifie pas lui-même (en groupe, si)', () => {
+  const B = Rules.BOSSES.sorcier;
+  const curseOn = (b) => {
+    const p = b.players.find((x) => x.cls === 'pretre');
+    b.addBuff(p, 'curse', 8, { curse: true, dot: B.curse.dps, tick: b.time });
+    return p;
+  };
+  // Seul (Défi des boss) : la malédiction reste et fait mal
+  const solo = soloBattle('boss', { cls: 'pretre', stats: base({ maxHp: 1000 }) }, { boss: 'sorcier' });
+  const p = curseOn(solo);
+  const hp = p.hp;
+  solo.updateCurses(B);
+  assert.ok(p.buffs.some((x) => x.curse), 'pas de purification');
+  assert.ok(p.hp < hp, 'la malédiction le blesse');
+  // En groupe (Combat de Boss du stream) : le Prêtre se purifie toujours
+  const group = new Battle();
+  group.openQueue(60, 'boss', 'sorcier');
+  clearTimeout(group.queueTimer);
+  group.join({ key: 'u1', userId: 1, name: 'P', level: 1, cls: 'pretre', look: {}, stats: base({ maxHp: 1000 }) });
+  group.join({ key: 'u2', userId: 2, name: 'G', level: 1, cls: 'guerrier', look: {}, stats: base({ maxHp: 1000 }) });
+  group.start(null, null);
+  group.stopLoop();
+  const gp = curseOn(group);
+  group.updateCurses(B);
+  assert.ok(!gp.buffs.some((x) => x.curse), 'purifié');
 });

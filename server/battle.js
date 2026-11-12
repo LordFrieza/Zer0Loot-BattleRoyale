@@ -179,12 +179,14 @@ class Battle extends EventEmitter {
     // Stats recalculées au lancement ; l'équipe choisie (Guerre des clans) est conservée.
     const list = [...this.participants.values()].map((p) => (refresh ? { ...refresh(p), clan: p.clan } : p));
     this.players = list.map((p) => this.makePlayer(p, event));
-    if (this.solo && this.solo.kind === 'expedition') {
+    if (this.solo) {
+      const table = this.solo.kind === 'expedition' ? Rules.EXPEDITION.classMult : Rules.BOSS_SOLO_CLASS;
       for (const f of this.players) {
-        const cm = Rules.EXPEDITION.classMult[f.cls || 'none'] || Rules.EXPEDITION.classMult.none;
+        const cm = table[f.cls || 'none'] || table.none;
         f.maxHp = Math.round(f.maxHp * cm.hp);
         f.hp = f.maxHp;
         f.damage *= cm.damage;
+        if (cm.regen != null) f.regen *= cm.regen; // Prêtre : régénération réduite face au boss
       }
     }
     this.fighters = [...this.players];
@@ -688,7 +690,9 @@ class Battle extends EventEmitter {
       const curse = h.buffs.find((x) => x.curse);
       if (!curse) continue;
       const priest = priests.find((p) => Math.hypot(p.x - h.x, p.y - h.y) <= B.curse.purifyRadius);
-      if (priest) {
+      // Défi des boss (seul) : un Prêtre ne se purifie pas lui-même (sinon le Magicien ne pourrait jamais le blesser).
+      const selfOnly = this.solo && priest === h;
+      if (priest && !selfOnly) {
         h.buffs = h.buffs.filter((x) => x !== curse);
         this.events.push({ t: 'purify', to: h.key, from: priest.key });
         continue;
