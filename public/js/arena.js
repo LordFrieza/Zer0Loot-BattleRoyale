@@ -527,6 +527,19 @@
           this.announces.push({ text: e.label, sub: e.hatched ? `${e.hatched} dragonnet${e.hatched > 1 ? 's' : ''} ${e.hatched > 1 ? 'ont' : 'a'} éclos !` : 'Tous les œufs ont été détruits !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
           this.shake = Math.max(this.shake || 0, 0.6);
           if (window.Sound) Sound.play('roar', true);
+        } else if (e.t === 'tech' && from) {
+          // Technique (compétence signature) : son nom au-dessus du personnage, traînée pour les sauts
+          const T = Rules.TECHNIQUES[e.id];
+          if (T) this.floaters.push({ x: from.x, y: from.y - 92, text: `${T.icon} ${T.label}`, color: '#9ff6ff', life: 1.3, size: 13 });
+          if (e.fx !== undefined) {
+            this.beams.push({ path: [{ x: e.fx, y: e.fy }, { x: e.x, y: e.y }], width: 5, color: e.id === 'pas_ombre' ? '#8a4dff' : '#9ff6ff', t: 0, dur: 0.35 });
+            const dd = this.disp.get(e.from);
+            if (dd) { dd.x = e.x; dd.y = e.y; } // pas de glissade : le saut est instantané
+            this.spark(e.x, e.y - 10, '#9ff6ff', 14);
+          }
+          if (e.r) this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.5, color: e.id === 'nova_givre' ? 'ice' : undefined });
+          if (e.id === 'fleche_recul' && e.to) { const dd = this.disp.get(e.to); if (dd) { dd.x = e.x; dd.y = e.y; } }
+          if (window.Sound) Sound.play('tech', e.id);
         } else if (e.t === 'spriteDown') {
           // la flammèche abattue remonte brûler le dragon
           const boss = this.disp.get('boss');
@@ -2049,6 +2062,27 @@
           const a0 = t / 70;
           for (let i = 0; i < 3; i++) {
             ctx.beginPath(); ctx.arc(x, y - 4, 46, a0 + i * 2.09, a0 + i * 2.09 + 1.1); ctx.stroke();
+          }
+        }
+        if (has('stun')) {
+          // étourdi : étoiles qui tournent au-dessus de la tête
+          ctx.font = '13px "Segoe UI Emoji", sans-serif';
+          ctx.textAlign = 'center';
+          for (let i = 0; i < 3; i++) {
+            const a = t / 160 + i * 2.09;
+            ctx.fillText('⭐', x + Math.cos(a) * 16, y - 46 + Math.sin(a) * 5);
+          }
+        }
+        if (has('slow')) {
+          ctx.strokeStyle = 'rgba(140,210,255,.8)';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.ellipse(x, y + 18, 20, 7, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        if (has('poison')) {
+          ctx.fillStyle = 'rgba(120,230,90,.75)';
+          for (let i = 0; i < 3; i++) {
+            const k = ((t / 700) + i / 3) % 1;
+            ctx.beginPath(); ctx.arc(x - 8 + i * 8, y - 20 - k * 26, 2.5 + k * 2, 0, Math.PI * 2); ctx.fill();
           }
         }
         if (has('frozen')) {

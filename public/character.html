@@ -49,6 +49,7 @@
       <button data-tab="perso">🧙 Personnage <span class="tab-badge" data-badge="perso"></span></button>
       <button data-tab="inventaire"><i class="ico-chest"></i> Inventaire <span class="tab-badge" data-badge="inventaire"></span></button>
       <button data-tab="arbre" id="tab-arbre">🌳 Arbre de compétences <span class="tab-badge" data-badge="arbre"></span></button>
+      <button data-tab="combat">⚔️ Style de combat <span class="tab-badge" data-badge="combat"></span></button>
       <button data-tab="boutique">🛍️ Boutique</button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
@@ -179,6 +180,24 @@
       <div class="talent-head" id="talent-head"></div>
       <div class="talent-scroll"><div class="talent-tree" id="talent-tree"></div></div>
       <div class="talent-detail" id="talent-detail"></div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="combat">
+    <div class="panel" id="techs-panel">
+      <h2>🎯 Techniques <span class="sub" id="techs-sub"></span><button class="help-btn" type="button">?</button></h2>
+      <div class="help">Des compétences signature, en plus de l'ultime de l'arbre : elles se déclenchent <b>toutes seules</b> en combat
+        quand leur condition est remplie (puis attendent leur temps de recharge). Un emplacement s'ouvre au niveau 5, un second au niveau 15.
+        Tu peux en changer à tout moment, gratuitement.</div>
+      <div class="tech-slots" id="tech-slots"></div>
+      <div class="tech-grid" id="tech-grid"></div>
+    </div>
+    <div class="panel" id="tactics-panel">
+      <h2>🧠 Tactique <span class="sub">Comment ton personnage se comporte en combat</span><button class="help-btn" type="button">?</button></h2>
+      <div class="help">Ton personnage se bat tout seul, mais tu choisis son caractère. Après chaque attaque, un combattant
+        reste <b>immobile un court instant</b> (moins longtemps avec une bonne vitesse d'attaque : l'Assassin récupère presque aussitôt,
+        l'Archer et le Mage restent plantés un peu plus) : c'est le moment où l'on peut le rattraper.</div>
+      <div id="tactics"></div>
     </div>
     </section>
 

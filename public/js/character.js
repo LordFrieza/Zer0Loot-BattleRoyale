@@ -57,6 +57,7 @@ function render() {
   renderPotionShop();
   renderPresets();
   renderTalents();
+  renderCombatStyle();
   if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
   renderBadges();
   $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
@@ -548,6 +549,73 @@ $('talent-tuto-ok').onclick = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+// ---------- Style de combat : techniques et tactique (V2) ----------
+function renderCombatStyle() {
+  const c = me.character;
+  const slots = Rules.techSlots(c.level);
+  $('techs-sub').textContent = slots ? `${c.techs.length} / ${slots} emplacement${slots > 1 ? 's' : ''}` : `Débloquées au niveau ${Rules.TECH_SLOTS[0]}`;
+  $('tech-slots').innerHTML = Rules.TECH_SLOTS.map((lvl, i) => {
+    const id = c.techs[i];
+    const T = id && Rules.TECHNIQUES[id];
+    if (c.level < lvl) return `<div class="tech-slot locked">🔒 Emplacement ${i + 1}<small>Niveau ${lvl}</small></div>`;
+    return T ? `<div class="tech-slot filled"><span class="tech-ico">${T.icon}</span><b>${T.label}</b><button class="small secondary" data-untech="${id}">Retirer</button></div>`
+      : `<div class="tech-slot">＋ Emplacement ${i + 1}<small>Choisis une technique ci-dessous</small></div>`;
+  }).join('');
+  const ids = Object.keys(Rules.TECHNIQUES).filter((id) => !Rules.TECHNIQUES[id].cls || Rules.TECHNIQUES[id].cls === c.cls)
+    .sort((a, b) => Rules.TECHNIQUES[a].level - Rules.TECHNIQUES[b].level);
+  $('tech-grid').innerHTML = ids.map((id) => {
+    const T = Rules.TECHNIQUES[id];
+    const why = Rules.techBlocker(c.cls, c.level, id);
+    const on = c.techs.includes(id);
+    const full = c.techs.length >= slots;
+    const tag = T.cls ? `<span class="tech-tag" style="--c:${Rules.CLASS_INFO[T.cls].color}">${Rules.CLASS_INFO[T.cls].icon} ${Rules.CLASS_INFO[T.cls].role}</span>` : '<span class="tech-tag">Toutes classes</span>';
+    const action = why ? `<span class="muted">🔒 ${esc(why)}</span>`
+      : on ? '<b class="up">✅ Équipée</b>'
+        : `<button class="small" data-tech="${id}" ${full ? 'title="Retire d\'abord une technique"' : ''}>${full ? 'Remplacer la dernière' : 'Équiper'}</button>`;
+    return `<div class="tech-card ${on ? 'on' : ''} ${why ? 'locked' : ''}">
+      <div class="tech-head"><span class="tech-ico">${T.icon}</span><b>${T.label}</b>${tag}<span class="muted">Niv. ${T.level}${T.cd ? ` · recharge ${T.cd} s` : ''}</span></div>
+      <p>${T.desc}</p><div class="row">${action}</div></div>`;
+  }).join('');
+  $('tech-grid').querySelectorAll('[data-tech]').forEach((b) => {
+    b.onclick = () => {
+      const list = [...c.techs];
+      if (list.length >= slots) list.pop();
+      list.push(b.dataset.tech);
+      act('/api/techs', { techs: list }, 'equip');
+    };
+  });
+  $('tech-slots').querySelectorAll('[data-untech]').forEach((b) => {
+    b.onclick = () => act('/api/techs', { techs: c.techs.filter((id) => id !== b.dataset.untech) }, 'unequip');
+  });
+
+  // Tactique
+  const t = c.tactics;
+  const chips = (group, key) => Object.entries(Rules.TACTICS[group]).map(([id, o]) =>
+    `<button class="chip ${t[key] === id ? 'active' : ''}" data-tac="${key}" data-val="${id}" title="${esc(o.desc)}">${o.icon} ${o.label}</button>`).join('');
+  const max = Rules.tacticsKiteMax(c.cls);
+  const def = Rules.classInfo(c.cls).combat.kite || 0;
+  const kite = t.kite === null || t.kite === undefined ? def : t.kite;
+  const stanceDesc = Rules.TACTICS.stance[t.stance].desc;
+  const targetDesc = Rules.TACTICS.target[t.target].desc;
+  $('tactics').innerHTML = `
+    <div class="tac-row"><div class="tac-label">Posture</div><div class="chips">${chips('stance', 'stance')}</div><p class="muted">${esc(stanceDesc)}</p></div>
+    <div class="tac-row"><div class="tac-label">Cible préférée</div><div class="chips">${chips('target', 'target')}</div><p class="muted">${esc(targetDesc)}</p></div>
+    ${max ? `<div class="tac-row"><div class="tac-label">Distance de recul</div>
+      <div class="row"><input type="range" id="tac-kite" min="${Rules.TACTICS.kiteMin}" max="${max}" step="5" value="${kite}" ${t.stance === 'agressif' ? 'disabled' : ''}>
+      <b id="tac-kite-val">${kite} px</b><button class="small secondary" id="tac-kite-reset" ${t.kite === null ? 'disabled' : ''}>Par défaut (${def} px)</button></div>
+      <p class="muted">Ton personnage recule quand un ennemi s'approche à moins de cette distance (0 : il ne recule jamais). ${t.stance === 'agressif' ? 'Sans effet en posture Agressive.' : t.stance === 'prudent' ? 'La posture Prudente l\'augmente de 40 %.' : ''}</p></div>`
+    : '<p class="muted">La distance de recul ne concerne que les classes qui attaquent à distance (Archer, Mage).</p>'}`;
+  $('tactics').querySelectorAll('[data-tac]').forEach((b) => {
+    b.onclick = () => act('/api/tactics', { [b.dataset.tac]: b.dataset.val }, 'equip');
+  });
+  const slider = $('tac-kite');
+  if (slider) {
+    slider.oninput = () => { $('tac-kite-val').textContent = slider.value + ' px'; };
+    slider.onchange = () => act('/api/tactics', { kite: Number(slider.value) }, 'equip');
+    $('tac-kite-reset').onclick = () => act('/api/tactics', { kite: null }, 'unequip');
+  }
+}
+
 // ---------- Entraînement ----------
 // Mini-bus d'événements : l'arène d'entraînement reçoit ses images comme l'arène du stream reçoit les siennes.
 const trainingBus = { h: {}, on(ev, fn) { (this.h[ev] = this.h[ev] || []).push(fn); }, emit(ev, d) { (this.h[ev] || []).forEach((fn) => fn(d)); } };
@@ -910,7 +978,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'boutique', 'entrainement', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'entrainement', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -939,6 +1007,7 @@ function renderBadges() {
   set('perso', c.skillPoints);
   set('inventaire', c.chests);
   set('arbre', Math.max(0, c.talentState.available));
+  set('combat', Math.max(0, Rules.techSlots(c.level) - c.techs.length));
   set('succes', claim);
 }
 

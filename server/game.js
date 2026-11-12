@@ -40,6 +40,9 @@ function upgrade(character) {
   if (character.consumableSlot === undefined) character.consumableSlot = null; // potion prête pour la prochaine partie
   if (!character.presets) character.presets = []; // presets d'équipement
   if (!character.talents) character.talents = []; // nœuds appris dans l'arbre de compétences (dans l'ordre)
+  // V2 : style de combat (tactique + techniques)
+  character.tactics = Object.assign({}, Rules.DEFAULT_TACTICS, character.tactics);
+  if (!Array.isArray(character.techs)) character.techs = [];
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -77,6 +80,8 @@ function newCharacter() {
     consumableSlot: null, // potion équipée pour la prochaine partie
     presets: [], // presets d'équipement : [{ id, name, items: { slot: itemId | null } }]
     talents: [], // arbre de compétences : nœuds appris, dans l'ordre
+    tactics: { ...Rules.DEFAULT_TACTICS }, // style de combat : posture, cible préférée, distance de recul
+    techs: [], // techniques signature choisies (1 emplacement au niveau 5, 2 au niveau 15)
   };
 }
 
@@ -279,6 +284,8 @@ function chooseClass(character, cls) {
   character.cls = cls;
   const talentsReset = character.talents.length;
   character.talents = []; // l'arbre dépend de la classe : remis à zéro gratuitement
+  character.techs = character.techs.filter((id) => !Rules.techBlocker(cls, character.level, id)); // techniques d'une autre classe retirées
+  if (character.tactics.kite !== null) character.tactics.kite = Math.min(character.tactics.kite, Rules.tacticsKiteMax(cls)) || null;
   let unequipped = 0;
   for (const [slot, item] of Object.entries(character.equipment)) {
     if (item && !Rules.canEquip(item, cls)) {
@@ -481,6 +488,49 @@ function resetTalents(character) {
   return { price: Rules.TALENT_RESET_PRICE, refunded };
 }
 
+// ---------- Style de combat : tactique et techniques (V2) ----------
+
+function setTactics(character, tactics) {
+  upgrade(character);
+  const t = tactics || {};
+  const next = { ...character.tactics };
+  if (t.stance !== undefined) {
+    if (!Rules.TACTICS.stance[t.stance]) throw new Error('Posture inconnue');
+    next.stance = t.stance;
+  }
+  if (t.target !== undefined) {
+    if (!Rules.TACTICS.target[t.target]) throw new Error('Cible inconnue');
+    next.target = t.target;
+  }
+  if (t.kite !== undefined) {
+    const max = Rules.tacticsKiteMax(character.cls);
+    if (t.kite === null) next.kite = null;
+    else {
+      if (!max) throw new Error('La distance de recul ne concerne que les classes à distance');
+      const v = Math.round(Number(t.kite));
+      if (!Number.isFinite(v)) throw new Error('Distance invalide');
+      next.kite = Math.max(Rules.TACTICS.kiteMin, Math.min(max, v));
+    }
+  }
+  character.tactics = next;
+  return { tactics: next };
+}
+
+// Remplace les techniques choisies (dans l'ordre des emplacements).
+function setTechniques(character, ids) {
+  upgrade(character);
+  const list = Array.isArray(ids) ? [...new Set(ids.map(String))] : [];
+  const slots = Rules.techSlots(character.level);
+  if (!slots && list.length) throw new Error(`Les techniques se débloquent au niveau ${Rules.TECH_SLOTS[0]}`);
+  if (list.length > slots) throw new Error(`Tu n'as que ${slots} emplacement${slots > 1 ? 's' : ''} de technique`);
+  for (const id of list) {
+    const why = Rules.techBlocker(character.cls, character.level, id);
+    if (why) throw new Error(why);
+  }
+  character.techs = list;
+  return { techs: list };
+}
+
 // ---------- Succès & titres ----------
 
 function claimAchievement(character, id) {
@@ -643,7 +693,7 @@ function publicCharacter(user) {
 }
 
 module.exports = {
-  newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem,
+  newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,

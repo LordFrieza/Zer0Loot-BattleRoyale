@@ -247,11 +247,16 @@ class Battle extends EventEmitter {
       luck: s.luck || 0, // Ruée vers l'or : agrandit le rayon de ramassage
       precision: s.precision || 0,
       thorns: s.thorns || 0,
-      // Comportement de classe
+      // Comportement de classe, ajusté par la tactique choisie sur la fiche (posture, cible, distance de recul)
       range: combat.range || 40,
       taunt: combat.taunt || 1,
-      kite: combat.kite || 0,
+      kite: kiteFor(p, combat),
       hunter: !!combat.hunter,
+      stance: p.tactics && Rules.TACTICS.stance[p.tactics.stance] ? p.tactics.stance : 'equilibre',
+      targetPref: p.tactics && Rules.TACTICS.target[p.tactics.target] && p.tactics.target !== 'auto' ? p.tactics.target : (combat.hunter ? 'faible' : 'proche'),
+      // Immobile un instant après chaque attaque (moins longtemps avec une bonne vitesse d'attaque)
+      recovery: (combat.recovery || 0) / Math.max(0.1, s.attackSpeed || 1),
+      techs: (p.techs || []).filter((id) => !Rules.techBlocker(p.cls, p.level, id)),
       regen: combat.regen || 0,
       projectile: combat.projectile || null,
       aoeRadius: combat.aoeRadius || 0,
@@ -919,7 +924,9 @@ class Battle extends EventEmitter {
         // Un ennemi invisible (potion) ne peut pas être ciblé.
         if (o.team === f.team || !o.alive || this.isInvisible(o) || this.immune(o, f)) continue;
         const d = Math.hypot(o.x - f.x, o.y - f.y);
-        let score = f.hunter ? o.hp * (1 + d / 500) : d * o.taunt;
+        let score = f.targetPref === 'faible' ? o.hp * (1 + d / 500)
+          : f.targetPref === 'menace' ? d * 30 / (30 + 3 * o.damage * o.dmgMult)
+            : d * o.taunt;
         // Roi de la Colline : on se bat de préférence pour la colline.
         if (this.koth) score += Math.hypot(o.x - this.koth.hill.x, o.y - this.koth.hill.y) * (f.hunter ? 3 : 1.5);
         // Guerre des clans : le cristal adverse attire, mais on défend le sien et on répond à qui nous colle.
@@ -943,6 +950,12 @@ class Battle extends EventEmitter {
       }
       f.targetKey = best.key;
 
+      // Techniques (compétences signature) : elles se déclenchent toutes seules quand leur condition est remplie.
+      if (f.techs.length) {
+        this.useTechniques(f, best, alive);
+        if (!f.alive) continue;
+      }
+
       // Barre de stamina pleine : l'ultime part tout seul.
       if (f.ult && f.stamina >= 1) {
         f.stamina = 0;
@@ -963,21 +976,26 @@ class Battle extends EventEmitter {
       const toHill = this.koth && reach > f.range
         && Math.hypot(f.x - this.koth.hill.x, f.y - this.koth.hill.y) > this.koth.hill.r * 0.8
         && Math.hypot(best.x - this.koth.hill.x, best.y - this.koth.hill.y) > this.koth.hill.r;
-      if (toHill) {
+      // Posture prudente : sous 30 % de vie, on fuit l'ennemi le plus proche.
+      const threat = f.stance === 'prudent' && f.hp / f.maxHp < Rules.COMBAT_AI.fleeHp ? this.nearestEnemy(f, alive, Rules.COMBAT_AI.fleeRange) : null;
+      if (this.time < f.recoverUntil) {
+        // Récupération : immobile juste après une attaque (fenêtre de vulnérabilité)
+      } else if (toHill) {
         this.walkTo(f, this.koth.hill, dt);
+      } else if (threat) {
+        this.retreat(f, threat, speed * 0.9 * dt);
       } else if (reach > f.range) {
         const step = Math.min(speed * dt, reach - f.range + 1);
         f.x += (dx / dist) * step;
         f.y += (dy / dist) * step;
       } else if (f.kite && reach < f.kite) {
-        // Archer : recule quand l'ennemi est trop près.
-        const step = speed * 0.8 * dt;
-        f.x -= (dx / dist) * step;
-        f.y -= (dy / dist) * step;
+        // Archer (ou tactique de recul) : recule quand l'ennemi est trop près, en évitant les bords.
+        this.retreat(f, best, speed * 0.8 * dt);
       }
       if (reach <= f.range && f.cd <= 0) {
         f.cd = f.cooldown / this.buffMult(f, 'attackSpeed');
         this.attack(f, best);
+        if (f.recovery && !f.buffs.some((b) => b.noRecovery)) f.recoverUntil = this.time + f.recovery / this.buffMult(f, 'attackSpeed');
       }
     }
 
@@ -1383,6 +1401,16 @@ class Battle extends EventEmitter {
 
   updateBuffs(f, dt) {
     f.buffs = f.buffs.filter((b) => b.until > this.time);
+    // Poison (Lame empoisonnée) : dégâts chaque demi-seconde, crédités à l'empoisonneur
+    for (const b of f.buffs) {
+      if (!b.poison || this.time < b.tick) continue;
+      b.tick += 0.5;
+      const dmg = Math.max(1, Math.round(f.maxHp * b.poison * 0.5));
+      f.hp -= dmg;
+      if (b.src) b.src.dealt += dmg;
+      this.events.push({ t: 'hit', from: b.src ? b.src.key : null, to: f.key, dmg, poison: true });
+      if (f.hp <= 0) { this.kill(b.src && b.src.alive ? b.src : null, f); return; }
+    }
     const regen = this.buffSum(f, 'regen');
     if (regen) this.heal(f, f.maxHp * regen * dt);
     // Tourbillon : frappe tous les ennemis autour à intervalle régulier.
@@ -1394,6 +1422,167 @@ class Battle extends EventEmitter {
         const crit = Math.random() < f.crit;
         this.hit(f, o, f.damage * f.dmgMult * this.buffMult(f, 'damage') * spin.ratio * (crit ? Rules.CRIT_MULTIPLIER : 1), { crit, splash: true, ult: true });
       }
+    }
+  }
+
+  // ---------- Style de combat (V2) : fuite, techniques ----------
+
+  nearestEnemy(f, alive, within = Infinity) {
+    let best = null;
+    let bd = within;
+    for (const o of alive) {
+      if (o.team === f.team || !o.alive || o.inert || o.isCrystal) continue;
+      const d = Math.hypot(o.x - f.x, o.y - f.y) - o.r - f.r;
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  }
+
+  // Recule loin de `from` en glissant le long des murs plutôt que de s'y coincer.
+  retreat(f, from, step) {
+    const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+    const m = Rules.COMBAT_AI.wallMargin;
+    let ax = f.x - from.x;
+    let ay = f.y - from.y;
+    const len = Math.hypot(ax, ay) || 1;
+    ax /= len;
+    ay /= len;
+    // Poussée des murs proches
+    let px = 0;
+    let py = 0;
+    if (f.x < m) px += (m - f.x) / m;
+    if (f.x > ARENA.w - m) px -= (f.x - (ARENA.w - m)) / m;
+    if (f.y < top + m) py += (top + m - f.y) / m;
+    if (f.y > ARENA.h - m) py -= (f.y - (ARENA.h - m)) / m;
+    let dx = ax + px * 1.6;
+    let dy = ay + py * 1.6;
+    if (Math.hypot(dx, dy) < 0.35) {
+      // Coincé : on longe le mur, du côté qui ramène vers le centre de l'arène
+      const cx = ARENA.w / 2 - f.x;
+      const cy = (top + ARENA.h) / 2 - f.y;
+      dx = -ay;
+      dy = ax;
+      if (dx * cx + dy * cy < 0) { dx = -dx; dy = -dy; }
+    }
+    const d = Math.hypot(dx, dy) || 1;
+    f.x += (dx / d) * step;
+    f.y += (dy / d) * step;
+  }
+
+  // Point d'arrivée d'un saut (roulade, clignement) : loin des ennemis, dans l'arène.
+  escapeSpot(f, alive, dist) {
+    const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+    let best = null;
+    let bestScore = -Infinity;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const x = Math.max(f.r + 10, Math.min(ARENA.w - f.r - 10, f.x + Math.cos(a) * dist));
+      const y = Math.max(top + f.r + 10, Math.min(ARENA.h - f.r - 10, f.y + Math.sin(a) * dist));
+      let near = Infinity;
+      for (const o of alive) if (o.team !== f.team && o.alive && !o.inert) near = Math.min(near, Math.hypot(o.x - x, o.y - y));
+      if (near > bestScore) { bestScore = near; best = { x, y }; }
+    }
+    return best;
+  }
+
+  stun(target, duration) {
+    target.stunUntil = Math.max(target.stunUntil, this.time + duration * (target.isBoss ? 0.5 : 1));
+    target.stunKind = 'stun'; // étourdi (étoiles), pas gelé
+  }
+
+  techReady(f, id) {
+    return (f.techCd[id] || 0) <= this.time;
+  }
+
+  techUsed(f, id, extra = {}) {
+    const T = Rules.TECHNIQUES[id];
+    if (T.cd) f.techCd[id] = this.time + T.cd;
+    this.events.push(Object.assign({ t: 'tech', from: f.key, id }, extra));
+  }
+
+  useTechniques(f, best, alive) {
+    const ratio = f.hp / f.maxHp;
+    const dist = (o) => Math.hypot(o.x - f.x, o.y - f.y) - o.r - f.r;
+    const enemiesWithin = (r) => alive.filter((o) => o.team !== f.team && o.alive && !o.inert && dist(o) <= r);
+    for (const id of f.techs) {
+      if (!this.techReady(f, id)) continue;
+      if (id === 'roulade' && ratio < 0.7 && enemiesWithin(25).length) {
+        const fx = f.x;
+        const fy = f.y;
+        const to = this.escapeSpot(f, alive, 110);
+        Object.assign(f, to);
+        f.protectUntil = Math.max(f.protectUntil || 0, this.time + 0.35);
+        this.techUsed(f, id, { fx: Math.round(fx), fy: Math.round(fy), x: Math.round(f.x), y: Math.round(f.y) });
+      } else if (id === 'charge' && !this.immune(best, f) && dist(best) >= 120 && dist(best) <= 320) {
+        const fx = f.x;
+        const fy = f.y;
+        const dx = best.x - f.x;
+        const dy = best.y - f.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const stop = best.r + f.r + 4;
+        f.x = best.x - (dx / d) * stop;
+        f.y = best.y - (dy / d) * stop;
+        this.stun(best, 0.6);
+        this.hit(f, best, f.damage * f.dmgMult * this.buffMult(f, 'damage') * 0.6, {});
+        this.techUsed(f, id, { fx: Math.round(fx), fy: Math.round(fy), x: Math.round(f.x), y: Math.round(f.y), to: best.key });
+      } else if (id === 'second_souffle' && !f.secondWindUsed && ratio < 0.25) {
+        f.secondWindUsed = true;
+        this.heal(f, f.maxHp * 0.25);
+        this.techUsed(f, id);
+      } else if (id === 'cri_guerre' && enemiesWithin(100).length >= 2) {
+        this.addBuff(f, 'cri_guerre', 4, { taken: 0.75 });
+        this.techUsed(f, id);
+      } else if (id === 'tir_rapide' && dist(best) <= f.range) {
+        this.addBuff(f, 'tir_rapide', 1.5, { attackSpeed: 2.5, noRecovery: true });
+        f.cd = Math.min(f.cd, 0.1);
+        this.techUsed(f, id);
+      } else if (id === 'clignement' && enemiesWithin(70).length) {
+        const fx = f.x;
+        const fy = f.y;
+        Object.assign(f, this.escapeSpot(f, alive, 170));
+        this.techUsed(f, id, { fx: Math.round(fx), fy: Math.round(fy), x: Math.round(f.x), y: Math.round(f.y) });
+      } else if (id === 'nova_givre' && enemiesWithin(90).length) {
+        for (const o of enemiesWithin(130)) if (!o.isCrystal) this.addBuff(o, 'slow', 3, { speed: 0.5 });
+        this.techUsed(f, id, { x: Math.round(f.x), y: Math.round(f.y), r: 130 });
+      } else if (id === 'pas_ombre' && !this.immune(best, f) && dist(best) > f.range && dist(best) <= 320) {
+        const fx = f.x;
+        const fy = f.y;
+        const dx = best.x - f.x;
+        const dy = best.y - f.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+        f.x = Math.max(f.r, Math.min(ARENA.w - f.r, best.x + (dx / d) * (best.r + f.r + 2)));
+        f.y = Math.max(top + f.r, Math.min(ARENA.h - f.r, best.y + (dy / d) * (best.r + f.r + 2)));
+        f.nextCrit = true;
+        this.techUsed(f, id, { fx: Math.round(fx), fy: Math.round(fy), x: Math.round(f.x), y: Math.round(f.y) });
+      } else if (id === 'priere_soin' && ratio < 0.5) {
+        this.heal(f, f.maxHp * 0.2);
+        this.techUsed(f, id);
+      } else if (id === 'lumiere' && enemiesWithin(100).length) {
+        for (const o of enemiesWithin(100)) this.stun(o, 0.8);
+        this.techUsed(f, id, { x: Math.round(f.x), y: Math.round(f.y), r: 100 });
+      }
+    }
+  }
+
+  // Techniques qui modifient une attaque qui vient de toucher.
+  attackTechniques(f, target) {
+    if (f.techs.includes('coup_bouclier') && this.techReady(f, 'coup_bouclier')) {
+      this.stun(target, 1);
+      this.techUsed(f, 'coup_bouclier', { to: target.key });
+    }
+    if (f.techs.includes('fleche_recul') && this.techReady(f, 'fleche_recul') && !target.isBoss && !target.isCrystal && !target.inert
+      && Math.hypot(target.x - f.x, target.y - f.y) < 130) {
+      const dx = target.x - f.x;
+      const dy = target.y - f.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const top = this.mode === 'dungeon' ? DUNGEON_TOP : 0;
+      target.x = Math.max(target.r, Math.min(ARENA.w - target.r, target.x + (dx / d) * 90));
+      target.y = Math.max(top + target.r, Math.min(ARENA.h - target.r, target.y + (dy / d) * 90));
+      this.techUsed(f, 'fleche_recul', { to: target.key, x: Math.round(target.x), y: Math.round(target.y) });
+    }
+    if (f.techs.includes('lame_poison') && !target.isCrystal && !target.inert) {
+      this.addBuff(target, 'poison', 4, { poison: 0.015, tick: this.time + 0.5, src: f });
     }
   }
 
@@ -1513,6 +1702,7 @@ class Battle extends EventEmitter {
           this.hit(f, o, dmg * P.ratio, { splash: true, ult: true });
           // Les boss résistent : gel réduit de moitié.
           o.stunUntil = Math.max(o.stunUntil, this.time + P.stun * (o.isBoss ? 0.5 : 1));
+          o.stunKind = 'frozen';
         }
         break;
       case 'execution': {
@@ -1549,7 +1739,7 @@ class Battle extends EventEmitter {
         ev.targets = victims.map((v) => v.key);
         for (const v of victims) {
           this.hit(f, v, dmg * P.ratio, { ult: true });
-          if (P.stun) v.stunUntil = Math.max(v.stunUntil, this.time + P.stun * (v.isBoss ? 0.5 : 1));
+          if (P.stun) { v.stunUntil = Math.max(v.stunUntil, this.time + P.stun * (v.isBoss ? 0.5 : 1)); v.stunKind = 'stun'; }
         }
         break;
       }
@@ -1638,11 +1828,13 @@ class Battle extends EventEmitter {
       this.events.push({ t: 'dodge', from: attacker.key, to: target.key, proj });
       return;
     }
-    const crit = Math.random() < attacker.crit;
+    const crit = attacker.nextCrit || Math.random() < attacker.crit;
+    attacker.nextCrit = false;
     const raw = attacker.damage * attacker.dmgMult * this.buffMult(attacker, 'damage') * (0.85 + Math.random() * 0.3) * (crit ? Rules.CRIT_MULTIPLIER : 1);
     const tx = target.x;
     const ty = target.y;
     this.hit(attacker, target, raw, { crit, proj });
+    if (attacker.techs.length && target.alive) this.attackTechniques(attacker, target);
     // Mage : explosion autour de la cible. Troll : son coup de massue balaie les combattants proches.
     const splash = attacker.aoeRadius
       ? { r: attacker.aoeRadius, ratio: attacker.aoeRatio }
@@ -1726,6 +1918,10 @@ class Battle extends EventEmitter {
     }
     if (!killer) return;
     killer.kills += 1;
+    if (killer.techs.includes('frenesie') && killer.alive) {
+      this.addBuff(killer, 'frenesie', 5, { attackSpeed: 1.4 });
+      this.events.push({ t: 'tech', from: killer.key, id: 'frenesie' });
+    }
     // Récompenses de kill et séries : seulement en Battle Royale (les monstres ne rapportent rien en eux-mêmes).
     if (this.mode !== 'br') return;
     this.emit('kill', killer, victim);
@@ -1884,6 +2080,17 @@ function inSlam(s, f) {
   return dist < f.r * 2 || diff <= s.half;
 }
 
+// Distance de recul d'un combattant : celle de sa classe, ajustée par sa tactique (posture, réglage perso).
+function kiteFor(p, combat) {
+  const t = p.tactics || {};
+  if (t.stance === 'agressif') return 0;
+  const max = Rules.tacticsKiteMax(p.cls);
+  let kite = combat.kite || 0;
+  if (max && t.kite !== null && t.kite !== undefined && Number.isFinite(Number(t.kite))) kite = Math.max(0, Math.min(max, Number(t.kite)));
+  if (t.stance === 'prudent' && max) kite = Math.min(max, Math.round((kite || 60) * Rules.COMBAT_AI.prudentKite));
+  return kite;
+}
+
 // Combattant avec les valeurs par défaut.
 function fighter(fields) {
   return Object.assign({
@@ -1895,6 +2102,8 @@ function fighter(fields) {
     chain: 0, lastKillAt: -Infinity, healAcc: 0, diedAt: null, diedRoom: null,
     spec: null, ult: null, staminaTime: 0, stamina: 0, consumable: null, potionUsed: false, started: false, engaged: false,
     buffs: [], stunUntil: 0,
+    stance: 'equilibre', targetPref: 'proche', recovery: 0, recoverUntil: 0,
+    techs: [], techCd: {}, nextCrit: false, secondWindUsed: false,
   }, fields);
 }
 
@@ -1902,7 +2111,7 @@ function fighter(fields) {
 function fxOf(f, time) {
   if (!f.alive) return undefined;
   const fx = f.buffs.filter((b) => !b.boon).map((b) => b.kind); // les bonus de sondage s'affichent dans le bandeau du donjon
-  if (time < f.stunUntil) fx.push('frozen');
+  if (time < f.stunUntil) fx.push(f.stunKind || 'frozen');
   if (f.buffs.some((b) => b.invisible)) fx.push('invisible');
   return fx.length ? fx : undefined;
 }

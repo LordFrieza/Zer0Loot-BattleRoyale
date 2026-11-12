@@ -708,3 +708,22 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .clan-btns { margin-top: 8px; gap: 10px; }
 .clan-btn { flex: 1; min-width: 200px; justify-content: center; background: color-mix(in srgb, var(--c) 18%, rgba(14, 10, 38, .9)); border: 2px solid var(--c); color: #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 35%, transparent); }
 .clan-btn.mine { background: color-mix(in srgb, var(--c) 45%, rgba(14, 10, 38, .9)); opacity: 1; }
+
+/* ---------- Style de combat (V2) ---------- */
+.tech-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tech-slot { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; padding: 12px; border: 2px dashed var(--border); border-radius: 12px; min-height: 64px; color: var(--muted); }
+.tech-slot.filled { border-style: solid; border-color: var(--neon); color: var(--text); flex-direction: row; gap: 10px; }
+.tech-slot.locked { opacity: .5; }
+.tech-slot small { font-size: 12px; }
+.tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.tech-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--bg2); font-size: 13px; }
+.tech-card.on { border-color: var(--neon); box-shadow: 0 0 12px rgba(41, 231, 255, .25); }
+.tech-card.locked { opacity: .55; }
+.tech-card p { margin: 6px 0; }
+.tech-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tech-ico { font-size: 22px; }
+.tech-tag { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--c, var(--border)); color: var(--c, var(--muted)); }
+.tac-row { margin-bottom: 14px; }
+.tac-label { font-weight: 800; margin-bottom: 6px; }
+.tac-row p { margin: 6px 0 0; font-size: 13px; }
+#tac-kite { width: 240px; }

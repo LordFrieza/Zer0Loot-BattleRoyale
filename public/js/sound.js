@@ -453,6 +453,13 @@
       for (let i = 0; i < 16; i++) tone(midi(84 + (i % 4) * 3), 0.08, { type: 'square', vol: 0.03, delay: 0.2 + i * 0.05 });
     },
 
+    // Technique déclenchée : petit « swoosh » (plus aigu pour les sauts et téléportations).
+    tech(id) {
+      const jump = ['roulade', 'clignement', 'pas_ombre', 'charge'].includes(id);
+      noise(0.18, { filter: 'bandpass', freq: jump ? 2400 : 900, sweep: jump ? 600 : 1800, q: 1.5, vol: 0.08 });
+      tone(jump ? 880 : 520, 0.12, { type: 'triangle', vol: 0.05, to: jump ? 1320 : 780 });
+    },
+
     // Roi de la Colline : la colline change de place.
     hillMove() {
       [72, 76, 79].forEach((n, i) => tone(midi(n), 0.16, { type: 'square', vol: 0.05, delay: i * 0.07 }));

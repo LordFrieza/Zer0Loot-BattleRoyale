@@ -269,6 +269,8 @@ app.post('/api/consumable/equip', requirePlayer, action((req) => {
 // ---------- Arbre de compétences ----------
 
 app.post('/api/talent/learn', requirePlayer, action((req) => game.learnTalent(req.user.character, String(req.body.id || ''))));
+app.post('/api/tactics', requirePlayer, action((req) => game.setTactics(req.user.character, req.body || {})));
+app.post('/api/techs', requirePlayer, action((req) => game.setTechniques(req.user.character, req.body.techs)));
 app.post('/api/stats/reset', requirePlayer, action((req) => game.resetStats(req.user.character)));
 app.post('/api/talent/reset', requirePlayer, action((req) => game.resetTalents(req.user.character)));
 
@@ -343,6 +345,8 @@ function participantFromUser(user) {
     look: lookOf(user),
     ult: Rules.ultOf(c.cls, c.talents || []), // ultime de l'arbre de compétences (null s'il n'en a pas)
     consumable: c.consumableSlot || null, // potion équipée pour cette partie
+    tactics: c.tactics || null, // style de combat (posture, cible, recul)
+    techs: c.techs || [], // techniques signature
   };
 }
 
@@ -388,7 +392,14 @@ function makeNpc(key, name, level, cls) {
     look,
     ult: Rules.ultOf(cls, talents),
     consumable: Math.random() < 0.3 ? anyOf(Rules.CONSUMABLES) : null,
+    techs: randomTechs(cls, level),
   };
+}
+
+// Techniques tirées au hasard parmi celles accessibles (bots, mannequins d'entraînement).
+function randomTechs(cls, level) {
+  const pool = Object.keys(Rules.TECHNIQUES).filter((id) => !Rules.techBlocker(cls, level, id)).sort(() => Math.random() - 0.5);
+  return pool.slice(0, Rules.techSlots(level));
 }
 
 function refreshParticipant(p) {

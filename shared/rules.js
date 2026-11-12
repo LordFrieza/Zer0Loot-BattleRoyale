@@ -41,15 +41,15 @@
       perks: ['+30 % Vie', '+25 % Défense', 'Attire l\'aggro des ennemis proches'],
       weapon: 'epee', offhand: 'bouclier',
       bonus: { vie: 30, defense: 25 }, flat: {},
-      combat: { range: 40, taunt: 0.7 },
+      combat: { range: 40, taunt: 0.7, recovery: 0.3 },
     },
     archer: {
       label: 'Archiloot', role: 'Archer', icon: '🏹', color: '#3ddc5a',
       desc: 'Tire de loin et recule quand un ennemi s\'approche trop près.',
-      perks: ['Attaque à distance', 'Recule face aux ennemis proches', '+15 % Précision', '−10 % Vie', '−15 % Dégâts'],
+      perks: ['Attaque à distance', 'Recule face aux ennemis proches (sans se coincer contre les bords)', '+15 % Précision', 'S\'immobilise un instant après chaque tir', '−10 % Vie', '−15 % Dégâts'],
       weapon: 'arc', offhand: 'carquois',
       bonus: { vie: -10, force: -15 }, flat: { precision: 0.15 },
-      combat: { range: 230, kite: 110, projectile: 'arrow' },
+      combat: { range: 230, kite: 110, projectile: 'arrow', recovery: 0.6 },
     },
     mage: {
       label: 'Magiloot', role: 'Mage', icon: '🔮', color: '#b14dff',
@@ -57,15 +57,15 @@
       perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+25 % Dégâts', '−15 % Vie', 'Attaque 35 % plus lente'],
       weapon: 'baton', offhand: 'grimoire',
       bonus: { vie: -15, force: 25 }, flat: {},
-      combat: { range: 170, projectile: 'fire', aoeRadius: 75, aoeRatio: 0.6, cooldownMult: 1.35 },
+      combat: { range: 170, projectile: 'fire', aoeRadius: 75, aoeRatio: 0.6, cooldownMult: 1.35, recovery: 0.5 },
     },
     assassin: {
       label: 'Lootassin', role: 'Assassin', icon: '🗡️', color: '#ffd23f',
       desc: 'Rapide et mortel : il traque l\'ennemi le plus affaibli du champ de bataille.',
-      perks: ['Cible l\'ennemi le plus faible', '+10 % Critique', '+25 % Vitesse d\'attaque', '−15 % Vie'],
+      perks: ['Cible l\'ennemi le plus faible', '+10 % Critique', '+25 % Vitesse d\'attaque', 'Récupère presque aussitôt après un coup', '−10 % Vie'],
       weapon: 'dagues', offhand: 'dague',
-      bonus: { vie: -15, vitesse_attaque: 25 }, flat: { crit: 0.10 },
-      combat: { range: 36, hunter: true },
+      bonus: { vie: -10, vitesse_attaque: 25 }, flat: { crit: 0.10 },
+      combat: { range: 36, hunter: true, recovery: 0.05 },
     },
     pretre: {
       label: 'Saint-Loot', role: 'Prêtre', icon: '✨', color: '#5fd3ff',
@@ -73,11 +73,11 @@
       perks: ['Régénère 1,5 % de sa vie par seconde', '+10 % Vie', '+10 % Défense', '−10 % Dégâts'],
       weapon: 'masse', offhand: 'relique',
       bonus: { vie: 10, defense: 10, force: -10 }, flat: {},
-      combat: { range: 40, regen: 0.015 },
+      combat: { range: 40, regen: 0.015, recovery: 0.3 },
     },
   };
   // Personnage sans classe (viewer qui a tapé !join sans compte) : combattant neutre.
-  const NO_CLASS = { label: 'Vagaloot', role: 'Vagabond', icon: '🧳', bonus: {}, flat: {}, combat: { range: 40 } };
+  const NO_CLASS = { label: 'Vagaloot', role: 'Vagabond', icon: '🧳', bonus: {}, flat: {}, combat: { range: 40, recovery: 0.3 } };
 
   function classInfo(cls) {
     return CLASS_INFO[cls] || NO_CLASS;
@@ -978,6 +978,70 @@
   }
 
   // ---------- Mode entraînement ----------
+  // ---------- Style de combat : tactique et techniques (V2) ----------
+  /*
+   * Récupération : après chaque attaque, un combattant reste immobile un court instant (secondes, voir
+   * CLASS_INFO.combat.recovery), divisé par sa vitesse d'attaque. L'Assassin récupère presque tout de suite.
+   * Fuite : un combattant qui recule évite les bords de l'arène (il glisse le long des murs au lieu de s'y coincer).
+   */
+  const COMBAT_AI = { wallMargin: 110, fleeHp: 0.3, fleeRange: 130, prudentKite: 1.4 };
+
+  // Tactique réglable sur la fiche : posture, cible préférée et distance de recul (classes à distance).
+  const TACTICS = {
+    stance: {
+      equilibre: { label: 'Équilibré', icon: '⚖️', desc: 'Le comportement normal de ta classe.' },
+      agressif: { label: 'Agressif', icon: '🔥', desc: 'Ne recule jamais, même à distance : colle à sa cible.' },
+      prudent: { label: 'Prudent', icon: '🛡️', desc: 'Garde plus de distance (classes à distance) et fuit quand sa vie passe sous 30 %.' },
+    },
+    target: {
+      auto: { label: 'Selon ma classe', icon: '🎯', desc: 'Le plus proche (l\'Assassin : le plus faible).' },
+      proche: { label: 'Le plus proche', icon: '📍', desc: 'Attaque l\'ennemi le plus proche.' },
+      faible: { label: 'Le plus faible', icon: '🩸', desc: 'Traque l\'ennemi qui a le moins de vie.' },
+      menace: { label: 'Le plus dangereux', icon: '☠️', desc: 'Vise l\'ennemi qui frappe le plus fort.' },
+    },
+    kiteMin: 0, // distance de recul réglable de 0 à (portée − 30) px pour les classes à distance
+  };
+  const DEFAULT_TACTICS = { stance: 'equilibre', target: 'auto', kite: null };
+  function tacticsKiteMax(cls) {
+    const c = classInfo(cls).combat;
+    return c.projectile ? Math.max(0, c.range - 30) : 0;
+  }
+
+  /*
+   * Techniques : compétences signature (en plus de l'ultime), qui se déclenchent toutes seules en combat.
+   * Un emplacement au niveau 5, un second au niveau 15. Chaque technique a un niveau requis ; certaines sont
+   * réservées à une classe (cls), d'autres aux combattants au corps à corps (melee).
+   */
+  const TECH_SLOTS = [5, 15];
+  const TECHNIQUES = {
+    roulade: { label: 'Roulade', icon: '🌀', level: 5, cd: 9, desc: 'Sous 70 % de vie, quand un ennemi est au contact : roulade de 110 px hors de portée, intouchable 0,35 s.' },
+    charge: { label: 'Charge', icon: '🐗', level: 5, cd: 10, melee: true, desc: 'Fonce sur sa cible entre 120 et 320 px, l\'étourdit 0,6 s et frappe à 60 %.' },
+    second_souffle: { label: 'Second souffle', icon: '💨', level: 10, desc: 'Une fois par partie, sous 25 % de vie : récupère 25 % de sa vie max.' },
+    frenesie: { label: 'Frénésie', icon: '😤', level: 15, desc: 'Après chaque kill : vitesse d\'attaque ×1,4 pendant 5 s.' },
+    cri_guerre: { label: 'Cri de guerre', icon: '📯', level: 10, cd: 12, cls: 'guerrier', desc: 'Entouré d\'au moins 2 ennemis : dégâts subis ×0,75 pendant 4 s.' },
+    coup_bouclier: { label: 'Coup de bouclier', icon: '🛡️', level: 15, cd: 8, cls: 'guerrier', desc: 'Toutes les 8 s, sa prochaine attaque étourdit la cible 1 s.' },
+    fleche_recul: { label: 'Flèche repoussante', icon: '🏹', level: 10, cd: 7, cls: 'archer', desc: 'Toutes les 7 s, sa flèche repousse de 90 px une cible trop proche (moins de 130 px).' },
+    tir_rapide: { label: 'Tir rapide', icon: '⚡', level: 15, cd: 12, cls: 'archer', desc: 'Au contact d\'une cible à portée : vitesse d\'attaque ×2,5 et aucune récupération pendant 1,5 s.' },
+    clignement: { label: 'Clignement', icon: '✨', level: 10, cd: 8, cls: 'mage', desc: 'Un ennemi à moins de 70 px : se téléporte 170 px plus loin.' },
+    nova_givre: { label: 'Nova de givre', icon: '❄️', level: 15, cd: 11, cls: 'mage', desc: 'Un ennemi à moins de 90 px : ralentit de moitié les ennemis à moins de 130 px pendant 3 s.' },
+    pas_ombre: { label: 'Pas de l\'ombre', icon: '👤', level: 10, cd: 9, cls: 'assassin', desc: 'Se téléporte dans le dos de sa cible (jusqu\'à 320 px) : la prochaine attaque est critique.' },
+    lame_poison: { label: 'Lame empoisonnée', icon: '🧪', level: 15, cls: 'assassin', desc: 'Ses coups empoisonnent : 1,5 % de la vie max par seconde pendant 4 s.' },
+    priere_soin: { label: 'Prière de soin', icon: '💖', level: 10, cd: 14, cls: 'pretre', desc: 'Sous 50 % de vie : récupère 20 % de sa vie max.' },
+    lumiere: { label: 'Lumière aveuglante', icon: '🌟', level: 15, cd: 12, cls: 'pretre', desc: 'Des ennemis à moins de 100 px : tous étourdis 0,8 s.' },
+  };
+  function techSlots(level) {
+    return TECH_SLOTS.filter((l) => (level || 1) >= l).length;
+  }
+  // Raison pour laquelle un personnage ne peut pas prendre une technique, ou null.
+  function techBlocker(cls, level, id) {
+    const t = TECHNIQUES[id];
+    if (!t) return 'Technique inconnue';
+    if (t.cls && t.cls !== cls) return `Réservée à la classe ${CLASS_INFO[t.cls].role}`;
+    if (t.melee && classInfo(cls).combat.projectile) return 'Réservée aux combattants au corps à corps';
+    if ((level || 1) < t.level) return `Disponible au niveau ${t.level}`;
+    return null;
+  }
+
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150 };
 
   // ---------- Raid de Donjon : ambiance qui change toutes les 5 salles ----------
@@ -1178,6 +1242,6 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
   };
 });
