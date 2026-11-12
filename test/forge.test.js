@@ -67,3 +67,64 @@ test('[FRG-5, FRG-6] forge : relance d\'une ligne', () => {
   game.reroll(c, item.id, 0);
   assert.strictEqual(c.gold, 40);
 });
+
+// ---------- Alchimie noire ----------
+
+test('[FRG-7] alchimie noire : sacrifie un objet de même rareté pour renforcer une ligne', () => {
+  assert.deepStrictEqual(Rules.RARITIES.map((r) => Rules.ALCHEMY.price[r]), [15, 30, 60, 120, 250]);
+  const c = game.newCharacter();
+  game.chooseClass(c, 'guerrier');
+  const target = game.makeItem('epique');
+  target.lines[1].value = 11;
+  const sac = game.makeItem('epique');
+  c.inventory.push(target, sac);
+  c.gold = 500;
+  const stat = target.lines[1].stat;
+  const r = game.alchemy(c, target.id, 1, sac.id);
+  assert.strictEqual(target.lines[1].stat, stat, 'la stat ne change pas');
+  assert.ok(r.gain >= 1 && r.gain <= 3);
+  assert.strictEqual(target.lines[1].value, 11 + r.gain);
+  assert.strictEqual(target.lines[1].alch, 1);
+  assert.strictEqual(c.gold, 380);
+  assert.ok(!c.inventory.some((i) => i.id === sac.id), 'objet sacrifié détruit');
+  assert.strictEqual(c.counters.alchemy, 1);
+  // Sur un objet équipé aussi
+  const sword = game.makeItem('commun', 'arme', { cls: 'guerrier' });
+  sword.lines[0].value = 1;
+  c.inventory.push(sword, game.makeItem('commun'));
+  game.equip(c, sword.id);
+  const fodder = c.inventory.find((i) => i.rarity === 'commun');
+  game.alchemy(c, sword.id, 0, fodder.id);
+  assert.strictEqual(c.equipment.arme.lines[0].value, 2, '+1 pour un Commun');
+  assert.ok(Rules.ACHIEVEMENTS.some((a) => a.id === 'alchemy10' && a.metric === 'alchemy' && a.goal === 10));
+});
+
+test('[FRG-8] alchimie noire : plafond et refus sans rien perdre', () => {
+  assert.deepStrictEqual(Rules.RARITIES.map(Rules.alchemyCap), [4, 8, 14, 21, 35]);
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  const target = game.makeItem('legendaire');
+  target.lines[0].value = 34;
+  const sacs = [game.makeItem('legendaire'), game.makeItem('legendaire')];
+  const rare = game.makeItem('rare');
+  c.inventory.push(target, ...sacs, rare);
+  c.gold = 1000;
+  const snapshot = () => JSON.stringify([c.gold, c.inventory.map((i) => i.id), target.lines]);
+  const before = snapshot();
+  assert.throws(() => game.alchemy(c, target.id, 0, rare.id), /même rareté/);
+  assert.throws(() => game.alchemy(c, target.id, 0, target.id), /lui-même/);
+  assert.throws(() => game.alchemy(c, target.id, 9, sacs[0].id), /Ligne introuvable/);
+  assert.throws(() => game.alchemy(c, 'nope', 0, sacs[0].id), /Objet introuvable/);
+  assert.throws(() => game.alchemy(c, target.id, 0, 'nope'), /sacrifier/);
+  c.presets.push({ name: 'p', items: { anneau: sacs[0].id } });
+  assert.throws(() => game.alchemy(c, target.id, 0, sacs[0].id), /protégé/);
+  c.presets = [];
+  c.gold = 249;
+  assert.throws(() => game.alchemy(c, target.id, 0, sacs[0].id), /250 golds/);
+  c.gold = 1000;
+  assert.strictEqual(snapshot(), before, 'rien débité ni détruit');
+  game.alchemy(c, target.id, 0, sacs[0].id);
+  assert.strictEqual(target.lines[0].value, 35, 'plafonnée à 35');
+  assert.throws(() => game.alchemy(c, target.id, 0, sacs[1].id), /maximum de l'alchimie \(35\)/);
+  assert.strictEqual(c.gold, 750);
+});

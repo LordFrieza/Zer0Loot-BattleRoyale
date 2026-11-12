@@ -373,6 +373,31 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .reroll-line.flash { animation: lineFlash 1s; }
 @keyframes lineFlash { 0% { background: rgba(255,176,0,.5); } 100% { background: transparent; } }
 
+/* Alchimie noire */
+.alch-card { grid-column: 1 / -1; border-color: #6d2bb3; background: linear-gradient(135deg, rgba(120,30,200,.16), transparent 60%), var(--bg2); }
+.alch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 10px; }
+@media (max-width: 900px) { .alch-grid { grid-template-columns: 1fr; } }
+.alch-label { font-weight: 800; font-size: 13px; margin: 6px 0; }
+#alch-item { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 6px; }
+.alch-line { display: grid; grid-template-columns: 1fr 90px 60px; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 5px; cursor: pointer; font-size: 13px; }
+.alch-line:hover { filter: brightness(1.2); }
+.alch-line.active { border-color: #b14dff; box-shadow: 0 0 10px rgba(177,77,255,.5); background: rgba(177,77,255,.12); }
+.alch-line.full { opacity: .6; }
+.alch-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.alch-bar i { display: block; height: 100%; background: linear-gradient(90deg, #6d2bb3, #d27bff); }
+.pick-chip.chosen { border-color: #b14dff; box-shadow: 0 0 10px rgba(177,77,255,.7); background: rgba(177,77,255,.2); }
+.alch-go { background: linear-gradient(180deg, #b14dff, #6d2bb3) !important; color: #fff !important; }
+li.alch { color: #e2b8ff; }
+.alch-mark { font-size: 11px; }
+.alch-overlay { background: radial-gradient(circle, rgba(45,10,78,.94), rgba(0,0,0,.97)); --glow: #b14dff; }
+.alch-stage { position: relative; width: 260px; height: 260px; }
+.alch-cauldron { position: absolute; left: 0; bottom: 0; width: 260px; filter: drop-shadow(0 0 18px #b14dff); }
+.alch-cauldron.boil { animation: boil .45s ease-out; }
+@keyframes boil { 0% { transform: scale(1); } 35% { transform: scale(1.06, .95); } 70% { transform: scale(.97, 1.04); } 100% { transform: scale(1); } }
+.alch-gain { color: #5dff9b; }
+li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
+@keyframes alchUp { 0% { background: rgba(177,77,255,.7); } 100% { background: transparent; } }
+
 /* Animation de forge */
 .forge-overlay { position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, rgba(60,20,5,.92), rgba(0,0,0,.97)); overflow: hidden; }
 .forge-overlay.open { display: flex; }

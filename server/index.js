@@ -238,6 +238,7 @@ app.post('/api/class', requirePlayer, action((req) => game.chooseClass(req.user.
 app.post('/api/forge/fuse', requirePlayer, action((req) => game.fuse(req.user.character, req.body.itemIds)));
 
 app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
+app.post('/api/forge/alchemy', requirePlayer, action((req) => game.alchemy(req.user.character, req.body.itemId, req.body.line, req.body.sacrificeId)));
 
 app.post('/api/look', requirePlayer, action((req) => {
   game.setLook(req.user.character, String(req.body.part || ''), req.body.value === null || req.body.value === undefined ? null : String(req.body.value));

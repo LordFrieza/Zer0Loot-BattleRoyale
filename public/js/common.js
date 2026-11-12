@@ -55,7 +55,7 @@ function itemHtml(item, extra = '', playerCls) {
   const r = Rules.RARITY_INFO[item.rarity];
   const type = itemType(item);
   const lines = item.lines
-    .map((l) => `<li>${Rules.formatLine(l.stat, l.value)}</li>`)
+    .map((l) => `<li${l.alch ? ` class="alch" title="Renforcée ${l.alch} fois par l'Alchimie noire"` : ''}>${Rules.formatLine(l.stat, l.value)}${l.alch ? ' <span class="alch-mark">⚗️</span>' : ''}</li>`)
     .join('');
   return `<div class="item rarity-${item.rarity}" data-id="${item.id}">
     <div class="item-name c-${item.rarity}">${type.icon} ${esc(item.name)}</div>

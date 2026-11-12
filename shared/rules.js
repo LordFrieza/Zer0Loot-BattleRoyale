@@ -230,6 +230,21 @@
   // Relance d'une ligne : prix en golds selon la rareté de l'objet.
   const REROLL_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
 
+  /*
+   * Alchimie noire : on sacrifie un objet de même rareté (et des golds) pour augmenter la valeur
+   * d'une ligne choisie d'un autre objet, sans jamais changer sa stat. La ligne peut dépasser le
+   * maximum normal de la rareté, jusqu'à un plafond (`capMult` × maximum).
+   */
+  const ALCHEMY = {
+    price: { commun: 15, peu_commun: 30, rare: 60, epique: 120, legendaire: 250 },
+    gain: { commun: [1, 1], peu_commun: [1, 2], rare: [1, 2], epique: [1, 3], legendaire: [2, 4] },
+    capMult: 1.4,
+  };
+  function alchemyCap(rarity) {
+    const info = RARITY_INFO[rarity];
+    return info ? Math.round(info.max * ALCHEMY.capMult) : 0;
+  }
+
   // ---------- Panoplies ----------
   /*
    * Un objet peut appartenir à une panoplie. Équiper plusieurs pièces de la même panoplie donne
@@ -304,6 +319,7 @@
     { id: 'fused25', metric: 'fused', goal: 25, name: 'Forgeron', desc: 'Fusionner 25 fois à la forge', gold: 150 },
     { id: 'fused100', metric: 'fused', goal: 100, name: 'Maître forgeron', desc: 'Fusionner 100 fois à la forge', gold: 500 },
     { id: 'rerolled10', metric: 'rerolled', goal: 10, name: 'Alchimiste', desc: 'Relancer 10 lignes à la forge', gold: 100 },
+    { id: 'alchemy10', metric: 'alchemy', goal: 10, name: 'Alchimiste noir', desc: 'Réussir 10 transmutations d\'Alchimie noire', gold: 150 },
     { id: 'betsWon1', metric: 'betsWon', goal: 1, name: 'Parieur', desc: 'Gagner 1 pari', gold: 20 },
     { id: 'betsWon10', metric: 'betsWon', goal: 10, name: 'Bookmaker', desc: 'Gagner 10 paris', gold: 150 },
     { id: 'betsWon50', metric: 'betsWon', goal: 50, name: 'Oracle', desc: 'Gagner 50 paris', gold: 500 },
@@ -317,7 +333,7 @@
     { id: 'dungeon10', metric: 'dungeonBest', goal: 10, name: 'Aventurier', desc: 'Atteindre la salle 10 du Raid de Donjon', gold: 200 },
     { id: 'dungeon20', metric: 'dungeonBest', goal: 20, name: 'Seigneur du donjon', desc: 'Atteindre la salle 20 du Raid de Donjon', gold: 1000 },
   ];
-  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest'];
+  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy'];
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -1231,7 +1247,7 @@
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
-    FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE,
+    FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,

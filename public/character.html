@@ -167,6 +167,26 @@
           <select id="reroll-item"></select>
           <div id="reroll-preview"></div>
         </div>
+        <div class="forge-card alch-card">
+          <h3>⚗️ Alchimie noire</h3>
+          <p class="muted help">Choisis un objet et <b>une de ses lignes</b>, puis <b>sacrifie un autre objet de la même rareté</b>
+            (et quelques golds) : la ligne gagne quelques points, <b>sans changer de stat</b>. Elle peut même dépasser le maximum
+            normal de sa rareté, jusqu'au plafond de l'alchimie. L'objet sacrifié est détruit.</p>
+          <div class="alch-grid">
+            <div>
+              <div class="alch-label">1. L'objet à renforcer</div>
+              <select id="alch-item"></select>
+              <div class="alch-label">2. La ligne</div>
+              <div id="alch-lines"></div>
+            </div>
+            <div>
+              <div class="alch-label">3. L'objet sacrifié <span class="muted" id="alch-sac-sub"></span></div>
+              <div class="forge-pick" id="alch-pick"></div>
+            </div>
+          </div>
+          <div class="fuse-info" id="alch-info"></div>
+          <div class="row"><button class="gold alch-go" id="alch-go">⚗️ Transmuter !</button></div>
+        </div>
       </div>
     </div>
 
@@ -415,6 +435,7 @@
   <script src="/js/sound.js"></script>
   <script src="/js/chest.js"></script>
   <script src="/js/forge.js"></script>
+  <script src="/js/alchemy.js"></script>
   <script src="/js/leaderboard.js"></script>
   <script src="/js/arena.js"></script>
   <script src="/js/character.js"></script>

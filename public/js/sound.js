@@ -311,6 +311,19 @@
       noise(0.15, { filter: 'highpass', freq: 5000, vol: 0.1, delay: 0.26 });
     },
 
+    // Alchimie noire : bouillonnement du chaudron (i = 0, 1, 2 : de plus en plus fort).
+    alchemyBubble(i = 0) {
+      for (let k = 0; k < 4 + i * 2; k++) tone(midi(50 + Math.floor(Math.random() * 14) + i * 3), 0.09, { type: 'sine', vol: 0.06 + i * 0.02, to: 600 + i * 200, delay: k * 0.06 });
+      noise(0.35, { filter: 'lowpass', freq: 500 + i * 300, vol: 0.12 + i * 0.04 });
+    },
+
+    // Alchimie noire : la ligne se renforce (accord mineur sombre puis éclat).
+    alchemyResult() {
+      tone(midi(45), 1.2, { type: 'sawtooth', vol: 0.06, to: midi(57) });
+      [0, 3, 7, 12].forEach((st, i) => tone(midi(69 + st), 0.4, { type: 'triangle', vol: 0.1, delay: 0.25 + i * 0.09 }));
+      noise(0.5, { filter: 'highpass', freq: 4000, vol: 0.12, delay: 0.6 });
+    },
+
     // Annonce d'un événement de bataille : gong + motif selon l'événement.
     eventStart(kind) {
       const c = ctx;

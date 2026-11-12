@@ -9,6 +9,7 @@ const selected = new Set();
 let simLuck = null;
 const opener = new ChestOpener();
 const forge = new ForgeAnimator();
+const alchemist = new AlchemyAnimator();
 Sound.bindVolume($('sound-ctl'));
 let opening = false;
 
@@ -789,7 +790,78 @@ function renderForge() {
     ? items.map(({ item, equipped }) => `<option value="${item.id}" ${item.id === rerollItemId ? 'selected' : ''}>${equipped ? '✅ Équipé · ' : ''}${itemType(item).icon} ${esc(item.name)} (${Rules.RARITY_INFO[item.rarity].label})</option>`).join('')
     : '<option>Aucun objet</option>';
   renderRerollPreview();
+  renderAlchemy();
 }
+
+// ---------- Alchimie noire ----------
+let alchItemId = null;
+let alchLine = 0;
+let alchSacId = null;
+
+function renderAlchemy() {
+  const c = me.character;
+  const items = allItems().sort((a, b) => (b.equipped - a.equipped) || Rules.RARITIES.indexOf(b.item.rarity) - Rules.RARITIES.indexOf(a.item.rarity));
+  if (!items.some((x) => x.item.id === alchItemId)) { alchItemId = items[0] ? items[0].item.id : null; alchLine = 0; }
+  $('alch-item').innerHTML = items.length
+    ? items.map(({ item, equipped }) => `<option value="${item.id}" ${item.id === alchItemId ? 'selected' : ''}>${equipped ? '✅ Équipé · ' : ''}${itemType(item).icon} ${esc(item.name)} (${Rules.RARITY_INFO[item.rarity].label})</option>`).join('')
+    : '<option>Aucun objet</option>';
+  const entry = items.find((x) => x.item.id === alchItemId);
+  if (!entry) {
+    $('alch-lines').innerHTML = ''; $('alch-pick').innerHTML = ''; $('alch-info').innerHTML = ''; $('alch-go').disabled = true;
+    return;
+  }
+  const item = entry.item;
+  const cap = Rules.alchemyCap(item.rarity);
+  const [gmin, gmax] = Rules.ALCHEMY.gain[item.rarity];
+  if (!item.lines[alchLine]) alchLine = 0;
+  $('alch-lines').innerHTML = item.lines.map((l, i) => {
+    const full = l.value >= cap;
+    return `<div class="alch-line ${i === alchLine ? 'active' : ''} ${full ? 'full' : ''}" data-al="${i}">
+      <span>${Rules.STAT_INFO[l.stat].icon} <b>+${l.value}${Rules.statUnit(l.stat)}</b> ${Rules.STAT_INFO[l.stat].label}${l.alch ? ' ⚗️' : ''}</span>
+      <span class="alch-bar"><i style="width:${Math.min(100, (l.value / cap) * 100)}%"></i></span>
+      <span class="muted">${full ? 'MAX' : `${l.value} / ${cap}`}</span></div>`;
+  }).join('');
+  $('alch-lines').querySelectorAll('[data-al]').forEach((el) => { el.onclick = () => { alchLine = Number(el.dataset.al); renderAlchemy(); }; });
+
+  const sacrifices = c.inventory.filter((i) => i.id !== item.id && i.rarity === item.rarity && !isProtected(i.id));
+  if (!sacrifices.some((i) => i.id === alchSacId)) alchSacId = null;
+  $('alch-sac-sub').innerHTML = `(${Rules.RARITY_INFO[item.rarity].label}, dans ton coffre)`;
+  $('alch-pick').innerHTML = sacrifices.length
+    ? sacrifices.map((i) => `<span class="pick-chip rarity-${i.rarity} ${i.id === alchSacId ? 'chosen' : ''}" data-sac="${i.id}" title="${esc(i.lines.map((l) => Rules.formatLine(l.stat, l.value)).join(', '))}">
+        ${itemType(i).icon} <span class="c-${i.rarity}">${esc(i.name)}</span></span>`).join('')
+    : `<span class="muted">Aucun objet <span class="c-${item.rarity}">${Rules.RARITY_INFO[item.rarity].label}</span> à sacrifier (hors objets protégés par un preset).</span>`;
+  $('alch-pick').querySelectorAll('[data-sac]').forEach((el) => {
+    el.onclick = () => { alchSacId = alchSacId === el.dataset.sac ? null : el.dataset.sac; Sound.play('chestHit', 2); renderAlchemy(); };
+  });
+
+  const line = item.lines[alchLine];
+  const price = Rules.ALCHEMY.price[item.rarity];
+  const full = line.value >= cap;
+  const gain = gmin === gmax ? `+${gmin}` : `+${gmin} à +${gmax}`;
+  $('alch-info').innerHTML = full
+    ? '⚗️ Cette ligne est déjà au <b>maximum de l\'alchimie</b>.'
+    : `⚗️ ${Rules.STAT_INFO[line.stat].label} : <b>${gain}</b> (plafond ${cap}${Rules.statUnit(line.stat)}) · coût <b>${price} 🪙</b>${alchSacId ? '' : ' · <span class="muted">choisis l\'objet à sacrifier</span>'}`;
+  $('alch-go').disabled = full || !alchSacId || c.gold < price;
+}
+
+$('alch-item').onchange = (e) => { alchItemId = e.target.value; alchLine = 0; alchSacId = null; renderAlchemy(); };
+$('alch-go').onclick = async () => {
+  const sacrifice = me.character.inventory.find((x) => x.id === alchSacId);
+  if (sacrifice && (sacrifice.rarity === 'epique' || sacrifice.rarity === 'legendaire')
+    && !confirm(`« ${sacrifice.name} » va être détruit définitivement. Continuer ?`)) return;
+  let r;
+  opening = true;
+  try {
+    r = await api('/api/forge/alchemy', { itemId: alchItemId, line: alchLine, sacrificeId: alchSacId });
+    me = await api('/api/me');
+  } catch (err) {
+    opening = false;
+    toast('⚠️ ' + err.message);
+    return;
+  }
+  alchSacId = null;
+  alchemist.play(r, me.character.cls, () => { opening = false; render(); });
+};
 
 function renderRerollPreview(flashIndex) {
   const entry = allItems().find((x) => x.item.id === rerollItemId);

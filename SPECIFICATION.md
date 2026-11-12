@@ -364,6 +364,8 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **FRG-4** Si les 3 objets fusionnés appartiennent à la même panoplie, alors l'objet créé doit en faire partie.
 - **FRG-5** Quand un joueur relance une ligne (objet équipé ou en inventaire), le serveur doit débiter 10 / 20 / 40 / 80 / 150 golds selon la rareté, remplacer la ligne par une stat absente de l'objet avec une nouvelle valeur dans la fourchette de rareté, et incrémenter `rerolled`.
 - **FRG-6** Si la ligne est invalide, que les golds manquent ou qu'aucune autre stat n'est possible, alors le serveur doit refuser sans débiter.
+- **FRG-7** Quand un joueur utilise l'Alchimie noire sur une ligne d'un objet (équipé ou en inventaire), le serveur doit exiger un autre objet de **même rareté** dans son inventaire, non protégé par un preset, débiter 15 / 30 / 60 / 120 / 250 golds (Commun → Légendaire), détruire l'objet sacrifié et augmenter la valeur de la ligne de +1 (Commun), +1 à 2 (Peu commun, Rare), +1 à 3 (Épique) ou +2 à 4 (Légendaire), **sans changer sa stat**, et incrémenter `alchemy` (succès « Alchimiste noir » à 10).
+- **FRG-8** La valeur d'une ligne renforcée ne doit jamais dépasser le plafond de l'alchimie, `arrondi(1,4 × maximum de la rareté)` : 4 / 8 / 14 / 21 / 35. Si la ligne est déjà au plafond, que la ligne ou l'objet sacrifié est invalide (introuvable, même objet, autre rareté, protégé) ou que les golds manquent, alors le serveur doit refuser sans rien débiter ni détruire. La ligne garde le nombre de renforcements (`alch`), affiché ⚗️.
 
 ## 13. Panoplies
 
@@ -386,7 +388,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 15. Succès et titres
 
-- **ACH-1** Le serveur doit suivre les métriques `battles`, `kills`, `wins`, `level`, `cosmetics`, `setPieces` et les compteurs `chests`, `legendary`, `recycled`, `fused`, `rerolled`, `betsWon`, `firstblood`, `double`, `massacre`, `subs`, `bossWins` et `dungeonBest` (meilleure salle du donjon ; lors de la fusion d'un fantôme, on garde le maximum au lieu d'additionner).
+- **ACH-1** Le serveur doit suivre les métriques `battles`, `kills`, `wins`, `level`, `cosmetics`, `setPieces` et les compteurs `chests`, `legendary`, `recycled`, `fused`, `rerolled`, `betsWon`, `firstblood`, `double`, `massacre`, `subs`, `bossWins`, `alchemy` et `dungeonBest` (meilleure salle du donjon ; lors de la fusion d'un fantôme, on garde le maximum au lieu d'additionner).
 - **ACH-2** Quand un succès atteint son objectif, le joueur doit pouvoir récupérer une seule fois sa récompense en golds ; sinon (non terminé ou déjà récupéré), le serveur doit refuser.
 - **ACH-3** Quand un joueur choisit un titre, le serveur doit exiger un succès terminé ; le titre est le nom du succès et s'affiche sous le pseudo et dans les classements.
 

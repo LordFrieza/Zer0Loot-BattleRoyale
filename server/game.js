@@ -361,6 +361,35 @@ function reroll(character, itemId, lineIndex) {
   return { item, line, old, price };
 }
 
+/*
+ * Alchimie noire : sacrifie un objet du coffre de même rareté que la cible (+ golds) pour augmenter
+ * la valeur d'une ligne de la cible (équipée ou non), sans changer sa stat, jusqu'à Rules.alchemyCap.
+ */
+function alchemy(character, itemId, lineIndex, sacrificeId) {
+  upgrade(character);
+  const item = findItem(character, itemId);
+  if (!item) throw new Error('Objet introuvable');
+  const index = Number(lineIndex);
+  if (!Number.isInteger(index) || !item.lines[index]) throw new Error('Ligne introuvable');
+  const sacrifice = character.inventory.find((i) => i.id === sacrificeId);
+  if (!sacrifice) throw new Error('Choisis un objet à sacrifier dans ton coffre personnel');
+  if (sacrifice.id === item.id) throw new Error('Un objet ne peut pas se sacrifier lui-même');
+  if (protectedIds(character).has(sacrifice.id)) throw new Error('Un objet protégé par un preset ne peut pas être sacrifié');
+  if (sacrifice.rarity !== item.rarity) throw new Error('L\'objet sacrifié doit être de la même rareté');
+  const cap = Rules.alchemyCap(item.rarity);
+  const line = item.lines[index];
+  if (line.value >= cap) throw new Error(`Cette ligne est déjà au maximum de l'alchimie (${cap})`);
+  const price = Rules.ALCHEMY.price[item.rarity];
+  if (character.gold < price) throw new Error(`L'alchimie noire coûte ${price} golds`);
+  character.gold -= price;
+  character.inventory = character.inventory.filter((i) => i.id !== sacrifice.id);
+  const [min, max] = Rules.ALCHEMY.gain[item.rarity];
+  const old = line.value;
+  line.value = Math.min(cap, old + rand(min, max));
+  line.alch = (line.alch || 0) + 1;
+  bump(character, 'alchemy');
+  return { item, index, line, old, gain: line.value - old, cap, price, sacrifice };
+}
 
 // ---------- Presets d'équipement ----------
 
@@ -694,7 +723,7 @@ function publicCharacter(user) {
 
 module.exports = {
   newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
-  openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll,
+  openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, savePreset, applyPreset, deletePreset,
