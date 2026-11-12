@@ -17,6 +17,8 @@ test('[LOOT-3] table de loot : total à 100 % et plafond', () => {
 });
 
 test('[LOOT-2, LOOT-4] objets : nombre de lignes et bornes selon la rareté', () => {
+  assert.deepStrictEqual(Rules.RARITIES.map((r) => [Rules.RARITY_INFO[r].min, Rules.RARITY_INFO[r].max]),
+    [[1, 3], [2, 6], [4, 10], [5, 15], [6, 25]], 'fourchettes qui se chevauchent');
   for (const rarity of Rules.RARITIES) {
     const info = Rules.RARITY_INFO[rarity];
     for (let i = 0; i < 200; i++) {

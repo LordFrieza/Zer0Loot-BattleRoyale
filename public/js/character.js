@@ -1145,6 +1145,11 @@ function renderForge() {
   });
 
   // Relance de ligne
+  // Rappel des fourchettes de valeur par rareté (relance et alchimie)
+  const range = (r) => `<span class="c-${r}">${Rules.RARITY_INFO[r].label} +${Rules.RARITY_INFO[r].min} à +${Rules.RARITY_INFO[r].max}</span>`;
+  $('reroll-ranges').innerHTML = 'Valeur d\'une nouvelle ligne : ' + Rules.RARITIES.map(range).join(' · ');
+  $('alch-ranges').innerHTML = 'Valeurs normales : ' + Rules.RARITIES.map(range).join(' · ')
+    + '<br>Plafond de l\'alchimie : ' + Rules.RARITIES.map((r) => `<span class="c-${r}">${Rules.RARITY_INFO[r].label} ${Rules.alchemyCap(r)}</span>`).join(' · ');
   $('reroll-prices').innerHTML = 'Prix : ' + Rules.RARITIES.map((r) => `<span class="c-${r}">${Rules.RARITY_INFO[r].label} ${Rules.REROLL_PRICE[r]} 🪙</span>`).join(' · ');
   const items = allItems().sort((a, b) => (b.equipped - a.equipped) || Rules.RARITIES.indexOf(b.item.rarity) - Rules.RARITIES.indexOf(a.item.rarity));
   if (!items.some((x) => x.item.id === rerollItemId)) rerollItemId = items[0] ? items[0].item.id : null;

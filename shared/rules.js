@@ -88,10 +88,11 @@
 
   const RARITY_INFO = {
     commun: { label: 'Commun', color: '#e8e8e8', lines: 1, min: 1, max: 3, clicks: 3 },
-    peu_commun: { label: 'Peu commun', color: '#3ddc5a', lines: 2, min: 4, max: 6, clicks: 5 },
-    rare: { label: 'Rare', color: '#3b8bff', lines: 3, min: 7, max: 10, clicks: 10 },
-    epique: { label: 'Épique', color: '#b14dff', lines: 4, min: 11, max: 15, clicks: 20 },
-    legendaire: { label: 'Légendaire', color: '#ff9a1f', lines: 5, min: 15, max: 25, clicks: 30 },
+    // Fourchettes larges qui se chevauchent : un bon objet Rare peut valoir mieux qu'un Épique moyen (et la relance a un intérêt).
+    peu_commun: { label: 'Peu commun', color: '#3ddc5a', lines: 2, min: 2, max: 6, clicks: 5 },
+    rare: { label: 'Rare', color: '#3b8bff', lines: 3, min: 4, max: 10, clicks: 10 },
+    epique: { label: 'Épique', color: '#b14dff', lines: 4, min: 5, max: 15, clicks: 20 },
+    legendaire: { label: 'Légendaire', color: '#ff9a1f', lines: 5, min: 6, max: 25, clicks: 30 },
   };
 
   // Couleur des lumières du coffre selon le nombre de clics déjà donnés.
@@ -1161,6 +1162,7 @@
     relicEvery: 3,
     relicChoices: 3,
     relicTimeout: 30, // s : passé ce délai, une relique est choisie au hasard
+    rewardScale: 2 / 3, // XP et golds de fin d'expédition
     // Seul face aux monstres, le corps à corps est désavantagé (pas de groupe pour encaisser) : vie et dégâts
     // ajustés par classe pendant l'Expédition, pour que chaque classe descende à peu près aussi loin.
     classMult: {
@@ -1184,13 +1186,15 @@
     };
   }
   // Récompense pour `floors` étages nettoyés (× `mult` avec la relique Trésor) : 1 coffre tous les 5 étages.
+  // XP et golds × EXPEDITION.rewardScale (2/3 depuis la 1.3 : l'Expédition rapportait trop).
   function expeditionReward(floors, mult = 1) {
     const n = Math.max(0, Math.floor(floors || 0));
     if (!n) return null;
+    const k = mult * EXPEDITION.rewardScale;
     return {
       floors: n,
-      xp: Math.round((25 * n + 2 * n * n) * mult),
-      gold: Math.round((20 * n + 1.5 * n * n) * mult),
+      xp: Math.round((25 * n + 2 * n * n) * k),
+      gold: Math.round((20 * n + 1.5 * n * n) * k),
       chests: Math.floor(n / 5),
     };
   }

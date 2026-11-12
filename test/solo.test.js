@@ -151,9 +151,9 @@ test('[SOLO-4] reliques : 3 au choix toutes les 3 profondeurs, cumulables', () =
 
 test('[SOLO-5] expédition : butin selon les profondeurs nettoyées', () => {
   assert.strictEqual(Rules.expeditionReward(0), null);
-  assert.deepStrictEqual(Rules.expeditionReward(1), { floors: 1, xp: 27, gold: 22, chests: 0 });
-  assert.deepStrictEqual(Rules.expeditionReward(10), { floors: 10, xp: 450, gold: 350, chests: 2 });
-  assert.deepStrictEqual(Rules.expeditionReward(20, 1.25), { floors: 20, xp: 1625, gold: 1250, chests: 4 });
+  assert.deepStrictEqual(Rules.expeditionReward(1), { floors: 1, xp: 18, gold: 14, chests: 0 });
+  assert.deepStrictEqual(Rules.expeditionReward(10), { floors: 10, xp: 300, gold: 233, chests: 2 });
+  assert.deepStrictEqual(Rules.expeditionReward(20, 1.25), { floors: 20, xp: 1083, gold: 833, chests: 4 });
   const b = soloBattle('expedition');
   let res = null;
   b.on('coopEnd', (r) => { res = r; });

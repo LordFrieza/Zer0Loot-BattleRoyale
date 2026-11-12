@@ -847,3 +847,4 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .mail-item { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
 .mail-item.unread { background: rgba(255,201,58,.08); border-left: 3px solid #ffc93a; }
 .mail-item .muted { font-size: 11px; }
+.rarity-ranges { font-size: 12px; line-height: 1.6; }

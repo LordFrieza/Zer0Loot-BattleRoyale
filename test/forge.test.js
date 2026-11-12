@@ -61,7 +61,8 @@ test('[FRG-5, FRG-6] forge : relance d\'une ligne', () => {
   assert.strictEqual(c.gold, 120);
   assert.ok(!before.includes(r.line.stat), 'nouvelle stat différente de toutes les lignes');
   assert.strictEqual(new Set(item.lines.map((l) => l.stat)).size, 4);
-  assert.ok(r.line.value >= 11 && r.line.value <= 15);
+  assert.ok(r.line.value >= Rules.RARITY_INFO.epique.min && r.line.value <= Rules.RARITY_INFO.epique.max);
+  assert.deepStrictEqual([Rules.RARITY_INFO.epique.min, Rules.RARITY_INFO.epique.max], [5, 15]);
   // Fonctionne aussi sur un objet équipé
   game.equip(c, item.id);
   game.reroll(c, item.id, 0);

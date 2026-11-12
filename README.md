@@ -123,7 +123,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   chance 85 → 5 / 49 / 32,55 / 10,85 / 2,6 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.
 - **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).
-  Commun 1 ligne (+1–3 %), Peu commun 2 (+4–6 %), Rare 3 (+7–10 %), Épique 4 (+11–15 %), Légendaire 5 (+15–25 %).
+  Commun 1 ligne (+1–3 %), Peu commun 2 (+2–6 %), Rare 3 (+4–10 %), Épique 4 (+5–15 %), Légendaire 5 (+6–25 %).
+  Les fourchettes se chevauchent : un très bon objet Rare peut valoir mieux qu'un Épique moyen (rappel dans la Forge).
   Chaque emplacement / type d'arme a ses stats de prédilection (ex. plastron → Vie/Défense/Épines, arc → Précision,
   dagues → Critique/Vitesse d'attaque, boucles → Chance).
 - **Forge** :
@@ -222,8 +223,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Expédition** : descente sans fin, seul contre des monstres de plus en plus forts (croissance exponentielle). Toutes
     les 3 profondeurs, le joueur choisit **une relique parmi 3** (13 reliques cumulables : dégâts, peau de pierre,
     vitesse, vol de vie, épines, régénération, critique, soin, ultime, pacte sanglant, vie en plus, trésor…). Butin pour
-    `n` profondeurs nettoyées : `25n + 2n²` XP, `20n + 1,5n²` golds, 1 coffre tous les 5 (ex. profondeur 10 : 450 XP,
-    350 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
+    `n` profondeurs nettoyées : 2/3 × `(25n + 2n²)` XP, 2/3 × `(20n + 1,5n²)` golds, 1 coffre tous les 5 (ex. profondeur 10 : 300 XP,
+    233 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
   - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (300 XP, 250 golds,
     1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
