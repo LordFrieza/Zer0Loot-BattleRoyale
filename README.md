@@ -167,7 +167,17 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Pastilles : points à répartir, coffres à ouvrir, points d'arbre, techniques à choisir, énergie, succès à récupérer.
   L'énergie du mode Solo s'affiche aussi en haut de la page (⚡). Lien direct possible (`/character.html#boutique`).
 - **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
-  n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse).
+  n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse). Filtre **par
+  stat** (seulement les objets qui ont la Vie, la Force…, triés par la valeur de cette stat), combinable avec
+  l'emplacement, et bouton **🏪 Vendre** sur chaque objet. Les golds restent affichés en haut de la page, sur tous les onglets.
+- **Marché** (onglet Marché) : chaque joueur peut mettre en vente jusqu'à **5 objets** de son coffre personnel (ni équipés,
+  ni protégés par un preset), au prix de son choix (5 à 1 000 000 golds). Pour placer la vente, il paie une **taxe de 20 %**
+  du prix (jamais remboursée). Une vente dure **96 h** ; sans acheteur, l'objet revient dans son coffre. Acheter ne coûte
+  que le prix affiché (**pas de taxe**) ; le vendeur reçoit les golds tout de suite, même s'il n'est pas connecté, et un
+  **courrier ✉️** (bouton en haut de la page, avec le nombre de messages non lus). L'onglet montre les ventes en cours (avec
+  un bouton pour les retirer), un **historique** (mises en vente, ventes, achats, retraits, expirations) et la liste des
+  objets en vente, filtrable par emplacement, rareté, stat et classe, triable par prix, rareté ou date. Succès : Marchand
+  (1 vente), Négociant (10 ventes), Client (1 achat).
 - **Presets d'équipement** (panneau Équipement) : jusqu'à 5 presets nommés ; « Équiper » remet exactement l'équipement
   sauvegardé (⟳ pour le mettre à jour, 🗑 pour le supprimer). Les objets d'un preset sont **protégés** 🔐 : ni
   recyclage, ni fusion à la forge, tant que le preset existe.
@@ -259,8 +269,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
     **Vitesse** fait parcourir plus de terrain. Les 15 dernières secondes : **JACKPOT** (pluie ×3, pièces à 2 golds).
     Ambiance « bonus game » : lumière dorée et rayons, arc-en-ciel pendant le jackpot, compteur géant, podium et
     confettis à la fin. Chacun **garde son butin** (+1 coffre pour le meilleur ramasseur) ; ni paris ni potion consommée.
-  - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris et
-    squelettes archers, plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
+  - **Raid de Donjon** (coopératif, dès 1 joueur) : salles successives de gobelins, slimes, chauves-souris,
+    squelettes archers, et deux monstres **venimeux** dont les coups empoisonnent : le rat pestiféré (dès la salle 2) et
+    le gobelin violet (dès la salle 4) ; aussi en Expédition. Ils sont plus nombreux et plus forts à chaque salle, avec un chef 👑 toutes les 5 salles. Entrée par la
     gauche, sortie par la droite, fondu au noir et grand « SALLE X ». L'ambiance change toutes les 5 salles : Cachots,
     Crypte oubliée (flammes vertes, toiles), Forges infernales (lave), Abysses (yeux dans le noir), puis le Néant.
     Pas de réapparition ; les survivants récupèrent
@@ -304,7 +315,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
-- **Succès** : 62 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
+- **Succès** : 65 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.

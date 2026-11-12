@@ -15,6 +15,8 @@
     <a class="logo" href="/"><img src="/img/logo.png" alt="Zer0Loot"><small>BATTLE ROYALE</small></a>
     <div class="right">
       <a href="/arena.html" target="_blank">Arène en direct</a>
+      <button type="button" class="mail-btn" id="mail-btn" title="Courrier">✉️<span class="mail-count" id="mail-count"></span></button>
+      <span class="gold-chip" id="gold-chip" title="Tes golds"></span>
       <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
       <span id="who"></span>
       <div id="sound-ctl"></div>
@@ -52,6 +54,7 @@
       <button data-tab="arbre" id="tab-arbre">🌳 Arbre de compétences <span class="tab-badge" data-badge="arbre"></span></button>
       <button data-tab="combat">⚔️ Style de combat <span class="tab-badge" data-badge="combat"></span></button>
       <button data-tab="boutique">🛍️ Boutique</button>
+      <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
@@ -157,6 +160,7 @@
       <label class="inv-toggle"><input type="checkbox" id="inv-show-other"> Afficher les objets des autres classes
         <span class="muted">(armes et objets secondaires que ta classe ne peut pas équiper)</span></label>
       <div class="inv-filters" id="inv-filters"></div>
+      <div class="inv-filters stat-filters" id="inv-stat-filters"></div>
       <div class="inventory" id="inventory"></div>
       <div class="pager" id="inv-pager"></div>
     </div>
@@ -303,6 +307,50 @@
         </div>
       </div>
       <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas><div class="relic-choice" id="training-relic"></div></div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="marche">
+    <div class="panel market-panel" id="market-panel">
+      <h2>🏪 Marché <span class="sub">Achète et vends des objets entre joueurs</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Mets en vente un objet de ton coffre personnel au prix que tu veux. Pour placer la vente, tu paies une
+        <b>taxe de 20 %</b> du prix (elle n'est pas remboursée). Tu peux avoir <b>5 ventes en cours</b> au maximum, et chacune
+        dure <b>4 jours (96 h)</b> : sans acheteur, l'objet revient dans ton coffre. Acheter ne coûte que le prix affiché,
+        <b>sans taxe</b>. Dès qu'un joueur achète ton objet, tu reçois les golds tout de suite et un <b>courrier ✉️</b>
+        en haut de la page. Les objets équipés ou protégés par un preset ne peuvent pas être vendus.</p>
+      <div class="market-grid">
+        <div class="market-card">
+          <h3>💸 Vendre un objet <span class="sub" id="market-slots"></span></h3>
+          <select id="market-item"></select>
+          <div id="market-item-preview"></div>
+          <div class="row market-price-row">
+            <label for="market-price" style="margin:0">Prix</label>
+            <input id="market-price" type="number" min="5" step="1" value="100" style="width:120px"> 🪙
+            <span class="muted" id="market-tax"></span>
+          </div>
+          <div class="row"><button class="gold" id="market-sell">🏷️ Mettre en vente</button></div>
+          <h3 style="margin-top:16px">📦 Mes ventes en cours</h3>
+          <div id="market-mine"></div>
+        </div>
+        <div class="market-card">
+          <h3>📜 Historique</h3>
+          <div class="market-history" id="market-history"></div>
+        </div>
+      </div>
+      <h3 class="market-title">🛒 Objets en vente <span class="sub" id="market-count"></span></h3>
+      <div class="inv-filters" id="market-slot-filters"></div>
+      <div class="row market-filters">
+        <select id="market-rarity"></select>
+        <select id="market-stat"></select>
+        <select id="market-sort">
+          <option value="new">Les plus récents</option>
+          <option value="cheap">Prix croissant</option>
+          <option value="dear">Prix décroissant</option>
+          <option value="rarity">Rareté</option>
+        </select>
+        <label class="inv-toggle" style="margin:0"><input type="checkbox" id="market-mycls"> Seulement ce que ma classe peut équiper</label>
+      </div>
+      <div class="inventory" id="market-list"></div>
     </div>
     </section>
 
@@ -488,6 +536,17 @@
       <div class="row" style="justify-content:flex-end;margin-top:14px">
         <button class="secondary" id="potion-shop-link">🛍️ Acheter des potions</button>
         <button class="secondary" id="potion-modal-close">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mail-modal">
+    <div class="modal-box" style="max-width:640px">
+      <h2>✉️ Courrier</h2>
+      <div class="mail-list" id="mail-list"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px">
+        <button class="secondary" id="mail-market">🏪 Voir le marché</button>
+        <button class="gold" id="mail-close">Fermer</button>
       </div>
     </div>
   </div>

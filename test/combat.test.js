@@ -304,3 +304,45 @@ test('[B-11] au contact, on est toujours à portée : les chauves-souris (et la 
     assert.ok(hero.hp < 5000, elite ? 'la Chauve-souris vampire frappe' : 'la chauve-souris frappe');
   }
 });
+
+test('[DNG-15] rat pestiféré et gobelin violet : leurs coups empoisonnent (plus fort pour leur chef)', () => {
+  const { Battle } = require('./helpers');
+  assert.deepStrictEqual([Rules.MONSTERS.rat.from, Rules.MONSTERS.gobelin_violet.from], [2, 4]);
+  assert.deepStrictEqual([Rules.ELITES.rat, Rules.ELITES.gobelin_violet], ['Roi des rats', 'Chaman gobelin']);
+  for (const [kind, elite, dot] of [['rat', false, 0.012], ['gobelin_violet', false, 0.02], ['rat', true, 0.018]]) {
+    const b = new Battle();
+    b.openQueue(60, 'dungeon');
+    clearTimeout(b.queueTimer);
+    b.join(player('g', { cls: 'guerrier', stats: base({ maxHp: 1000, speed: 0, cooldown: 99 }) }));
+    b.start(null, null);
+    b.stopLoop();
+    Object.assign(b.dungeon, { stage: 'fight', room: 5 });
+    const hero = b.players[0];
+    hero.dodge = 0;
+    const m = b.makeMonster(kind, elite, { hp: 1, damage: 1 }, { x: 500, y: 400 }, 0);
+    m.precision = 1;
+    b.monsters = [m];
+    b.fighters = [hero, m];
+    b.attack(m, hero);
+    const p = hero.buffs.find((x) => x.kind === 'poison');
+    assert.ok(p, kind);
+    assert.ok(Math.abs(p.poison - dot) < 1e-9, `${kind} ${elite}`);
+    assert.ok(Math.abs(p.until - b.time - 3) < 1e-9, '3 s');
+    const hp = hero.hp;
+    for (let i = 0; i < 20; i++) b.updateBuffs(hero, 0.05, (b.time += 0.05));
+    assert.ok(hero.hp < hp, 'le poison fait des dégâts');
+  }
+  // Une esquive n'empoisonne pas
+  const b = new Battle();
+  b.openQueue(60, 'dungeon');
+  clearTimeout(b.queueTimer);
+  b.join(player('g', { cls: 'guerrier' }));
+  b.start(null, null);
+  b.stopLoop();
+  const hero = b.players[0];
+  hero.dodge = 1;
+  const rat = b.makeMonster('rat', false, { hp: 1, damage: 1 }, { x: 500, y: 400 }, 0);
+  rat.precision = 0;
+  b.attack(rat, hero);
+  assert.ok(!hero.buffs.some((x) => x.kind === 'poison'));
+});

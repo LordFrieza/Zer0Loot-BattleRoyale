@@ -350,11 +350,14 @@
     { id: 'challenge1', metric: 'challengeWins', goal: 1, name: 'Duelliste', desc: 'Réussir 1 Défi des boss (mode Solo)', gold: 50 },
     { id: 'hero1', metric: 'heroWins', goal: 1, name: 'Héroïque', desc: 'Réussir un Défi des boss en Héroïque ou Légendaire', gold: 200 },
     { id: 'legend1', metric: 'legendWins', goal: 1, name: 'Légende vivante', desc: 'Réussir un Défi des boss en Légendaire', gold: 500 },
+    { id: 'sold1', metric: 'sold', goal: 1, name: 'Marchand', desc: 'Vendre 1 objet au marché', gold: 30 },
+    { id: 'sold10', metric: 'sold', goal: 10, name: 'Négociant', desc: 'Vendre 10 objets au marché', gold: 200 },
+    { id: 'bought1', metric: 'bought', goal: 1, name: 'Client', desc: 'Acheter 1 objet au marché', gold: 20 },
     { id: 'techs1', metric: 'techs', goal: 1, name: 'Technicien', desc: 'Équiper une technique (onglet Style de combat)', gold: 30 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
-    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs'];
+    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
   const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
@@ -642,11 +645,15 @@
     gobelin: { label: 'Gobelin', icon: '👺', hp: 40, damage: 6, speed: 78, cooldown: 0.95, range: 36, radius: 13, reduction: 0.05, dodge: 0.08, from: 1 },
     slime: { label: 'Slime', icon: '🟢', hp: 80, damage: 6, speed: 42, cooldown: 1.25, range: 34, radius: 15, reduction: 0.2, dodge: 0, from: 1 },
     chauve_souris: { label: 'Chauve-souris', icon: '🦇', hp: 24, damage: 4, speed: 135, cooldown: 0.65, range: 30, radius: 11, reduction: 0, dodge: 0.25, from: 2 },
+    // Leurs coups empoisonnent : `poison.dot` de la vie max par seconde pendant `poison.duration` s (×1,5 pour un chef).
+    rat: { label: 'Rat pestiféré', icon: '🐀', hp: 20, damage: 3, speed: 120, cooldown: 0.7, range: 30, radius: 10, reduction: 0, dodge: 0.15, from: 2, poison: { dot: 0.012, duration: 3 } },
+    gobelin_violet: { label: 'Gobelin violet', icon: '🟣', hp: 46, damage: 5, speed: 82, cooldown: 1, range: 36, radius: 13, reduction: 0.05, dodge: 0.1, from: 4, poison: { dot: 0.02, duration: 3 } },
     squelette: { label: 'Squelette archer', icon: '💀', hp: 42, damage: 7, speed: 55, cooldown: 1.4, range: 210, kite: 100, recovery: 0.6, projectile: 'bone', radius: 13, reduction: 0.1, dodge: 0.05, from: 3 },
   };
   // Toutes les 5 salles, un chef bien plus costaud accompagne les monstres.
   const ELITES = {
     gobelin: 'Roi des gobelins', slime: 'Slime géant', chauve_souris: 'Chauve-souris vampire', squelette: 'Seigneur squelette',
+    rat: 'Roi des rats', gobelin_violet: 'Chaman gobelin',
   };
   const ELITE = { every: 5, hpMult: 5, damageMult: 1.5, scale: 1.9 };
   const DUNGEON = {
@@ -1088,6 +1095,25 @@
   }
 
 
+  // ---------- Marché entre joueurs ----------
+  /*
+   * Un joueur met en vente un objet de son coffre personnel à un prix en golds. Il paie tout de suite une taxe
+   * (20 % du prix, arrondie au-dessus), jamais remboursée. L'ordre dure 96 h ; au-delà, l'objet lui revient.
+   * L'acheteur paie le prix, sans taxe, et le vendeur reçoit tout de suite la somme (et un courrier).
+   */
+  const MARKET = {
+    maxOrders: 5,
+    durationMs: 96 * 3600 * 1000,
+    taxRate: 0.2,
+    minPrice: 5,
+    maxPrice: 1000000,
+    mailMax: 50, // courriers gardés par joueur (les plus anciens partent)
+    historyMax: 40, // lignes d'historique du marché gardées par joueur
+  };
+  function marketTax(price) {
+    return Math.max(1, Math.ceil(price * MARKET.taxRate));
+  }
+
   // ---------- Mode Solo (V2) ----------
   /*
    * Énergie : 3 au maximum, +1 toutes les 10 h ; une tentative (Expédition ou Défi des boss) coûte 1 énergie.
@@ -1476,6 +1502,6 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

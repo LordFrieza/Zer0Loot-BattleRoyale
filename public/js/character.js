@@ -4,6 +4,7 @@ let me = null;
 let queue = null;
 let config = null;
 let invFilter = 'all';
+let invStat = 'all'; // filtre par stat : seulement les objets qui ont cette ligne (triés par sa valeur)
 let recycleMode = false;
 const selected = new Set();
 let simLuck = null;
@@ -23,6 +24,7 @@ function render() {
   if (!me || opening) return;
   const c = me.character;
   $('who').textContent = me.username;
+  $('gold-chip').textContent = `🪙 ${c.gold.toLocaleString('fr-FR')}`;
   $('char-name').textContent = me.twitchDisplayName || me.username;
   window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
   const ci = c.cls && Rules.CLASS_INFO[c.cls];
@@ -60,6 +62,8 @@ function render() {
   renderTalents();
   renderCombatStyle();
   renderSolo();
+  renderMail();
+  if (marketOrders) renderMarket();
   if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
   renderBadges();
   $('char-title').textContent = c.titleName ? `« ${c.titleName} »` : '';
@@ -214,10 +218,23 @@ function renderInventory() {
     b.onclick = () => { invFilter = b.dataset.f; invPage = 0; renderInventory(); };
   });
   $('inv-count').textContent = inv.length + ' objet(s)';
-  const list = (invFilter === 'other' ? inv : visible)
+  const bySlot = (invFilter === 'other' ? inv : visible)
+    .filter((item) => invFilter === 'all' || (invFilter === 'other' ? otherClass(item) : item.slot === invFilter));
+  // Filtre par stat (combinable avec l'emplacement) : seules les stats présentes dans le coffre sont proposées.
+  const statOf = (item) => item.lines.reduce((sum, l) => (l.stat === invStat ? sum + l.value : sum), 0);
+  const statCounts = {};
+  for (const item of bySlot) for (const st of new Set(item.lines.map((l) => l.stat))) statCounts[st] = (statCounts[st] || 0) + 1;
+  if (invStat !== 'all' && !statCounts[invStat]) invStat = 'all';
+  $('inv-stat-filters').innerHTML = `<span class="muted filter-label">Stat :</span><button class="${invStat === 'all' ? 'active' : ''}" data-st="all">Toutes</button>`
+    + Rules.STATS.filter((st) => statCounts[st]).map((st) => `<button class="${invStat === st ? 'active' : ''}" data-st="${st}">${Rules.STAT_INFO[st].icon} ${Rules.STAT_INFO[st].label} (${statCounts[st]})</button>`).join('');
+  $('inv-stat-filters').querySelectorAll('[data-st]').forEach((b) => {
+    b.onclick = () => { invStat = b.dataset.st; invPage = 0; renderInventory(); };
+  });
+  const list = bySlot
     .map((item, i) => ({ item, i }))
-    .filter(({ item }) => invFilter === 'all' || (invFilter === 'other' ? otherClass(item) : item.slot === invFilter))
-    .sort((x, y) => Rules.RARITIES.indexOf(y.item.rarity) - Rules.RARITIES.indexOf(x.item.rarity) || y.i - x.i)
+    .filter(({ item }) => invStat === 'all' || item.lines.some((l) => l.stat === invStat))
+    .sort((x, y) => (invStat !== 'all' ? statOf(y.item) - statOf(x.item) : 0)
+      || Rules.RARITIES.indexOf(y.item.rarity) - Rules.RARITIES.indexOf(x.item.rarity) || y.i - x.i)
     .map(({ item }) => item);
   // Retire de la sélection les objets qui ne sont plus dans l'inventaire ou plus affichés (filtre, case « autres classes »).
   const ids = new Set(list.map((i) => i.id));
@@ -236,11 +253,20 @@ function renderInventory() {
       const btn = ok
         ? `<button class="small" data-equip="${item.id}">Équiper</button>`
         : `<button class="small secondary" disabled title="Change de classe ou passe-le à la forge">🔒 ${Rules.CLASS_INFO[Rules.itemClass(item)].label} uniquement</button>`;
-      return itemHtml(item, `${protectedTag(item)}${ok ? compareHtml(item) : ''}<div class="actions">${btn}</div>`, me.character.cls);
+      const sell = isProtected(item.id) ? '' : `<button class="small secondary" data-sell="${item.id}" title="Le vendre au marché">🏪 Vendre</button>`;
+      return itemHtml(item, `${protectedTag(item)}${ok ? compareHtml(item) : ''}<div class="actions">${btn}${sell}</div>`, me.character.cls);
     }).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
     b.onclick = () => act('/api/equip', { itemId: b.dataset.equip }, 'equip');
+  });
+  $('inventory').querySelectorAll('[data-sell]').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      marketItemId = b.dataset.sell;
+      showTab('marche');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
   });
   $('inventory').querySelectorAll('.item').forEach((el) => {
     el.classList.toggle('selected', recycleMode && selected.has(el.dataset.id));
@@ -789,6 +815,155 @@ function onSoloQueue(q) {
 
 setInterval(() => { if (me) { renderEnergy(); renderRelicChoice(); } }, 1000);
 
+// ---------- Marché ----------
+let marketOrders = null; // ordres en vente (chargés à l'ouverture de l'onglet, rafraîchis en direct)
+let marketSlot = 'all';
+let marketItemId = null;
+
+async function loadMarket() {
+  try { marketOrders = (await api('/api/market')).orders; } catch (e) { marketOrders = marketOrders || []; }
+  renderMarket();
+}
+
+function timeLeft(ms) {
+  const m = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  return d ? `${d} j ${h % 24} h` : h ? `${h} h ${String(m % 60).padStart(2, '0')}` : `${m} min`;
+}
+const dateShort = (t) => new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const MARKET_LOG = { listed: '🏷️ Mis en vente', sold: '💰 Vendu', bought: '🛒 Acheté', cancelled: '↩️ Retiré', expired: '⌛ Expiré' };
+
+function renderMarket() {
+  if (!me || !me.character) return;
+  const c = me.character;
+  const M = Rules.MARKET;
+  const orders = marketOrders || [];
+  const mine = orders.filter((o) => o.sellerId === me.id);
+  $('market-slots').textContent = `${mine.length} / ${M.maxOrders} ventes en cours`;
+
+  // Vendre : un objet du coffre (pas protégé par un preset)
+  const sellable = c.inventory.filter((i) => !isProtected(i.id))
+    .sort((a, b) => Rules.RARITIES.indexOf(b.rarity) - Rules.RARITIES.indexOf(a.rarity));
+  if (!sellable.some((i) => i.id === marketItemId)) marketItemId = sellable[0] ? sellable[0].id : null;
+  $('market-item').innerHTML = sellable.length
+    ? sellable.map((i) => `<option value="${i.id}" ${i.id === marketItemId ? 'selected' : ''}>${itemType(i).icon} ${esc(i.name)} (${Rules.RARITY_INFO[i.rarity].label})</option>`).join('')
+    : '<option value="">Aucun objet à vendre dans ton coffre</option>';
+  const item = sellable.find((i) => i.id === marketItemId);
+  $('market-item-preview').innerHTML = item ? itemHtml(item, '', c.cls) : '';
+  const price = Math.floor(Number($('market-price').value) || 0);
+  const okPrice = price >= M.minPrice && price <= M.maxPrice;
+  const tax = okPrice ? Rules.marketTax(price) : 0;
+  $('market-tax').innerHTML = okPrice
+    ? `Taxe : <b>${tax} 🪙</b> (20 %, non remboursée) · tu recevras <b>${price} 🪙</b> à la vente`
+    : `Prix entre ${M.minPrice} et ${M.maxPrice.toLocaleString('fr-FR')} 🪙`;
+  $('market-sell').disabled = !item || !okPrice || c.gold < tax || mine.length >= M.maxOrders;
+  $('market-sell').title = mine.length >= M.maxOrders ? `${M.maxOrders} ventes au maximum` : c.gold < tax ? 'Pas assez de golds pour la taxe' : '';
+
+  // Mes ventes en cours
+  $('market-mine').innerHTML = mine.length
+    ? mine.map((o) => `<div class="market-row"><span class="c-${o.item.rarity}">${itemType(o.item).icon} ${esc(o.item.name)}</span>
+        <b>${o.price.toLocaleString('fr-FR')} 🪙</b><span class="muted">⌛ ${timeLeft(o.expiresAt - Date.now())}</span>
+        <button class="small secondary" data-mcancel="${o.id}">↩️ Retirer</button></div>`).join('')
+    : '<p class="muted">Aucune vente en cours.</p>';
+  $('market-mine').querySelectorAll('[data-mcancel]').forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm('Retirer cette vente ? L\'objet revient dans ton coffre, mais la taxe n\'est pas remboursée.')) return;
+      if (await act('/api/market/cancel', { orderId: b.dataset.mcancel }, 'equip')) { toast('↩️ Vente retirée : l\'objet est revenu dans ton coffre'); loadMarket(); }
+    };
+  });
+
+  // Historique
+  $('market-history').innerHTML = c.marketLog.length
+    ? c.marketLog.map((l) => `<div class="market-log"><span class="muted">${dateShort(l.at)}</span> ${MARKET_LOG[l.kind] || l.kind}
+        <span class="c-${l.rarity}">${esc(l.item)}</span> · <b>${l.price.toLocaleString('fr-FR')} 🪙</b>${l.other ? ` <span class="muted">(${l.kind === 'sold' ? 'à' : 'de'} ${esc(l.other)})</span>` : ''}${l.tax ? ` <span class="muted">· taxe ${l.tax} 🪙</span>` : ''}</div>`).join('')
+    : '<p class="muted">Rien pour l\'instant : tes ventes et tes achats s\'afficheront ici.</p>';
+
+  // Objets en vente (filtres et tri)
+  const rarity = $('market-rarity').value;
+  const stat = $('market-stat').value;
+  const myCls = $('market-mycls').checked;
+  const base = orders.filter((o) => (rarity === 'all' || o.item.rarity === rarity)
+    && (stat === 'all' || o.item.lines.some((l) => l.stat === stat))
+    && (!myCls || Rules.canEquip(o.item, c.cls)));
+  const counts = {};
+  for (const o of base) counts[o.item.slot] = (counts[o.item.slot] || 0) + 1;
+  $('market-slot-filters').innerHTML = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]))
+    .map(([k, label]) => `<button class="${marketSlot === k ? 'active' : ''}" data-ms="${k}">${label} (${k === 'all' ? base.length : counts[k] || 0})</button>`).join('');
+  $('market-slot-filters').querySelectorAll('[data-ms]').forEach((b) => { b.onclick = () => { marketSlot = b.dataset.ms; renderMarket(); }; });
+  const statVal = (o) => o.item.lines.reduce((s, l) => (l.stat === stat ? s + l.value : s), 0);
+  const sort = $('market-sort').value;
+  const shown = base.filter((o) => marketSlot === 'all' || o.item.slot === marketSlot).sort((a, b) => {
+    if (sort === 'cheap') return a.price - b.price;
+    if (sort === 'dear') return b.price - a.price;
+    if (sort === 'rarity') return Rules.RARITIES.indexOf(b.item.rarity) - Rules.RARITIES.indexOf(a.item.rarity) || a.price - b.price;
+    return (stat !== 'all' ? statVal(b) - statVal(a) : 0) || b.createdAt - a.createdAt;
+  });
+  $('market-count').textContent = marketOrders ? `${orders.length} objet(s) en vente` : 'Chargement…';
+  $('market-list').innerHTML = shown.length
+    ? shown.map((o) => {
+      const own = o.sellerId === me.id;
+      const btn = own ? '<button class="small secondary" disabled>Ta vente</button>'
+        : c.gold < o.price ? '<button class="small" disabled>Pas assez de golds</button>'
+          : `<button class="small gold" data-mbuy="${o.id}">🛒 Acheter</button>`;
+      return itemHtml(o.item, `<div class="market-price">${o.price.toLocaleString('fr-FR')} 🪙</div>
+        <div class="muted market-meta">Vendu par ${esc(o.seller)} · ⌛ ${timeLeft(o.expiresAt - Date.now())}</div>
+        ${!own && Rules.canEquip(o.item, c.cls) ? compareHtml(o.item) : ''}<div class="actions">${btn}</div>`, c.cls);
+    }).join('')
+    : `<div class="muted">${marketOrders ? 'Aucun objet ne correspond à ces filtres.' : 'Chargement du marché…'}</div>`;
+  $('market-list').querySelectorAll('[data-mbuy]').forEach((b) => {
+    b.onclick = async () => {
+      const o = orders.find((x) => x.id === b.dataset.mbuy);
+      if (!o || !confirm(`Acheter « ${o.item.name} » à ${o.seller} pour ${o.price} golds ?`)) return;
+      const r = await act('/api/market/buy', { orderId: o.id }, 'buy');
+      if (r) { toast(`🛒 « ${o.item.name} » acheté : il est dans ton coffre personnel !`, 5000); loadMarket(); }
+    };
+  });
+}
+
+function setupMarket() {
+  $('market-rarity').innerHTML = '<option value="all">Toutes les raretés</option>'
+    + Rules.RARITIES.map((r) => `<option value="${r}">${Rules.RARITY_INFO[r].label}</option>`).join('');
+  $('market-stat').innerHTML = '<option value="all">Toutes les stats</option>'
+    + Rules.STATS.filter((s) => s !== 'stamina').map((s) => `<option value="${s}">${Rules.STAT_INFO[s].icon} ${Rules.STAT_INFO[s].label}</option>`).join('');
+  for (const id of ['market-rarity', 'market-stat', 'market-sort', 'market-mycls']) $(id).onchange = renderMarket;
+  $('market-item').onchange = (e) => { marketItemId = e.target.value; renderMarket(); };
+  $('market-price').oninput = renderMarket;
+  $('market-sell').onclick = async () => {
+    const item = me.character.inventory.find((i) => i.id === marketItemId);
+    const price = Math.floor(Number($('market-price').value) || 0);
+    if (!item) return;
+    const tax = Rules.marketTax(price);
+    if (!confirm(`Mettre « ${item.name} » en vente pour ${price} golds ?\nTaxe : ${tax} golds, payée maintenant et non remboursée.\nLa vente dure 4 jours.`)) return;
+    const r = await act('/api/market/sell', { itemId: item.id, price }, 'buy');
+    if (r) { toast(`🏷️ « ${item.name} » est en vente pour ${price} golds (taxe ${r.tax} 🪙)`, 5000); loadMarket(); }
+  };
+}
+setupMarket();
+
+// ---------- Courrier ----------
+function renderMail() {
+  const mail = me.character.mail || [];
+  const unread = mail.filter((m) => !m.read).length;
+  $('mail-count').textContent = unread ? String(unread) : '';
+  $('mail-btn').classList.toggle('has-mail', unread > 0);
+  $('mail-btn').title = unread ? `${unread} nouveau(x) courrier(s)` : 'Courrier';
+  if ($('mail-modal').classList.contains('open')) {
+    $('mail-list').innerHTML = mail.length
+      ? mail.map((m) => `<div class="mail-item ${m.read ? '' : 'unread'}"><span class="muted">${dateShort(m.at)}</span><div>${esc(m.text)}</div></div>`).join('')
+      : '<p class="muted">Aucun courrier. Tu seras prévenu ici quand un joueur achètera un de tes objets.</p>';
+  }
+}
+$('mail-btn').onclick = async () => {
+  $('mail-modal').classList.add('open');
+  renderMail();
+  if (me.character.mail.some((m) => !m.read)) {
+    try { await api('/api/mail/read', {}); } catch (e) { /* ignore */ }
+  }
+};
+$('mail-close').onclick = () => { $('mail-modal').classList.remove('open'); };
+$('mail-market').onclick = () => { $('mail-modal').classList.remove('open'); showTab('marche'); };
+
 // ---------- Entraînement ----------
 // Mini-bus d'événements : l'arène d'entraînement reçoit ses images comme l'arène du stream reçoit les siennes.
 const trainingBus = { h: {}, on(ev, fn) { (this.h[ev] = this.h[ev] || []).push(fn); }, emit(ev, d) { (this.h[ev] || []).forEach((fn) => fn(d)); } };
@@ -1164,7 +1339,7 @@ $('fuse-go').onclick = async () => {
       <td>+${Rules.REWARDS.participation.xp} XP</td><td>—</td><td>—</td></tr>`;
 
   const M = Rules.MONSTERS;
-  const monsters = Object.values(M).map((m) => `${m.icon} ${m.label}${m.from > 1 ? ` (dès la salle ${m.from})` : ''}`).join(', ');
+  const monsters = Object.values(M).map((m) => `${m.icon} ${m.label}${m.poison ? ' (venimeux ☠️)' : ''}${m.from > 1 ? ` (dès la salle ${m.from})` : ''}`).join(', ');
   $('dungeon-rules').innerHTML = [
     `Les aventuriers entrent par la gauche, éliminent tous les monstres de la salle, puis sortent à droite vers la salle suivante.`,
     `Monstres : ${monsters}. Toutes les ${Rules.ELITE.every} salles, un <b>chef 👑</b> beaucoup plus costaud les accompagne.`,
@@ -1237,7 +1412,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'solo', 'entrainement', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'entrainement', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1246,6 +1421,7 @@ function showTab(name) {
   try { localStorage.setItem('zl_tab', name); } catch (e) { /* ignore */ }
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
+  if (name === 'marche' && me) loadMarket();
 }
 
 document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => {
@@ -1268,6 +1444,7 @@ function renderBadges() {
   set('arbre', Math.max(0, c.talentState.available));
   set('combat', Math.max(0, Rules.techSlots(c.level) - c.techs.length));
   set('solo', c.cls && !c.soloActive ? Rules.energyState(c.energy, Date.now()).value : 0);
+  set('marche', (c.mail || []).filter((m) => !m.read).length);
   set('succes', claim);
 }
 
@@ -1943,6 +2120,14 @@ socket.on('trainingQueue', (q) => {
 });
 socket.on('trainingFrame', (f) => { trainingBus.emit('frame', f); renderRelicChoiceIn(f, $('training-relic'), '/api/training/relic'); });
 socket.on('soloQueue', onSoloQueue);
+// Marché : un ordre a changé quelque part → on rafraîchit si l'onglet est ouvert.
+let marketRefresh = null;
+socket.on('market', () => {
+  if (!document.querySelector('.tab[data-tab="marche"].active')) { if (marketOrders) marketOrders = null; return; }
+  clearTimeout(marketRefresh);
+  marketRefresh = setTimeout(loadMarket, 300);
+});
+socket.on('mail', (m) => { toast('✉️ ' + m.text, 8000); Sound.play(m.kind === 'sold' ? 'victory' : 'reward'); });
 socket.on('soloFrame', (f) => { soloFrame = f; soloBus.emit('frame', f); });
 socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
 socket.on('bet', (r) => {

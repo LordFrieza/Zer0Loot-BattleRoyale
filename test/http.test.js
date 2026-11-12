@@ -851,6 +851,51 @@ test('[TRN-5] entraînement : répéter l\'Expédition et le Défi des boss sans
   assert.strictEqual(trainings.has(id), false, 'terminé');
 });
 
+test('[MKT-1, MKT-2, MKT-3, MKT-4, MKT-5] marché via l\'API : vendre, lister, acheter, retirer, courrier', async () => {
+  const sel = client();
+  const buyer = client();
+  const ids = (await register(sel, 'pl_vendeur')).id;
+  const idb = (await register(buyer, 'pl_acheteur')).id;
+  await give(ids, { gold: 100 });
+  await give(idb, { gold: 500 });
+  const seller = db.state.users[ids];
+  const item = game.makeItem('rare');
+  seller.character.inventory.push(item);
+  const events = [];
+  const onEmit = io.emit.bind(io);
+  io.emit = (ev, ...args) => { events.push(ev); return onEmit(ev, ...args); };
+  const r = await sel.post('/api/market/sell', { itemId: item.id, price: 150 });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.data));
+  assert.strictEqual(r.data.tax, 30);
+  assert.strictEqual((await meOf(sel)).character.gold, 70);
+  const listed = (await buyer.get('/api/market')).data;
+  const order = listed.orders.find((o) => o.item.id === item.id);
+  assert.ok(order, 'listé');
+  assert.deepStrictEqual([order.price, order.seller, listed.mine], [150, 'pl_vendeur', 0]);
+  assert.strictEqual((await sel.get('/api/market')).data.mine, 1);
+  assert.match((await sel.post('/api/market/buy', { orderId: order.id })).data.error, /propre objet/);
+  const bought = await buyer.post('/api/market/buy', { orderId: order.id });
+  assert.strictEqual(bought.status, 200);
+  const cb = (await meOf(buyer)).character;
+  assert.ok(cb.inventory.some((i) => i.id === item.id));
+  assert.strictEqual(cb.gold, 350);
+  let cs = (await meOf(sel)).character;
+  assert.strictEqual(cs.gold, 220);
+  assert.ok(cs.mail[0].text.includes('pl_acheteur') && !cs.mail[0].read);
+  assert.strictEqual((await sel.post('/api/mail/read')).status, 200);
+  cs = (await meOf(sel)).character;
+  assert.ok(cs.mail.every((m) => m.read));
+  // Retrait
+  const it2 = game.makeItem('commun');
+  seller.character.inventory.push(it2);
+  const o2 = (await sel.post('/api/market/sell', { itemId: it2.id, price: 10 })).data.orderId;
+  assert.strictEqual((await buyer.post('/api/market/cancel', { orderId: o2 })).status, 400);
+  assert.strictEqual((await sel.post('/api/market/cancel', { orderId: o2 })).status, 200);
+  assert.ok((await meOf(sel)).character.inventory.some((i) => i.id === it2.id));
+  io.emit = onEmit;
+  assert.ok(events.filter((e) => e === 'market').length >= 3, 'diffusion « market »');
+});
+
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {
   const bad = { Cookie: 'zl_session=%E0%A4%A; autre=%' };
   // Routes HTTP : pas de session, donc 401 (et surtout pas de 500)

@@ -698,6 +698,8 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .tnode.blocked { opacity: .2; filter: grayscale(1); }
 .tnode.sel { outline: 3px solid #fff; outline-offset: 3px; }
 .tnode:hover { filter: brightness(1.25); }
+/* Au clic, le rond reste centré (le transform générique des boutons le faisait sauter en diagonale) */
+.tnode:active, .tnode.available:active { transform: translate(-50%, -50%); animation: none; }
 .talent-detail { margin-top: 10px; min-height: 60px; }
 .talent-detail-box { border: 1px solid var(--c); border-left: 4px solid var(--c); border-radius: 10px; padding: 10px 14px; background: var(--bg2); font-size: 14px; }
 .talent-detail-title { font-size: 16px; margin-bottom: 4px; }
@@ -814,3 +816,34 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .relic-card small { font-size: 12px; color: #d9ccff; text-align: center; }
 .training-speed { display: inline-flex; align-items: center; gap: 6px; }
 .training-speed [data-tspeed].active { background: var(--accent); color: #fff; }
+.stat-filters { margin-top: -4px; }
+.stat-filters .filter-label { font-size: 12px; align-self: center; margin-right: 2px; }
+.gold-chip { font-weight: 900; color: #ffc93a; padding: 3px 10px; border: 1px solid rgba(255,201,58,.45); border-radius: 999px; background: rgba(255,201,58,.08); font-size: 14px; white-space: nowrap; }
+
+/* ---------- Marché ---------- */
+.market-panel { border: 1px solid #2fbf71; background: linear-gradient(135deg, rgba(47,191,113,.10), transparent 55%), var(--panel); }
+.market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+@media (max-width: 900px) { .market-grid { grid-template-columns: 1fr; } }
+.market-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.market-card h3, .market-title { margin: 0 0 8px; font-family: var(--title-font); font-size: 15px; }
+.market-card h3 .sub, .market-title .sub { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted); }
+#market-item { width: 100%; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+#market-item-preview .item { opacity: 1; transform: none; margin-bottom: 8px; }
+.market-price-row { margin: 6px 0 10px; gap: 8px; flex-wrap: wrap; }
+.market-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.market-history { max-height: 360px; overflow: auto; }
+.market-log { font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.market-filters { gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.market-filters select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.market-price { font-weight: 900; font-size: 16px; color: #ffc93a; margin-top: 6px; }
+.market-meta { font-size: 11px; margin-bottom: 4px; }
+/* ---------- Courrier ---------- */
+.mail-btn { position: relative; background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 15px; box-shadow: none; cursor: pointer; }
+.mail-btn.has-mail { border-color: #ffc93a; animation: mailPulse 1.6s ease-in-out infinite; }
+@keyframes mailPulse { 50% { box-shadow: 0 0 12px rgba(255,201,58,.7); } }
+.mail-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: #ff4d6d; color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; padding: 0 4px; }
+.mail-count:empty { display: none; }
+.mail-list { max-height: 60vh; overflow: auto; }
+.mail-item { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.mail-item.unread { background: rgba(255,201,58,.08); border-left: 3px solid #ffc93a; }
+.mail-item .muted { font-size: 11px; }

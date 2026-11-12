@@ -52,6 +52,9 @@ function upgrade(character) {
   // V2 : énergie du mode Solo (pleine pour les anciens personnages) et partie solo en cours
   if (!character.energy || !Number.isFinite(character.energy.value)) character.energy = { value: Rules.SOLO.energyMax, at: Date.now() };
   if (character.soloActive === undefined) character.soloActive = null;
+  // 1.3 : courrier (ventes, expirations) et historique du marché
+  if (!Array.isArray(character.mail)) character.mail = [];
+  if (!Array.isArray(character.marketLog)) character.marketLog = [];
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -95,6 +98,8 @@ function newCharacter() {
     drawingVer: 0, // version du dessin (les clients le gardent en cache)
     energy: { value: Rules.SOLO.energyMax, at: Date.now() }, // énergie du mode Solo (voir Rules.energyState)
     soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
+    mail: [], // courrier : [{ id, at, text, read, kind }] (ventes au marché, objets revenus…)
+    marketLog: [], // historique du marché : [{ at, kind: listed|sold|bought|cancelled|expired, item, price, … }]
   };
 }
 

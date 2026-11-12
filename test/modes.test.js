@@ -528,7 +528,7 @@ test('[DNG-13] sondage : bonus jusqu\'au prochain sondage et « Quitte ou double
   const room = d.dungeon.room;
   const mult = Rules.dungeonMultipliers(room);
   const normal = d.monsters.find((m) => !m.elite);
-  assert.strictEqual(normal.maxHp, Math.round(Rules.MONSTERS[normal.kind].hp * mult.hp * 1.25));
+  assert.strictEqual(normal.maxHp, Math.round(Rules.MONSTERS[normal.kind].hp * (mult.hp * 1.25)));
   let res = null;
   d.on('coopEnd', (r) => { res = r; });
   d.dungeon.room = 12;

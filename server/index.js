@@ -11,6 +11,7 @@ const db = require('./db');
 const game = require('./game');
 const twitch = require('./twitch');
 const { Battle } = require('./battle');
+const market = require('./market');
 const { Bets } = require('./bets');
 const Rules = require('../shared/rules');
 
@@ -1057,6 +1058,52 @@ app.post('/api/training/stop', requirePlayer, (req, res) => {
 });
 
 
+// ---------- Marché entre joueurs ----------
+
+// Prévient un joueur (en direct) qu'il a du courrier, et rafraîchit sa fiche.
+function notifyMail(user) {
+  pushMe(user);
+  const last = user.character.mail[0];
+  if (last) io.to('user:' + user.id).emit('mail', last);
+}
+
+// Ventes expirées : objets rendus et vendeurs prévenus (avant chaque lecture ou action sur le marché).
+function sweepMarket() {
+  const touched = market.sweep();
+  for (const u of touched) notifyMail(u);
+  return touched.length;
+}
+
+app.get('/api/market', requirePlayer, (req, res) => {
+  sweepMarket();
+  const orders = market.list();
+  res.json({ orders, mine: orders.filter((o) => o.sellerId === req.user.id).length });
+});
+
+app.post('/api/market/sell', requirePlayer, action((req) => {
+  sweepMarket();
+  const r = market.sell(req.user, String(req.body.itemId || ''), req.body.price);
+  io.emit('market');
+  return { tax: r.tax, orderId: r.order.id };
+}));
+
+app.post('/api/market/buy', requirePlayer, action((req) => {
+  sweepMarket();
+  const r = market.buy(req.user, String(req.body.orderId || ''));
+  notifyMail(r.seller);
+  io.emit('market');
+  return { item: r.item, price: r.price };
+}));
+
+app.post('/api/market/cancel', requirePlayer, action((req) => {
+  sweepMarket();
+  const r = market.cancel(req.user, String(req.body.orderId || ''));
+  io.emit('market');
+  return { item: r.item };
+}));
+
+app.post('/api/mail/read', requirePlayer, action((req) => market.readMail(req.user)));
+
 // ---------- Mode Solo (V2) ----------
 /*
  * Expédition (profondeurs + reliques) ou Défi des boss, contre 1 énergie. Simulé sur une Battle à part, diffusé
@@ -1195,6 +1242,8 @@ io.on('connection', (socket) => {
 function start(port = PORT) {
   startTwitch();
   setInterval(() => io.emit('twitch', twitch.status()), 5000);
+  // Marché : les ventes expirées rendent leurs objets (et préviennent les vendeurs), même si personne n'ouvre le marché.
+  setInterval(() => { if (sweepMarket()) io.emit('market'); }, 5 * 60 * 1000);
 
   // Nettoyage des sessions expirées.
   setInterval(() => {

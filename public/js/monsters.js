@@ -52,8 +52,60 @@
     ctx.beginPath(); ctx.arc(0, y - 2, 1.4, 0, Math.PI * 2); ctx.fill();
   }
 
-  function gobelin(ctx, o, elite) {
-    const skin = elite ? '#5fa33e' : '#7cbf4f';
+  // Gobelin violet (venimeux) : même silhouette, peau violette et dague qui goutte de poison.
+  function gobelinViolet(ctx, o, elite) {
+    gobelin(ctx, o, elite, { skin: elite ? '#7a3db8' : '#a061d8', blade: '#7dff6a', eyes: '#ffe14a' });
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    ctx.save();
+    ctx.translate(9, 1);
+    ctx.rotate(-0.9 + swing * 2.1);
+    ctx.fillStyle = 'rgba(125,255,106,.85)';
+    const drip = (t * 1.6 + (o.seed || 0)) % 1;
+    ctx.beginPath(); ctx.arc(0, -4 + drip * 9, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (elite) { // plumes de chaman
+      ctx.fillStyle = '#7dff6a';
+      for (const d of [-1, 1]) { ctx.beginPath(); ctx.ellipse(d * 4, -24, 1.6, 4, d * 0.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+
+  // Rat pestiféré : petit, rapide, la gueule bave du poison.
+  function rat(ctx, o, elite) {
+    const t = (o.t || 0) / 1000;
+    const run = Math.sin(t * 22 + (o.seed || 0));
+    const fur = elite ? '#5a4a3a' : '#7d7266';
+    shadow(ctx, 11, 15);
+    // queue
+    ctx.strokeStyle = '#d9a3a3'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-10, 8); ctx.quadraticCurveTo(-18, 4 + run * 2, -22, 10); ctx.stroke();
+    // pattes
+    ctx.fillStyle = '#d9a3a3';
+    ctx.fillRect(-7 + run * 1.5, 11, 3, 4); ctx.fillRect(4 - run * 1.5, 11, 3, 4);
+    // corps
+    ctx.fillStyle = fur;
+    ctx.beginPath(); ctx.ellipse(-1, 6, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
+    // tête pointue
+    ctx.beginPath(); ctx.moveTo(6, 1); ctx.quadraticCurveTo(14, 2, 17, 7); ctx.quadraticCurveTo(12, 10, 6, 10); ctx.closePath(); ctx.fill();
+    // oreille
+    ctx.fillStyle = '#e8a8b0';
+    ctx.beginPath(); ctx.ellipse(6, 0, 3, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = fur;
+    ctx.beginPath(); ctx.ellipse(6.6, 0.6, 1.6, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    // œil rouge, nez, bave verte
+    ctx.fillStyle = '#ff3b3b';
+    ctx.beginPath(); ctx.arc(11, 4, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8a8b0';
+    ctx.beginPath(); ctx.arc(17, 7, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(125,255,106,.9)';
+    const drip = (t * 1.3 + (o.seed || 0)) % 1;
+    ctx.beginPath(); ctx.arc(15, 10 + drip * 6, 1, 0, Math.PI * 2); ctx.fill();
+    if (elite) crown(ctx, -4);
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(-1, 6, 11, 7, 0, 0, Math.PI * 2); ctx.fill(); });
+  }
+
+  function gobelin(ctx, o, elite, pal = {}) {
+    const skin = pal.skin || (elite ? '#5fa33e' : '#7cbf4f');
     const swing = o.swing || 0;
     shadow(ctx, 11);
     // jambes
@@ -72,7 +124,7 @@
     ctx.beginPath(); ctx.moveTo(-7, -13); ctx.lineTo(-17, -18); ctx.lineTo(-7, -9); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(7, -13); ctx.lineTo(17, -18); ctx.lineTo(7, -9); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.ellipse(0, -12, 8.5, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e7ff6a';
+    ctx.fillStyle = pal.eyes || '#e7ff6a';
     ctx.beginPath(); ctx.ellipse(-3, -13, 2.2, 1.6, -0.3, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(3.5, -13, 2.2, 1.6, 0.3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#111';
@@ -90,7 +142,7 @@
     ctx.translate(9, 1);
     ctx.rotate(-0.9 + swing * 2.1);
     ctx.fillStyle = '#5a3b1e'; ctx.fillRect(-1.2, -2, 2.4, 5);
-    ctx.fillStyle = '#b8b0a0';
+    ctx.fillStyle = pal.blade || '#b8b0a0';
     ctx.beginPath(); ctx.moveTo(-1.8, -2); ctx.lineTo(0, -13); ctx.lineTo(1.8, -2); ctx.closePath(); ctx.fill();
     ctx.restore();
     ctx.fillStyle = skin;
@@ -694,7 +746,7 @@
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan };
+  const DRAW = { gobelin, gobelin_violet: gobelinViolet, rat, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan };
   // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
   const BOSS_KINDS = ['troll', 'dragon', 'sorcier'];
 

@@ -758,6 +758,7 @@ class Battle extends EventEmitter {
       range: m.range,
       kite: m.kite || 0,
       recovery: m.recovery || 0, // comme un joueur archer : immobile un instant après chaque tir
+      poison: m.poison ? { dot: m.poison.dot * (elite ? 1.5 : 1), duration: m.poison.duration } : null, // rat, gobelin violet
       projectile: m.projectile || null,
       cd: 0.4 + Math.random() * 0.8,
     });
@@ -1942,6 +1943,10 @@ class Battle extends EventEmitter {
     const ty = target.y;
     this.hit(attacker, target, raw, { crit, proj });
     if (attacker.techs.length && target.alive) this.attackTechniques(attacker, target);
+    // Monstres venimeux (rat, gobelin violet) : chaque coup qui touche empoisonne (sans cumul, la durée repart).
+    if (attacker.poison && target.alive && !target.isCrystal && !target.inert) {
+      this.addBuff(target, 'poison', attacker.poison.duration, { poison: attacker.poison.dot, tick: this.time + 0.5, src: attacker });
+    }
     // Mage : explosion autour de la cible. Troll : son coup de massue balaie les combattants proches.
     const splash = attacker.aoeRadius
       ? { r: attacker.aoeRadius, ratio: attacker.aoeRatio }
@@ -2233,7 +2238,7 @@ function fighter(fields) {
     title: null, app: null, cls: null, look: {}, level: 1, userId: null,
     x: 0, y: 0, r: RADIUS, scale: 1, elite: false,
     reduction: 0, dodge: 0, crit: 0, lifesteal: 0, precision: 0, thorns: 0,
-    range: 40, taunt: 1, kite: 0, hunter: false, regen: 0, projectile: null, aoeRadius: 0, aoeRatio: 0, cleave: false,
+    range: 40, taunt: 1, kite: 0, hunter: false, regen: 0, projectile: null, poison: null, aoeRadius: 0, aoeRatio: 0, cleave: false,
     cd: 0, dmgMult: 1, targetKey: null, alive: true, kills: 0, dealt: 0,
     chain: 0, lastKillAt: -Infinity, healAcc: 0, diedAt: null, diedRoom: null,
     spec: null, ult: null, staminaTime: 0, stamina: 0, consumable: null, potionUsed: false, started: false, engaged: false,
