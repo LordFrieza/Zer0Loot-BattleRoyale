@@ -1283,6 +1283,7 @@ function renderAppearance() {
 
 // ---------- Visage dessiné ----------
 let drawPixels = null; // brouillon en cours (null = pas encore chargé)
+let drawDirty = false; // le joueur est en train de dessiner (brouillon non enregistré)
 let drawColor = 1;
 let drawing = false;
 
@@ -1300,6 +1301,7 @@ function renderDrawEditor() {
       if (!el || el.dataset.px === undefined) return;
       const i = Number(el.dataset.px);
       drawPixels = drawPixels.slice(0, i) + String(drawColor) + drawPixels.slice(i + 1);
+      drawDirty = true;
       paintCell(el);
     };
     $('draw-grid').onpointerdown = (e) => { drawing = true; $('draw-grid').setPointerCapture(e.pointerId); paint(e.target.closest('[data-px]')); e.preventDefault(); };
@@ -1321,10 +1323,11 @@ function paintCell(el) {
   el.style.background = ch === '0' ? '' : Rules.DRAWING.palette[Number(ch) - 1];
 }
 
-$('draw-clear').onclick = () => { drawPixels = '0'.repeat(Rules.DRAWING.size ** 2); renderDrawEditor(); };
-$('draw-reset').onclick = () => { drawPixels = null; renderDrawEditor(); };
+$('draw-clear').onclick = () => { drawPixels = '0'.repeat(Rules.DRAWING.size ** 2); drawDirty = true; renderDrawEditor(); };
+$('draw-reset').onclick = () => { drawPixels = null; drawDirty = false; renderDrawEditor(); };
 $('draw-save').onclick = async () => {
   const r = await act('/api/drawing', { pixels: drawPixels }, 'equip');
+  if (r) drawDirty = false;
   if (r) toast('🎨 Visage enregistré : il apparaîtra en bataille !');
 };
 
@@ -1855,8 +1858,10 @@ function myFighter(appOverride, clsOverride) {
   for (const [slot, item] of Object.entries(c.equipment)) if (item) look[slot] = item.rarity;
   const app = { ...c.look };
   // Mon propre dessin : le brouillon de l'éditeur, sinon le dessin enregistré (pas besoin du cache réseau)
-  if (app.drawing) app.drawingPixels = (drawPixels && /[1-9]/.test(drawPixels) ? drawPixels : c.drawing) || null;
-  if (drawPixels && /[1-9]/.test(drawPixels) && $('draw-box').offsetParent) { app.drawing = 'dessin'; app.drawingPixels = drawPixels; }
+  // Le dessin ne s'affiche que s'il est porté, ou pendant qu'on dessine (aperçu en direct du brouillon).
+  const drafting = drawDirty && drawPixels && /[1-9]/.test(drawPixels);
+  if (app.drawing) app.drawingPixels = (drafting ? drawPixels : c.drawing) || null;
+  else if (drafting && $('draw-box').offsetParent) { app.drawing = 'dessin'; app.drawingPixels = drawPixels; }
   return { name: me.twitchDisplayName || me.username, cls: clsOverride || c.cls, look, app: { ...app, ...appOverride } };
 }
 

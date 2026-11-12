@@ -626,6 +626,8 @@ function setLook(character, part, value) {
     throw new Error('Partie inconnue');
   }
   character.look[part] = value;
+  // Choisir des yeux, des sourcils ou une bouche retire le visage dessiné (qui les cache).
+  if (part === 'eyes' || part === 'brows' || part === 'mouth') character.look.drawing = null;
 }
 
 /*

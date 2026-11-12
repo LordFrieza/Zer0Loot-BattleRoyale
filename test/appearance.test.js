@@ -95,3 +95,19 @@ test('[LOOK-8] visage dessiné : grille validée, version, modération', () => {
   game.clearDrawing(c);
   assert.deepStrictEqual([c.drawing, c.drawingVer, c.look.drawing], ['', 2, null]);
 });
+
+test('[LOOK-8] choisir des yeux, des sourcils ou une bouche retire le visage dessiné (sans l\'effacer)', () => {
+  const c = game.newCharacter();
+  c.owned.push('dessin');
+  const pixels = '0'.repeat(30) + '1111' + '0'.repeat(110);
+  game.setDrawing(c, pixels);
+  assert.strictEqual(c.look.drawing, 'dessin');
+  game.setLook(c, 'color', 'cyan');
+  assert.strictEqual(c.look.drawing, 'dessin', 'la couleur ne touche pas au visage');
+  for (const [part, value] of [['eyes', 'ronds'], ['brows', 'droits'], ['mouth', 'sourire']]) {
+    game.setLook(c, 'drawing', 'dessin');
+    game.setLook(c, part, value);
+    assert.strictEqual(c.look.drawing, null, part);
+    assert.strictEqual(c.drawing, pixels, 'le dessin reste enregistré');
+  }
+});
