@@ -87,7 +87,17 @@ de la file, confirme les `!join` et annonce le vainqueur.
   (sinon une classe au hasard). En changeant de classe, les objets incompatibles retournent dans le coffre personnel.
   Les anciennes épées / anciens boucliers (d'avant les classes) sont devenus des objets de Guerrier.
 - **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (sauf l'Assassin).
-  Après 45 s, une zone se referme pour éviter les combats interminables.
+  Après 45 s, une zone se referme pour éviter les combats interminables. Après chaque attaque, un combattant reste
+  **immobile un court instant** (récupération : Archer 0,6 s, Mage 0,5 s, Guerrier et Prêtre 0,3 s, Assassin presque rien),
+  raccourci par la vitesse d'attaque ; en reculant, les classes à distance **longent les murs** au lieu de rester coincées.
+- **Style de combat** (onglet du même nom) :
+  - **Tactique** : posture (Équilibré, Agressif : ne recule jamais, Prudent : recule plus loin et fuit sous 30 % de vie),
+    cible préférée (selon la classe, la plus proche, la plus faible, la plus dangereuse) et distance de recul réglable
+    (classes à distance).
+  - **Techniques signature** débloquées par le niveau, indépendantes de l'ultime : 1 emplacement au niveau 5, 2 au
+    niveau 15, parmi 14 techniques (Roulade, Charge, Second souffle, Frénésie, et 2 par classe : Cri de guerre, Coup de
+    bouclier, Flèche repoussante, Tir rapide, Clignement, Nova de givre, Pas de l'ombre, Lame empoisonnée, Prière de
+    soin, Lumière aveuglante). Détails : `TECHNIQUES` dans `shared/rules.js`.
 - **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds ;
   participation = 25 XP pour chaque combattant à la fin de la bataille (gagnant compris, pas si l'admin annule).
 - **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +1 coffre ;
@@ -108,18 +118,24 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Chance : points + bonus d'équipement (les lignes de Chance des objets s'ajoutent en points) → table de loot et forge
   - Stamina : +5 % de vitesse de remplissage de la barre de stamina par point (plafond ×2,5). Barre pleine en 40 s
     (Guerrier), 38 s (Archer), 42 s (Mage), 36 s (Assassin), 40 s (Prêtre) sans bonus. Jamais sur les objets.
-- **Table de loot** : chance 0 → 90 / 6 / 3 / 0,9 / 0,1 % ; chance 10 → 80 / 10 / 6 / 3 / 1 %.
+- **Table de loot** : chance 0 → 90 / 6,5 / 2,8 / 0,65 / 0,05 % ; chance 10 → 80 / 11,5 / 6,3 / 1,85 / 0,35 % ;
+  chance 85 → 5 / 49 / 32,55 / 10,85 / 2,6 %.
   Variation linéaire par point de chance, plafonnée à 85 de chance effective.
 - **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).
   Commun 1 ligne (+1–3 %), Peu commun 2 (+4–6 %), Rare 3 (+7–10 %), Épique 4 (+11–15 %), Légendaire 5 (+15–25 %).
   Chaque emplacement / type d'arme a ses stats de prédilection (ex. plastron → Vie/Défense/Épines, arc → Précision,
   dagues → Critique/Vitesse d'attaque, boucles → Chance).
 - **Forge** :
-  - Fusion : 3 objets de même rareté → 1 nouvel objet, toujours équipable par ta classe. Chance de monter d'une rareté :
-    40 % (Commun), 30 % (Peu commun), 20 % (Rare), 10 % (Épique), + 0,5 % par point de chance effective (max +25 %).
-    Sinon, nouvel objet de même rareté. 3 Légendaires → un nouveau Légendaire.
+  - Fusion (10 / 20 / 40 / 80 / 150 golds selon la rareté) : 3 objets de même rareté → 1 nouvel objet, toujours
+    équipable par ta classe. Chance de monter d'une rareté : 40 % (Commun), 30 % (Peu commun), 15 % (Rare), 5 % (Épique),
+    + 0,5 % par point de chance effective (max +20 %, moitié moins pour un Épique). Sinon, nouvel objet de même rareté.
+    3 Légendaires → un nouveau Légendaire.
   - Relance : remplace une ligne d'un objet (équipé ou non) par une autre stat au hasard, absente de l'objet.
     Prix : 10 / 20 / 40 / 80 / 150 golds selon la rareté.
+  - **Alchimie noire** : sacrifie un objet de **même rareté** (+ 15 / 30 / 60 / 120 / 250 golds) pour renforcer une ligne
+    choisie d'un autre objet, **sans changer sa stat** : +1 (Commun), +1 à 2 (Peu commun, Rare), +1 à 3 (Épique),
+    +2 à 4 (Légendaire). La ligne peut dépasser le maximum de sa rareté jusqu'au plafond de l'alchimie (1,4 × le maximum :
+    4 / 8 / 14 / 21 / 35) ; elle porte la marque ⚗️. Animation du chaudron ; succès « Alchimiste noir » (10 transmutations).
 - **Coffres** : 3 objets par coffre, achat 100 golds, stockage illimité. Clics pour ouvrir selon la meilleure rareté :
   3 / 5 / 10 / 20 / 30. Lumières : blanc, puis vert (4ᵉ clic), bleu (6ᵉ), violet (11ᵉ), orange (21ᵉ).
 - **Paris** : dès que la file est ouverte, chaque joueur voit les combattants inscrits dans l'encart « 🎲 Paris » de sa
@@ -130,14 +146,24 @@ de la file, confirme les `!join` et annonce le vainqueur.
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Apparence** (onglet Personnage, gratuit) : couleur du personnage (15 teintes ou automatique selon le pseudo),
   7 styles d'yeux, 5 de sourcils, 8 de bouches. Visible sur la fiche, dans l'arène et dans les aperçus.
-- **Boutique** (onglet Boutique) : 25 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
-  chapeaux, capes, chaussures, accessoires de visage, auras animées. Essayage sur l'aperçu avant achat ; un article
-  acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence du casque** (le casque reste équipé et ses
-  bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10 articles).
-- **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence), Inventaire (coffres,
-  équipement et presets, coffre personnel paginé par 20 objets, forge), Arbre de compétences, Boutique (potions puis
-  cosmétiques), Entraînement, Succès, Classements, Règles. Pastilles : points à répartir, coffres à ouvrir, points
-  d'arbre, succès à récupérer. Lien direct possible (`/character.html#boutique`).
+- **Boutique** (onglet Boutique) : 55 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
+  chapeaux, capes, chaussures, accessoires de visage, auras animées, et des **skins d'équipement** (plastron, pantalon,
+  gants, ceinture) qui remplacent l'apparence de la pièce. Les **skins d'arme et d'objet secondaire** sont réservés à une
+  classe (2 armes et 1 objet secondaire par classe) : achetables par tous, portés seulement avec la bonne classe.
+  Essayage sur l'aperçu avant achat ; un article acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence
+  du casque** (le casque reste équipé et ses bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10).
+  - **Visage à dessiner** (1 500 golds) : le joueur dessine son visage (grille 12 × 12, 8 couleurs) dans l'onglet
+    Personnage ; il remplace yeux, sourcils et bouche en bataille. L'arène ne reçoit qu'une référence et charge le dessin
+    une fois ; l'admin peut effacer un dessin inapproprié (liste des joueurs).
+  - **Cosmétiques d'exploit** (8), visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
+    d'ogre / de dragon / spectrale (vaincre le Troll / le Dragon / le Magicien **seul**), couronne d'os (salle 30 du
+    donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
+    (profondeur 25 en Expédition), aura du champion (100 victoires).
+- **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
+  Inventaire (coffres, équipement et presets, coffre personnel paginé par 20 objets, forge et alchimie), Arbre de
+  compétences, Style de combat, Boutique (potions puis cosmétiques), Solo, Entraînement, Succès, Classements, Règles.
+  Pastilles : points à répartir, coffres à ouvrir, points d'arbre, techniques à choisir, énergie, succès à récupérer.
+  L'énergie du mode Solo s'affiche aussi en haut de la page (⚡). Lien direct possible (`/character.html#boutique`).
 - **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
   n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse).
 - **Presets d'équipement** (panneau Équipement) : jusqu'à 5 presets nommés ; « Équiper » remet exactement l'équipement
@@ -145,18 +171,19 @@ de la file, confirme les `!join` et annonce le vainqueur.
   recyclage, ni fusion à la forge, tant que le preset existe.
 - **Potions** (onglet Boutique, en haut) : 9 consommables payés en golds, stock jusqu'à 99 chacun. On en équipe **une**
   dans la case à côté du personnage ; elle est **consommée au lancement de la prochaine partie** (tous les modes), qu'elle
-  se déclenche ou non, et ne se déclenche qu'une fois (une fois par raid dans le donjon) :
+  se déclenche ou non, et ne se déclenche qu'une fois (une fois par raid dans le donjon). Jamais utilisée en Golden Shower
+  (sans combat) ni en Solo :
   | Potion | Prix | Déclencheur | Effet |
   |---|---|---|---|
-  | 🧪 Potion de vie | 60 | vie < 50 % | +4 % de vie max par seconde pendant 6 s |
-  | 🍷 Potion de berserker | 80 | vie < 50 % | dégâts ×1,5 pendant 8 s |
-  | 🧴 Potion de défense | 80 | vie < 50 % | dégâts subis ×0,4 pendant 4 s |
-  | 💨 Potion de célérité | 70 | premier ennemi à portée | vitesse et vitesse d'attaque ×1,4 pendant 10 s |
-  | 🌀 Téléportation d'urgence | 90 | vie < 20 % | téléportation au plus loin des ennemis |
-  | 👻 Potion d'invisibilité | 100 | vie < 20 % | invisible 5 s : plus ciblable (les zones touchent quand même) |
-  | 🌹 Potion de ronces | 70 | vie < 50 % | +40 % d'épines pendant 8 s |
-  | 🔋 Élixir d'endurance | 120 | début du combat | barre de stamina à 50 % |
-  | 🪶 Plume de phénix | 250 | en tombant | renaît avec 30 % de sa vie (pas de kill pour l'adversaire) |
+  | 🧪 Potion de vie | 90 | vie < 50 % | +4 % de vie max par seconde pendant 6 s |
+  | 🍷 Potion de berserker | 120 | vie < 50 % | dégâts ×1,5 pendant 8 s |
+  | 🧴 Potion de défense | 120 | vie < 50 % | dégâts subis ×0,4 pendant 4 s |
+  | 💨 Potion de célérité | 105 | premier ennemi à portée | vitesse et vitesse d'attaque ×1,4 pendant 10 s |
+  | 🌀 Téléportation d'urgence | 135 | vie < 20 % | téléportation au plus loin des ennemis |
+  | 👻 Potion d'invisibilité | 150 | vie < 20 % | invisible 5 s : plus ciblable (les zones touchent quand même) |
+  | 🌹 Potion de ronces | 105 | vie < 50 % | +40 % d'épines pendant 8 s |
+  | 🔋 Élixir d'endurance | 180 | début du combat | barre de stamina à 50 % |
+  | 🪶 Plume de phénix | 375 | en tombant | renaît avec 30 % de sa vie (pas de kill pour l'adversaire) |
 - **Arbre de compétences** (onglet visible mais verrouillé avant le niveau 4 ; tutoriel en fenêtre au déblocage, puis
   derrière le bouton ?) : 1 point d'arbre tous les 3 niveaux (niveaux 4, 7, 10, 13…). Deux chemins par classe, chacun
   menant à une spécialisation ; prendre le premier rond d'un chemin bloque l'autre, et à chaque carrefour on choisit un
@@ -175,17 +202,28 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Entraînement** (onglet Entraînement) : duel privé, visible seulement par le joueur, contre un mannequin (classe et
   niveau 1 à 50 au choix) ou le fantôme d'un autre joueur (son build, son arbre et son équipement actuels). Règles du
   Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
+- **Mode Solo** (onglet Solo) : chaque tentative coûte **1 ⚡ énergie** (3 au maximum, +1 toutes les 10 h). Partie
+  privée, visible seulement par le joueur, en vitesse ×1 ou ×2, sans potion ; on peut abandonner, ou fermer la page (la
+  partie continue et les gains arrivent à la fin). Une partie interrompue par un redémarrage rend son énergie.
+  - **Expédition** : descente sans fin, seul contre des monstres de plus en plus forts (croissance exponentielle). Toutes
+    les 3 profondeurs, le joueur choisit **une relique parmi 3** (13 reliques cumulables : dégâts, peau de pierre,
+    vitesse, vol de vie, épines, régénération, critique, soin, ultime, pacte sanglant, vie en plus, trésor…). Butin pour
+    `n` profondeurs nettoyées : `25n + 2n²` XP, `20n + 1,5n²` golds, 1 coffre tous les 5 (ex. profondeur 10 : 450 XP,
+    350 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
+    classes à distance.
+  - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (300 XP, 250 golds,
+    1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire débloque la peau légendaire du boss.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
     « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon ou Malvorath le Magicien des ténèbres.
     Même récompense pour les trois, même rage finale à 2 min 30.
   - **Grokk le Troll** : vie et dégâts selon le nombre
-    de combattants au lancement (200 PV + 300 PV par combattant). Coup de massue qui touche les voisins, attaques
+    de combattants au lancement (200 PV + 300 PV par combattant, puis +6 % par niveau moyen des joueurs au-delà du 1, ×2,5 au plus). Coup de massue qui touche les voisins, attaques
     spéciales annoncées au sol (onde de choc, rocher sur le plus gros groupe). Grosse barre de vie avec coches à 66 % et
     33 % : à chaque coche, +30 % de dégâts et +35 % de vitesse d'attaque. Rage finale à 2 min 30 (dégâts ×3).
     Victoire : **3 coffres, 500 XP et 500 golds pour TOUS les participants** (morts compris), avec explosion du Troll
     et pluie de coffres et de golds. Défaite : XP de participation seulement.
-  - **Pyrax le Dragon** (200 PV + 370 par combattant) : griffes qui touchent les voisins, souffle de feu en cône vers le
+  - **Pyrax le Dragon** (200 PV + 400 par combattant) : griffes qui touchent les voisins, souffle de feu en cône vers le
     plus gros groupe et coup de queue tout autour. À **75 %** et **30 %**, il **s'envole** 12 s : seuls les combattants
     à distance (portée ≥ 150 : Archer, Mage) peuvent le toucher, il bombarde le sol de boules de feu et lâche des
     **flammèches** : le corps à corps les chasse, chacune abattue brûle le dragon (1 % de sa vie) et le fait atterrir
@@ -211,7 +249,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     ×1,5 en vie et dégâts). À 1 min 30, **mort subite** : les cristaux prennent ×3 ; à 3 min, le cristal le moins entamé
     gagne. Chaque membre de l'équipe gagnante reçoit 200 XP, 40 golds et 1 coffre, le **MVP** (le plus de dégâts) 1 coffre
     de plus. Les **paris** se font sur une équipe.
-  - **Ruée vers l'or** (mode bonus, dès 1 joueur, 75 s) : **pas de combat**. Les personnages se baladent au hasard et
+  - **Golden Shower** (mode bonus, dès 1 joueur, 75 s) : **pas de combat**. Les personnages se baladent au hasard et
     ramassent ce qui tombe du ciel : une pluie de pièces (1 gold chacune), des **coffres** en parachute (plus rares) et
     des bonus (💰 sac de 25 golds, 🧲 aimant, ⭐ étoile de vitesse). La **Chance** agrandit le rayon de ramassage, la
     **Vitesse** fait parcourir plus de terrain. Les 15 dernières secondes : **JACKPOT** (pluie ×3, pièces à 2 golds).
@@ -262,13 +300,14 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
-- **Succès** : 42 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, boss, donjon,
+- **Succès** : 43 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, boss, donjon,
   panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
 - **Classements** : top 10 victoires, kills et batailles jouées, avec podium pour le top 3 (page perso et page admin).
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
-- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP, bannissement (déconnexion
+- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie, effacement d'un
+  visage dessiné, bannissement (déconnexion
   immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
   observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.

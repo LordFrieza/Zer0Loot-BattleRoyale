@@ -1733,7 +1733,7 @@ function renderQueue() {
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const QB = Rules.BOSSES[queue.boss];
-    const what = queue.mode === 'gold' ? '🪙 Ruée vers l\'or en cours : il pleut des pièces !' : queue.mode === 'clans' ? '⚔️ Guerre des clans en cours !' : queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    const what = queue.mode === 'gold' ? '🪙 Golden Shower en cours : il pleut des pièces !' : queue.mode === 'clans' ? '⚔️ Guerre des clans en cours !' : queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
     if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
@@ -1741,7 +1741,7 @@ function renderQueue() {
     let text;
     if (r.mode === 'boss') text = r.victory ? `🏆 ${r.boss.name} est vaincu ! Tous les participants sont récompensés.` : `💀 ${r.boss.name} a gagné… Retentez votre chance !`;
     else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
-    else if (r.mode === 'gold') text = `🪙 Fin de la Ruée vers l'or : ${r.totals.gold} golds ramassés !${r.best ? ` Roi du butin : ${esc(r.best.name)} (${r.best.gold} golds).` : ''}`;
+    else if (r.mode === 'gold') text = `🪙 Fin du Golden Shower : ${r.totals.gold} golds ramassés !${r.best ? ` Roi du butin : ${esc(r.best.name)} (${r.best.gold} golds).` : ''}`;
     else if (r.mode === 'clans') text = `${Rules.CLANS.teams[r.winner].icon} Victoire des ${Rules.CLANS.teams[r.winner].label} !${r.mvp ? ` MVP : ${esc(r.mvp.name)}.` : ''}`;
     else if (r.mode === 'koth') text = r.winner ? `👑 ${esc(r.winner.name)} est le Roi de la Colline (${r.winner.score} points, ${r.winner.kills} kill(s)) !` : 'Partie terminée.';
     else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
@@ -1887,7 +1887,7 @@ const REWARD_LABELS = {
   firstblood: '🩸 PREMIER KILL !', double: '⚡ DOUBLE KILL !', massacre: '💀 MASSACRE !',
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
   boss: '👹 BOSS VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
-  solo_boss: '👹 Défi des boss réussi !', clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin de la Ruée vers l\'or :',
+  solo_boss: '👹 Défi des boss réussi !', clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin du Golden Shower :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',

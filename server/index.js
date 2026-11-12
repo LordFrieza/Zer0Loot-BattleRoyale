@@ -741,7 +741,7 @@ battle.on('goldEnd', (result, fighters) => {
   }
   db.save();
   const b = result.best;
-  twitch.say(`🪙 Fin de la Ruée vers l'or : ${result.totals.gold} golds et ${result.totals.chests} coffre(s) ramassés !${b ? ` Roi du butin : ${b.name} avec ${b.gold} golds (+1 coffre).` : ''}`);
+  twitch.say(`🪙 Fin du Golden Shower : ${result.totals.gold} golds et ${result.totals.chests} coffre(s) ramassés !${b ? ` Roi du butin : ${b.name} avec ${b.gold} golds (+1 coffre).` : ''}`);
   notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
 });

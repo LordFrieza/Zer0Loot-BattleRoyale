@@ -42,6 +42,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **DB-5** Quand `db.flush()` est appelé, le serveur doit écrire immédiatement et annuler l'écriture différée en attente.
 - **DB-6** Les identifiants d'utilisateur doivent être des chaînes issues du compteur `nextId`.
 - **DB-7** Quand un personnage chargé provient d'une ancienne sauvegarde, le serveur doit le compléter via `upgrade()` (champs `lootStats`, `stats`, `cls`, `counters`, `claimed`, `look`, `owned`, `title`, migration des slots `epee`/`bouclier` vers `arme`/`secondaire` avec `kind`).
+- **DB-8** Quand le serveur V2 démarre sur une base de la V1, il doit conserver **toute** la progression de chaque joueur (niveau, XP, points, classe, golds, coffres, inventaire et équipement avec leurs lignes, record, compteurs, succès récupérés, titre, apparence, cosmétiques, potions, presets, arbre) et seulement ajouter les nouveaux champs avec leurs valeurs par défaut : tactique (`DEFAULT_TACTICS`), techniques (aucune), visage dessiné (vide), énergie pleine, aucune partie solo en cours, nouveaux compteurs à 0 et nouveaux emplacements cosmétiques vides.
 
 ## 3. Comptes et sessions
 

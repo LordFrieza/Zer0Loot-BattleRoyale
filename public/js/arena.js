@@ -361,7 +361,7 @@
           setTimeout(() => Sound.play('eventStart', q.event), Math.max(0, fanfare * 1000 - 200));
         }
         if (q.mode === 'gold') {
-          this.announces.push({ text: '🎉 BONUS GAME ! 🎉', sub: 'Ruée vers l\'or : ramassez un max de pièces et de coffres !', subSize: 24, color: '#ffd23f', life: 3.5, age: 0 });
+          this.announces.push({ text: '🎉 BONUS GAME ! 🎉', sub: 'Golden Shower : ramassez un max de pièces et de coffres !', subSize: 24, color: '#ffd23f', life: 3.5, age: 0 });
         }
         if (q.mode === 'clans') {
           this.announces.push({ text: '⚔️ GUERRE DES CLANS !', sub: '🔴 Rouges contre Bleus 🔵 : détruisez le cristal adverse !', subSize: 24, color: '#ff6b9a', life: 3.5, age: 0 });
@@ -1571,7 +1571,7 @@
       ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = '#ffd23f';
       ctx.textAlign = 'left';
-      ctx.fillText('🪙 Ruée vers l\'or', 30, 40);
+      ctx.fillText('🪙 Golden Shower', 30, 40);
       const left = Math.ceil(g.left);
       ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = left <= 15 ? '#ff8fa3' : '#fff';
