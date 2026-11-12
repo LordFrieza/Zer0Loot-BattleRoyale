@@ -245,6 +245,16 @@ app.post('/api/look', requirePlayer, action((req) => {
 }));
 
 app.post('/api/shop/buy', requirePlayer, action((req) => game.buyCosmetic(req.user.character, String(req.body.id || ''))));
+app.post('/api/drawing', requirePlayer, action((req) => game.setDrawing(req.user.character, req.body.pixels)));
+
+// Visage dessiné d'un joueur (public : l'arène le récupère une fois puis le garde en cache).
+app.get('/api/drawing/:id', (req, res) => {
+  const user = db.state.users[req.params.id];
+  const c = user && user.character;
+  if (!c || !c.drawing || user.banned) return res.status(404).json({ error: 'Aucun dessin' });
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.json({ pixels: c.drawing, ver: c.drawingVer });
+});
 
 app.post('/api/equip', requirePlayer, action((req) => {
   game.equip(req.user.character, req.body.itemId);
@@ -330,6 +340,17 @@ function lookOf(user) {
   return look;
 }
 
+/*
+ * Apparence envoyée aux clients : le dessin n'est pas envoyé à chaque frame, seulement une référence
+ * « id.version » que l'arène résout une fois via /api/drawing/:id.
+ */
+function appOf(user) {
+  const c = user.character;
+  const app = { ...c.look };
+  app.drawing = c.look.drawing && c.drawing ? `${user.id}.${c.drawingVer}` : null;
+  return app;
+}
+
 function participantFromUser(user) {
   const c = user.character;
   const spec = Rules.specOf(c.cls, c.talents || []);
@@ -341,7 +362,7 @@ function participantFromUser(user) {
     cls: c.cls || null,
     spec: spec ? { label: spec.spec, icon: spec.icon } : null,
     title: game.titleOf(c),
-    app: { ...c.look },
+    app: appOf(user),
     stats: game.derived(c),
     look: lookOf(user),
     ult: Rules.ultOf(c.cls, c.talents || []), // ultime de l'arbre de compétences (null s'il n'en a pas)
@@ -379,7 +400,12 @@ function makeNpc(key, name, level, cls) {
   const anyOf = (obj) => { const k = Object.keys(obj); return k[Math.floor(Math.random() * k.length)]; };
   const app = { ...Rules.DEFAULT_LOOK };
   for (const part of Object.keys(Rules.APPEARANCE)) app[part] = anyOf(Rules.APPEARANCE[part].options);
-  if (Math.random() < 0.35) { const id = anyOf(Rules.COSMETICS); app[Rules.COSMETICS[id].slot] = id; }
+  if (Math.random() < 0.35) {
+    // Jamais de cosmétique d'exploit, de dessin ni de skin d'une autre classe sur un bot
+    const pool = Object.fromEntries(Object.entries(Rules.COSMETICS).filter(([, it]) => !it.unlock && it.slot !== 'drawing' && (!it.cls || it.cls === cls)));
+    const id = anyOf(pool);
+    app[Rules.COSMETICS[id].slot] = id;
+  }
   const spec = Rules.specOf(cls, talents);
   return {
     app,
@@ -658,7 +684,11 @@ battle.on('coopEnd', (result, fighters) => {
     const participation = { ...Rules.REWARDS.participation };
     const participationLevels = game.grant(user.character, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
-    if (result.mode === 'boss' && result.victory) game.bump(user.character, 'bossWins');
+    if (result.mode === 'boss' && result.victory) {
+      game.bump(user.character, 'bossWins');
+      // Exploit : boss vaincu seul (aucun autre combattant, bot compris) → débloque sa peau légendaire
+      if (fighters.length === 1 && Rules.SOLO_BOSS_COUNTER[result.boss.id]) game.bump(user.character, Rules.SOLO_BOSS_COUNTER[result.boss.id]);
+    }
     if (result.mode === 'dungeon') user.character.counters.dungeonBest = Math.max(user.character.counters.dungeonBest || 0, result.room);
     if (result.reward) {
       const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
@@ -814,6 +844,7 @@ app.get('/api/admin/players', requireAdmin, (req, res) => {
       chests: u.character.chests,
       record: u.character.record,
       title: game.titleOf(u.character),
+      drawing: u.character.drawing || null, // visage dessiné (modération)
     };
   }));
 });
@@ -855,6 +886,13 @@ app.post('/api/admin/players/:id/ban', requireAdmin, action((req) => {
   }
   io.emit('leaderboard', leaderboard());
   return { banned: user.banned };
+}));
+
+// Modération : efface le visage dessiné d'un joueur.
+app.post('/api/admin/players/:id/drawing/clear', requireAdmin, action((req) => {
+  const user = adminTarget(req);
+  game.clearDrawing(user.character);
+  pushMe(user);
 }));
 
 app.post('/api/admin/simulate-sub', requireAdmin, action((req) => {

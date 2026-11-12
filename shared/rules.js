@@ -333,7 +333,11 @@
     { id: 'dungeon10', metric: 'dungeonBest', goal: 10, name: 'Aventurier', desc: 'Atteindre la salle 10 du Raid de Donjon', gold: 200 },
     { id: 'dungeon20', metric: 'dungeonBest', goal: 20, name: 'Seigneur du donjon', desc: 'Atteindre la salle 20 du Raid de Donjon', gold: 1000 },
   ];
-  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy'];
+  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest'];
+  // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest'];
+  // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
+  const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier' };
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -1103,7 +1107,10 @@
       },
     },
   };
-  const DEFAULT_LOOK = { color: null, eyes: 'points', brows: 'aucun', mouth: 'aucune', hat: null, cape: null, shoes: null, aura: null, face: null };
+  const DEFAULT_LOOK = {
+    color: null, eyes: 'points', brows: 'aucun', mouth: 'aucune', hat: null, cape: null, shoes: null, aura: null, face: null,
+    chest: null, pants: null, gloves: null, belt: null, weapon: null, offhand: null, body: null, drawing: null,
+  };
 
   // ---------- Boutique de cosmétiques (achetés avec des golds, purement visuels) ----------
   /*
@@ -1112,11 +1119,24 @@
    */
   const COSMETIC_SLOTS = {
     hat: { label: 'Chapeau', plural: 'Chapeaux', icon: '🎩', note: 'Remplace l\'apparence du casque' },
-    cape: { label: 'Cape', plural: 'Capes', icon: '🧣' },
-    shoes: { label: 'Chaussures', plural: 'Chaussures', icon: '👢' },
     face: { label: 'Accessoire', plural: 'Accessoires', icon: '🕶️' },
+    drawing: { label: 'Visage dessiné', plural: 'Visage dessiné', icon: '🎨', note: 'Remplace les yeux, les sourcils et la bouche' },
+    cape: { label: 'Cape', plural: 'Capes', icon: '🧣' },
+    chest: { label: 'Plastron', plural: 'Plastrons', icon: '🦺', note: 'Remplace l\'apparence du plastron' },
+    pants: { label: 'Pantalon', plural: 'Pantalons', icon: '👖', note: 'Remplace l\'apparence du pantalon' },
+    gloves: { label: 'Gants', plural: 'Gants', icon: '🧤', note: 'Remplace l\'apparence des gants' },
+    belt: { label: 'Ceinture', plural: 'Ceintures', icon: '🎗️', note: 'Remplace l\'apparence de la ceinture' },
+    shoes: { label: 'Chaussures', plural: 'Chaussures', icon: '👢' },
+    weapon: { label: 'Arme', plural: 'Armes', icon: '⚔️', note: 'Réservée à une classe' },
+    offhand: { label: 'Objet secondaire', plural: 'Objets secondaires', icon: '🛡️', note: 'Réservé à une classe' },
+    body: { label: 'Peau', plural: 'Peaux légendaires', icon: '🧌', note: 'Change tout le corps' },
     aura: { label: 'Aura', plural: 'Auras', icon: '✨' },
   };
+  /*
+   * `cls` : skin réservé à une classe (armes et objets secondaires). `unlock` : cosmétique d'exploit, visible
+   * mais verrouillé dans la boutique tant que l'exploit (une métrique de succès) n'est pas accompli ;
+   * il se récupère alors gratuitement.
+   */
   const COSMETICS = {
     // Chapeaux
     sorcier: { slot: 'hat', label: 'Chapeau de sorcier', price: 300, color: '#5b3fd1' },
@@ -1126,29 +1146,84 @@
     couronne: { slot: 'hat', label: 'Couronne royale', price: 1200, color: '#ffc93a' },
     aureole: { slot: 'hat', label: 'Auréole', price: 900, color: '#fff3a0' },
     chat: { slot: 'hat', label: 'Oreilles de chat', price: 250, color: '#f08cb4' },
+    couronne_os: { slot: 'hat', label: 'Couronne d\'os', price: 0, color: '#efe6cf', unlock: { metric: 'dungeonBest', goal: 30, desc: 'Atteindre la salle 30 du Raid de Donjon' } },
     // Capes
     cape_rouge: { slot: 'cape', label: 'Cape écarlate', price: 300, color: '#c8323c' },
     cape_bleue: { slot: 'cape', label: 'Cape azur', price: 300, color: '#2f63c8' },
     cape_noire: { slot: 'cape', label: 'Cape de l\'ombre', price: 450, color: '#1a1622' },
     cape_royale: { slot: 'cape', label: 'Cape royale', price: 800, color: '#7a2fc0', trim: '#ffc93a' },
+    cape_guerre: { slot: 'cape', label: 'Étendard des mille batailles', price: 0, color: '#7a1218', trim: '#e8d9a8', unlock: { metric: 'kills', goal: 500, desc: 'Éliminer 500 adversaires' } },
     // Chaussures
     bottes: { slot: 'shoes', label: 'Bottes de cuir', price: 150, color: '#6b4426' },
     baskets: { slot: 'shoes', label: 'Baskets', price: 200, color: '#f2f2f2', trim: '#e8434f' },
     dorees: { slot: 'shoes', label: 'Bottes dorées', price: 600, color: '#ffc93a' },
     flammes: { slot: 'shoes', label: 'Bottes de feu', price: 700, color: '#ff6b2a', trim: '#ffd23f' },
+    bottes_legende: { slot: 'shoes', label: 'Bottes de légende', price: 0, color: '#ff9a1f', trim: '#fff3a0', unlock: { metric: 'legendary', goal: 10, desc: 'Obtenir 10 objets légendaires' } },
     // Accessoires de visage
     lunettes: { slot: 'face', label: 'Lunettes de soleil', price: 200, color: '#111' },
     monocle: { slot: 'face', label: 'Monocle', price: 250, color: '#ffc93a' },
     bandeau: { slot: 'face', label: 'Bandeau de pirate', price: 200, color: '#111' },
     moustache: { slot: 'face', label: 'Moustache', price: 150, color: '#4a2e1c' },
     masque: { slot: 'face', label: 'Masque de ninja', price: 350, color: '#22202c' },
+    masque_abysses: { slot: 'face', label: 'Masque des abysses', price: 0, color: '#1b2a4a', unlock: { metric: 'expeditionBest', goal: 25, desc: 'Atteindre la profondeur 25 en Expédition (mode Solo)' } },
+    // Visage dessiné (le dessin lui-même est dans character.drawing)
+    dessin: { slot: 'drawing', label: 'Visage à dessiner', price: 1500, color: '#ffffff' },
+    // Plastrons
+    plastron_dore: { slot: 'chest', label: 'Armure dorée', price: 700, color: '#e8b830', trim: '#fff0a8' },
+    robe_etoilee: { slot: 'chest', label: 'Robe étoilée', price: 500, color: '#2a2f7a', trim: '#ffe68a' },
+    tenue_ninja: { slot: 'chest', label: 'Tenue de ninja', price: 450, color: '#23202c', trim: '#c8323c' },
+    tunique_foret: { slot: 'chest', label: 'Tunique sylvestre', price: 400, color: '#3f7a3a', trim: '#a8d86a' },
+    smoking: { slot: 'chest', label: 'Smoking', price: 600, color: '#15131c', trim: '#f2f2f2' },
+    // Pantalons
+    kilt: { slot: 'pants', label: 'Kilt écossais', price: 300, color: '#b8323c', trim: '#1f4a2a' },
+    jambieres: { slot: 'pants', label: 'Jambières d\'acier', price: 450, color: '#a4a9bb', trim: '#5c6074' },
+    pantalon_ninja: { slot: 'pants', label: 'Pantalon de ninja', price: 300, color: '#23202c', trim: '#c8323c' },
+    // Gants
+    gants_dores: { slot: 'gloves', label: 'Gantelets dorés', price: 400, color: '#ffc93a' },
+    gants_feu: { slot: 'gloves', label: 'Poings de feu', price: 650, color: '#ff6b2a', trim: '#ffd23f' },
+    griffes: { slot: 'gloves', label: 'Griffes', price: 500, color: '#4a3a5a', trim: '#f2f2f2' },
+    // Ceintures
+    ceinture_champion: { slot: 'belt', label: 'Ceinture de champion', price: 800, color: '#c8323c', trim: '#ffc93a' },
+    ceinture_crane: { slot: 'belt', label: 'Ceinture à crâne', price: 400, color: '#2b2233', trim: '#efe6cf' },
+    ceinture_cuir: { slot: 'belt', label: 'Ceinture d\'aventurier', price: 200, color: '#7a4a26', trim: '#c9b48a' },
+    // Armes (réservées à une classe)
+    epee_feu: { slot: 'weapon', cls: 'guerrier', label: 'Lame de feu', price: 900, color: '#ff6b2a', trim: '#ffd23f' },
+    hache: { slot: 'weapon', cls: 'guerrier', label: 'Hache de guerre', price: 700, color: '#b8bccb', trim: '#6b4a2b' },
+    arc_elfique: { slot: 'weapon', cls: 'archer', label: 'Arc elfique', price: 800, color: '#7fd86a', trim: '#e8f8c8' },
+    arc_os: { slot: 'weapon', cls: 'archer', label: 'Arc en os', price: 700, color: '#efe6cf', trim: '#8a2a2a' },
+    baton_lune: { slot: 'weapon', cls: 'mage', label: 'Bâton lunaire', price: 850, color: '#b8d8ff', trim: '#7a5cff' },
+    baton_crane: { slot: 'weapon', cls: 'mage', label: 'Bâton nécromant', price: 750, color: '#5dff9b', trim: '#efe6cf' },
+    katana: { slot: 'weapon', cls: 'assassin', label: 'Katana', price: 850, color: '#e8eef8', trim: '#c8323c' },
+    dagues_ombre: { slot: 'weapon', cls: 'assassin', label: 'Crocs de l\'ombre', price: 700, color: '#8a4dff', trim: '#1a1622' },
+    masse_soleil: { slot: 'weapon', cls: 'pretre', label: 'Masse solaire', price: 850, color: '#ffd23f', trim: '#fff6c8' },
+    marteau: { slot: 'weapon', cls: 'pretre', label: 'Marteau sacré', price: 700, color: '#c9ced8', trim: '#ffc93a' },
+    // Objets secondaires (réservés à une classe)
+    bouclier_dragon: { slot: 'offhand', cls: 'guerrier', label: 'Bouclier du dragon', price: 700, color: '#c8423a', trim: '#ffc93a' },
+    carquois_feu: { slot: 'offhand', cls: 'archer', label: 'Carquois ardent', price: 600, color: '#7a2a18', trim: '#ff6b2a' },
+    grimoire_maudit: { slot: 'offhand', cls: 'mage', label: 'Grimoire maudit', price: 600, color: '#2a1a3a', trim: '#5dff9b' },
+    dague_poison: { slot: 'offhand', cls: 'assassin', label: 'Dague empoisonnée', price: 600, color: '#5dff9b', trim: '#1a1622' },
+    relique_lune: { slot: 'offhand', cls: 'pretre', label: 'Relique lunaire', price: 600, color: '#b8d8ff', trim: '#fff6c8' },
+    // Peaux légendaires (exploits uniquement)
+    peau_ogre: { slot: 'body', label: 'Peau d\'ogre', price: 0, color: '#7fae4f', unlock: { metric: 'soloTroll', goal: 1, desc: 'Vaincre le Troll seul' } },
+    peau_dragon: { slot: 'body', label: 'Écailles de dragon', price: 0, color: '#c8423a', unlock: { metric: 'soloDragon', goal: 1, desc: 'Vaincre le Dragon seul' } },
+    peau_spectre: { slot: 'body', label: 'Forme spectrale', price: 0, color: '#b8d8ff', unlock: { metric: 'soloSorcier', goal: 1, desc: 'Vaincre le Magicien des ténèbres seul' } },
     // Auras
     aura_feu: { slot: 'aura', label: 'Aura de feu', price: 1000, color: '#ff6b2a' },
     aura_glace: { slot: 'aura', label: 'Aura de glace', price: 1000, color: '#7fd8ff' },
     aura_foudre: { slot: 'aura', label: 'Aura de foudre', price: 1200, color: '#ffe14a' },
     aura_ombre: { slot: 'aura', label: 'Aura de l\'ombre', price: 1200, color: '#8a4dff' },
     aura_arcenciel: { slot: 'aura', label: 'Aura arc-en-ciel', price: 2000, color: '#ff5fd2' },
+    aura_champion: { slot: 'aura', label: 'Aura du champion', price: 0, color: '#ffc93a', unlock: { metric: 'wins', goal: 100, desc: 'Gagner 100 parties' } },
   };
+  // Visage dessiné : grille de pixels (chaque caractère = une couleur de la palette, 0 = transparent).
+  const DRAWING = {
+    size: 12,
+    palette: ['#1a1626', '#ffffff', '#e8434f', '#ffc93a', '#3ddc5a', '#3b8bff', '#f08cb4', '#7a4a26'],
+  };
+  function cosmeticLocked(character, id) {
+    const it = COSMETICS[id];
+    return !!(it && it.unlock && achievementValue(character, it.unlock.metric) < it.unlock.goal);
+  }
 
   // ---------- Twitch ----------
   const SUB_REWARD_GOLD = 300; // par abonnement (sub, resub ou sub offert : au donateur)
@@ -1253,11 +1328,11 @@
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
-    ACHIEVEMENTS, COUNTERS, achievementValue, achievementState, achievementById,
+    ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, achievementValue, achievementState, achievementById,
     BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS,
+    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

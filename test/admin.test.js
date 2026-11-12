@@ -88,7 +88,7 @@ test('[ADM-1, ADM-2, ADM-5] admin : contrôles de la file, choix de l\'événeme
 
   const list = (await admin.get('/api/admin/players')).data;
   const me = list.find((p) => p.id === alice.id);
-  assert.deepStrictEqual(Object.keys(me).sort(), ['banned', 'chests', 'cls', 'ghost', 'gold', 'id', 'level', 'name', 'record', 'title', 'twitch', 'username']);
+  assert.deepStrictEqual(Object.keys(me).sort(), ['banned', 'chests', 'cls', 'drawing', 'ghost', 'gold', 'id', 'level', 'name', 'record', 'title', 'twitch', 'username']);
   assert.ok(!list.some((p) => p.username === 'admin'), 'l\'admin n\'est pas un joueur');
 
   // La file : ouvrir, fermer (les inscrits restent), lancer, réinitialiser

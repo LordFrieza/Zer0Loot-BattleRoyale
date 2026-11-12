@@ -43,6 +43,9 @@ function upgrade(character) {
   // V2 : style de combat (tactique + techniques)
   character.tactics = Object.assign({}, Rules.DEFAULT_TACTICS, character.tactics);
   if (!Array.isArray(character.techs)) character.techs = [];
+  // V2 : visage dessiné (grille de pixels) et sa version (pour le cache des clients)
+  if (typeof character.drawing !== 'string') character.drawing = '';
+  if (!character.drawingVer) character.drawingVer = 0;
   if (character.migratedSlots !== 2) {
     character.inventory.forEach(migrateItem);
     for (const [slot, item] of Object.entries(character.equipment)) {
@@ -82,6 +85,8 @@ function newCharacter() {
     talents: [], // arbre de compétences : nœuds appris, dans l'ordre
     tactics: { ...Rules.DEFAULT_TACTICS }, // style de combat : posture, cible préférée, distance de recul
     techs: [], // techniques signature choisies (1 emplacement au niveau 5, 2 au niveau 15)
+    drawing: '', // visage dessiné : une couleur de Rules.DRAWING.palette par case (0 = transparent)
+    drawingVer: 0, // version du dessin (les clients le gardent en cache)
   };
 }
 
@@ -286,6 +291,10 @@ function chooseClass(character, cls) {
   character.talents = []; // l'arbre dépend de la classe : remis à zéro gratuitement
   character.techs = character.techs.filter((id) => !Rules.techBlocker(cls, character.level, id)); // techniques d'une autre classe retirées
   if (character.tactics.kite !== null) character.tactics.kite = Math.min(character.tactics.kite, Rules.tacticsKiteMax(cls)) || null;
+  for (const slot of ['weapon', 'offhand']) { // skins d'arme d'une autre classe : retirés (mais gardés)
+    const skin = Rules.COSMETICS[character.look[slot]];
+    if (skin && skin.cls !== cls) character.look[slot] = null;
+  }
   let unequipped = 0;
   for (const [slot, item] of Object.entries(character.equipment)) {
     if (item && !Rules.canEquip(item, cls)) {
@@ -601,6 +610,7 @@ function setLook(character, part, value) {
       const item = Rules.COSMETICS[value];
       if (!item || item.slot !== part) throw new Error('Cosmétique inconnu');
       if (!character.owned.includes(value)) throw new Error('Achète d\'abord cet article à la boutique');
+      if (item.cls && item.cls !== character.cls) throw new Error(`Ce skin est réservé à la classe ${Rules.CLASS_INFO[item.cls].label}`);
     }
   } else {
     throw new Error('Partie inconnue');
@@ -608,16 +618,49 @@ function setLook(character, part, value) {
   character.look[part] = value;
 }
 
+/*
+ * Achat d'un cosmétique. Un cosmétique d'exploit (`unlock`) reste verrouillé tant que l'exploit n'est pas
+ * accompli, puis se récupère gratuitement. Un skin de classe n'est porté directement que par cette classe.
+ */
 function buyCosmetic(character, id) {
   upgrade(character);
   const item = Rules.COSMETICS[id];
   if (!item) throw new Error('Article inconnu');
   if (character.owned.includes(id)) throw new Error('Tu possèdes déjà cet article');
+  if (Rules.cosmeticLocked(character, id)) throw new Error(`Exploit requis : ${item.unlock.desc}`);
   if (character.gold < item.price) throw new Error(`Il te faut ${item.price} golds`);
   character.gold -= item.price;
   character.owned.push(id);
-  character.look[item.slot] = id; // porté directement après l'achat
-  return { price: item.price };
+  const worn = !item.cls || item.cls === character.cls;
+  if (worn) character.look[item.slot] = id; // porté directement après l'achat
+  return { price: item.price, worn };
+}
+
+/*
+ * Visage dessiné : Rules.DRAWING.size² caractères, chacun « 0 » (transparent) ou l'index + 1 d'une couleur
+ * de la palette. Il faut avoir acheté l'article « dessin » ; le dessin est porté dès qu'il est enregistré.
+ */
+function setDrawing(character, pixels) {
+  upgrade(character);
+  if (!character.owned.includes('dessin')) throw new Error('Achète d\'abord le visage à dessiner à la boutique');
+  const n = Rules.DRAWING.size * Rules.DRAWING.size;
+  const max = Rules.DRAWING.palette.length;
+  if (typeof pixels !== 'string' || pixels.length !== n || ![...pixels].every((ch) => ch >= '0' && ch <= String(max))) {
+    throw new Error('Dessin invalide');
+  }
+  if (!/[1-9]/.test(pixels)) throw new Error('Ton dessin est vide');
+  character.drawing = pixels;
+  character.drawingVer += 1;
+  character.look.drawing = 'dessin';
+  return { ver: character.drawingVer };
+}
+
+// Modération : efface le dessin d'un joueur (l'article reste acheté, il peut redessiner).
+function clearDrawing(character) {
+  upgrade(character);
+  character.drawing = '';
+  character.drawingVer += 1;
+  character.look.drawing = null;
 }
 
 // ---------- Admin ----------
@@ -683,7 +726,7 @@ function absorbGhost(user, ghost) {
   if (g.consumableSlot) c.consumables[g.consumableSlot] = (c.consumables[g.consumableSlot] || 0) + 1;
   for (const k of Rules.COUNTERS) {
     // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
-    c.counters[k] = k === 'dungeonBest' ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
+    c.counters[k] = Rules.MAX_COUNTERS.includes(k) ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
   }
   delete db.state.users[ghost.id];
 }
@@ -724,7 +767,7 @@ function publicCharacter(user) {
 module.exports = {
   newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
-  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic,
+  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,

@@ -89,7 +89,7 @@ test('[FRG-7] alchimie noire : sacrifie un objet de même rareté pour renforcer
   assert.ok(!c.inventory.some((i) => i.id === sac.id), 'objet sacrifié détruit');
   assert.strictEqual(c.counters.alchemy, 1);
   // Sur un objet équipé aussi
-  const sword = game.makeItem('commun', 'arme', { cls: 'guerrier' });
+  const sword = game.makeItem('commun', 'arme', { cls: 'guerrier', ownChance: 1 });
   sword.lines[0].value = 1;
   c.inventory.push(sword, game.makeItem('commun'));
   game.equip(c, sword.id);

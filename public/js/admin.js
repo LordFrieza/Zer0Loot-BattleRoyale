@@ -161,7 +161,9 @@ function renderPlayers() {
       const ci = p.cls && Rules.CLASS_INFO[p.cls];
       return `<tr class="${p.banned ? 'banned' : ''}" data-id="${p.id}">
         <td><b>${esc(p.name)}</b>${p.twitch ? ` <span class="muted">@${esc(p.twitch)}</span>` : ''}${p.ghost ? '<span class="tag">sans compte</span>' : ''}${p.banned ? '<span class="tag red">banni</span>' : ''}
-          ${p.title ? `<div class="muted" style="font-size:11px">« ${esc(p.title)} »</div>` : ''}</td>
+          ${p.title ? `<div class="muted" style="font-size:11px">« ${esc(p.title)} »</div>` : ''}
+          ${p.drawing ? `<div class="row" style="gap:6px;margin-top:4px"><canvas width="36" height="36" class="drawing-thumb" data-pixels="${p.drawing}" title="Visage dessiné"></canvas>
+            <button class="small secondary" data-cleardraw title="Effacer ce dessin (modération)">🧽 Effacer le dessin</button></div>` : ''}</td>
         <td>${ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '—'}</td>
         <td>${p.level}</td><td>${p.gold}</td><td>${p.chests}</td>
         <td>${p.record.wins} / ${p.record.kills} / ${p.record.battles}</td>
@@ -183,6 +185,27 @@ function renderPlayers() {
         toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : 'XP'} donné(s) à ${p.name}`);
         loadPlayers();
       }
+    };
+  });
+  $('players').querySelectorAll('canvas[data-pixels]').forEach((cv) => {
+    const ctx = cv.getContext('2d');
+    const n = Rules.DRAWING.size;
+    const px = cv.width / n;
+    ctx.fillStyle = '#f5d3b8';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    [...cv.dataset.pixels].forEach((ch, i) => {
+      if (ch === '0') return;
+      ctx.fillStyle = Rules.DRAWING.palette[Number(ch) - 1];
+      ctx.fillRect((i % n) * px, Math.floor(i / n) * px, px, px);
+    });
+  });
+  $('players').querySelectorAll('[data-cleardraw]').forEach((b) => {
+    b.onclick = async () => {
+      const row = b.closest('tr');
+      const p = playersList.find((x) => x.id === row.dataset.id);
+      if (!confirm(`Effacer le visage dessiné de ${p.name} ?`)) return;
+      const r = await run(`/api/admin/players/${row.dataset.id}/drawing/clear`, {});
+      if (r) { toast(`🧽 Dessin de ${p.name} effacé`); loadPlayers(); }
     };
   });
   $('players').querySelectorAll('[data-ban]').forEach((b) => {

@@ -570,6 +570,22 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .shop-item canvas { display: block; margin: 0 auto; }
 .shop-item .shop-name { font-weight: 800; font-size: 13px; margin: 4px 0; }
 .shop-item .shop-price { color: var(--accent2); font-weight: 800; font-size: 13px; margin-bottom: 6px; }
+.shop-item .shop-cls { font-size: 11px; font-weight: 800; margin-bottom: 2px; }
+.shop-item .shop-unlock { font-size: 11px; color: #ffd98a; margin-bottom: 4px; line-height: 1.3; }
+.shop-item.exploit { border-color: #b8860b; background: linear-gradient(180deg, rgba(255,201,58,.10), transparent 60%), var(--bg2); }
+.shop-item.locked canvas { filter: grayscale(.85) brightness(.55); }
+.shop-item.locked .shop-name { opacity: .75; }
+.shop-cat h3 .sub { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; }
+/* Visage dessiné */
+.draw-box { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.draw-box h3 { margin: 0 0 10px; font-family: var(--title-font); font-size: 15px; }
+.draw-box h3 .sub { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted); }
+.draw-layout { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.draw-grid { display: grid; width: 264px; height: 264px; border-radius: 50%; overflow: hidden; background: #f5d3b8; border: 3px solid var(--border); touch-action: none; user-select: none; cursor: crosshair; }
+.draw-grid > div { box-shadow: inset 0 0 0 .5px rgba(0,0,0,.12); }
+.draw-side { flex: 1; min-width: 220px; }
+.draw-palette { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.swatch.eraser { background: var(--panel); font-size: 14px; line-height: 1; }
 
 /* Pagination du coffre personnel */
 .pager { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; margin-top: 14px; }

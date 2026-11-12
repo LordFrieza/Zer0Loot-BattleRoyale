@@ -1099,7 +1099,7 @@ function renderAppearance() {
   // Cosmétiques possédés
   const owned = me.character.owned;
   rows.push(Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
-    const mine = owned.filter((id) => Rules.COSMETICS[id].slot === slot);
+    const mine = owned.filter((id) => Rules.COSMETICS[id].slot === slot && (!Rules.COSMETICS[id].cls || Rules.COSMETICS[id].cls === me.character.cls));
     const opts = mine.length
       ? `<button class="chip ${look[slot] ? '' : 'active'}" data-part="${slot}" data-value="">Aucun</button>`
         + mine.map((id) => `<button class="chip ${look[slot] === id ? 'active' : ''}" data-part="${slot}" data-value="${id}">${Rules.COSMETICS[id].label}</button>`).join('')
@@ -1110,7 +1110,55 @@ function renderAppearance() {
   $('app-options').querySelectorAll('[data-part]').forEach((b) => {
     b.onclick = () => act('/api/look', { part: b.dataset.part, value: b.dataset.value || null }, 'equip');
   });
+  renderDrawEditor();
 }
+
+// ---------- Visage dessiné ----------
+let drawPixels = null; // brouillon en cours (null = pas encore chargé)
+let drawColor = 1;
+let drawing = false;
+
+function renderDrawEditor() {
+  const c = me.character;
+  const has = c.owned.includes('dessin');
+  $('draw-box').style.display = has ? '' : 'none';
+  if (!has) return;
+  const n = Rules.DRAWING.size;
+  if (drawPixels === null) drawPixels = c.drawing && c.drawing.length === n * n ? c.drawing : '0'.repeat(n * n);
+  if (!$('draw-grid').childElementCount) {
+    $('draw-grid').style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+    $('draw-grid').innerHTML = Array.from({ length: n * n }, (_, i) => `<div data-px="${i}"></div>`).join('');
+    const paint = (el) => {
+      if (!el || el.dataset.px === undefined) return;
+      const i = Number(el.dataset.px);
+      drawPixels = drawPixels.slice(0, i) + String(drawColor) + drawPixels.slice(i + 1);
+      paintCell(el);
+    };
+    $('draw-grid').onpointerdown = (e) => { drawing = true; $('draw-grid').setPointerCapture(e.pointerId); paint(e.target.closest('[data-px]')); e.preventDefault(); };
+    $('draw-grid').onpointermove = (e) => { if (drawing) paint(document.elementFromPoint(e.clientX, e.clientY)); };
+    $('draw-grid').onpointerup = () => { drawing = false; };
+    $('draw-grid').onpointercancel = () => { drawing = false; };
+  }
+  $('draw-grid').querySelectorAll('[data-px]').forEach(paintCell);
+  const body = Rules.COSMETICS[c.look.body];
+  const col = c.look.color && Rules.APPEARANCE.color.options[c.look.color];
+  $('draw-grid').style.background = body ? body.color : col ? col.hex : '#f5d3b8';
+  $('draw-palette').innerHTML = `<button class="swatch eraser ${drawColor === 0 ? 'active' : ''}" data-col="0" title="Gomme">🧽</button>`
+    + Rules.DRAWING.palette.map((hex, i) => `<button class="swatch ${drawColor === i + 1 ? 'active' : ''}" data-col="${i + 1}" style="background:${hex}"></button>`).join('');
+  $('draw-palette').querySelectorAll('[data-col]').forEach((b) => { b.onclick = () => { drawColor = Number(b.dataset.col); renderDrawEditor(); }; });
+}
+
+function paintCell(el) {
+  const ch = drawPixels[Number(el.dataset.px)];
+  el.style.background = ch === '0' ? '' : Rules.DRAWING.palette[Number(ch) - 1];
+}
+
+$('draw-clear').onclick = () => { drawPixels = '0'.repeat(Rules.DRAWING.size ** 2); renderDrawEditor(); };
+$('draw-reset').onclick = () => { drawPixels = null; renderDrawEditor(); };
+$('draw-save').onclick = async () => {
+  const r = await act('/api/drawing', { pixels: drawPixels }, 'equip');
+  if (r) toast('🎨 Visage enregistré : il apparaîtra en bataille !');
+};
 
 // ---------- Boutique ----------
 let trying = null; // cosmétique essayé sur l'aperçu de la boutique
@@ -1121,25 +1169,34 @@ function renderShop() {
   const t = trying && Rules.COSMETICS[trying];
   $('shop-try').innerHTML = t ? `Essai : <b>${esc(t.label)}</b>` : 'Clique sur un article pour l\'essayer';
   $('shop-list').innerHTML = Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
-    const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot).sort((a, b) => a[1].price - b[1].price);
-    return `<div class="shop-cat"><h3>${def.icon} ${def.plural}</h3><div class="shop-grid">${items.map(([id, it]) => {
+    const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot)
+      .sort((a, b) => (!!a[1].unlock - !!b[1].unlock) || (a[1].cls || '').localeCompare(b[1].cls || '') || a[1].price - b[1].price);
+    return `<div class="shop-cat"><h3>${def.icon} ${def.plural}${def.note ? ` <span class="sub">${def.note}</span>` : ''}</h3><div class="shop-grid">${items.map(([id, it]) => {
       const owned = c.owned.includes(id);
       const worn = c.look[slot] === id;
+      const locked = Rules.cosmeticLocked(c, id);
+      const wrongCls = it.cls && it.cls !== c.cls;
       let btn;
       if (worn) btn = `<button class="small secondary" data-wear="${slot}" data-value="">✓ Porté · retirer</button>`;
-      else if (owned) btn = `<button class="small" data-wear="${slot}" data-value="${id}">Porter</button>`;
+      else if (owned) btn = wrongCls ? `<button class="small" disabled>${Rules.CLASS_INFO[it.cls].label} uniquement</button>` : `<button class="small" data-wear="${slot}" data-value="${id}">Porter</button>`;
+      else if (locked) btn = '<button class="small" disabled>🔒 Verrouillé</button>';
+      else if (it.unlock) btn = `<button class="small gold" data-buy="${id}">🏆 Récupérer</button>`;
       else btn = `<button class="small gold" data-buy="${id}" ${c.gold < it.price ? 'disabled' : ''}>Acheter</button>`;
-      return `<div class="shop-item ${owned ? 'owned' : ''} ${trying === id ? 'trying' : ''}" data-try="${id}">
+      const progress = it.unlock ? Math.min(Rules.achievementValue(c, it.unlock.metric), it.unlock.goal) : 0;
+      const ci = it.cls && Rules.CLASS_INFO[it.cls];
+      return `<div class="shop-item ${owned ? 'owned' : ''} ${locked ? 'locked' : ''} ${it.unlock ? 'exploit' : ''} ${trying === id ? 'trying' : ''}" data-try="${id}">
         <canvas width="110" height="100" data-shopcv="${id}"></canvas>
         <div class="shop-name">${esc(it.label)}</div>
-        <div class="shop-price">${owned ? '<span class="up">Possédé</span>' : `${it.price} 🪙`}</div>
+        ${ci ? `<div class="shop-cls" style="color:${ci.color}">${ci.icon} ${ci.label}</div>` : ''}
+        ${it.unlock ? `<div class="shop-unlock" title="Cosmétique d'exploit">🏆 ${esc(it.unlock.desc)}${owned ? '' : ` <b>${progress} / ${it.unlock.goal}</b>`}</div>` : ''}
+        <div class="shop-price">${owned ? '<span class="up">Possédé</span>' : it.unlock ? (locked ? '<span class="muted">Exploit</span>' : '<span class="up">Débloqué !</span>') : `${it.price} 🪙`}</div>
         ${btn}
       </div>`;
     }).join('')}</div></div>`;
   }).join('');
   $('shop-list').querySelectorAll('canvas[data-shopcv]').forEach((cv) => {
     const id = cv.dataset.shopcv;
-    drawFighter(cv.getContext('2d'), 55, 62, myFighter({ [Rules.COSMETICS[id].slot]: id }), { scale: 1.9 });
+    drawFighter(cv.getContext('2d'), 55, 62, myFighter(tryOverride(id), Rules.COSMETICS[id].cls), { scale: 1.9 });
   });
   $('shop-list').querySelectorAll('[data-try]').forEach((el) => {
     el.onclick = (e) => {
@@ -1152,14 +1209,26 @@ function renderShop() {
   $('shop-list').querySelectorAll('[data-buy]').forEach((b) => {
     b.onclick = async () => {
       const it = Rules.COSMETICS[b.dataset.buy];
-      if (!confirm(`Acheter « ${it.label} » pour ${it.price} golds ?`)) return;
+      if (!it.unlock && !confirm(`Acheter « ${it.label} » pour ${it.price} golds ?`)) return;
       const r = await act('/api/shop/buy', { id: b.dataset.buy }, 'buy');
-      if (r) { trying = null; toast(`🛍️ ${it.label} acheté et porté !`); }
+      if (!r) return;
+      trying = null;
+      if (it.slot === 'drawing') { toast('🎨 Visage débloqué ! Dessine-le dans l\'onglet Personnage, rubrique Apparence.', 6000); return; }
+      toast(r.worn ? `🛍️ ${it.label} ${it.unlock ? 'récupéré' : 'acheté'} et porté !` : `🛍️ ${it.label} acheté : il sera porté quand tu joueras ${Rules.CLASS_INFO[it.cls].label}.`, 5000);
     };
   });
   $('shop-list').querySelectorAll('[data-wear]').forEach((b) => {
     b.onclick = () => act('/api/look', { part: b.dataset.wear, value: b.dataset.value || null }, 'equip');
   });
+}
+
+// Aperçu d'un article : le visage à dessiner montre un exemple tant que le joueur n'a rien dessiné.
+const DRAW_SAMPLE = '000000000000000000000000000000000000000001100110000001100110000000000000000000000000000030000030000003333300000000000000000000000000000000000000';
+function tryOverride(id) {
+  const it = Rules.COSMETICS[id];
+  const o = { [it.slot]: id };
+  if (it.slot === 'drawing') o.drawingPixels = me.character.drawing || DRAW_SAMPLE;
+  return o;
 }
 
 // ---------- Panoplies ----------
@@ -1610,10 +1679,15 @@ async function openChest() {
 
 // Aperçu animé du personnage.
 // Aperçus animés du personnage (fiche, apparence, boutique avec essayage).
-function myFighter(appOverride) {
+function myFighter(appOverride, clsOverride) {
+  const c = me.character;
   const look = {};
-  for (const [slot, item] of Object.entries(me.character.equipment)) if (item) look[slot] = item.rarity;
-  return { name: me.twitchDisplayName || me.username, cls: me.character.cls, look, app: { ...me.character.look, ...appOverride } };
+  for (const [slot, item] of Object.entries(c.equipment)) if (item) look[slot] = item.rarity;
+  const app = { ...c.look };
+  // Mon propre dessin : le brouillon de l'éditeur, sinon le dessin enregistré (pas besoin du cache réseau)
+  if (app.drawing) app.drawingPixels = (drawPixels && /[1-9]/.test(drawPixels) ? drawPixels : c.drawing) || null;
+  if (drawPixels && /[1-9]/.test(drawPixels) && $('draw-box').offsetParent) { app.drawing = 'dessin'; app.drawingPixels = drawPixels; }
+  return { name: me.twitchDisplayName || me.username, cls: clsOverride || c.cls, look, app: { ...app, ...appOverride } };
 }
 
 (function animatePreviews() {
@@ -1628,7 +1702,7 @@ function myFighter(appOverride) {
       const ctx = v.canvas.getContext('2d');
       ctx.clearRect(0, 0, v.canvas.width, v.canvas.height);
       if (!me) continue;
-      const f = myFighter(v.shop && trying ? { [Rules.COSMETICS[trying].slot]: trying } : {});
+      const f = v.shop && trying ? myFighter(tryOverride(trying), Rules.COSMETICS[trying].cls) : myFighter({});
       drawFighter(ctx, v.x, v.y, f, { scale: v.scale, bob: Math.sin(t / 400) * 3, swing: (Math.sin(t / 700) + 1) * 0.15 });
     }
     requestAnimationFrame(frame);

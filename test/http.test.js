@@ -362,6 +362,7 @@ test('[BOSS-6, BOSS-7, MODE-5, MODE-6, ACH-1] Combat de Boss : récompense commu
     assert.deepStrictEqual([ch.level, ch.xp], [2, 225], '25 + 500 XP');
     assert.deepStrictEqual(ch.record, { battles: 1, kills: 0, wins: 0 }, 'tuer le Troll ne compte pas comme un kill');
     assert.strictEqual(ch.counters.bossWins, 1);
+    assert.strictEqual(ch.counters.soloTroll, 0, 'à deux, ce n\'est pas un exploit solo');
   }
 
   // Défaite : seulement la participation
@@ -379,7 +380,7 @@ test('[BOSS-6, BOSS-7, MODE-5, MODE-6, ACH-1] Combat de Boss : récompense commu
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[BOSS-8, BOSS-7] Combat de Boss : l\'admin choisit le boss (Dragon, Magicien), même récompense', async () => {
+test('[BOSS-8, BOSS-7, LOOK-7] Combat de Boss : l\'admin choisit le boss (Dragon, Magicien), même récompense', async () => {
   await admin.post('/api/admin/battle/reset');
   assert.strictEqual((await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'licorne' })).status, 400);
   const r = await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'dragon' });
@@ -396,6 +397,7 @@ test('[BOSS-8, BOSS-7] Combat de Boss : l\'admin choisit le boss (Dragon, Magici
   assert.strictEqual(battle.result.boss.id, 'dragon');
   const ch = (await meOf(a)).character;
   assert.deepStrictEqual([ch.chests, ch.gold, ch.counters.bossWins], [3, 500, 1]);
+  assert.deepStrictEqual([ch.counters.soloDragon, ch.counters.soloTroll], [1, 0], 'Dragon vaincu seul : exploit');
   // Le Magicien des ténèbres
   await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'sorcier' });
   assert.strictEqual((await alice.get('/api/queue')).data.boss, 'sorcier');
@@ -664,6 +666,48 @@ test('[TRN-1, TRN-2, TRN-3, TRN-4, TAL-6] entraînement : duel privé contre un 
   assert.ok(!trainings.has(id));
   assert.strictEqual(Rules.TRAINING.maxDuration, 150);
   assert.strictEqual(Rules.TRAINING.maxConcurrent, 20);
+});
+
+test('[LOOK-5, LOOK-8] bots sans skin interdit ; visage dessiné : enregistrement, lecture publique, modération', async () => {
+  await admin.post('/api/admin/battle/reset');
+  await admin.post('/api/admin/queue/open', { seconds: 600 });
+  await admin.post('/api/admin/queue/bots', { count: 60 });
+  for (const p of battle.participants.values()) {
+    for (const [slot, id] of Object.entries(p.app)) {
+      const it = Rules.COSMETICS[id];
+      if (!Rules.COSMETIC_SLOTS[slot] || !it) continue;
+      assert.ok(!it.unlock && it.slot !== 'drawing' && (!it.cls || it.cls === p.cls), `${p.name} : ${id}`);
+    }
+  }
+  await admin.post('/api/admin/battle/reset');
+
+  const d = client();
+  const id = (await register(d, 'pl_dessin')).id;
+  const pixels = '0'.repeat(30) + '1111' + '0'.repeat(110);
+  assert.strictEqual((await d.post('/api/drawing', { pixels })).status, 400, 'il faut acheter l\'article');
+  await give(id, { gold: 1500 });
+  assert.strictEqual((await d.post('/api/shop/buy', { id: 'dessin' })).status, 200);
+  assert.match((await d.post('/api/drawing', { pixels: '0'.repeat(144) })).data.error, /vide/);
+  assert.match((await d.post('/api/drawing', { pixels: '9'.repeat(144) })).data.error, /invalide/);
+  assert.match((await d.post('/api/drawing', { pixels: '1'.repeat(10) })).data.error, /invalide/);
+  const r = await d.post('/api/drawing', { pixels });
+  assert.strictEqual(r.data.ver, 1);
+  const pub = await client().get('/api/drawing/' + id);
+  assert.deepStrictEqual(pub.data, { pixels, ver: 1 });
+  // Dans la file : seulement une référence id.version
+  await admin.post('/api/admin/queue/open', { seconds: 600 });
+  await d.post('/api/queue/join');
+  const q = (await d.get('/api/queue')).data;
+  const me = q.participants.find((p) => p.key === 'u' + id);
+  assert.strictEqual(me.app.drawing, `${id}.1`);
+  assert.ok(!JSON.stringify(q).includes(pixels), 'le dessin n\'est pas diffusé dans la file');
+  await admin.post('/api/admin/battle/reset');
+  // Modération
+  assert.strictEqual((await players()).find((p) => p.id === id).drawing, pixels);
+  assert.strictEqual((await admin.post(`/api/admin/players/${id}/drawing/clear`)).status, 200);
+  assert.strictEqual((await client().get('/api/drawing/' + id)).status, 404);
+  const ch = (await meOf(d)).character;
+  assert.deepStrictEqual([ch.drawing, ch.look.drawing, ch.owned.includes('dessin')], ['', null, true]);
 });
 
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {
