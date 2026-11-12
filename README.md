@@ -80,7 +80,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   | ⚔️ Guerriloot (guerrier) | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
   | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche | +15 pts Précision, −10 % Vie, −15 % Dégâts | Arc · Carquois |
   | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +25 % Dégâts, −15 % Vie, attaque 35 % plus lente | Bâton · Grimoire |
-  | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, −15 % Vie | Dagues · Dague de parade |
+  | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, +15 pts Précision, +1 pt Vol de vie, −10 % Vie | Dagues · Dague de parade |
   | ✨ Saint-Loot (prêtre) | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
 
   Les armes et objets secondaires sont **réservés à leur classe**. Dans les coffres, ils sont pour ta classe 1 fois sur 2

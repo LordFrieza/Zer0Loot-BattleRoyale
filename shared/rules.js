@@ -62,9 +62,9 @@
     assassin: {
       label: 'Lootassin', role: 'Assassin', icon: '🗡️', color: '#ffd23f',
       desc: 'Rapide et mortel : il traque l\'ennemi le plus affaibli du champ de bataille.',
-      perks: ['Cible l\'ennemi le plus faible', '+10 % Critique', '+25 % Vitesse d\'attaque', 'Récupère presque aussitôt après un coup', '−10 % Vie'],
+      perks: ['Cible l\'ennemi le plus faible', '+10 % Critique', '+25 % Vitesse d\'attaque', '+15 % Précision', '+1 % Vol de vie', 'Récupère presque aussitôt après un coup', '−10 % Vie'],
       weapon: 'dagues', offhand: 'dague',
-      bonus: { vie: -10, vitesse_attaque: 25 }, flat: { crit: 0.10 },
+      bonus: { vie: -10, vitesse_attaque: 25 }, flat: { crit: 0.10, precision: 0.15, lifesteal: 0.01 },
       combat: { range: 36, hunter: true, recovery: 0.05 },
     },
     pretre: {
@@ -1452,7 +1452,7 @@
     const attackSpeed = Math.min(2.5, (1 + 0.05 * p.vitesse_attaque) * mult('vitesse_attaque'));
     const cooldown = (BASE_ATTACK_COOLDOWN * (ci.combat.cooldownMult || 1)) / attackSpeed;
     // Vol de vie : 2 % de base, +1,5 % par point, plafond 40 %.
-    const lifesteal = Math.min(0.4, ((2 + 1.5 * p.vol_de_vie) * mult('vol_de_vie')) / 100);
+    const lifesteal = Math.min(0.4, ((2 + 1.5 * p.vol_de_vie) * mult('vol_de_vie')) / 100 + (flat.lifesteal || 0));
     // Précision : 5 % de base, +3 % par point → réduit l'esquive adverse d'autant (plafond 80 %).
     const precision = Math.min(0.8, ((5 + 3 * p.precision) * mult('precision')) / 100 + (flat.precision || 0));
     // Épines : 2 % de base, +2 % par point des dégâts reçus renvoyés, plafond 50 %.

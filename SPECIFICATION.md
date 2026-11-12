@@ -263,7 +263,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 | Guerrier | Vie +30 %, Défense +25 % | portée 40, `taunt` 0,7 | épée · bouclier |
 | Archer | Vie −10 %, Force −15 %, Précision +15 pts | portée 230, recule < 110, flèche | arc · carquois |
 | Mage | Vie −15 %, Force +25 % | portée 170, boule de feu, AoE 75 px × 60 %, recharge ×1,35 | bâton · grimoire |
-| Assassin | Vie −15 %, Vitesse d'attaque +25 %, Critique +10 pts | portée 36, traque le plus faible | dagues · dague de parade |
+| Assassin | Vie −10 %, Vitesse d'attaque +25 %, Critique +10 pts, Précision +15 pts, Vol de vie +1 pt | portée 36, traque le plus faible | dagues · dague de parade |
 | Prêtre | Vie +10 %, Défense +10 %, Force −10 % | portée 40, régénère 1,5 %/s | masse · relique |
 
 - **CLS-3** Quand un joueur choisit sa première classe, le serveur doit l'attribuer gratuitement.

@@ -55,6 +55,13 @@ test('[CLS-2, STAT-2] classes : bonus de stats', () => {
   assert.strictEqual(Rules.derive({}, {}, 'mage').maxHp, 85);
   assert.strictEqual(Rules.derive({}, {}, 'mage').damage, 12.5);
   assert.ok(Math.abs(Rules.derive({}, {}, 'assassin').crit - 0.11) < 1e-9);
+  // Lootassin : +15 pts de Précision et +1 pt de Vol de vie (bonus plats, comme la Précision de l'Archer)
+  const as = Rules.derive({}, {}, 'assassin');
+  assert.ok(Math.abs(as.precision - 0.20) < 1e-9, '5 % de base + 15');
+  assert.ok(Math.abs(as.lifesteal - 0.03) < 1e-9, '2 % de base + 1');
+  assert.strictEqual(as.maxHp, 90, '−10 % de Vie');
+  assert.ok(Rules.CLASS_INFO.assassin.perks.includes('+15 % Précision') && Rules.CLASS_INFO.assassin.perks.includes('+1 % Vol de vie'));
+  assert.ok(Math.abs(Rules.derive({}, {}, 'guerrier').lifesteal - 0.02) < 1e-9, 'les autres classes ne changent pas');
   assert.ok(Math.abs(Rules.derive({}, {}, 'mage').cooldown - 1.35) < 1e-9);
   assert.ok(Math.abs(Rules.derive({}, {}, 'archer').precision - 0.20) < 1e-9);
 });
