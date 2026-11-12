@@ -970,6 +970,32 @@ app.post('/api/training/start', requirePlayer, (req, res) => {
     if (!user.character.cls) throw new Error('Choisis d\'abord une classe');
     stopTraining(user.id);
     if (trainings.size >= Rules.TRAINING.maxConcurrent) throw new Error('Trop d\'entraînements en cours, réessaie dans un instant');
+    // Répétition du mode Solo (Expédition ou Défi des boss) : sans énergie, sans récompense, rien n'est compté.
+    if (req.body.opponent === 'expedition' || req.body.opponent === 'boss') {
+      const kind = req.body.opponent;
+      const bossId = kind === 'boss' ? String(req.body.boss || 'troll') : 'troll';
+      if (!Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
+      const difficulty = kind === 'boss' ? String(req.body.difficulty || 'normal') : null;
+      if (kind === 'boss' && !Rules.BOSS_CHALLENGE[difficulty]) throw new Error('Difficulté inconnue');
+      const b = new Battle({ solo: { kind, level: user.character.level, difficulty, training: true } });
+      b.openQueue(60, kind === 'boss' ? 'boss' : 'dungeon', bossId);
+      clearTimeout(b.queueTimer);
+      b.join({ ...participantFromUser(user), consumable: null });
+      const room = 'user:' + user.id;
+      b.on('queue', (q) => io.to(room).emit('trainingQueue', { ...q, training: true }));
+      b.on('frame', (f) => io.to(room).emit('trainingFrame', f));
+      b.on('coopEnd', () => { clearTimeout(b.trainingTimer); trainings.delete(user.id); });
+      b.setSpeed(Rules.SOLO.speeds.includes(Number(req.body.speed)) ? Number(req.body.speed) : 1);
+      b.start(null, null);
+      trainings.set(user.id, b);
+      b.trainingTimer = setTimeout(() => b.abandon(), Rules.TRAINING.soloMaxDuration * 1000);
+      b.trainingTimer.unref();
+      const B = Rules.BOSSES[bossId];
+      res.json({ ok: true, opponent: kind === 'boss'
+        ? { name: B.name, level: user.character.level, difficulty }
+        : { name: 'Expédition', level: user.character.level } });
+      return;
+    }
     let opponent;
     if (req.body.opponent === 'player') {
       const other = db.state.users[req.body.id];
@@ -1005,6 +1031,24 @@ app.post('/api/training/start', requirePlayer, (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+// Entraînement en mode Solo : choix de la relique et vitesse, comme une vraie partie solo.
+function trainingSolo(req) {
+  const b = trainings.get(req.user.id);
+  if (!b || !b.solo || b.phase !== 'battle') throw new Error('Aucun entraînement solo en cours');
+  return b;
+}
+app.post('/api/training/relic', requirePlayer, action((req) => {
+  const id = trainingSolo(req).chooseRelic(String(req.body.id || ''));
+  if (!id) throw new Error('Cette relique n\'est pas proposée');
+  return { id };
+}));
+app.post('/api/training/speed', requirePlayer, action((req) => {
+  const speed = Number(req.body.speed);
+  if (!Rules.SOLO.speeds.includes(speed)) throw new Error('Vitesse inconnue');
+  trainingSolo(req).setSpeed(speed);
+  return { speed };
+}));
 
 app.post('/api/training/stop', requirePlayer, (req, res) => {
   stopTraining(req.user.id);

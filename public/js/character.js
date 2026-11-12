@@ -714,15 +714,20 @@ function renderSoloRun() {
 }
 
 function renderRelicChoice() {
-  const dg = soloFrame && soloFrame.phase === 'battle' && soloFrame.dungeon;
+  renderRelicChoiceIn(soloFrame, $('relic-choice'), '/api/solo/relic');
+}
+
+// Choix d'une relique par-dessus une arène (mode Solo, ou sa répétition dans l'onglet Entraînement).
+function renderRelicChoiceIn(frame, box, endpoint) {
+  const dg = frame && frame.phase === 'battle' && frame.dungeon;
   const choice = dg && dg.relicChoice;
-  const box = $('relic-choice');
   if (!choice) { box.classList.remove('show'); box.dataset.key = ''; return; }
   const key = choice.options.join(',') + dg.room;
-  $('relic-left') && ($('relic-left').textContent = Math.ceil(choice.left) + ' s');
+  const left = box.querySelector('.relic-left');
+  if (left) left.textContent = Math.ceil(choice.left) + ' s';
   if (box.dataset.key === key) return;
   box.dataset.key = key;
-  box.innerHTML = `<div class="relic-title">🔮 Choisis une relique <span id="relic-left">${Math.ceil(choice.left)} s</span></div>
+  box.innerHTML = `<div class="relic-title">🔮 Choisis une relique <span class="relic-left">${Math.ceil(choice.left)} s</span></div>
     <div class="relic-cards">${choice.options.map((id) => {
       const R = Rules.RELICS[id];
       return `<button class="relic-card" data-relic="${id}"><span class="ic">${R.icon}</span><b>${esc(R.label)}</b><small>${esc(R.desc)}</small></button>`;
@@ -732,7 +737,7 @@ function renderRelicChoice() {
   box.querySelectorAll('[data-relic]').forEach((b) => {
     b.onclick = async () => {
       try {
-        await api('/api/solo/relic', { id: b.dataset.relic });
+        await api(endpoint, { id: b.dataset.relic });
         Sound.play('reroll');
         box.classList.remove('show');
       } catch (err) { toast('⚠️ ' + err.message); }
@@ -814,12 +819,23 @@ function renderTrainingOpponents() {
 function setupTraining() {
   $('training-cls').innerHTML = Rules.CLASSES.map((cls) => `<option value="${cls}">${Rules.CLASS_INFO[cls].icon} ${Rules.CLASS_INFO[cls].label}</option>`).join('');
   $('training-level').max = Rules.TRAINING.maxLevel;
+  $('training-boss-id').innerHTML = Object.entries(Rules.BOSSES).map(([id, B]) => `<option value="${id}">${B.icon} ${esc(B.name)}</option>`).join('');
+  $('training-diff').innerHTML = Object.entries(Rules.BOSS_CHALLENGE).map(([id, D]) => `<option value="${id}">${D.icon} ${D.label}</option>`).join('');
+  document.querySelectorAll('[data-tspeed]').forEach((b) => {
+    b.onclick = async () => {
+      soloSpeed = Number(b.dataset.tspeed);
+      try { localStorage.setItem('zl_solo_speed', String(soloSpeed)); } catch (e) { /* ignore */ }
+      try { await api('/api/training/speed', { speed: soloSpeed }); } catch (err) { toast('⚠️ ' + err.message); }
+    };
+  });
   $('training-kind').querySelectorAll('[data-kind]').forEach((b) => {
     b.onclick = () => {
       trainingKind = b.dataset.kind;
       $('training-kind').querySelectorAll('[data-kind]').forEach((x) => x.classList.toggle('active', x === b));
       $('training-bot').style.display = trainingKind === 'bot' ? '' : 'none';
       $('training-player').style.display = trainingKind === 'player' ? '' : 'none';
+      $('training-boss').style.display = trainingKind === 'boss' ? '' : 'none';
+      $('training-start').textContent = trainingKind === 'expedition' ? '🕳️ Lancer l\'expédition' : trainingKind === 'boss' ? '👹 Lancer le défi' : '⚔️ Lancer le duel';
       if (trainingKind === 'player') loadTrainingOpponents();
     };
   });
@@ -828,10 +844,14 @@ function setupTraining() {
     ensureTrainingView();
     const body = trainingKind === 'bot'
       ? { opponent: 'bot', cls: $('training-cls').value, level: Number($('training-level').value) }
-      : { opponent: 'player', id: $('training-opponent').value };
+      : trainingKind === 'player' ? { opponent: 'player', id: $('training-opponent').value }
+        : trainingKind === 'boss' ? { opponent: 'boss', boss: $('training-boss-id').value, difficulty: $('training-diff').value, speed: soloSpeed }
+          : { opponent: 'expedition', speed: soloSpeed };
     try {
       const r = await api('/api/training/start', body);
-      $('training-status').textContent = `Duel contre ${r.opponent.name} (niv. ${r.opponent.level})…`;
+      $('training-status').textContent = trainingKind === 'expedition' ? 'Expédition d\'entraînement en cours (sans énergie ni récompense)…'
+        : trainingKind === 'boss' ? `Défi d'entraînement : ${r.opponent.name} en ${Rules.BOSS_CHALLENGE[r.opponent.difficulty].label}…`
+          : `Duel contre ${r.opponent.name} (niv. ${r.opponent.level})…`;
       $('training-stop').disabled = false;
       $('training-arena').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (err) {
@@ -1906,14 +1926,22 @@ socket.on('trainingQueue', (q) => {
   trainingBus.emit('queue', q);
   const running = q.phase === 'battle';
   $('training-stop').disabled = !running;
-  if (q.phase === 'ended' && q.result && q.result.winner) {
+  $('training-speed').style.display = q.solo && running ? '' : 'none';
+  document.querySelectorAll('[data-tspeed]').forEach((b) => b.classList.toggle('active', !!q.solo && Number(b.dataset.tspeed) === q.solo.speed));
+  if (q.phase === 'ended' && q.result && q.result.solo) {
+    const r = q.result;
+    $('training-status').innerHTML = r.solo === 'expedition'
+      ? `🕳️ <b>Profondeur ${r.depth} atteinte</b> (entraînement, rien n'est gagné). Relance quand tu veux.`
+      : r.victory ? `🏆 <b class="up">${esc(r.boss.name)} vaincu</b> en ${Rules.BOSS_CHALLENGE[r.difficulty].label} ! (entraînement, rien n'est gagné)`
+        : `💀 <b class="down">${esc(r.boss.name)} a gagné</b> (${Rules.BOSS_CHALLENGE[r.difficulty].label}). Ajuste ton build et retente !`;
+  } else if (q.phase === 'ended' && q.result && q.result.winner) {
     const won = q.result.winner.key === 'u' + me.id;
     $('training-status').innerHTML = won ? '🏆 <b class="up">Victoire !</b> Relance quand tu veux.' : `💀 <b class="down">${esc(q.result.winner.name)} gagne.</b> Ajuste ton build et retente !`;
   } else if (q.phase === 'idle') {
     $('training-status').textContent = 'Duel arrêté.';
   }
 });
-socket.on('trainingFrame', (f) => trainingBus.emit('frame', f));
+socket.on('trainingFrame', (f) => { trainingBus.emit('frame', f); renderRelicChoiceIn(f, $('training-relic'), '/api/training/relic'); });
 socket.on('soloQueue', onSoloQueue);
 socket.on('soloFrame', (f) => { soloFrame = f; soloBus.emit('frame', f); });
 socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });

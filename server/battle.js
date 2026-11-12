@@ -248,6 +248,7 @@ class Battle extends EventEmitter {
     return {
       kind: this.solo.kind,
       speed: this.speed,
+      training: this.solo.training || undefined,
       difficulty: this.solo.difficulty || undefined,
       // Gains déjà assurés (Expédition) : les étages nettoyés
       reward: this.solo.kind === 'expedition' && d ? Rules.expeditionReward(d.cleared, d.rewardMult) : undefined,
@@ -2092,6 +2093,7 @@ class Battle extends EventEmitter {
     if (this.solo) {
       this.result.solo = this.solo.kind;
       if (this.abandoned) this.result.abandoned = true;
+      if (this.solo.training) this.result.training = true; // entraînement : rien n'est gagné
     }
     if (this.mode === 'boss') {
       this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };

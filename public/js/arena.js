@@ -2329,7 +2329,7 @@
       ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
       const rw = f.solo.reward;
       ctx.fillStyle = '#3ddc5a';
-      ctx.fillText(rw ? `🎁 ${rw.gold} golds · ${rw.xp} XP${rw.chests ? ` · ${rw.chests} 🎁` : ''}` : '🎁 Nettoie un étage pour gagner', 30, 72);
+      if (f.solo.training) { ctx.fillStyle = '#ffd98a'; ctx.fillText('🏋️ Entraînement : sans récompense', 30, 72); } else ctx.fillText(rw ? `🎁 ${rw.gold} golds · ${rw.xp} XP${rw.chests ? ` · ${rw.chests} 🎁` : ''}` : '🎁 Nettoie un étage pour gagner', 30, 72);
       ctx.fillStyle = dg.enraged ? '#ff8fa3' : '#cfc6ff';
       ctx.fillText(`${clock}${f.solo.speed > 1 ? `  ⏩ ×${f.solo.speed}` : ''}${dg.enraged ? '  😡' : ''}`, 30, 98);
       let y = 120;
@@ -2381,7 +2381,9 @@
           : r.abandoned ? 'Tu as abandonné le défi.' : `Il lui restait ${Math.round((r.boss.hp / r.boss.maxHp) * 100)} % de vie (${D.label}).`;
       }
       this.title(sub, 220, 26, '#fff', '#b83cff');
-      if (r.reward) {
+      if (r.training) {
+        this.title('🏋️ Entraînement : aucune récompense, aucune énergie dépensée', 290, 24, '#ffd98a', '#ff9a00');
+      } else if (r.reward) {
         const gains = [r.reward.chests ? `+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}` : '', `+${r.reward.xp} XP`, `+${r.reward.gold} golds`].filter(Boolean).join(' · ');
         this.title(`🎁 ${gains}`, 290, 34, '#3ddc5a', '#3ddc5a');
       } else {

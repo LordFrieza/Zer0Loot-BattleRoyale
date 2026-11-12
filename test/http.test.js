@@ -8,7 +8,7 @@ const { before, after } = test;
 const { Rules, db, game } = require('./helpers');
 
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
-const { server, io, battle, chatCommand, solos, refundSoloRuns } = require('../server/index');
+const { server, io, battle, chatCommand, solos, refundSoloRuns, trainings } = require('../server/index');
 
 let base = '';
 
@@ -804,6 +804,51 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo v
   // L'admin peut rendre de l'énergie (sans dépasser le maximum)
   assert.strictEqual((await give(id, { energy: 9 })).status, 200);
   assert.strictEqual((await meOf(s)).character.energyState.value, 3);
+});
+
+test('[TRN-5] entraînement : répéter l\'Expédition et le Défi des boss sans énergie ni récompense', async () => {
+  const t = client();
+  const id = (await register(t, 'pl_trn_solo')).id;
+  await t.post('/api/class', { cls: 'guerrier' });
+  const before = (await meOf(t)).character;
+  assert.strictEqual(before.energyState.value, 3);
+  assert.match((await t.post('/api/training/start', { opponent: 'boss', boss: 'licorne' })).data.error, /Boss inconnu/);
+  assert.match((await t.post('/api/training/start', { opponent: 'boss', difficulty: 'facile' })).data.error, /Difficulté inconnue/);
+  assert.strictEqual((await t.post('/api/training/relic', { id: 'fiole' })).status, 400, 'aucun entraînement solo en cours');
+
+  // Expédition : reliques et vitesse, puis abandon
+  const r = await t.post('/api/training/start', { opponent: 'expedition', speed: 2 });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.data));
+  const b = trainings.get(id);
+  b.stopLoop();
+  assert.deepStrictEqual([b.solo.kind, b.solo.training, b.speed, b.players[0].consumable], ['expedition', true, 2, null]);
+  assert.strictEqual(solos.has(id), false, 'pas une vraie partie solo');
+  assert.strictEqual((await t.post('/api/training/speed', { speed: 1 })).data.speed, 1);
+  for (let i = 0; i < 20 * 120 && b.dungeon.stage !== 'relic'; i++) {
+    if (b.dungeon.stage === 'fight') for (const m of b.monsters) if (m.alive) b.kill(b.players[0], m);
+    b.tick(0.05);
+  }
+  const pick = b.dungeon.relicChoice[0];
+  assert.strictEqual((await t.post('/api/training/relic', { id: pick })).data.id, pick);
+  b.abandon();
+  assert.strictEqual(b.result.training, true);
+  assert.strictEqual(b.result.depth, 3);
+  let ch = (await meOf(t)).character;
+  assert.deepStrictEqual([ch.energyState.value, ch.gold, ch.xp, ch.chests, ch.counters.expeditionBest, ch.counters.relics, ch.soloActive],
+    [3, before.gold, before.xp, before.chests, 0, 0, null], 'ni énergie dépensée, ni gains, ni record');
+
+  // Défi des boss en Légendaire : victoire sans récompense ni exploit
+  assert.strictEqual((await t.post('/api/training/start', { opponent: 'boss', boss: 'troll', difficulty: 'legendaire' })).status, 200);
+  const bb = trainings.get(id);
+  bb.stopLoop();
+  assert.strictEqual(bb.boss.maxHp, Math.round(Rules.bossStats(1, 'troll', 1).maxHp * Rules.BOSS_SOLO_SCALE.troll.hp * 4.2));
+  bb.kill(bb.players[0], bb.boss);
+  bb.tick(0.05);
+  assert.deepStrictEqual([bb.result.victory, bb.result.training], [true, true]);
+  ch = (await meOf(t)).character;
+  assert.deepStrictEqual([ch.energyState.value, ch.gold, ch.chests, ch.counters.heroTroll, ch.counters.trollWins, ch.counters.challengeWins, ch.record.battles],
+    [3, before.gold, before.chests, 0, 0, 0, 0]);
+  assert.strictEqual(trainings.has(id), false, 'terminé');
 });
 
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {

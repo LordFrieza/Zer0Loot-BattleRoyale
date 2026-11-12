@@ -356,6 +356,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **TRN-2** L'entraînement doit se jouer sur une bataille séparée de la bataille du stream, avec les règles du Battle Royale, et n'envoyer ses images (`trainingFrame`) et son état (`trainingQueue`) qu'au joueur concerné.
 - **TRN-3** L'entraînement ne doit donner aucune récompense, ne rien compter (batailles, kills, succès) et ne pas consommer la potion équipée (elle peut tout de même se déclencher).
 - **TRN-4** Un joueur ne doit avoir qu'un entraînement à la fois (en relancer un arrête le précédent) ; au plus 20 entraînements en même temps sur le serveur ; un entraînement dure au plus 150 s (au-delà, le meilleur ratio de vie gagne) ; le joueur peut l'arrêter.
+- **TRN-5** L'entraînement doit aussi permettre de répéter le mode Solo : l'**Expédition** ou le **Défi des boss** (boss et difficulté au choix, toutes les difficultés), avec les mêmes règles que le mode Solo (reliques à choisir via `/api/training/relic`, vitesse ×1 / ×2 via `/api/training/speed`, pas de potion), mais **sans dépenser d'énergie**, sans aucune récompense et sans rien compter (record, exploits, succès, classements) ; le résultat porte `training: true`. Une répétition dure au plus 10 min (au-delà, elle s'arrête comme un abandon).
 
 ## 12 sexies. Mode Solo (V2)
 

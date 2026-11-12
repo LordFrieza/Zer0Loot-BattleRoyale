@@ -1205,7 +1205,7 @@
     boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire.' },
   };
 
-  const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150 };
+  const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
 
   // ---------- Raid de Donjon : ambiance qui change toutes les 5 salles ----------
   const DUNGEON_THEMES = [

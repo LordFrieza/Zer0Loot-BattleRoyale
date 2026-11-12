@@ -268,11 +268,21 @@
       <p class="muted help">Un duel privé, visible seulement par toi : face à un <b>mannequin</b> (classe et niveau au choix, points et arbre
         tirés au hasard) ou face au <b>fantôme</b> d'un autre joueur, avec son build, son arbre et son équipement actuels.
         Ton personnage combat avec tout ce qu'il a, y compris ta potion équipée (activée mais <b>pas consommée</b>).
-        Aucune récompense, aucune perte, rien n'est compté dans les classements.</p>
+        Tu peux aussi répéter le <b>mode Solo</b> : l'<b>Expédition</b> ou le <b>Défi des boss</b> (toutes les difficultés),
+        <b>sans dépenser d'énergie</b> (et sans potion, comme en vrai).
+        Aucune récompense, aucune perte, rien n'est compté dans les classements ni dans les succès.</p>
       <div class="training-controls">
         <div class="chips" id="training-kind">
           <button class="chip active" data-kind="bot">🎯 Mannequin</button>
           <button class="chip" data-kind="player">👻 Fantôme d'un joueur</button>
+          <button class="chip" data-kind="expedition">🕳️ Expédition (Solo)</button>
+          <button class="chip" data-kind="boss">👹 Défi des boss (Solo)</button>
+        </div>
+        <div class="row" id="training-boss" style="display:none">
+          <label style="margin:0">Boss</label>
+          <select id="training-boss-id"></select>
+          <label style="margin:0">Difficulté</label>
+          <select id="training-diff"></select>
         </div>
         <div class="row" id="training-bot">
           <label style="margin:0">Classe</label>
@@ -287,10 +297,12 @@
         <div class="row">
           <button class="gold" id="training-start">⚔️ Lancer le duel</button>
           <button class="secondary" id="training-stop" disabled>⏹ Arrêter</button>
+          <span class="training-speed" id="training-speed" style="display:none"><span class="muted">Vitesse</span>
+            <button class="secondary small" data-tspeed="1">×1</button><button class="secondary small" data-tspeed="2">×2</button></span>
           <span class="muted" id="training-status"></span>
         </div>
       </div>
-      <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas></div>
+      <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas><div class="relic-choice" id="training-relic"></div></div>
     </div>
     </section>
 

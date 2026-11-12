@@ -204,6 +204,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Entraînement** (onglet Entraînement) : duel privé, visible seulement par le joueur, contre un mannequin (classe et
   niveau 1 à 50 au choix) ou le fantôme d'un autre joueur (son build, son arbre et son équipement actuels). Règles du
   Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
+  On peut aussi y **répéter le mode Solo** (Expédition, ou Défi des boss avec boss et difficulté au choix) **sans dépenser
+  d'énergie** et sans rien gagner : mêmes règles qu'en Solo (reliques, vitesse ×1 / ×2, pas de potion), 10 min maximum.
 - **Mode Solo** (onglet Solo) : chaque tentative coûte **1 ⚡ énergie** (3 au maximum, +1 toutes les 10 h). Partie
   privée, visible seulement par le joueur, en vitesse ×1 ou ×2, sans potion ; on peut abandonner, ou fermer la page (la
   partie continue et les gains arrivent à la fin). Une partie interrompue par un redémarrage rend son énergie.
