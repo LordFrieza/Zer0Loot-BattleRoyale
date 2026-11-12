@@ -668,6 +668,7 @@ battle.on('end', (winner, fighters) => {
       const win = scaled(Rules.REWARDS.win);
       const levels = game.grant(user.character, win);
       user.character.record.wins += 1;
+      if (battle.mode === 'koth') game.bump(user.character, 'kothWins');
       io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels });
     }
     pushMe(user);
@@ -701,6 +702,7 @@ battle.on('coopEnd', (result, fighters) => {
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (result.mode === 'boss' && result.victory) {
       game.bump(user.character, 'bossWins');
+      if (Rules.BOSS_WIN_COUNTER[result.boss.id]) game.bump(user.character, Rules.BOSS_WIN_COUNTER[result.boss.id]);
       // Exploit : boss vaincu seul (aucun autre combattant, bot compris) → débloque sa peau légendaire
       if (fighters.length === 1 && Rules.SOLO_BOSS_COUNTER[result.boss.id]) game.bump(user.character, Rules.SOLO_BOSS_COUNTER[result.boss.id]);
     }
@@ -735,6 +737,8 @@ battle.on('goldEnd', (result, fighters) => {
     user.character.record.battles += 1;
     const best = result.best && result.best.key === f.key ? Rules.GOLD.bestChests : 0;
     const reward = { xp: Rules.REWARDS.participation.xp, gold: f.goldGot, chests: f.chestsGot + best };
+    game.upgrade(user.character);
+    user.character.counters.goldBest = Math.max(user.character.counters.goldBest || 0, f.goldGot);
     const levels = game.grant(user.character, reward);
     io.to('user:' + user.id).emit('reward', { type: 'gold', reward, levels, best: !!best });
     pushMe(user);
@@ -759,11 +763,13 @@ battle.on('clansEnd', (result, fighters) => {
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
     if (f.clan === result.winner) {
       user.character.record.wins += 1;
+      game.bump(user.character, 'clansWins');
       const reward = { ...result.reward };
       const levels = game.grant(user.character, reward);
       io.to('user:' + user.id).emit('reward', { type: 'clans', reward, levels, clan: result.winner });
     }
     if (result.mvp && result.mvp.key === f.key) {
+      game.bump(user.character, 'clansMvp');
       const mvp = { xp: 0, gold: 0, chests: Rules.CLANS.mvpChests };
       game.grant(user.character, mvp);
       io.to('user:' + user.id).emit('reward', { type: 'mvp', reward: mvp, levels: 0 });
@@ -824,10 +830,12 @@ function leaderboard() {
     wins: u.character.record.wins,
     kills: u.character.record.kills,
     battles: u.character.record.battles,
+    expedition: (u.character.counters && u.character.counters.expeditionBest) || 0, // record de profondeur (mode Solo)
+    dungeon: (u.character.counters && u.character.counters.dungeonBest) || 0, // record de salle (Raid de Donjon)
   }));
   const top = (key) => list.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key] || b.level - a.level).slice(0, BOARD_SIZE)
     .map((p) => ({ ...p, value: p[key] }));
-  return { wins: top('wins'), kills: top('kills'), battles: top('battles') };
+  return { wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon') };
 }
 
 app.get('/api/leaderboard', (req, res) => res.json(leaderboard()));
@@ -1035,8 +1043,22 @@ function soloRewards(user, result) {
     levels = game.grant(c, reward);
     io.to('user:' + user.id).emit('reward', { type: 'solo_' + result.solo, reward, levels, depth: result.depth });
   }
-  if (result.solo === 'expedition') c.counters.expeditionBest = Math.max(c.counters.expeditionBest || 0, result.depth || 0);
-  if (result.solo === 'boss' && result.victory && Rules.SOLO_BOSS_COUNTER[result.boss.id]) game.bump(c, Rules.SOLO_BOSS_COUNTER[result.boss.id]);
+  if (result.solo === 'expedition') {
+    c.counters.expeditionBest = Math.max(c.counters.expeditionBest || 0, result.depth || 0);
+    if (result.relics && result.relics.length) game.bump(c, 'relics', result.relics.length);
+  }
+  if (result.solo === 'boss' && result.victory) {
+    const id = result.boss.id;
+    game.bump(c, 'challengeWins');
+    if (Rules.SOLO_BOSS_COUNTER[id]) game.bump(c, Rules.SOLO_BOSS_COUNTER[id]);
+    if (Rules.BOSS_WIN_COUNTER[id]) game.bump(c, Rules.BOSS_WIN_COUNTER[id]);
+    // Héroïque ou Légendaire : débloque la peau légendaire du boss
+    if (result.difficulty === 'heroique' || result.difficulty === 'legendaire') {
+      game.bump(c, 'heroWins');
+      if (Rules.HERO_BOSS_COUNTER[id]) game.bump(c, Rules.HERO_BOSS_COUNTER[id]);
+    }
+    if (result.difficulty === 'legendaire') game.bump(c, 'legendWins');
+  }
   db.save();
   pushMe(user);
 }

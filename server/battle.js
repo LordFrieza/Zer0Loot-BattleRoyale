@@ -756,6 +756,7 @@ class Battle extends EventEmitter {
       precision: 0.1,
       range: m.range,
       kite: m.kite || 0,
+      recovery: m.recovery || 0, // comme un joueur archer : immobile un instant après chaque tir
       projectile: m.projectile || null,
       cd: 0.4 + Math.random() * 0.8,
     });

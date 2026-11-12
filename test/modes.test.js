@@ -348,7 +348,7 @@ test('[ACH-1] donjon : la fusion d\'un fantôme garde la meilleure salle', () =>
   game.linkTwitch(user, 'fantome_donjon', 'Fantome_Donjon');
   assert.strictEqual(user.character.counters.dungeonBest, 12, 'maximum, pas la somme');
   assert.strictEqual(user.character.counters.bossWins, 3, 'les victoires s\'additionnent');
-  assert.ok(Rules.ACHIEVEMENTS.some((a) => a.metric === 'bossWins') && Rules.ACHIEVEMENTS.some((a) => a.metric === 'dungeonBest'));
+  assert.ok(Rules.ACHIEVEMENTS.some((a) => a.metric === 'trollWins') && Rules.ACHIEVEMENTS.some((a) => a.metric === 'dungeonBest'));
   assert.strictEqual(Rules.achievementValue(user.character, 'dungeonBest'), 12);
 });
 

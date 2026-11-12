@@ -92,7 +92,7 @@ test('[SOLO-3] expédition : monstres de plus en plus nombreux et forts, ajustem
   assert.ok(Math.abs(Rules.expeditionMultipliers(1, 11).hp - 0.55 * 1.06) < 1e-9, '+0,6 % par niveau');
   // Classe : un Guerrier a plus de vie et de dégâts pendant l'Expédition
   const g = soloBattle('expedition', { cls: 'guerrier' }).players[0];
-  assert.deepStrictEqual([g.maxHp, g.hp, g.damage], [1600, 1600, 185]);
+  assert.deepStrictEqual([g.maxHp, g.hp, g.damage], [1250, 1250, 135]);
   assert.strictEqual(soloBattle('expedition', { cls: 'archer' }).players[0].maxHp, 1000);
   // Profondeur 1 : 2 monstres affaiblis ; soin de 35 % entre deux profondeurs
   const b = soloBattle('expedition');

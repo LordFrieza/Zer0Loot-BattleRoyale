@@ -249,3 +249,34 @@ test('[TECH-3] techniques de classe', () => {
   r.b.stun(r.foe, 0.8);
   assert.ok(Math.abs(r.foe.stunUntil - r.b.time - 0.4) < 1e-9);
 });
+
+test('[AI-1] les squelettes archers ont la même pause qu\'un Archer après chaque tir', () => {
+  const { Battle } = require('./helpers');
+  assert.strictEqual(Rules.MONSTERS.squelette.recovery, 0.6);
+  const b = new Battle();
+  b.openQueue(60, 'dungeon');
+  clearTimeout(b.queueTimer);
+  b.join(player('g', { cls: 'guerrier' }));
+  b.start(null, null);
+  b.stopLoop();
+  b.dungeon.stage = 'fight';
+  const hero = b.players[0];
+  const sk = b.makeMonster('squelette', false, { hp: 1, damage: 1 }, { x: 640, y: 400 }, 0);
+  b.monsters = [sk];
+  b.fighters = [hero, sk];
+  assert.strictEqual(sk.recovery, 0.6);
+  Object.assign(hero, { x: 700, y: 400, speed: 0, cd: 99 });
+  sk.cd = 0;
+  b.tick(0.05); // tire
+  assert.ok(sk.recoverUntil > b.time);
+  const x = sk.x;
+  b.tick(0.05);
+  assert.strictEqual(sk.x, x, 'immobile alors que le Guerrier est au contact');
+  for (let i = 0; i < 14; i++) b.tick(0.05);
+  assert.notStrictEqual(sk.x, x, 'puis il recule de nouveau');
+  assert.strictEqual(b.makeMonster('gobelin', false, { hp: 1, damage: 1 }, { x: 0, y: 0 }, 1).recovery, 0, 'les autres monstres n\'en ont pas');
+});
+
+test('[TAC-1] cible « Selon ma classe » : texte explicite', () => {
+  assert.strictEqual(Rules.TACTICS.target.auto.desc, 'Le plus proche (sauf le Lootassin : le plus faible, si cette option est choisie).');
+});

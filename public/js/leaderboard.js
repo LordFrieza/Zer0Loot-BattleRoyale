@@ -1,9 +1,11 @@
-/* Classements (victoires, kills, batailles) avec podium pour le top 3. Utilisé par la page perso et la page admin. */
+/* Classements (victoires, kills, batailles, records d'Expédition et de donjon) avec podium pour le top 3. Utilisé par la page perso et la page admin. */
 (function () {
   const BOARDS = [
-    { key: 'wins', label: 'Victoires', icon: '🏆', unit: 'victoire' },
-    { key: 'kills', label: 'Kills', icon: '⚔️', unit: 'kill' },
-    { key: 'battles', label: 'Batailles jouées', icon: '🎖️', unit: 'bataille' },
+    { key: 'wins', label: 'Victoires', icon: '🏆', unit: 'victoire', note: 'Battle Royale, Roi de la Colline et Guerre des clans' },
+    { key: 'kills', label: 'Kills', icon: '⚔️', unit: 'kill', note: 'Battle Royale uniquement' },
+    { key: 'battles', label: 'Batailles jouées', icon: '🎖️', unit: 'bataille', note: 'Tous les modes du stream' },
+    { key: 'expedition', label: 'Expédition', icon: '🕳️', unit: 'profondeur', fmt: (n) => `profondeur ${n}`, note: 'Record de profondeur en mode Solo' },
+    { key: 'dungeon', label: 'Raid de Donjon', icon: '🏰', unit: 'salle', fmt: (n) => `salle ${n}`, note: 'Salle la plus lointaine atteinte' },
   ];
   const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -13,8 +15,9 @@
   }
 
   function board(b, list, meId) {
-    const plural = (n) => `${n} ${b.unit}${n > 1 ? 's' : ''}`;
-    if (!list.length) return `<div class="lb-board"><h3>${b.icon} ${b.label}</h3><p class="muted">Personne pour l'instant.</p></div>`;
+    const plural = b.fmt || ((n) => `${n} ${b.unit}${n > 1 ? 's' : ''}`);
+    const head = `<h3>${b.icon} ${b.label}</h3><div class="lb-note">${b.note}</div>`;
+    if (!list.length) return `<div class="lb-board">${head}<p class="muted">Personne pour l'instant.</p></div>`;
     // Ordre visuel du podium : 2e, 1er, 3e
     const podium = [1, 0, 2].filter((i) => list[i]).map((i) => {
       const p = list[i];
@@ -28,7 +31,7 @@
     }).join('');
     const rest = list.slice(3).map((p, i) => `<li class="${p.id === meId ? 'lb-me-row' : ''}">
       <span class="lb-rank">#${i + 4}</span><span class="lb-rest-name">${name(p, meId)}</span><span class="muted">Niv. ${p.level}</span><b>${p.value}</b></li>`).join('');
-    return `<div class="lb-board"><h3>${b.icon} ${b.label}</h3><div class="lb-podium">${podium}</div>${rest ? `<ol class="lb-rest">${rest}</ol>` : ''}</div>`;
+    return `<div class="lb-board">${head}<div class="lb-podium">${podium}</div>${rest ? `<ol class="lb-rest">${rest}</ol>` : ''}</div>`;
   }
 
   window.renderLeaderboard = function (el, data, meId) {

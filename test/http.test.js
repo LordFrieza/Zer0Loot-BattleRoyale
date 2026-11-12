@@ -309,6 +309,7 @@ test('[PRG-3, PRG-4, PRG-5, BET-1, BET-7, BET-10, B-26, LB-1] bataille complète
 
   const board = (await alice.get('/api/leaderboard')).data;
   assert.strictEqual(board.wins[0].name, 'pl_win');
+  assert.deepStrictEqual(Object.keys(board), ['wins', 'kills', 'battles', 'expedition', 'dungeon']);
 });
 
 test('[MODE-2, MODE-3, MODE-5, ADM-1, BET-1] modes coopératifs : choix du mode, 1 combattant, pas de paris, événement en attente', async () => {
@@ -363,6 +364,7 @@ test('[BOSS-6, BOSS-7, MODE-5, MODE-6, ACH-1] Combat de Boss : récompense commu
     assert.deepStrictEqual(ch.record, { battles: 1, kills: 0, wins: 0 }, 'tuer le Troll ne compte pas comme un kill');
     assert.strictEqual(ch.counters.bossWins, 1);
     assert.strictEqual(ch.counters.soloTroll, 0, 'à deux, ce n\'est pas un exploit solo');
+    assert.strictEqual(ch.counters.trollWins, 1);
   }
 
   // Défaite : seulement la participation
@@ -397,14 +399,15 @@ test('[BOSS-8, BOSS-7, LOOK-7] Combat de Boss : l\'admin choisit le boss (Dragon
   assert.strictEqual(battle.result.boss.id, 'dragon');
   const ch = (await meOf(a)).character;
   assert.deepStrictEqual([ch.chests, ch.gold, ch.counters.bossWins], [3, 500, 1]);
-  assert.deepStrictEqual([ch.counters.soloDragon, ch.counters.soloTroll], [1, 0], 'Dragon vaincu seul : exploit');
+  assert.deepStrictEqual([ch.counters.soloDragon, ch.counters.soloTroll], [1, 0], 'Dragon vaincu seul');
+  assert.deepStrictEqual([ch.counters.dragonWins, ch.counters.heroDragon], [1, 0], 'victoire comptée, mais pas la peau (pas en Défi Héroïque)');
   // Le Magicien des ténèbres
   await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'sorcier' });
   assert.strictEqual((await alice.get('/api/queue')).data.boss, 'sorcier');
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[KOTH-6, BET-1, PRG-4] Roi de la Colline : paris ouverts, récompense de victoire au meilleur score', async () => {
+test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompense de victoire au meilleur score', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();
   const b = client();
@@ -426,11 +429,13 @@ test('[KOTH-6, BET-1, PRG-4] Roi de la Colline : paris ouverts, récompense de v
   assert.strictEqual(battle.result.winner.key, fa.key);
   const ch = (await meOf(a)).character;
   assert.strictEqual(ch.record.wins, 1);
+  assert.strictEqual(ch.counters.kothWins, 1);
+  assert.strictEqual((await meOf(b)).character.counters.kothWins, 0);
   assert.strictEqual(ch.gold, 100 + Rules.REWARDS.win.gold);
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[CLAN-1, CLAN-8, CLAN-9] Guerre des clans : !rouge / !bleu, changement de camp, récompenses et paris d\'équipe', async () => {
+test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changement de camp, récompenses et paris d\'équipe', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();
   const b = client();
@@ -465,14 +470,16 @@ test('[CLAN-1, CLAN-8, CLAN-9] Guerre des clans : !rouge / !bleu, changement de 
   assert.strictEqual(ca.gold, Rules.CLANS.reward.gold);
   assert.strictEqual(ca.chests, Rules.CLANS.reward.chests + Rules.CLANS.mvpChests, 'victoire + MVP');
   assert.strictEqual(ca.record.wins, 1);
+  assert.deepStrictEqual([ca.counters.clansWins, ca.counters.clansMvp], [1, 1]);
   const cb = (await meOf(b)).character;
+  assert.deepStrictEqual([cb.counters.clansWins, cb.counters.clansMvp], [0, 0]);
   assert.strictEqual(cb.chests, 0, 'perdant : pas de coffre');
   assert.strictEqual(cb.gold, 100, 'pari gagné : sa mise lui revient (seul parieur)');
   assert.strictEqual(cb.record.battles, 1);
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[GOLD-5, GOLD-1] Ruée vers l\'or : chacun garde son butin, +1 coffre au meilleur, potion gardée', async () => {
+test('[GOLD-5, GOLD-1, ACH-4] Ruée vers l\'or : chacun garde son butin, +1 coffre au meilleur, potion gardée', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();
   const b = client();
@@ -496,12 +503,13 @@ test('[GOLD-5, GOLD-1] Ruée vers l\'or : chacun garde son butin, +1 coffre au m
   assert.strictEqual(ca.gold, 120);
   assert.strictEqual(ca.chests, 3, '2 ramassés + 1 pour le meilleur');
   assert.strictEqual(ca.consumableSlot, 'vie', 'la potion n\'est pas consommée');
+  assert.strictEqual(ca.counters.goldBest, 120, 'record de butin en un Golden Shower');
   const cb = (await meOf(b)).character;
   assert.deepStrictEqual([cb.gold, cb.chests, cb.xp, cb.record.battles], [30, 0, 25, 1]);
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
+test('[DNG-7, DNG-8, MODE-6, ACH-1, LB-1] Raid de Donjon : récompense selon la salle atteinte, record de salle', async () => {
   const a = client();
   const ida = (await register(a, 'pl_dungeon')).id;
   await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'dungeon' });
@@ -520,6 +528,7 @@ test('[DNG-7, DNG-8, MODE-6, ACH-1] Raid de Donjon : récompense selon la salle 
   assert.strictEqual(ch.xp, 175, '25 + 150 XP');
   assert.strictEqual(ch.chests, 0);
   assert.strictEqual(ch.counters.dungeonBest, 11);
+  assert.ok((await a.get('/api/leaderboard')).data.dungeon.some((p) => p.value === 11), 'classement Raid de Donjon');
   assert.deepStrictEqual(ch.record, { battles: 1, kills: 0, wins: 0 });
 
   // Un raid moins bon ne fait pas baisser le record
@@ -710,7 +719,7 @@ test('[LOOK-5, LOOK-8] bots sans skin interdit ; visage dessiné : enregistremen
   assert.deepStrictEqual([ch.drawing, ch.look.drawing, ch.owned.includes('dessin')], ['', null, true]);
 });
 
-test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ADM-3] mode Solo via l\'API : énergie, expédition, défi, redémarrage', async () => {
+test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo via l\'API : énergie, expédition, défi, redémarrage', async () => {
   const s = client();
   const id = (await register(s, 'pl_solo_v2')).id;
   assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /classe/);
@@ -749,6 +758,9 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ADM-3] mode Solo via l\'A
   const rw = Rules.expeditionReward(2);
   assert.strictEqual(ch.gold, before.gold + rw.gold);
   assert.deepStrictEqual([ch.counters.expeditionBest, ch.soloActive, ch.consumableSlot], [2, null, 'vie'], 'record, partie terminée, potion intacte');
+  assert.strictEqual(ch.counters.relics, b.dungeon.relics.length, 'reliques choisies comptées');
+  const board = (await s.get('/api/leaderboard')).data;
+  assert.ok(board.expedition.some((p) => p.id === id && p.value === 2), 'classement Expédition');
   assert.strictEqual(solos.has(id), false);
   assert.strictEqual((await s.post('/api/solo/abandon')).status, 400);
 
@@ -760,6 +772,17 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ADM-3] mode Solo via l\'A
   bb.tick(0.05);
   ch = (await meOf(s)).character;
   assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value], [1, before.gold + rw.gold + 250, 1]);
+  assert.deepStrictEqual([ch.counters.sorcierWins, ch.counters.challengeWins, ch.counters.heroWins, ch.counters.heroSorcier], [1, 1, 0, 0],
+    'Normal : pas de peau légendaire');
+  await give(id, { energy: 1 });
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'boss', boss: 'sorcier', difficulty: 'legendaire' })).status, 200);
+  const bh = solos.get(id);
+  bh.stopLoop();
+  bh.kill(bh.players[0], bh.boss);
+  bh.tick(0.05);
+  ch = (await meOf(s)).character;
+  assert.deepStrictEqual([ch.counters.heroSorcier, ch.counters.heroWins, ch.counters.legendWins, ch.counters.challengeWins], [1, 1, 1, 2]);
+  assert.strictEqual(Rules.cosmeticLocked(ch, 'peau_spectre'), false, 'Légendaire : peau débloquée');
 
   // Redémarrage pendant une partie : énergie rendue
   assert.strictEqual((await s.post('/api/solo/start', { kind: 'expedition' })).status, 200);

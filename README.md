@@ -88,7 +88,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Les anciennes épées / anciens boucliers (d'avant les classes) sont devenus des objets de Guerrier.
 - **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (sauf l'Assassin).
   Après 45 s, une zone se referme pour éviter les combats interminables. Après chaque attaque, un combattant reste
-  **immobile un court instant** (récupération : Archer 0,6 s, Mage 0,5 s, Guerrier et Prêtre 0,3 s, Assassin presque rien),
+  **immobile un court instant** (récupération : Archer 0,6 s, Mage 0,5 s, Guerrier et Prêtre 0,3 s, Assassin presque rien ;
+  les squelettes archers des donjons aussi, 0,6 s),
   raccourci par la vitesse d'attaque ; en reculant, les classes à distance **longent les murs** au lieu de rester coincées.
 - **Style de combat** (onglet du même nom) :
   - **Tactique** : posture (Équilibré, Agressif : ne recule jamais, Prudent : recule plus loin et fuit sous 30 % de vie),
@@ -156,7 +157,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Personnage ; il remplace yeux, sourcils et bouche en bataille. L'arène ne reçoit qu'une référence et charge le dessin
     une fois ; l'admin peut effacer un dessin inapproprié (liste des joueurs).
   - **Cosmétiques d'exploit** (8), visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
-    d'ogre / de dragon / spectrale (vaincre le Troll / le Dragon / le Magicien **seul**), couronne d'os (salle 30 du
+    d'ogre / de dragon / spectrale (vaincre le Troll / le Dragon / le Magicien en **Défi des boss, en Héroïque ou
+    Légendaire**), couronne d'os (salle 30 du
     donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
     (profondeur 25 en Expédition), aura du champion (100 victoires).
 - **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
@@ -212,7 +214,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     350 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
   - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (300 XP, 250 golds,
-    1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire débloque la peau légendaire du boss.
+    1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
     « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon ou Malvorath le Magicien des ténèbres.
@@ -300,10 +302,13 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
-- **Succès** : 43 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, boss, donjon,
-  panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
+- **Succès** : 62 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
+  donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
+  techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
-- **Classements** : top 10 victoires, kills et batailles jouées, avec podium pour le top 3 (page perso et page admin).
+- **Classements** (top 10, podium pour le top 3, page perso et page admin) : victoires (Battle Royale, Roi de la Colline,
+  Guerre des clans), kills (Battle Royale uniquement), batailles jouées (tous les modes du stream), record de profondeur
+  en Expédition et record de salle du Raid de Donjon. Chaque classement indique ce qu'il compte.
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
 - **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie, effacement d'un

@@ -472,8 +472,8 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .char-title { color: var(--accent2); font-style: italic; font-weight: 700; min-height: 20px; }
 
 /* ---------- Classements ---------- */
-.lb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 1000px) { .lb-grid { grid-template-columns: 1fr; } }
+.lb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.lb-note { text-align: center; font-size: 11px; color: var(--muted); margin: -4px 0 10px; }
 .lb-board { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .lb-board h3 { margin: 0 0 8px; text-align: center; font-family: var(--title-font); font-size: 15px; text-shadow: 0 0 10px rgba(184, 60, 255, .5); }
 .lb-podium { display: flex; align-items: flex-end; justify-content: center; gap: 6px; margin-bottom: 10px; }

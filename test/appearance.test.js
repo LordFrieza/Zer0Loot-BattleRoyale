@@ -60,12 +60,14 @@ test('[LOOK-6] cosmétiques d\'exploit : visibles, verrouillés, puis gratuits',
   const exploits = Object.entries(Rules.COSMETICS).filter(([, it]) => it.unlock);
   assert.deepStrictEqual(exploits.map(([id]) => id).sort(),
     ['aura_champion', 'bottes_legende', 'cape_guerre', 'couronne_os', 'masque_abysses', 'peau_dragon', 'peau_ogre', 'peau_spectre']);
-  assert.deepStrictEqual(Rules.COSMETICS.peau_ogre.unlock, { metric: 'soloTroll', goal: 1, desc: 'Vaincre le Troll seul' });
+  assert.deepStrictEqual(Rules.COSMETICS.peau_ogre.unlock, { metric: 'heroTroll', goal: 1, desc: 'Vaincre le Troll en Défi des boss, en Héroïque ou Légendaire' });
   const c = game.newCharacter();
   c.gold = 10000;
   assert.strictEqual(Rules.cosmeticLocked(c, 'peau_ogre'), true);
-  assert.throws(() => game.buyCosmetic(c, 'peau_ogre'), /Exploit requis : Vaincre le Troll seul/);
+  assert.throws(() => game.buyCosmetic(c, 'peau_ogre'), /Exploit requis : Vaincre le Troll en Défi des boss/);
   game.bump(c, 'soloTroll');
+  assert.strictEqual(Rules.cosmeticLocked(c, 'peau_ogre'), true, 'une victoire seul en Normal ne suffit pas');
+  game.bump(c, 'heroTroll');
   assert.strictEqual(Rules.cosmeticLocked(c, 'peau_ogre'), false);
   assert.deepStrictEqual(game.buyCosmetic(c, 'peau_ogre'), { price: 0, worn: true });
   assert.strictEqual(c.gold, 10000);

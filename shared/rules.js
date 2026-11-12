@@ -327,22 +327,48 @@
     { id: 'cosmetics1', metric: 'cosmetics', goal: 1, name: 'Coquet', desc: 'Acheter 1 article à la boutique', gold: 20 },
     { id: 'cosmetics10', metric: 'cosmetics', goal: 10, name: 'Icône de mode', desc: 'Posséder 10 articles de la boutique', gold: 300 },
     { id: 'sets6', metric: 'setPieces', goal: 6, name: 'Tiré à quatre épingles', desc: 'Équiper 6 pièces d\'une même panoplie', gold: 500 },
-    { id: 'boss1', metric: 'bossWins', goal: 1, name: 'Tueur de troll', desc: 'Vaincre le Troll (Combat de Boss)', gold: 100 },
-    { id: 'boss10', metric: 'bossWins', goal: 10, name: 'Fléau des trolls', desc: 'Vaincre le Troll 10 fois', gold: 500 },
+    { id: 'boss1', metric: 'trollWins', goal: 1, name: 'Tueur de troll', desc: 'Vaincre le Troll (Combat de Boss ou Défi des boss)', gold: 100 },
+    { id: 'boss10', metric: 'trollWins', goal: 10, name: 'Fléau des trolls', desc: 'Vaincre le Troll 10 fois', gold: 500 },
+    { id: 'dragon1', metric: 'dragonWins', goal: 1, name: 'Pourfendeur de dragon', desc: 'Vaincre le Dragon (Combat de Boss ou Défi des boss)', gold: 150 },
+    { id: 'dragon10', metric: 'dragonWins', goal: 10, name: 'Fléau des dragons', desc: 'Vaincre le Dragon 10 fois', gold: 500 },
+    { id: 'sorcier1', metric: 'sorcierWins', goal: 1, name: 'Briseur de sortilèges', desc: 'Vaincre le Magicien des ténèbres (Combat de Boss ou Défi des boss)', gold: 150 },
+    { id: 'sorcier10', metric: 'sorcierWins', goal: 10, name: 'Exorciste', desc: 'Vaincre le Magicien des ténèbres 10 fois', gold: 500 },
+    { id: 'koth1', metric: 'kothWins', goal: 1, name: 'Prince de la colline', desc: 'Gagner 1 partie de Roi de la Colline', gold: 50 },
+    { id: 'koth10', metric: 'kothWins', goal: 10, name: 'Roi de la montagne', desc: 'Gagner 10 parties de Roi de la Colline', gold: 300 },
+    { id: 'clans1', metric: 'clansWins', goal: 1, name: 'Soldat du clan', desc: 'Gagner 1 Guerre des clans avec ton équipe', gold: 30 },
+    { id: 'clans10', metric: 'clansWins', goal: 10, name: 'Général', desc: 'Gagner 10 Guerres des clans avec ton équipe', gold: 200 },
+    { id: 'mvp1', metric: 'clansMvp', goal: 1, name: 'MVP', desc: 'Être le MVP d\'une Guerre des clans', gold: 100 },
+    { id: 'gold100', metric: 'goldBest', goal: 100, name: 'Chercheur d\'or', desc: 'Ramasser 100 golds en un seul Golden Shower', gold: 50 },
+    { id: 'gold200', metric: 'goldBest', goal: 200, name: 'Roi du butin', desc: 'Ramasser 200 golds en un seul Golden Shower', gold: 200 },
     { id: 'dungeon5', metric: 'dungeonBest', goal: 5, name: 'Explorateur', desc: 'Atteindre la salle 5 du Raid de Donjon', gold: 50 },
     { id: 'dungeon10', metric: 'dungeonBest', goal: 10, name: 'Aventurier', desc: 'Atteindre la salle 10 du Raid de Donjon', gold: 200 },
     { id: 'dungeon20', metric: 'dungeonBest', goal: 20, name: 'Seigneur du donjon', desc: 'Atteindre la salle 20 du Raid de Donjon', gold: 1000 },
+    { id: 'expedition10', metric: 'expeditionBest', goal: 10, name: 'Spéléologue', desc: 'Atteindre la profondeur 10 en Expédition (mode Solo)', gold: 100 },
+    { id: 'expedition20', metric: 'expeditionBest', goal: 20, name: 'Explorateur des abysses', desc: 'Atteindre la profondeur 20 en Expédition', gold: 300 },
+    { id: 'expedition40', metric: 'expeditionBest', goal: 40, name: 'Seigneur des profondeurs', desc: 'Atteindre la profondeur 40 en Expédition', gold: 1000 },
+    { id: 'relics50', metric: 'relics', goal: 50, name: 'Collectionneur de reliques', desc: 'Choisir 50 reliques en Expédition', gold: 200 },
+    { id: 'challenge1', metric: 'challengeWins', goal: 1, name: 'Duelliste', desc: 'Réussir 1 Défi des boss (mode Solo)', gold: 50 },
+    { id: 'hero1', metric: 'heroWins', goal: 1, name: 'Héroïque', desc: 'Réussir un Défi des boss en Héroïque ou Légendaire', gold: 200 },
+    { id: 'legend1', metric: 'legendWins', goal: 1, name: 'Légende vivante', desc: 'Réussir un Défi des boss en Légendaire', gold: 500 },
+    { id: 'techs1', metric: 'techs', goal: 1, name: 'Technicien', desc: 'Équiper une technique (onglet Style de combat)', gold: 30 },
   ];
-  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest'];
+  const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
+    'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
+    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier' };
+  // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
+  const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins' };
+  // Défi des boss réussi en Héroïque ou Légendaire : débloque la peau légendaire du boss.
+  const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier' };
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
     if (metric === 'level') return character.level || 1;
     if (metric === 'cosmetics') return (character.owned || []).length;
+    if (metric === 'techs') return (character.techs || []).length;
     if (metric === 'setPieces') return Math.max(0, ...setBonus(character.equipment).sets.map((x) => x.pieces));
     return (character.counters && character.counters[metric]) || 0;
   }
@@ -617,7 +643,7 @@
     gobelin: { label: 'Gobelin', icon: '👺', hp: 40, damage: 6, speed: 78, cooldown: 0.95, range: 36, radius: 13, reduction: 0.05, dodge: 0.08, from: 1 },
     slime: { label: 'Slime', icon: '🟢', hp: 80, damage: 6, speed: 42, cooldown: 1.25, range: 34, radius: 15, reduction: 0.2, dodge: 0, from: 1 },
     chauve_souris: { label: 'Chauve-souris', icon: '🦇', hp: 24, damage: 4, speed: 135, cooldown: 0.65, range: 30, radius: 11, reduction: 0, dodge: 0.25, from: 2 },
-    squelette: { label: 'Squelette archer', icon: '💀', hp: 42, damage: 7, speed: 55, cooldown: 1.4, range: 210, kite: 100, projectile: 'bone', radius: 13, reduction: 0.1, dodge: 0.05, from: 3 },
+    squelette: { label: 'Squelette archer', icon: '💀', hp: 42, damage: 7, speed: 55, cooldown: 1.4, range: 210, kite: 100, recovery: 0.6, projectile: 'bone', radius: 13, reduction: 0.1, dodge: 0.05, from: 3 },
   };
   // Toutes les 5 salles, un chef bien plus costaud accompagne les monstres.
   const ELITES = {
@@ -1014,7 +1040,7 @@
       prudent: { label: 'Prudent', icon: '🛡️', desc: 'Garde plus de distance (classes à distance) et fuit quand sa vie passe sous 30 %.' },
     },
     target: {
-      auto: { label: 'Selon ma classe', icon: '🎯', desc: 'Le plus proche (l\'Assassin : le plus faible).' },
+      auto: { label: 'Selon ma classe', icon: '🎯', desc: 'Le plus proche (sauf le Lootassin : le plus faible, si cette option est choisie).' },
       proche: { label: 'Le plus proche', icon: '📍', desc: 'Attaque l\'ennemi le plus proche.' },
       faible: { label: 'Le plus faible', icon: '🩸', desc: 'Traque l\'ennemi qui a le moins de vie.' },
       menace: { label: 'Le plus dangereux', icon: '☠️', desc: 'Vise l\'ennemi qui frappe le plus fort.' },
@@ -1113,8 +1139,8 @@
     // Seul face aux monstres, le corps à corps est désavantagé (pas de groupe pour encaisser) : vie et dégâts
     // ajustés par classe pendant l'Expédition, pour que chaque classe descende à peu près aussi loin.
     classMult: {
-      guerrier: { hp: 1.6, damage: 1.85 }, archer: { hp: 1, damage: 1 }, mage: { hp: 1, damage: 1 },
-      assassin: { hp: 1.9, damage: 1.7 }, pretre: { hp: 1.5, damage: 1.8 }, none: { hp: 1, damage: 1 },
+      guerrier: { hp: 1.25, damage: 1.35 }, archer: { hp: 1, damage: 1 }, mage: { hp: 1, damage: 1 },
+      assassin: { hp: 1.6, damage: 1.4 }, pretre: { hp: 1.25, damage: 1.4 }, none: { hp: 1, damage: 1 },
     },
   };
   function expeditionRoom(depth) {
@@ -1322,9 +1348,9 @@
     dague_poison: { slot: 'offhand', cls: 'assassin', label: 'Dague empoisonnée', price: 600, color: '#5dff9b', trim: '#1a1622' },
     relique_lune: { slot: 'offhand', cls: 'pretre', label: 'Relique lunaire', price: 600, color: '#b8d8ff', trim: '#fff6c8' },
     // Peaux légendaires (exploits uniquement)
-    peau_ogre: { slot: 'body', label: 'Peau d\'ogre', price: 0, color: '#7fae4f', unlock: { metric: 'soloTroll', goal: 1, desc: 'Vaincre le Troll seul' } },
-    peau_dragon: { slot: 'body', label: 'Écailles de dragon', price: 0, color: '#c8423a', unlock: { metric: 'soloDragon', goal: 1, desc: 'Vaincre le Dragon seul' } },
-    peau_spectre: { slot: 'body', label: 'Forme spectrale', price: 0, color: '#b8d8ff', unlock: { metric: 'soloSorcier', goal: 1, desc: 'Vaincre le Magicien des ténèbres seul' } },
+    peau_ogre: { slot: 'body', label: 'Peau d\'ogre', price: 0, color: '#7fae4f', unlock: { metric: 'heroTroll', goal: 1, desc: 'Vaincre le Troll en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_dragon: { slot: 'body', label: 'Écailles de dragon', price: 0, color: '#c8423a', unlock: { metric: 'heroDragon', goal: 1, desc: 'Vaincre le Dragon en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_spectre: { slot: 'body', label: 'Forme spectrale', price: 0, color: '#b8d8ff', unlock: { metric: 'heroSorcier', goal: 1, desc: 'Vaincre le Magicien des ténèbres en Défi des boss, en Héroïque ou Légendaire' } },
     // Auras
     aura_feu: { slot: 'aura', label: 'Aura de feu', price: 1000, color: '#ff6b2a' },
     aura_glace: { slot: 'aura', label: 'Aura de glace', price: 1000, color: '#7fd8ff' },
@@ -1446,7 +1472,7 @@
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
-    ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, achievementValue, achievementState, achievementById,
+    ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, achievementValue, achievementState, achievementById,
     BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,

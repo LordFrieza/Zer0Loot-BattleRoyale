@@ -31,6 +31,8 @@ function upgrade(character) {
     character.counters.chests = Math.floor(looted / Rules.ITEMS_PER_CHEST);
     character.counters.legendary = character.lootStats.legendaire || 0;
   }
+  // 1.2.1 : victoires contre le Troll — on reprend les victoires de boss d'avant (le Troll était le boss principal).
+  if (character.counters.trollWins == null) character.counters.trollWins = character.counters.bossWins || 0;
   for (const k of Rules.COUNTERS) if (character.counters[k] == null) character.counters[k] = 0;
   if (!character.claimed) character.claimed = [];
   character.look = Object.assign({}, Rules.DEFAULT_LOOK, character.look);

@@ -677,9 +677,9 @@ function renderSolo() {
   const mask = Rules.COSMETICS.masque_abysses.unlock.goal;
   $('exp-record').innerHTML = `🏅 Record : <b>profondeur ${best}</b>${best < mask ? ` · <span class="muted">profondeur ${mask} pour débloquer le Masque des abysses</span>` : ' · 🎭 Masque des abysses débloqué !'}`;
   $('solo-boss-pick').innerHTML = Object.entries(Rules.BOSSES).map(([id, B]) => {
-    const won = c.counters[Rules.SOLO_BOSS_COUNTER[id]] > 0;
+    const won = c.counters[Rules.HERO_BOSS_COUNTER[id]] > 0;
     return `<button class="solo-boss ${soloBoss === id ? 'active' : ''}" data-sboss="${id}" style="--c:${B.color}">
-      <span class="ic">${B.icon}</span><b>${esc(B.name)}</b>${won ? '<span class="won" title="Déjà vaincu seul">🏆</span>' : ''}</button>`;
+      <span class="ic">${B.icon}</span><b>${esc(B.name)}</b>${won ? '<span class="won" title="Vaincu en Héroïque ou Légendaire : peau légendaire débloquée">🏆</span>' : ''}</button>`;
   }).join('');
   $('solo-boss-pick').querySelectorAll('[data-sboss]').forEach((b) => { b.onclick = () => { soloBoss = b.dataset.sboss; renderSolo(); }; });
   $('solo-diff-pick').innerHTML = Object.entries(Rules.BOSS_CHALLENGE).map(([id, D]) => `<button class="solo-diff ${soloDiff === id ? 'active' : ''}" data-sdiff="${id}">
