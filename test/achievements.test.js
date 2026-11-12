@@ -59,3 +59,19 @@ test('[ACH-4] succès des modes et du Solo : compteurs et migration des victoire
   game.setTechniques(t, ['roulade']);
   assert.strictEqual(Rules.achievementState(t, Rules.achievementById('techs1')).done, true);
 });
+
+test('[ACH-4] succès « Technicien » : acquis même si on retire la technique', () => {
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  c.level = 5;
+  game.setTechniques(c, ['roulade']);
+  game.setTechniques(c, []);
+  assert.strictEqual(c.counters.techs, 1);
+  assert.strictEqual(Rules.achievementState(c, Rules.achievementById('techs1')).done, true, 'reste terminé');
+  // Ancienne sauvegarde avec une technique déjà équipée
+  const old = game.newCharacter();
+  old.techs = ['roulade'];
+  delete old.counters.techs;
+  game.upgrade(old);
+  assert.strictEqual(old.counters.techs, 1);
+});

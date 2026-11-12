@@ -45,6 +45,7 @@ function upgrade(character) {
   // V2 : style de combat (tactique + techniques)
   character.tactics = Object.assign({}, Rules.DEFAULT_TACTICS, character.tactics);
   if (!Array.isArray(character.techs)) character.techs = [];
+  character.counters.techs = Math.max(character.counters.techs || 0, character.techs.length);
   // V2 : visage dessiné (grille de pixels) et sa version (pour le cache des clients)
   if (typeof character.drawing !== 'string') character.drawing = '';
   if (!character.drawingVer) character.drawingVer = 0;
@@ -573,6 +574,8 @@ function setTechniques(character, ids) {
     if (why) throw new Error(why);
   }
   character.techs = list;
+  // Succès « Technicien » : la progression reste acquise même si on retire ensuite la technique
+  character.counters.techs = Math.max(character.counters.techs || 0, list.length);
   return { techs: list };
 }
 

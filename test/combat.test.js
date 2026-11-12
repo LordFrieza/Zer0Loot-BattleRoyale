@@ -129,6 +129,7 @@ test('[TECH-2] techniques communes : Roulade, Charge, Second souffle, Frénésie
   Object.assign(foe, { x: 630, y: 360 });
   b.tick(0.05);
   assert.ok(Math.hypot(a.x - foe.x, a.y - foe.y) > 100, 'hors de portée');
+  assert.ok(Math.abs(Math.hypot(a.x - 600, a.y - 360) - 130) < 1, 'saut de 130 px');
   assert.ok(a.protectUntil > b.time, 'intouchable un instant');
   assert.ok(a.techCd.roulade > b.time + 8);
 
@@ -142,6 +143,7 @@ test('[TECH-2] techniques communes : Roulade, Charge, Second souffle, Frénésie
   b.tick(0.05);
   assert.ok(Math.hypot(a.x - foe.x, a.y - foe.y) < 40, 'au contact');
   assert.ok(foe.hp < hp && foe.stunUntil > b.time);
+  assert.ok(Math.abs(a.techCd.charge - (b.time + 15)) < 0.06, 'recharge de 15 s');
   assert.ok(testBattle([player('m', { cls: 'mage', techs: ['charge'] }), player('x')]).fighters[0].techs.length === 0, 'pas pour les classes à distance');
 
   // Second souffle : une seule fois
@@ -279,4 +281,26 @@ test('[AI-1] les squelettes archers ont la même pause qu\'un Archer après chaq
 
 test('[TAC-1] cible « Selon ma classe » : texte explicite', () => {
   assert.strictEqual(Rules.TACTICS.target.auto.desc, 'Le plus proche (sauf le Lootassin : le plus faible, si cette option est choisie).');
+});
+
+test('[B-11] au contact, on est toujours à portée : les chauves-souris (et la Chauve-souris vampire) frappent', () => {
+  const { Battle } = require('./helpers');
+  for (const elite of [false, true]) {
+    const b = new Battle();
+    b.openQueue(60, 'dungeon');
+    clearTimeout(b.queueTimer);
+    b.join(player('g', { cls: 'guerrier', stats: base({ maxHp: 5000, speed: 0, cooldown: 99 }) }));
+    b.start(null, null);
+    b.stopLoop();
+    Object.assign(b.dungeon, { stage: 'fight', room: 5 });
+    const hero = b.players[0];
+    Object.assign(hero, { x: 400, y: 400, cd: 99 });
+    const bat = b.makeMonster('chauve_souris', elite, { hp: 1, damage: 1 }, { x: 600, y: 400 }, 0);
+    bat.dodge = 0;
+    b.monsters = [bat];
+    b.fighters = [hero, bat];
+    assert.ok(bat.range < 32, 'portée plus petite que l\'écart laissé par la séparation');
+    for (let i = 0; i < 20 * 10; i++) b.tick(0.05);
+    assert.ok(hero.hp < 5000, elite ? 'la Chauve-souris vampire frappe' : 'la chauve-souris frappe');
+  }
 });

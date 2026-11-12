@@ -1070,12 +1070,15 @@ class Battle extends EventEmitter {
       const dist = Math.hypot(dx, dy) || 1;
       // Distance « bord à bord » : les gros (Troll, chefs) se touchent de plus loin.
       const reach = dist - (best.r + f.r - 2 * RADIUS);
+      // Au contact (la séparation laisse exactement la somme des rayons), on est toujours à portée, même avec
+      // une petite portée (chauves-souris).
+      const inRange = reach <= f.range || dist <= best.r + f.r + 2;
       const speed = f.speed * this.buffMult(f, 'speed');
       f.cd -= dt;
-      if (reach <= f.range && !f.engaged) { f.engaged = true; this.triggerPotion(f, 'engage'); }
+      if (inRange && !f.engaged) { f.engaged = true; this.triggerPotion(f, 'engage'); }
 
       // Roi de la Colline : hors de la colline et personne à portée → on y retourne au lieu de courir après les autres.
-      const toHill = this.koth && reach > f.range
+      const toHill = this.koth && !inRange
         && Math.hypot(f.x - this.koth.hill.x, f.y - this.koth.hill.y) > this.koth.hill.r * 0.8
         && Math.hypot(best.x - this.koth.hill.x, best.y - this.koth.hill.y) > this.koth.hill.r;
       // Posture prudente : sous 30 % de vie, on fuit l'ennemi le plus proche.
@@ -1086,7 +1089,7 @@ class Battle extends EventEmitter {
         this.walkTo(f, this.koth.hill, dt);
       } else if (threat) {
         this.retreat(f, threat, speed * 0.9 * dt);
-      } else if (reach > f.range) {
+      } else if (!inRange) {
         const step = Math.min(speed * dt, reach - f.range + 1);
         f.x += (dx / dist) * step;
         f.y += (dy / dist) * step;
@@ -1094,7 +1097,7 @@ class Battle extends EventEmitter {
         // Archer (ou tactique de recul) : recule quand l'ennemi est trop près, en évitant les bords.
         this.retreat(f, best, speed * 0.8 * dt);
       }
-      if (reach <= f.range && f.cd <= 0) {
+      if (inRange && f.cd <= 0) {
         f.cd = f.cooldown / this.buffMult(f, 'attackSpeed');
         this.attack(f, best);
         if (f.recovery && !f.buffs.some((b) => b.noRecovery)) f.recoverUntil = this.time + f.recovery / this.buffMult(f, 'attackSpeed');
@@ -1612,7 +1615,7 @@ class Battle extends EventEmitter {
       if (id === 'roulade' && ratio < 0.7 && enemiesWithin(25).length) {
         const fx = f.x;
         const fy = f.y;
-        const to = this.escapeSpot(f, alive, 110);
+        const to = this.escapeSpot(f, alive, Rules.TECHNIQUES.roulade.dist);
         Object.assign(f, to);
         f.protectUntil = Math.max(f.protectUntil || 0, this.time + 0.35);
         this.techUsed(f, id, { fx: Math.round(fx), fy: Math.round(fy), x: Math.round(f.x), y: Math.round(f.y) });

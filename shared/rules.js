@@ -354,9 +354,9 @@
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
-    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier'];
+    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
@@ -368,7 +368,6 @@
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
     if (metric === 'level') return character.level || 1;
     if (metric === 'cosmetics') return (character.owned || []).length;
-    if (metric === 'techs') return (character.techs || []).length;
     if (metric === 'setPieces') return Math.max(0, ...setBonus(character.equipment).sets.map((x) => x.pieces));
     return (character.counters && character.counters[metric]) || 0;
   }
@@ -1060,8 +1059,8 @@
    */
   const TECH_SLOTS = [5, 15];
   const TECHNIQUES = {
-    roulade: { label: 'Roulade', icon: '🌀', level: 5, cd: 9, desc: 'Sous 70 % de vie, quand un ennemi est au contact : roulade de 110 px hors de portée, intouchable 0,35 s.' },
-    charge: { label: 'Charge', icon: '🐗', level: 5, cd: 10, melee: true, desc: 'Fonce sur sa cible entre 120 et 320 px, l\'étourdit 0,6 s et frappe à 60 %.' },
+    roulade: { label: 'Roulade', icon: '🌀', level: 5, cd: 9, dist: 130, desc: 'Sous 70 % de vie, quand un ennemi est au contact : roulade de 130 px hors de portée, intouchable 0,35 s.' },
+    charge: { label: 'Charge', icon: '🐗', level: 5, cd: 15, melee: true, desc: 'Fonce sur sa cible entre 120 et 320 px, l\'étourdit 0,6 s et frappe à 60 %.' },
     second_souffle: { label: 'Second souffle', icon: '💨', level: 10, desc: 'Une fois par partie, sous 25 % de vie : récupère 25 % de sa vie max.' },
     frenesie: { label: 'Frénésie', icon: '😤', level: 15, desc: 'Après chaque kill : vitesse d\'attaque ×1,4 pendant 5 s.' },
     cri_guerre: { label: 'Cri de guerre', icon: '📯', level: 10, cd: 12, cls: 'guerrier', desc: 'Entouré d\'au moins 2 ennemis : dégâts subis ×0,75 pendant 4 s.' },

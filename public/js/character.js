@@ -1430,6 +1430,7 @@ function renderSets() {
 // ---------- Succès ----------
 let achFilter = 'next';
 let knownDone = null; // succès déjà terminés (pour annoncer les nouveaux)
+const announced = new Set(); // succès déjà annoncés pendant cette visite (jamais deux fois)
 
 function renderAchievements() {
   const c = me.character;
@@ -1441,7 +1442,8 @@ function renderAchievements() {
   const doneIds = new Set(done.map((x) => x.a.id));
   if (knownDone) {
     for (const x of done) {
-      if (!knownDone.has(x.a.id)) {
+      if (!knownDone.has(x.a.id) && !x.st.claimed && !announced.has(x.a.id)) {
+        announced.add(x.a.id);
         toast(`🏅 Succès débloqué : ${x.a.name} ! (+${x.a.gold} 🪙 à récupérer)`, 6000);
         Sound.play('levelUp');
       }
