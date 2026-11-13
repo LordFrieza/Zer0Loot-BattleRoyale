@@ -87,7 +87,7 @@ function sell(user, itemId, price, now = Date.now()) {
   if (ordersOf(user.id).length >= M.maxOrders) throw new Error(`Tu as déjà ${M.maxOrders} objets en vente : attends une vente ou retire un ordre`);
   const item = c.inventory.find((i) => i.id === itemId);
   if (!item) throw new Error('Objet introuvable dans ton coffre personnel (retire-le d\'abord s\'il est équipé)');
-  if (game.protectedIds(c).has(item.id)) throw new Error('Un objet protégé par un preset ne peut pas être vendu');
+  if (game.protectedIds(c).has(item.id)) throw new Error('Un objet protégé (verrouillé ou dans un preset) ne peut pas être vendu');
   const tax = Rules.marketTax(price);
   if (c.gold < tax) throw new Error(`Mettre en vente à ce prix coûte ${tax} golds de taxe`);
   c.gold -= tax;

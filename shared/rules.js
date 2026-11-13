@@ -173,9 +173,30 @@
     return item.kind ? KINDS[item.kind].cls : null;
   }
 
-  function canEquip(item, cls) {
-    const req = itemClass(item);
-    return !req || req === cls;
+  // Depuis la 1.3, tout le monde peut équiper tous les objets : la classe d'une arme ou d'un objet secondaire donne
+  // seulement un bonus (voir itemClassBonus). Gardé pour la compatibilité des appels existants.
+  function canEquip() {
+    return true;
+  }
+
+  /*
+   * Bonus de classe : une arme ou un objet secondaire de sa propre classe donne un bonus en % dans la stat de
+   * prédilection de la classe, selon la rareté de l'objet (ex. Saint-Loot : Vie +5 % sur un objet Épique).
+   */
+  const CLASS_ITEM_BONUS = {
+    stat: { guerrier: 'defense', archer: 'precision', mage: 'force', assassin: 'critique', pretre: 'vie' },
+    value: { commun: 2, peu_commun: 3, rare: 4, epique: 5, legendaire: 7 },
+  };
+  // Bonus que l'objet donne à sa classe : { cls, stat, value } (null pour un objet sans classe).
+  function classBonusOf(item) {
+    const cls = itemClass(item);
+    if (!cls) return null;
+    return { cls, stat: CLASS_ITEM_BONUS.stat[cls], value: CLASS_ITEM_BONUS.value[item.rarity] || 0 };
+  }
+  // Bonus réellement obtenu par un joueur de classe `cls` (null si l'objet n'est pas de sa classe).
+  function itemClassBonus(item, cls) {
+    const b = classBonusOf(item);
+    return b && b.cls === cls ? b : null;
   }
 
   const STAT_SUFFIX = {
@@ -1503,7 +1524,7 @@
     FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
-    classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, fuseUpgradeChance,
+    classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, achievementValue, achievementState, achievementById,

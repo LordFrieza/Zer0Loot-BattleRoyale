@@ -276,6 +276,8 @@ app.post('/api/equip', requirePlayer, action((req) => {
   game.equip(req.user.character, req.body.itemId);
 }));
 
+app.post('/api/item/lock', requirePlayer, action((req) => game.toggleLock(req.user.character, String(req.body.itemId || ''))));
+
 app.post('/api/unequip', requirePlayer, action((req) => {
   game.unequip(req.user.character, req.body.slot);
 }));

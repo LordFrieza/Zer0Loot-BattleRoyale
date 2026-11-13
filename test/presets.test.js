@@ -37,7 +37,7 @@ test('[PRE-1] presets : nom obligatoire, au moins un objet, 5 maximum, remplacem
   assert.strictEqual(c.presets[0].items.casque, null);
 });
 
-test('[PRE-2] presets : application exacte, objets manquants ou d\'une autre classe ignorés', () => {
+test('[PRE-2] presets : application exacte, objets manquants ignorés', () => {
   const { c, casque, epee } = equipped();
   const { preset } = game.savePreset(c, 'Boss');
   // On change tout : autre casque, plus d'arme
@@ -56,11 +56,12 @@ test('[PRE-2] presets : application exacte, objets manquants ou d\'une autre cla
   game.equip(c, gants.id);
   game.applyPreset(c, preset.id);
   assert.strictEqual(c.equipment.gants, undefined);
-  // Objet d'une autre classe : ignoré
-  game.unequip(c, 'arme');
+  // Objet manquant : ignoré et compté ; un objet d'une autre classe s'équipe désormais
   c.cls = 'archer';
+  game.unequip(c, 'arme');
+  c.inventory = c.inventory.filter((i) => i.id !== epee.id);
   const r2 = game.applyPreset(c, preset.id);
-  assert.strictEqual(r2.locked, 1);
+  assert.strictEqual(r2.missing, 1);
   assert.strictEqual(c.equipment.arme, undefined);
   assert.throws(() => game.applyPreset(c, 'inconnu'), /introuvable/);
 });
@@ -81,4 +82,31 @@ test('[PRE-3, PRE-4] presets : objets protégés du recyclage et de la forge, pr
   assert.deepStrictEqual(game.publicCharacter({ character: c }).protectedIds, []);
   assert.strictEqual(game.recycle(c, [casque.id]).recycled, 1);
   assert.throws(() => game.deletePreset(c, preset.id), /introuvable/);
+});
+
+test('[EQP-4] verrou : un objet verrouillé ne peut être ni fusionné, ni sacrifié, ni recyclé, ni vendu', () => {
+  const market = require('../server/market');
+  const { db } = require('./helpers');
+  const c = game.newCharacter();
+  c.gold = 1000;
+  const items = [0, 1, 2].map(() => game.makeItem('rare'));
+  const target = game.makeItem('rare');
+  c.inventory.push(...items, target);
+  assert.deepStrictEqual(game.toggleLock(c, items[0].id), { locked: true });
+  assert.ok(game.protectedIds(c).has(items[0].id));
+  assert.throws(() => game.fuse(c, items.map((i) => i.id)), /verrouillé/);
+  assert.throws(() => game.recycle(c, [items[0].id]), /verrouillé/);
+  assert.throws(() => game.alchemy(c, target.id, 0, items[0].id), /verrouillé/);
+  const user = { id: 'lock1', username: 'verrou', role: 'player', character: c };
+  db.state.users[user.id] = user;
+  assert.throws(() => market.sell(user, items[0].id, 50), /verrouillé/);
+  // Il reste utilisable : équipé, relancé, renforcé
+  game.alchemy(c, items[0].id, 0, items[1].id);
+  game.equip(c, items[0].id);
+  assert.ok(game.protectedIds(c).has(items[0].id), 'toujours verrouillé une fois équipé');
+  game.reroll(c, items[0].id, 0);
+  // Déverrouillage
+  assert.deepStrictEqual(game.toggleLock(c, items[0].id), { locked: false });
+  assert.ok(!game.protectedIds(c).has(items[0].id));
+  assert.throws(() => game.toggleLock(c, 'nope'), /introuvable/);
 });

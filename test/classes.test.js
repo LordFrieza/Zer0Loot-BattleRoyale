@@ -15,26 +15,37 @@ test('[CLS-3, CLS-4, CLS-5] classes : première classe gratuite, changement à 1
   assert.strictEqual(c.cls, 'archer');
 });
 
-test('[CLS-2, CLS-6, EQP-1] classes : armes réservées, objets incompatibles retirés au changement', () => {
+test('[CLS-2, CLS-6, CLS-8, EQP-1] classes : tout est équipable, bonus de classe sur les armes et objets secondaires', () => {
+  assert.deepStrictEqual(Rules.CLASS_ITEM_BONUS.stat, { guerrier: 'defense', archer: 'precision', mage: 'force', assassin: 'critique', pretre: 'vie' });
+  assert.deepStrictEqual(Rules.RARITIES.map((r) => Rules.CLASS_ITEM_BONUS.value[r]), [2, 3, 4, 5, 7]);
   const c = game.newCharacter();
   game.chooseClass(c, 'mage');
   const sword = game.makeItem('rare', 'arme', { kind: 'epee' });
-  const staff = game.makeItem('rare', 'arme', { kind: 'baton' });
+  const staff = game.makeItem('epique', 'arme', { kind: 'baton' });
   const book = game.makeItem('rare', 'secondaire', { kind: 'grimoire' });
   const helmet = game.makeItem('rare', 'casque');
+  for (const it of [sword, staff, book, helmet]) it.lines = [{ stat: 'vie', value: 5 }];
   c.inventory.push(sword, staff, book, helmet);
-  assert.throws(() => game.equip(c, sword.id), /Guerriloot/);
-  game.equip(c, staff.id);
-  game.equip(c, book.id);
+  game.equip(c, sword.id); // une épée de Guerrier sur un Mage : autorisé, sans bonus
+  assert.strictEqual(game.gearBonus(c).force, 0);
+  game.equip(c, staff.id); // bâton de Mage Épique : Force +5
+  game.equip(c, book.id); // grimoire Rare : Force +4
   game.equip(c, helmet.id);
+  assert.strictEqual(game.gearBonus(c).force, 9);
+  assert.deepStrictEqual(Rules.classBonusOf(staff), { cls: 'mage', stat: 'force', value: 5 });
+  assert.strictEqual(Rules.itemClassBonus(staff, 'guerrier'), null);
+  assert.strictEqual(Rules.classBonusOf(helmet), null, 'pas de classe sur un casque');
+  // Changement de classe : tout reste équipé, le bonus suit la classe
   c.gold = 100;
-  assert.deepStrictEqual(game.chooseClass(c, 'guerrier'), { cost: 100, unequipped: 2, talentsReset: 0 });
-  assert.deepStrictEqual(Object.keys(c.equipment), ['casque']);
+  assert.deepStrictEqual(game.chooseClass(c, 'guerrier'), { cost: 100, unequipped: 0, talentsReset: 0 });
+  assert.deepStrictEqual(Object.keys(c.equipment).sort(), ['arme', 'casque', 'secondaire']);
+  assert.strictEqual(game.gearBonus(c).force, 0);
   game.equip(c, sword.id);
-  assert.strictEqual(c.equipment.arme.kind, 'epee');
+  assert.strictEqual(game.gearBonus(c).defense, 4, 'épée Rare de Guerrier : Défense +4');
   const noClass = game.newCharacter();
   noClass.inventory.push(game.makeItem('commun', 'arme', { kind: 'arc' }));
-  assert.throws(() => game.equip(noClass, noClass.inventory[0].id));
+  game.equip(noClass, noClass.inventory[0].id);
+  assert.strictEqual(noClass.equipment.arme.kind, 'arc');
 });
 
 test('[DB-7] classes : anciennes épées / boucliers migrés en objets de Guerrier', () => {

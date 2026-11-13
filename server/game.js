@@ -108,6 +108,9 @@ function gearBonus(character) {
   for (const item of Object.values(character.equipment)) {
     if (!item) continue;
     for (const line of item.lines) pct[line.stat] += line.value;
+    // Arme / objet secondaire de sa classe : bonus dans la stat de prédilection de la classe
+    const cb = Rules.itemClassBonus(item, character.cls);
+    if (cb) pct[cb.stat] += cb.value;
   }
   return pct;
 }
@@ -264,7 +267,7 @@ function recycle(character, itemIds) {
   upgrade(character);
   const ids = new Set(itemIds);
   const locked = protectedIds(character);
-  if (itemIds.some((id) => locked.has(id))) throw new Error('Un objet protégé par un preset ne peut pas être recyclé');
+  if (itemIds.some((id) => locked.has(id))) throw new Error('Un objet protégé (verrouillé ou dans un preset) ne peut pas être recyclé');
   const before = character.inventory.length;
   character.inventory = character.inventory.filter((i) => !ids.has(i.id));
   const count = before - character.inventory.length;
@@ -279,10 +282,6 @@ function equip(character, itemId) {
   const idx = character.inventory.findIndex((i) => i.id === itemId);
   if (idx < 0) throw new Error('Objet introuvable');
   const item = character.inventory[idx];
-  if (!Rules.canEquip(item, character.cls)) {
-    const ci = Rules.CLASS_INFO[Rules.itemClass(item)];
-    throw new Error(`Réservé à la classe ${ci.label}`);
-  }
   character.inventory.splice(idx, 1);
   const previous = character.equipment[item.slot];
   if (previous) character.inventory.push(previous);
@@ -291,7 +290,7 @@ function equip(character, itemId) {
 
 // ---------- Classes ----------
 
-// Première classe gratuite, puis changement payant. Les objets incompatibles retournent au coffre.
+// Première classe gratuite, puis changement payant. L'équipement reste en place (le bonus de classe suit la nouvelle classe).
 function chooseClass(character, cls) {
   upgrade(character);
   if (!Rules.CLASSES.includes(cls)) throw new Error('Classe inconnue');
@@ -308,15 +307,7 @@ function chooseClass(character, cls) {
     const skin = Rules.COSMETICS[character.look[slot]];
     if (skin && skin.cls !== cls) character.look[slot] = null;
   }
-  let unequipped = 0;
-  for (const [slot, item] of Object.entries(character.equipment)) {
-    if (item && !Rules.canEquip(item, cls)) {
-      delete character.equipment[slot];
-      character.inventory.push(item);
-      unequipped += 1;
-    }
-  }
-  return { cost, unequipped, talentsReset };
+  return { cost, unequipped: 0, talentsReset };
 }
 
 // ---------- Forge ----------
@@ -333,7 +324,7 @@ function fuse(character, itemIds) {
   const items = ids.map((id) => character.inventory.find((i) => i.id === id));
   if (items.some((i) => !i)) throw new Error('Objets introuvables dans ton coffre personnel');
   const locked = protectedIds(character);
-  if (ids.some((id) => locked.has(id))) throw new Error('Un objet protégé par un preset ne peut pas être fusionné');
+  if (ids.some((id) => locked.has(id))) throw new Error('Un objet protégé (verrouillé ou dans un preset) ne peut pas être fusionné');
   const rarity = items[0].rarity;
   if (items.some((i) => i.rarity !== rarity)) throw new Error('Les 3 objets doivent être de la même rareté');
   const price = Rules.FUSE_PRICE[rarity];
@@ -396,7 +387,7 @@ function alchemy(character, itemId, lineIndex, sacrificeId) {
   const sacrifice = character.inventory.find((i) => i.id === sacrificeId);
   if (!sacrifice) throw new Error('Choisis un objet à sacrifier dans ton coffre personnel');
   if (sacrifice.id === item.id) throw new Error('Un objet ne peut pas se sacrifier lui-même');
-  if (protectedIds(character).has(sacrifice.id)) throw new Error('Un objet protégé par un preset ne peut pas être sacrifié');
+  if (protectedIds(character).has(sacrifice.id)) throw new Error('Un objet protégé (verrouillé ou dans un preset) ne peut pas être sacrifié');
   if (sacrifice.rarity !== item.rarity) throw new Error('L\'objet sacrifié doit être de la même rareté');
   const cap = Rules.alchemyCap(item.rarity);
   const line = item.lines[index];
@@ -416,10 +407,22 @@ function alchemy(character, itemId, lineIndex, sacrificeId) {
 // ---------- Presets d'équipement ----------
 
 // Identifiants des objets enregistrés dans au moins un preset (protégés du recyclage et de la forge).
+// Objets protégés de la forge, de l'alchimie (sacrifice), du recyclage et du marché : ceux d'un preset et ceux verrouillés.
 function protectedIds(character) {
   const ids = new Set();
   for (const p of character.presets || []) for (const id of Object.values(p.items)) if (id) ids.add(id);
+  for (const item of (character.inventory || []).concat(Object.values(character.equipment || {}))) if (item && item.locked) ids.add(item.id);
   return ids;
+}
+
+// Verrou d'un objet (coffre ou équipé) : il ne peut plus être fusionné, sacrifié, recyclé ni vendu par mégarde.
+function toggleLock(character, itemId) {
+  upgrade(character);
+  const item = findItem(character, itemId);
+  if (!item) throw new Error('Objet introuvable');
+  if (item.locked) delete item.locked;
+  else item.locked = true;
+  return { locked: !!item.locked };
 }
 
 // Enregistre l'équipement actuel dans un nouveau preset, ou remplace un preset existant (id).
@@ -456,7 +459,6 @@ function applyPreset(character, id) {
     if (!wanted) { unequip(character, slot); changed += 1; continue; }
     const item = character.inventory.find((i) => i.id === wanted);
     if (!item) { missing += 1; continue; }
-    if (!Rules.canEquip(item, character.cls)) { locked += 1; continue; }
     equip(character, wanted);
     changed += 1;
   }
@@ -816,7 +818,7 @@ module.exports = {
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
-  protectedIds, savePreset, applyPreset, deletePreset,
+  protectedIds, toggleLock, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,
   talentState, learnTalent, resetTalents,
 };

@@ -141,18 +141,27 @@ function renderEquipment() {
     const label = kind ? `${kind.icon} ${info.label} · ${kind.label}` : `${info.icon} ${info.label}`;
     if (!item) return `<div class="slot"><div class="slot-label">${label}</div><div class="muted" style="margin-top:8px">Vide</div></div>`;
     const lines = item.lines.map((l) => Rules.formatLine(l.stat, l.value)).join('<br>');
+    const cb = Rules.itemClassBonus(item, me.character.cls);
     return `<div class="slot filled rarity-${item.rarity}" data-slot="${slot}">
+      <button type="button" class="lock-btn ${item.locked ? 'on' : ''}" data-lock="${item.id}" title="${item.locked ? 'Verrouillé : cliquer pour déverrouiller' : 'Verrouiller (protège de la forge, de l\'alchimie, du recyclage et du marché)'}">${item.locked ? '🔒' : '🔓'}</button>
       <div class="slot-label">${label}</div>
-      <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}</div>`;
+      <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}${cb ? `<br><span class="cls-bonus">★ ${Rules.formatLine(cb.stat, cb.value)} (bonus de classe)</span>` : ''}</div>`;
   }).join('');
   $('equipment').querySelectorAll('.slot.filled').forEach((el) => {
     el.onclick = () => act('/api/unequip', { slot: el.dataset.slot }, 'unequip');
   });
+  $('equipment').querySelectorAll('[data-lock]').forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); toggleLock(b.dataset.lock); };
+  });
 }
 
+// Stats d'un objet pour le joueur (lignes + bonus de classe si l'objet est de sa classe).
 function sumLines(item) {
   const out = {};
-  if (item) for (const l of item.lines) out[l.stat] = (out[l.stat] || 0) + l.value;
+  if (!item) return out;
+  for (const l of item.lines) out[l.stat] = (out[l.stat] || 0) + l.value;
+  const cb = me && Rules.itemClassBonus(item, me.character.cls);
+  if (cb) out[cb.stat] = (out[cb.stat] || 0) + cb.value;
   return out;
 }
 
@@ -192,8 +201,13 @@ function renderPager(pages, total) {
   });
 }
 
-// Objets d'une autre classe (armes et objets secondaires que la classe du joueur ne peut pas équiper).
-const otherClass = (item) => !!Rules.itemClass(item) && !Rules.canEquip(item, me.character.cls);
+// Objets d'une autre classe (équipables, mais sans bonus de classe pour le joueur).
+const otherClass = (item) => !!Rules.itemClass(item) && Rules.itemClass(item) !== me.character.cls;
+
+async function toggleLock(itemId) {
+  const r = await act('/api/item/lock', { itemId }, 'equip');
+  if (r) toast(r.locked ? '🔒 Objet verrouillé : il est protégé de la forge, de l\'alchimie, du recyclage et du marché' : '🔓 Objet déverrouillé', 3500);
+}
 let showOther = true;
 try { showOther = localStorage.getItem('zl_inv_show_other') !== '0'; } catch (e) { /* ignore */ }
 $('inv-show-other').checked = showOther;
@@ -209,10 +223,10 @@ function renderInventory() {
   const inv = me.character.inventory;
   // Avec la case décochée, les objets hors classe disparaissent de toutes les vues sauf du filtre « Hors classe ».
   const visible = showOther ? inv : inv.filter((i) => !otherClass(i));
-  const filters = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]), [['other', '🚫 Hors classe']]);
+  const filters = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]), [['other', '↔️ Autres classes']]);
   $('inv-filters').innerHTML = filters.map(([k, label]) => {
     const n = k === 'all' ? visible.length : k === 'other' ? inv.filter(otherClass).length : visible.filter((i) => i.slot === k).length;
-    return `<button class="${invFilter === k ? 'active' : ''}" data-f="${k}" ${k === 'other' ? 'title="Seulement les objets des autres classes : pratique pour les recycler"' : ''}>${label} (${n})</button>`;
+    return `<button class="${invFilter === k ? 'active' : ''}" data-f="${k}" ${k === 'other' ? 'title="Armes et objets secondaires des autres classes : équipables, mais sans bonus de classe pour toi"' : ''}>${label} (${n})</button>`;
   }).join('');
   $('inv-filters').querySelectorAll('button').forEach((b) => {
     b.onclick = () => { invFilter = b.dataset.f; invPage = 0; renderInventory(); };
@@ -249,16 +263,17 @@ function renderInventory() {
   $('inventory').classList.toggle('recycling', recycleMode);
   $('inventory').innerHTML = pageItems.length
     ? pageItems.map((item) => {
-      const ok = Rules.canEquip(item, me.character.cls);
-      const btn = ok
-        ? `<button class="small" data-equip="${item.id}">Équiper</button>`
-        : `<button class="small secondary" disabled title="Change de classe ou passe-le à la forge">🔒 ${Rules.CLASS_INFO[Rules.itemClass(item)].label} uniquement</button>`;
+      const btn = `<button class="small" data-equip="${item.id}">Équiper</button>`;
+      const lock = `<button class="small secondary lock-chip ${item.locked ? 'on' : ''}" data-lock="${item.id}" title="${item.locked ? 'Déverrouiller' : 'Verrouiller : protège de la forge, de l\'alchimie, du recyclage et du marché'}">${item.locked ? '🔒' : '🔓'}</button>`;
       const sell = isProtected(item.id) ? '' : `<button class="small secondary" data-sell="${item.id}" title="Le vendre au marché">🏪 Vendre</button>`;
-      return itemHtml(item, `${protectedTag(item)}${ok ? compareHtml(item) : ''}<div class="actions">${btn}${sell}</div>`, me.character.cls);
+      return itemHtml(item, `${protectedTag(item)}${compareHtml(item)}<div class="actions">${btn}${sell}${lock}</div>`, me.character.cls);
     }).join('')
     : '<div class="muted">Ton coffre personnel est vide. Ouvre des coffres de LOOT pour le remplir !</div>';
   $('inventory').querySelectorAll('[data-equip]').forEach((b) => {
     b.onclick = () => act('/api/equip', { itemId: b.dataset.equip }, 'equip');
+  });
+  $('inventory').querySelectorAll('[data-lock]').forEach((b) => {
+    b.onclick = (e) => { e.stopPropagation(); toggleLock(b.dataset.lock); };
   });
   $('inventory').querySelectorAll('[data-sell]').forEach((b) => {
     b.onclick = (e) => {
@@ -290,7 +305,10 @@ const isProtected = (id) => !!(me && me.character.protectedIds.includes(id));
 
 function protectedTag(item) {
   const names = me.character.presets.filter((p) => Object.values(p.items).includes(item.id)).map((p) => esc(p.name));
-  return names.length ? `<div class="protected-tag" title="Protégé : ni recyclage, ni fusion">🔐 Preset : ${names.join(', ')}</div>` : '';
+  const tags = [];
+  if (item.locked) tags.push('<div class="protected-tag" title="Protégé : ni fusion, ni sacrifice, ni recyclage, ni vente">🔒 Verrouillé</div>');
+  if (names.length) tags.push(`<div class="protected-tag" title="Protégé : ni fusion, ni sacrifice, ni recyclage, ni vente">🔐 Preset : ${names.join(', ')}</div>`);
+  return tags.join('');
 }
 
 function renderPresets() {
@@ -885,7 +903,7 @@ function renderMarket() {
   const myCls = $('market-mycls').checked;
   const base = orders.filter((o) => (rarity === 'all' || o.item.rarity === rarity)
     && (stat === 'all' || o.item.lines.some((l) => l.stat === stat))
-    && (!myCls || Rules.canEquip(o.item, c.cls)));
+    && (!myCls || Rules.itemClassBonus(o.item, c.cls)));
   const counts = {};
   for (const o of base) counts[o.item.slot] = (counts[o.item.slot] || 0) + 1;
   $('market-slot-filters').innerHTML = [['all', 'Tout']].concat(Rules.SLOTS.map((s) => [s, Rules.SLOT_INFO[s].icon + ' ' + Rules.SLOT_INFO[s].label]))
@@ -908,7 +926,7 @@ function renderMarket() {
           : `<button class="small gold" data-mbuy="${o.id}">🛒 Acheter</button>`;
       return itemHtml(o.item, `<div class="market-price">${o.price.toLocaleString('fr-FR')} 🪙</div>
         <div class="muted market-meta">Vendu par ${esc(o.seller)} · ⌛ ${timeLeft(o.expiresAt - Date.now())}</div>
-        ${!own && Rules.canEquip(o.item, c.cls) ? compareHtml(o.item) : ''}<div class="actions">${btn}</div>`, c.cls);
+        ${!own ? compareHtml(o.item) : ''}<div class="actions">${btn}</div>`, c.cls);
     }).join('')
     : `<div class="muted">${marketOrders ? 'Aucun objet ne correspond à ces filtres.' : 'Chargement du marché…'}</div>`;
   $('market-list').querySelectorAll('[data-mbuy]').forEach((b) => {
@@ -1237,7 +1255,7 @@ function renderRerollPreview(flashIndex) {
   const price = Rules.REROLL_PRICE[item.rarity];
   const poor = me.character.gold < price;
   $('reroll-preview').innerHTML = item.lines.map((l, i) => `
-    <div class="reroll-line ${i === flashIndex ? 'flash' : ''}">
+    <div class="reroll-line ${i === flashIndex ? 'just-rerolled' : ''}">
       <span>${Rules.STAT_INFO[l.stat].icon} <b>+${l.value}${Rules.statUnit(l.stat)}</b> ${Rules.STAT_INFO[l.stat].label}</span>
       <span class="spacer"></span>
       <button class="small gold" data-reroll="${i}" ${poor ? 'disabled' : ''}>🎲 Relancer (${price} 🪙)</button>

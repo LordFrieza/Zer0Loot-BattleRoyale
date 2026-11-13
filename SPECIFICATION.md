@@ -269,7 +269,8 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CLS-3** Quand un joueur choisit sa première classe, le serveur doit l'attribuer gratuitement.
 - **CLS-4** Quand un joueur change de classe, le serveur doit débiter 100 golds ; si les golds sont insuffisants, alors il doit refuser.
 - **CLS-5** Si la classe demandée est inconnue ou identique à l'actuelle, alors le serveur doit refuser.
-- **CLS-6** Quand la classe change, le serveur doit renvoyer à l'inventaire les objets équipés incompatibles avec la nouvelle classe.
+- **CLS-6** Quand la classe change, l'équipement doit rester en place (tout objet est équipable par toutes les classes) ; le bonus de classe des armes et objets secondaires suit la nouvelle classe.
+- **CLS-8** Une arme ou un objet secondaire appartient à une classe (son type), mais **toutes les classes** peuvent l'équiper. Équipé par un joueur de sa classe, il ajoute un bonus en % dans la stat de prédilection de la classe (Guerriloot : Défense, Archiloot : Précision, Magiloot : Force, Lootassin : Critique, Saint-Loot : Vie), selon sa rareté : +2 / +3 / +4 / +5 / +7 (Commun → Légendaire). Les objets affichent ce bonus (« Bonus Saint-Loot : Vie +5 % »), mis en avant quand c'est la classe du joueur.
 - **CLS-7** Quand la classe change, le serveur doit remettre l'arbre de compétences à zéro gratuitement (l'arbre dépend de la classe) et indiquer le nombre de points rendus.
 
 ## 9. Stats et valeurs dérivées
@@ -308,15 +309,16 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CHEST-1** Quand un joueur achète des coffres, le serveur doit débiter 100 golds par coffre (quantité ≥ 1) et refuser si les golds sont insuffisants.
 - **CHEST-2** Quand un joueur ouvre un coffre, le serveur doit exiger au moins un coffre, en consommer un, créer 3 objets (rareté tirée selon sa chance effective), les ajouter à l'inventaire illimité, mettre à jour `lootStats` et les compteurs `chests` et `legendary`, puis renvoyer la meilleure rareté et le nombre de clics requis.
 - **CHEST-3** Le client doit animer l'ouverture : lumières blanc, vert (4ᵉ clic), bleu (6ᵉ), violet (11ᵉ), orange (21ᵉ) ; l'ouverture est déjà décidée côté serveur.
-- **EQP-1** Quand un joueur équipe un objet, le serveur doit exiger que l'objet soit dans l'inventaire et compatible avec sa classe, puis renvoyer l'objet précédent du même emplacement à l'inventaire.
+- **EQP-1** Quand un joueur équipe un objet, le serveur doit exiger que l'objet soit dans l'inventaire (quelle que soit sa classe), puis renvoyer l'objet précédent du même emplacement à l'inventaire.
 - **EQP-2** Quand un joueur déséquipe un emplacement, le serveur doit renvoyer l'objet à l'inventaire, ou refuser si l'emplacement est vide.
+- **EQP-4** Un joueur doit pouvoir verrouiller ou déverrouiller un objet de son coffre ou de son équipement (`/api/item/lock`). Un objet verrouillé est protégé comme un objet de preset : le serveur doit refuser de le fusionner, de le sacrifier à l'Alchimie noire, de le recycler ou de le vendre au marché (il peut toujours être équipé, relancé ou renforcé).
 - **EQP-3** Quand un joueur recycle des objets de son inventaire, le serveur doit les supprimer et créditer 3 golds par objet quelle que soit la rareté, et incrémenter le compteur `recycled` ; si aucun objet n'est trouvé, alors il doit refuser.
 
 ## 12 bis. Presets d'équipement
 
 - **PRE-1** Quand un joueur sauvegarde son équipement, le serveur doit exiger un nom (1 à 24 caractères) et au moins un objet équipé, enregistrer l'objet de chaque emplacement (ou vide) et refuser au-delà de 5 presets ; avec l'identifiant d'un preset existant, il doit le remplacer.
-- **PRE-2** Quand un joueur applique un preset, le serveur doit remettre exactement son équipement (un emplacement vide dans le preset est vidé) ; un objet introuvable ou réservé à une autre classe est ignoré et compté.
-- **PRE-3** Si un objet enregistré dans au moins un preset est envoyé au recyclage ou à la fusion, alors le serveur doit refuser l'opération entière.
+- **PRE-2** Quand un joueur applique un preset, le serveur doit remettre exactement son équipement (un emplacement vide dans le preset est vidé) ; un objet introuvable est ignoré et compté.
+- **PRE-3** Si un objet enregistré dans au moins un preset (ou verrouillé, EQP-4) est envoyé au recyclage ou à la fusion, alors le serveur doit refuser l'opération entière.
 - **PRE-4** Quand un preset est supprimé, ses objets ne doivent plus être protégés (sauf s'ils sont dans un autre preset).
 
 ## 12 ter. Potions et consommables

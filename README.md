@@ -83,8 +83,13 @@ de la file, confirme les `!join` et annonce le vainqueur.
   | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, +15 pts Précision, +1 pt Vol de vie, −10 % Vie | Dagues · Dague de parade |
   | ✨ Saint-Loot (prêtre) | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
 
-  Les armes et objets secondaires sont **réservés à leur classe**. Dans les coffres, ils sont pour ta classe 1 fois sur 2
-  (sinon une classe au hasard). En changeant de classe, les objets incompatibles retournent dans le coffre personnel.
+  Les armes et objets secondaires appartiennent à une classe, mais **tout le monde peut les équiper** : avec un objet de
+  sa propre classe, on gagne un **bonus de classe** dans la stat de prédilection (Guerriloot : Défense, Archiloot :
+  Précision, Magiloot : Force, Lootassin : Critique, Saint-Loot : Vie) de +2 / +3 / +4 / +5 / +7 % selon la rareté.
+  Dans les coffres, ils sont pour ta classe 1 fois sur 2 (sinon une classe au hasard), et toujours à la forge. En changeant
+  de classe, l'équipement reste en place et le bonus suit la nouvelle classe.
+- **Verrou** : le bouton 🔓 / 🔒 d'un objet (coffre ou équipement) le protège comme un objet de preset : il ne peut plus
+  être fusionné, sacrifié à l'Alchimie noire, recyclé ni vendu par mégarde (il peut toujours être relancé ou renforcé).
   Les anciennes épées / anciens boucliers (d'avant les classes) sont devenus des objets de Guerrier.
 - **Combat** : placements aléatoires, chaque perso prend en aggro l'ennemi le plus proche (sauf l'Assassin).
   Après 45 s, une zone se referme pour éviter les combats interminables. Après chaque attaque, un combattant reste

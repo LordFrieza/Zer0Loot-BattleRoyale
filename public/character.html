@@ -158,7 +158,7 @@
         <button class="secondary small" id="recycle-toggle">♻️ Recycler</button></h2>
       <div class="recycle-bar" id="recycle-bar" style="display:none"></div>
       <label class="inv-toggle"><input type="checkbox" id="inv-show-other"> Afficher les objets des autres classes
-        <span class="muted">(armes et objets secondaires que ta classe ne peut pas équiper)</span></label>
+        <span class="muted">(armes et objets secondaires équipables, mais sans ton bonus de classe)</span></label>
       <div class="inv-filters" id="inv-filters"></div>
       <div class="inv-filters stat-filters" id="inv-stat-filters"></div>
       <div class="inventory" id="inventory"></div>
@@ -350,7 +350,7 @@
           <option value="dear">Prix décroissant</option>
           <option value="rarity">Rareté</option>
         </select>
-        <label class="inv-toggle" style="margin:0"><input type="checkbox" id="market-mycls"> Seulement ce que ma classe peut équiper</label>
+        <label class="inv-toggle" style="margin:0"><input type="checkbox" id="market-mycls"> Seulement les objets avec le bonus de ma classe</label>
       </div>
       <div class="inventory" id="market-list"></div>
     </div>

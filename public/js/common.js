@@ -33,13 +33,15 @@ function itemType(item) {
   return kind ? { icon: kind.icon, label: kind.label } : { icon: Rules.SLOT_INFO[item.slot].icon, label: Rules.SLOT_INFO[item.slot].label };
 }
 
-// Étiquette de classe pour les armes / objets secondaires (rouge si la classe du joueur ne peut pas l'équiper).
+// Bonus de classe des armes / objets secondaires (équipables par tous ; bonus pour la classe de l'objet).
 function classTag(item, playerCls) {
-  const cls = Rules.itemClass(item);
-  if (!cls) return '';
-  const ci = Rules.CLASS_INFO[cls];
-  const locked = playerCls !== undefined && cls !== playerCls;
-  return `<span class="cls-tag ${locked ? 'locked' : ''}" title="Réservé à la classe ${ci.label}">${locked ? '🔒' : ci.icon} ${ci.label}</span>`;
+  const b = Rules.classBonusOf(item);
+  if (!b) return '';
+  const ci = Rules.CLASS_INFO[b.cls];
+  const mine = playerCls !== undefined && b.cls === playerCls;
+  const other = playerCls !== undefined && !mine;
+  const bonus = `${Rules.STAT_INFO[b.stat].label} +${b.value} %`;
+  return `<span class="cls-tag ${mine ? 'mine' : other ? 'other' : ''}" title="Équipable par toutes les classes. Bonus pour les ${ci.label} : ${bonus}">${ci.icon} Bonus ${ci.label} : ${bonus}</span>`;
 }
 
 // Étiquette de panoplie (« 🧛 Nosferatu »).
