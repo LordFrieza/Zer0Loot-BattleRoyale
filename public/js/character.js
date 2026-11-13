@@ -1131,17 +1131,24 @@ function renderForge() {
     el.onclick = () => { fuseSel.splice(fuseSel.indexOf(el.dataset.unfuse), 1); renderForge(); };
   });
 
+  // Prix de la fusion (payé à chaque forge, selon la rareté des 3 objets)
+  $('fuse-prices').innerHTML = 'Prix d\'une fusion : ' + Rules.RARITIES.map((r) => `<span class="c-${r}">${Rules.RARITY_INFO[r].label} ${Rules.FUSE_PRICE[r]} 🪙</span>`).join(' · ');
+  const price = rarity ? Rules.FUSE_PRICE[rarity] : 0;
+  const poor = !!rarity && c.gold < price;
   if (rarity) {
     const chance = Rules.fuseUpgradeChance(rarity, c.derived.luck);
     const next = Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1];
-    $('fuse-info').innerHTML = next
+    $('fuse-info').innerHTML = (next
       ? `🎲 <b>${fr(chance)} %</b> de chances d'obtenir un objet <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span>
          <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${fr(chance - Rules.FUSE_UPGRADE[rarity])} % grâce à ta chance : ${Rules.FUSE_LUCK_BONUS.toLocaleString('fr-FR')} % par point)</span>`
-      : '🎲 Légendaire : tu obtiendras un nouvel objet <span class="c-legendaire">Légendaire</span>.';
+      : '🎲 Légendaire : tu obtiendras un nouvel objet <span class="c-legendaire">Légendaire</span>.')
+      + `<br>💰 Coût : <b>${price} 🪙</b>${poor ? ` <span class="down">(il te manque ${price - c.gold} 🪙)</span>` : ''}`;
   } else {
     $('fuse-info').innerHTML = '<span class="muted">Choisis 3 objets de même rareté ci-dessous.</span>';
   }
-  $('fuse-go').disabled = fuseSel.length !== Rules.FUSE_COUNT;
+  $('fuse-go').textContent = rarity ? `🔨 Forger ! (${price} 🪙)` : '🔨 Forger !';
+  $('fuse-go').disabled = fuseSel.length !== Rules.FUSE_COUNT || poor;
+  $('fuse-go').title = poor ? `La fusion coûte ${price} golds` : '';
 
   // Filtres par rareté + liste des objets du coffre
   const counts = Object.fromEntries(Rules.RARITIES.map((r) => [r, inv.filter((i) => i.rarity === r).length]));
