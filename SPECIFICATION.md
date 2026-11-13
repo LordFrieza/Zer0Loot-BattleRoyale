@@ -232,7 +232,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CLAN-5** Un combattant tué doit réapparaître dans son camp, avec toute sa vie et protégé 1,5 s, au bout de `min(30, 5 × nombre de morts)` secondes (5 s, puis 10 s, 15 s…).
 - **CLAN-6** À partir de 90 s (« mort subite », événement `overtime`), les cristaux doivent subir des dégâts ×3.
 - **CLAN-7** La partie doit se terminer quand un cristal est détruit (l'autre équipe gagne), sinon à 180 s : le cristal qui a gardé la plus grande part de sa vie gagne (égalité : le plus de kills, puis au hasard). Le résultat (`mode: 'clans'`) donne l'équipe gagnante, l'état des deux équipes, le MVP (le plus de dégâts infligés) et le classement par dégâts.
-- **CLAN-8** À la fin, chaque humain doit gagner l'XP de participation (+1 bataille) ; chaque humain de l'équipe gagnante, 200 XP, 40 golds, 1 coffre et +1 victoire ; le MVP, 1 coffre de plus. Aucune récompense de kill ni de série.
+- **CLAN-8** À la fin, chaque humain doit gagner l'XP de participation (+1 bataille) ; chaque humain de l'équipe gagnante, 200 XP, 40 golds, 1 coffre et +1 victoire ; le MVP, 1 coffre de plus (× le multiplicateur de puissance de chacun face à l'équipe adverse, PWR-2). Aucune récompense de kill ni de série.
 - **CLAN-9** En Guerre des clans, les paris doivent porter sur une équipe (`clan:rouge` ou `clan:bleu`, la sienne comprise), jamais sur un combattant ; les parieurs de l'équipe gagnante se partagent la cagnotte comme pour un combattant gagnant.
 
 ### 7.12 Ruée vers l'or (mode bonus)
@@ -289,9 +289,11 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 - **PRG-1** L'XP nécessaire pour passer du niveau `n` au suivant doit valoir `300 + 200·(n−1)`.
 - **PRG-2** Quand de l'XP est ajoutée, le serveur doit enchaîner les passages de niveau et donner 1 point de compétence par niveau.
-- **PRG-3** Quand un joueur fait un kill, il doit gagner 100 XP, 1 coffre, 10 golds, et son record de kills augmente.
-- **PRG-4** Quand la bataille se termine, chaque combattant humain doit gagner 25 XP de participation et +1 bataille ; le vainqueur doit en plus gagner 300 XP, 1 coffre, 30 golds et +1 victoire.
-- **PRG-5** Quand une série est déclenchée, le serveur doit créditer : `firstblood` +1 coffre ; `double` +1 coffre ; `massacre` +2 coffres ; `triple` aucune récompense (annonce seule) ; et incrémenter le compteur de succès correspondant (sauf `triple`).
+- **PRG-3** Quand un joueur fait un kill, il doit gagner 100 XP, 1 coffre, 10 golds (× le multiplicateur de puissance, PWR-2), et son record de kills augmente.
+- **PRG-4** Quand la bataille se termine, chaque combattant humain doit gagner 25 XP de participation et +1 bataille ; le vainqueur doit en plus gagner 300 XP, 1 coffre, 30 golds (× le multiplicateur de puissance, PWR-2) et +1 victoire.
+- **PRG-5** Quand une série est déclenchée, le serveur doit créditer (× le multiplicateur de puissance, PWR-2) : `firstblood` +1 coffre ; `double` +1 coffre ; `massacre` +2 coffres ; `triple` aucune récompense (annonce seule) ; et incrémenter le compteur de succès correspondant (sauf `triple`).
+- **PWR-1** Chaque combattant doit avoir une **puissance** : `niveau + (total des % de son équipement, bonus de classe compris) / 10`, arrondie au dixième. Celle d'un bot utilise la valeur moyenne des lignes de la rareté de chacune de ses pièces. La puissance d'un humain est recalculée au lancement de la partie ; la fiche du joueur l'affiche.
+- **PWR-2** Dans les modes où l'on s'affronte (Battle Royale, Roi de la Colline, Guerre des clans), les récompenses de victoire, de kill et de série doivent être multipliées par `puissance adverse ÷ puissance du joueur`, borné entre ×0,4 et ×2 (arrondi au centième). Puissance adverse : celle de la victime pour un kill ; la moyenne des autres combattants pour une victoire ou une série ; la moyenne de l'équipe adverse en Guerre des clans. L'XP et les golds sont arrondis ; les coffres sont arrondis au hasard (0,4 coffre = 40 % de chance d'en recevoir 1). Le multiplicateur s'ajoute au Loot double (×2) ; la participation, les modes coopératifs, le Golden Shower et le mode Solo ne sont pas concernés. L'événement `reward` indique le multiplicateur (`mult`).
 - **PRG-6** Les bots, qui n'ont pas de `userId`, ne doivent recevoir aucune récompense.
 - **PRG-7** Quand une récompense est attribuée, le serveur doit émettre `reward` au joueur avec le type, les montants et le nombre de niveaux gagnés.
 - **PRG-8** Quand l'admin donne des ressources, le serveur doit borner chaque montant entre 0 et 10 000 000, refuser « rien à donner » et émettre une récompense `gift`.

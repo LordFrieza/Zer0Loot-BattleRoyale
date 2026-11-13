@@ -896,6 +896,44 @@ test('[MKT-1, MKT-2, MKT-3, MKT-4, MKT-5] marché via l\'API : vendre, lister, a
   assert.ok(events.filter((e) => e === 'market').length >= 3, 'diffusion « market »');
 });
 
+test('[PWR-1, PWR-2] Battle Royale : récompenses selon la puissance (le fort gagne moins, le faible plus)', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const strong = client();
+  const weak = client();
+  const ids = (await register(strong, 'pl_fort')).id;
+  const idw = (await register(weak, 'pl_faible')).id;
+  db.state.users[ids].character.level = 20; // puissance 20 (sans équipement) contre 1
+  const events = [];
+  const sock = io.to.bind(io);
+  io.to = (room) => { const r = sock(room); return { emit: (ev, data) => { if (room === 'user:' + idw && ev === 'reward') events.push(data); return r.emit(ev, data); } }; };
+  const play = async (winnerId, loserId) => {
+    await admin.post('/api/admin/queue/open', { seconds: 600 });
+    await strong.post('/api/queue/join');
+    await weak.post('/api/queue/join');
+    await admin.post('/api/admin/battle/start');
+    battle.stopLoop();
+    const w = battle.players.find((f) => f.userId === winnerId);
+    const l = battle.players.find((f) => f.userId === loserId);
+    assert.deepStrictEqual([battle.players.find((f) => f.userId === ids).power, battle.players.find((f) => f.userId === idw).power], [20, 1]);
+    battle.kill(w, l);
+    battle.tick(0.05);
+  };
+  // Le fort écrase le faible : kill, premier kill et victoire ×0,4
+  const goldS = (await meOf(strong)).character.gold;
+  await play(ids, idw);
+  assert.strictEqual((await meOf(strong)).character.gold - goldS, Math.round(10 * 0.4) + Math.round(30 * 0.4), 'kill 4 + victoire 12');
+  // Le faible bat le fort : tout ×2 (plafond)
+  const before = (await meOf(weak)).character;
+  await play(idw, ids);
+  const after = (await meOf(weak)).character;
+  assert.strictEqual(after.gold - before.gold, 20 + 60, 'kill 20 + victoire 60');
+  assert.strictEqual(after.chests - before.chests, 2 + 2 + 2, 'kill, premier kill et victoire : 2 coffres chacun');
+  io.to = sock;
+  assert.ok(events.some((e) => e.type === 'win' && e.mult === 2), 'le multiplicateur est envoyé au joueur');
+  assert.ok(events.some((e) => e.type === 'participation' && !e.mult), 'la participation ne change pas');
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveur ne plante pas', async () => {
   const bad = { Cookie: 'zl_session=%E0%A4%A; autre=%' };
   // Routes HTTP : pas de session, donc 401 (et surtout pas de 500)

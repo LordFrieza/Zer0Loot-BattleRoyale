@@ -221,6 +221,37 @@
   };
   const STREAK_WINDOW = 8;
   const MASSACRE_KILLS = 5;
+
+  /*
+   * Récompenses équilibrées des modes où l'on s'affronte (Battle Royale, Roi de la Colline, Guerre des clans).
+   * Puissance d'un combattant = niveau + (total des % de son équipement, bonus de classe compris) / 10.
+   * Les récompenses de victoire, de kill et de série sont multipliées par
+   *   (puissance des adversaires ÷ ta puissance), borné entre ×0,4 et ×2 :
+   * battre plus fort que soi rapporte plus, écraser plus faible rapporte moins. La participation ne change pas.
+   */
+  const POWER = { gearDivisor: 10, minMult: 0.4, maxMult: 2 };
+  function powerScore(level, gearTotal) {
+    return Math.round(((level || 1) + (gearTotal || 0) / POWER.gearDivisor) * 10) / 10;
+  }
+  function rewardMultiplier(mine, theirs) {
+    if (!(mine > 0) || !(theirs > 0)) return 1;
+    return Math.round(Math.min(POWER.maxMult, Math.max(POWER.minMult, theirs / mine)) * 100) / 100;
+  }
+  // Applique le multiplicateur : XP et golds arrondis, coffres arrondis au hasard (0,4 coffre = 40 % de chance d'en avoir 1).
+  function scaleReward(reward, mult, rnd = Math.random) {
+    const c = (reward.chests || 0) * mult;
+    const chests = Math.floor(c) + (rnd() < c - Math.floor(c) ? 1 : 0);
+    return { xp: Math.round((reward.xp || 0) * mult), gold: Math.round((reward.gold || 0) * mult), chests };
+  }
+  // Équipement estimé d'un bot à partir de l'apparence de ses pièces (rareté par emplacement) : valeur moyenne des lignes.
+  function lookGearTotal(look) {
+    let total = 0;
+    for (const r of Object.values(look || {})) {
+      const info = RARITY_INFO[r];
+      if (info) total += info.lines * (info.min + info.max) / 2;
+    }
+    return total;
+  }
   const STREAK_INFO = {
     firstblood: { label: 'PREMIER KILL !', color: '#ff4d6d' },
     double: { label: 'DOUBLE KILL !', color: '#ffb000' },
@@ -1520,7 +1551,7 @@
   return {
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
-    REWARDS, STREAK_WINDOW, MASSACRE_KILLS, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
+    REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
     FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,

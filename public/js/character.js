@@ -40,7 +40,8 @@ function render() {
   $('gold').textContent = c.gold;
   $('chests-small').textContent = c.chests;
   $('chests').textContent = c.chests;
-  $('record').textContent = `${c.record.battles} bataille(s) · ${c.record.kills} kill(s) · ${c.record.wins} victoire(s)`;
+  $('record').innerHTML = `${c.record.battles} bataille(s) · ${c.record.kills} kill(s) · ${c.record.wins} victoire(s)<br>
+    <span class="power-line" title="Niveau + total des % de ton équipement ÷ 10. Sert à équilibrer les récompenses des modes PvP (onglet Règles).">💪 Puissance : <b>${String(c.power).replace('.', ',')}</b></span>`;
   $('open-chest').disabled = c.chests <= 0;
   $('buy-1').disabled = c.gold < Rules.CHEST_PRICE;
   $('buy-10').disabled = c.gold < Rules.CHEST_PRICE * 10;
@@ -1317,7 +1318,28 @@ $('fuse-go').onclick = async () => {
     + row('⚡ Double kill', R.double, `2 kills d'affilée en moins de ${Rules.STREAK_WINDOW} s`)
     + row('💀 Massacre', R.massacre, `${Rules.MASSACRE_KILLS} kills dans la même bataille`);
   $('streak-rules').innerHTML = `Les bonus de séries s'ajoutent aux récompenses normales du kill et sont annoncés en grand sur le stream
-    (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus).`;
+    (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus). Ces montants sont ceux d'un combat entre joueurs de même puissance :
+    voir juste en dessous.`;
+  const P = Rules.POWER;
+  const ex = (mine, theirs) => `<tr><td>${mine}</td><td>${theirs}</td><td><b>×${String(Rules.rewardMultiplier(mine, theirs)).replace('.', ',')}</b></td>
+    <td>${Math.round(R.win.xp * Rules.rewardMultiplier(mine, theirs))} XP · ${Math.round(R.win.gold * Rules.rewardMultiplier(mine, theirs))} 🪙</td></tr>`;
+  $('power-rules').innerHTML = `
+    <p>Pour que les plus forts ne creusent pas l'écart à chaque partie, les récompenses du <b>Battle Royale</b>, du
+      <b>Roi de la Colline</b> et de la <b>Guerre des clans</b> dépendent de la <b>puissance</b> des combattants :</p>
+    <ul class="rules-list">
+      <li><b>💪 Puissance</b> = ton niveau + le total des % de ton équipement ÷ ${P.gearDivisor} (bonus de classe compris).
+        Elle est affichée sur ta fiche et recalculée au lancement de chaque partie.</li>
+      <li><b>Victoire et séries</b> : récompense × <b>puissance moyenne de tes adversaires ÷ ta puissance</b>
+        (en Guerre des clans : la puissance moyenne de l'équipe adverse).</li>
+      <li><b>Kill</b> : récompense × <b>puissance de ta victime ÷ ta puissance</b>.</li>
+      <li>Le multiplicateur va de <b>×${String(P.minMult).replace('.', ',')}</b> à <b>×${P.maxMult}</b>. Les coffres sont arrondis au hasard
+        (0,4 coffre = 40 % de chance d'en gagner un).</li>
+      <li>La <b>participation</b>, les modes coopératifs (Boss, Donjon), le Golden Shower et le mode Solo ne changent pas.
+        Le Loot double (×2) s'ajoute au multiplicateur.</li>
+    </ul>
+    <table class="loot-table"><tr><th>Ta puissance</th><th>Adversaires</th><th>Multiplicateur</th><th>Victoire</th></tr>
+      ${ex(20, 20)}${ex(20, 30)}${ex(15, 60)}${ex(60, 30)}${ex(80, 15)}</table>
+    <p>Battre plus fort que soi rapporte donc plus, et écraser des joueurs bien plus faibles rapporte beaucoup moins.</p>`;
   $('events-help').innerHTML = Object.values(Rules.BATTLE_EVENTS).map((ev) => `<div style="--c:${ev.color}"><b>${ev.icon} ${ev.label}</b><br>${ev.desc}</div>`).join('');
   $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
     const ci = Rules.CLASS_INFO[cls];
@@ -2175,7 +2197,8 @@ socket.on('reward', (r) => {
   if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
   const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !`
     : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !` : REWARD_LABELS[r.type];
-  toast(`${label} ${gains.join(', ')}`, 5000);
+  const mult = r.mult && r.mult !== 1 ? ` (×${String(r.mult).replace('.', ',')} ${r.mult > 1 ? '⬆️ adversaires plus forts' : '⬇️ adversaires plus faibles'})` : '';
+  toast(`${label} ${gains.join(', ')}${mult}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);
 });
 

@@ -2279,6 +2279,18 @@
       if (a.life <= 0) this.announces.shift();
     }
 
+    // Récompense de victoire selon la puissance (puissance moyenne des adversaires ÷ celle du vainqueur, ×0,4 à ×2).
+    winRewardText(r) {
+      const W = Rules.REWARDS.win;
+      const ps = (this.queue && this.queue.participants) || [];
+      const me = ps.find((p) => p.key === r.winner.key);
+      const others = ps.filter((p) => p.key !== r.winner.key && p.power);
+      const avg = others.length ? others.reduce((a, p) => a + p.power, 0) / others.length : 0;
+      const m = me && me.power && avg ? Rules.rewardMultiplier(me.power, avg) : 1;
+      const txt = `+${Math.round(W.xp * m)} XP · +${Math.round(W.gold * m)} golds · coffre`;
+      return m === 1 ? txt : `${txt} (×${String(m).replace('.', ',')} selon la puissance)`;
+    }
+
     drawResult(t) {
       const r = this.queue && this.queue.result;
       if (!r) return;
@@ -2301,7 +2313,7 @@
         this.title(r.winner.name, 240, 64, '#fff', '#ff3fd8');
         this.title(this.queue.training
           ? `remporte le duel en ${formatCountdown(r.duration * 1000)} · aucune récompense en entraînement`
-          : `${koth ? `${r.winner.score} points · ` : ''}${r.winner.kills} kill(s) · +${Rules.REWARDS.win.xp} XP · +${Rules.REWARDS.win.chests} coffre · +${Rules.REWARDS.win.gold} golds`, 305, 24, '#cfc6ff');
+          : `${koth ? `${r.winner.score} points · ` : ''}${r.winner.kills} kill(s) · ${this.winRewardText(r)}`, 305, 24, '#cfc6ff');
         const fighter = this.frame && this.frame.fighters.find((f) => f.key === r.winner.key);
         if (fighter) drawFighter(ctx, W / 2, 420, fighter, { scale: 3, bob: Math.sin(t / 300) * 4, swing: (Math.sin(t / 500) + 1) / 2 });
       }

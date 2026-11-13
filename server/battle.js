@@ -72,7 +72,7 @@ class Battle extends EventEmitter {
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
         key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, app: p.app || null, title: p.title || null,
-        clan: p.clan || undefined,
+        clan: p.clan || undefined, power: p.power || undefined,
       })),
       // L'événement n'est révélé qu'au lancement de la bataille.
       event: this.phase === 'battle' || this.phase === 'ended' ? this.event : null,
@@ -282,6 +282,7 @@ class Battle extends EventEmitter {
       cls: p.cls || null,
       look: p.look,
       level: p.level,
+      power: p.power || Rules.powerScore(p.level, 0), // récompenses équilibrées (modes PvP)
       kind: 'player',
       team: Rules.GAME_MODES[this.mode].coop ? HEROES : p.key, // Battle Royale, Roi de la Colline : chacun pour soi
       hp: s.maxHp,

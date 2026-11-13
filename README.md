@@ -106,6 +106,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
     soin, Lumière aveuglante). Détails : `TECHNIQUES` dans `shared/rules.js`.
 - **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds ;
   participation = 25 XP pour chaque combattant à la fin de la bataille (gagnant compris, pas si l'admin annule).
+- **Récompenses équilibrées** (Battle Royale, Roi de la Colline, Guerre des clans) : chaque combattant a une
+  **💪 Puissance** = niveau + total des % de son équipement ÷ 10 (affichée sur la fiche). Les récompenses de victoire et
+  de série sont multipliées par *puissance moyenne des adversaires ÷ sa puissance* (en Guerre des clans : l'équipe
+  adverse), celles d'un kill par *puissance de la victime ÷ sa puissance*, entre ×0,4 et ×2. Les coffres sont arrondis au
+  hasard (0,4 coffre = 40 % de chance d'en avoir un). La participation, les modes coopératifs, le Golden Shower et le Solo
+  ne changent pas. Battre plus fort que soi rapporte plus ; écraser des joueurs bien plus faibles rapporte moins.
 - **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +1 coffre ;
   double kill (2 kills d'affilée en moins de 8 s) = +1 coffre ; triple kill = annonce seulement ;
   massacre (5 kills dans la bataille) = +2 coffres.

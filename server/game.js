@@ -115,6 +115,12 @@ function gearBonus(character) {
   return pct;
 }
 
+// Puissance (récompenses équilibrées des modes PvP) : niveau + total des % de l'équipement / 10.
+function powerOf(character) {
+  const total = Object.values(gearBonus(character)).reduce((a, b) => a + b, 0);
+  return Rules.powerScore(character.level, total);
+}
+
 function derived(character) {
   upgrade(character);
   // Les panoplies et l'arbre de compétences donnent des points bonus, qui s'ajoutent aux points de compétence.
@@ -809,12 +815,13 @@ function publicCharacter(user) {
     ult: Rules.ultOf(c.cls, c.talents),
     spec: Rules.specOf(c.cls, c.talents),
     protectedIds: [...protectedIds(c)],
+    power: powerOf(c),
     energyState: energyOf(c),
   };
 }
 
 module.exports = {
-  newCharacter, upgrade, gearBonus, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
+  newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
