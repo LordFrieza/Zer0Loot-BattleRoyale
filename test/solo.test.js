@@ -213,6 +213,7 @@ test('[SOLO-9] clés de boss : une au départ, sans limite, trouvées dans les r
   assert.deepStrictEqual(game.adminGive(c, { keys: 3 }).keys, 3);
   assert.strictEqual(c.bossKeys, 253);
   // La Clé de boss n'est jamais tirée comme une relique ordinaire, seulement à SOLO.keyChance
+  assert.strictEqual(Rules.SOLO.keyChance, 0.1, '10 % par choix de reliques');
   assert.ok(Rules.RELICS.cle_boss.rare);
   const real = Math.random;
   try {

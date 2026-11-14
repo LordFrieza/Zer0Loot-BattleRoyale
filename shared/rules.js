@@ -1186,7 +1186,7 @@
     // de reliques de l'Expédition (relique « Clé de boss », proposée au hasard) ; chaque personnage en reçoit une au départ.
     keyCost: 1,
     startKeys: 1,
-    keyChance: 0.2, // chance qu'un choix de reliques propose une Clé de boss
+    keyChance: 0.1, // chance qu'un choix de reliques propose une Clé de boss
   };
 
   // Énergie après recharge : { value, at } → { value, at, nextAt } (at = début de la recharge en cours).

@@ -235,7 +235,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Expédition** : descente sans fin, seul contre des monstres de plus en plus forts (croissance exponentielle). Toutes
     les 3 profondeurs, le joueur choisit **une relique parmi 3** (13 reliques cumulables : dégâts, peau de pierre,
     vitesse, vol de vie, épines, régénération, critique, soin, ultime, pacte sanglant, vie en plus, trésor…). Une fois sur
-    cinq, l'une des propositions est une **Clé de boss** : la prendre la garantit à la fin de l'expédition. Butin pour
+    dix, l'une des propositions est une **Clé de boss** : la prendre la garantit à la fin de l'expédition. Butin pour
     `n` profondeurs nettoyées : 2/3 × `(25n + 2n²)` XP, 2/3 × `(20n + 1,5n²)` golds, 1 coffre tous les 5 (ex. profondeur 10 : 300 XP,
     233 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
