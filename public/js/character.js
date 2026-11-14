@@ -66,6 +66,7 @@ function render() {
   renderTalents();
   renderCombatStyle();
   renderSolo();
+  renderPets();
   renderMail();
   if (marketOrders) renderMarket();
   if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
@@ -1436,10 +1437,41 @@ $('fuse-go').onclick = async () => {
     `À <b>70 %</b> et <b>20 %</b>, il s'enferme dans un <b>bouclier</b> : il faut détruire ses ${So.shield.crystals} <b>cristaux</b>, qui le soignent tant qu'ils tiennent.`,
     `À <b>45 %</b>, il se <b>dédouble</b> : ${So.clones.count} illusions fragiles (mais qui attaquent aussi). Les dégâts de zone (Mage) font des merveilles !`,
   ]);
+  const Mi = Rules.BOSSES.mimic;
+  const Li = Rules.BOSSES.liche;
+  const Ma = Rules.BOSSES.maexxna;
+  const exOf = (id) => Rules.bossStats(10, id).maxHp.toLocaleString('fr-FR');
+  $('boss-others').innerHTML += block(Mi, [
+    `${Mi.hpBase} PV + ${Mi.hpPerPlayer} par combattant (10 → ${exOf('mimic')} PV). Ses morsures touchent aussi les voisins de sa cible.`,
+    `Toutes les ${String(Mi.specialEvery).replace('.', ',')} s : il <b>vomit</b> en cône le contenu de son ventre, puis <b>bondit</b> sur le héros le plus éloigné. Le vomi change à chaque fois : ${Object.values(Mi.vomit.loot).map((L) => `${L.icon} <b>${L.label}</b>`).join(', ')} (dégâts, saignement, poison et ralentissement, ou héros assommés).`,
+    `À <b>75 %</b>, <b>50 %</b> et <b>25 %</b>, il <b>copie un héros</b> au hasard : ${Mi.copies.counts.join(', puis ')} copies de <b>niveau 1</b> (sa classe, sans équipement). Tant qu'une copie est debout, il subit <b>${pct(1 - Mi.copies.guard)} de dégâts en moins</b> !`,
+  ]) + block(Li, [
+    `${Li.hpBase} PV + ${Li.hpPerPlayer} par combattant (10 → ${exOf('liche')} PV). Elle attaque <b>de loin</b> avec des éclats de glace et se téléporte de temps en temps.`,
+    `Elle <b>gèle</b> des héros pendant ${Li.freeze.duration} s, puis recommence ${Li.freeze.gap} s plus tard : <b>1</b> héros à la fois, puis <b>2</b> sous 66 %. Un héros gelé ne bouge plus, n'attaque plus, ne remplit plus sa stamina et perd ${Li.freeze.dps} PV par seconde, mais <b>personne ne peut le toucher</b> et on peut le soigner.`,
+    `Toutes les ${String(Li.specialEvery).replace('.', ',')} s : <b>pics de glace</b> sous quelques héros, puis <b>nova de givre</b> autour d'elle (dégâts et ralentissement).`,
+    `À <b>33 %</b>, elle <b>relève tous les héros morts</b> depuis le début pour se défendre (${pct(Li.raise.hpRatio)} de leurs stats) : ils s'effondrent si elle meurt. Si personne n'est tombé, elle gèle <b>3</b> héros, puis 2.`,
+  ]) + block(Ma, [
+    `${Ma.hpBase} PV + ${Ma.hpPerPlayer} par combattant (10 → ${exOf('maexxna')} PV). Chaque morsure <b>empoisonne</b> (${pct(Ma.poison.dot)} de la vie par seconde pendant ${Ma.poison.duration} s).`,
+    `Elle tisse des <b>toiles</b> partout : un héros dedans est <b>ralenti de ${pct(1 - Ma.webs.slow)}</b>. Toutes les ${Ma.specialEvery} s : <b>jet de toile</b> sur le plus gros groupe, puis <b>crachat de venin</b> en cône. Une <b>nuée d'araignées</b> venimeuses arrive toutes les ${Ma.spiders.every} s.`,
+    `À <b>70 %</b> et <b>20 %</b>, elle enferme des héros dans des <b>cocons</b> : brisez-les pour libérer vos alliés (sinon ils cèdent seuls au bout de ${Ma.cocoon.hold} s, après avoir bien souffert).`,
+    `À <b>45 %</b>, elle remonte <b>au plafond</b> ${Ma.ceiling.duration} s : pluie de toiles et de venin, et une grosse nuée. Elle redescend plus rapide, et entre en <b>frénésie</b> sous 20 %.`,
+  ]);
   $('boss-others').querySelectorAll('.boss-mini').forEach((cv) => {
     const kind = cv.dataset.kind;
-    drawMonster(cv.getContext('2d'), kind === 'dragon' ? 66 : 60, kind === 'dragon' ? 76 : 84, { kind }, { scale: kind === 'dragon' ? 0.48 : 0.8, t: 0 });
+    const conf = { dragon: [66, 76, 0.48], mimic: [62, 90, 0.62], maexxna: [64, 96, 0.5] }[kind] || [60, 84, 0.8];
+    drawMonster(cv.getContext('2d'), conf[0], conf[1], { kind }, { scale: conf[2], t: 0 });
   });
+  const RU = Rules.RUSH;
+  $('rush-rules').innerHTML = [
+    `Un boss tiré au hasard ouvre la run (chacun passe une fois avant de revenir, jamais deux fois de suite). Le boss n°k a <b>+${pct(RU.hpPerRound)} de vie</b> et <b>+${pct(RU.damagePerRound)} de dégâts</b> par boss déjà passé.`,
+    `Après chaque boss vaincu, le chat vote ${RU.poll.duration} s (<code>!1</code>, <code>!2</code>, <code>!3</code>, ou sur le site) : <b>🎲 un bonus</b> tiré au hasard pour le reste de la run, <b>👼 une résurrection</b> (un héros tombé au hasard, à ${pct(RU.revive)} de sa vie ; ou <b>💖 un grand soin</b> si personne n'est tombé), ou <b>💀 Quitte ou double</b> : boss suivants <b>×${String(RU.defiMult).replace('.', ',')}</b>, mais ${RU.defiGold} golds et ${RU.defiXp} XP par boss vaincu tout de suite pour tous.`,
+    `Les survivants récupèrent ${pct(RU.healBetween)} de leur vie entre deux boss. La run s'arrête quand <b>tout le monde est tombé</b> (ou qu'un boss tient ${Math.floor(300 / 60)} min).`,
+    `Chaque boss vaincu compte pour ses succès et peut laisser un <b>familier</b> (5 %).`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  $('rush-rewards').innerHTML = '<tr><th>Boss vaincus</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
+    + [1, 2, 3, 5, 8].map((n) => { const r = Rules.rushReward(n); return `<tr><td><b>${n}</b></td><td>+${r.xp} XP</td><td>+${r.gold} 🪙</td><td>+${r.chests} <i class="ico-chest"></i></td></tr>`; }).join('')
+    + '<tr><td colspan="4" class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants (+ l\'XP de participation).</td></tr>';
+  $('rush-boons').innerHTML = Object.values(Rules.RUSH_BOONS).map((b) => `<tr><td style="color:${b.color}"><b>${b.icon} ${b.label}</b></td><td>${b.desc}</td></tr>`).join('');
   const R = B.reward;
   $('boss-rewards').innerHTML = `<tr><th>Résultat</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>
     <tr><td><b>🏆 Boss vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
@@ -1521,7 +1553,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'entrainement', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'entrainement', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1531,6 +1563,7 @@ function showTab(name) {
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
   if (name === 'marche' && me) loadMarket();
+  if (name === 'familier' && me) renderPets();
 }
 
 document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => {
@@ -1554,6 +1587,7 @@ function renderBadges() {
   set('combat', Math.max(0, Rules.techSlots(c.level) - c.techs.length));
   set('solo', c.cls && !c.soloActive ? Rules.energyState(c.energy, Date.now()).value : 0);
   set('marche', (c.mail || []).filter((m) => !m.read).length);
+  set('familier', window.petFindsWaiting ? petFindsWaiting() : 0);
   set('succes', claim);
 }
 
@@ -2070,9 +2104,9 @@ function renderPollVote(box) {
   const mine = pollVote && pollVote.room === poll.room ? pollVote.choice : null;
   const total = poll.options.reduce((a, o) => a + o.votes, 0);
   box.insertAdjacentHTML('beforeend', `<div class="poll-vote">
-    <div class="row"><b>🗳️ Sondage du donjon : le chat choisit un bonus pour les aventuriers !</b><span class="countdown" id="poll-cd"></span></div>
+    <div class="row"><b>🗳️ ${poll.rush ? 'Boss Rush : le chat choisit la suite de la run !' : 'Sondage du donjon : le chat choisit un bonus pour les aventuriers !'}</b><span class="countdown" id="poll-cd"></span></div>
     <div class="poll-options">${poll.options.map((o, i) => {
-      const b = Rules.DUNGEON_BOONS[o.id];
+      const b = o.label ? o : Rules.DUNGEON_BOONS[o.id];
       const share = total ? Math.round((o.votes / total) * 100) : 0;
       return `<button class="poll-option ${mine === o.id ? 'mine' : ''}" data-vote="${o.id}" style="--c:${b.color}">
         <span class="poll-ico">${b.icon}</span><span class="poll-body"><b>${b.label}</b><span>${b.desc}</span>
@@ -2259,6 +2293,7 @@ socket.on('bet', (r) => {
   renderBets();
 });
 
+socket.on('pet', (e) => { if (window.onPetEvent) onPetEvent(e); });
 socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
   const gains = [`+${r.reward.xp} XP`];

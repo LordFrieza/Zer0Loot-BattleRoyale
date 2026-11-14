@@ -57,6 +57,7 @@
       <button data-tab="boutique">🛍️ Boutique</button>
       <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
+      <button data-tab="familier">🐾 Familier <span class="tab-badge" data-badge="familier"></span></button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
       <button data-tab="classements">🏆 Classements</button>
@@ -407,6 +408,30 @@
     </div>
     </section>
 
+    <section class="tab" data-tab="familier">
+    <div class="panel pet-panel">
+      <h2>🐾 Familier <span class="sub">Ton mini boss à chouchouter</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Chaque boss vaincu (Combat de Boss, Boss Rush ou Défi des boss) a <b>5 % de chance</b> de laisser sa
+        version miniature à chaque héros. Ton <b>familier principal</b> a faim, soif et envie de jouer : ses besoins baissent avec
+        le temps. Si sa <b>satisfaction</b> (la moyenne des trois) est d'au moins <b>50 %</b>, il te ramène une
+        <b>trouvaille</b> toutes les quelques heures (3 en attente au plus) : une arme, des golds, de l'XP, un coffre, une potion
+        ou une pièce d'armure selon son espèce. Les soins lui donnent de l'expérience : à chaque niveau, ses trouvailles sont plus
+        fréquentes et plus grosses. Garde-le <b>au-dessus de 80 % pendant 3 jours</b> d'affilée et il deviendra ton
+        <b>compagnon de combat</b> : il te suivra dans l'arène (purement cosmétique). Les autres familiers se reposent :
+        leurs besoins ne baissent pas tant qu'ils ne sont pas principaux.</p>
+      <div id="pet-empty"></div>
+      <div class="pet-layout" id="pet-main">
+        <div class="pet-scene"><canvas id="pet-canvas" width="960" height="400" title="Clique sur ton familier pour le caresser, sur un cadeau pour le récupérer"></canvas></div>
+        <div class="pet-side" id="pet-side"></div>
+      </div>
+      <div class="pet-cols">
+        <div class="pet-box" id="pet-pantry"></div>
+        <div class="pet-box" id="pet-enclos-shop"></div>
+      </div>
+      <div class="pet-box" id="pet-collection"></div>
+    </div>
+    </section>
+
     <section class="tab" data-tab="succes">
     <div class="panel" id="achievements">
       <h2>🏅 Succès <span class="sub" id="ach-count"></span><button class="help-btn" type="button">?</button></h2>
@@ -475,8 +500,18 @@
           <h4>👹 Grokk le Troll</h4>
           <ul class="rules-list" id="boss-rules"></ul>
           <div id="boss-others"></div>
-          <h4>🎁 Récompenses (les mêmes pour les trois boss)</h4>
+          <h4>🎁 Récompenses (les mêmes pour tous les boss)</h4>
           <table class="loot-table" id="boss-rewards"></table>
+          <p class="muted" style="font-size:13px">🐾 Chaque boss vaincu a aussi <b>5 % de chance</b> de laisser à chaque héros sa version miniature : un <b>familier</b> (onglet Familier).</p>
+        </div>
+        <div class="mode-card" style="--c:#ff4d6d">
+          <div class="mode-head"><div style="font-size:64px;line-height:1">💀</div>
+            <div><h3>💀 Boss Rush</h3><p class="muted">Les boss s'enchaînent, de plus en plus forts, jusqu'à la chute de l'équipe.</p></div></div>
+          <ul class="rules-list" id="rush-rules"></ul>
+          <h4>🎁 Récompenses selon le nombre de boss vaincus</h4>
+          <table class="loot-table" id="rush-rewards"></table>
+          <h4>🎲 Bonus possibles (choix « Bonus » du vote)</h4>
+          <div class="table-scroll"><table class="loot-table boons-table" id="rush-boons"></table></div>
         </div>
         <div class="mode-card" style="--c:#5fd3ff">
           <div class="mode-head"><canvas id="dungeon-portrait" width="230" height="110"></canvas>
@@ -578,6 +613,7 @@
   <script src="/js/alchemy.js"></script>
   <script src="/js/leaderboard.js"></script>
   <script src="/js/arena.js"></script>
+  <script src="/js/pets.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

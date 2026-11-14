@@ -52,6 +52,8 @@ test('[DB-8] migration V1 → V2 : toute la progression est conservée, les nouv
     assert.deepStrictEqual([c.drawing, c.drawingVer, c.soloActive], ['', 0, null]);
     assert.deepStrictEqual([c.mail, c.marketLog], [[], []], 'courrier et historique du marché vides');
     assert.strictEqual(c.energy.value, Rules.SOLO.energyMax);
+    assert.strictEqual(c.bossKeys, Rules.SOLO.startKeys, 'une Clé de boss offerte');
+    assert.deepStrictEqual(c.pets, { list: [], active: null, follow: null, food: {}, enclos: [] }, 'enclos vide');
     for (const k of ['alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest']) assert.strictEqual(c.counters[k], 0);
     for (const k of ['chest', 'pants', 'gloves', 'belt', 'weapon', 'offhand', 'body', 'drawing']) assert.strictEqual(c.look[k], null);
   }

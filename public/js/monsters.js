@@ -1,6 +1,6 @@
 /*
  * Dessin des monstres du donjon (gobelin, slime, chauve-souris, squelette) et des boss (Troll, Dragon, Magicien des
- * ténèbres) avec leurs créatures (œufs, dragonnets, cristaux d'ombre).
+ * ténèbres, Mimic, Liche de glace, Maexxna) avec leurs créatures (œufs, dragonnets, cristaux d'ombre, araignées, cocons).
  * Même repère que drawFighter : (x, y) au centre du corps, ombre au sol vers y + 18.
  * o = { scale, facing (1|-1), bob, flash (0..1), swing (0..1), t (ms, pour les animations), alpha }
  */
@@ -740,15 +740,347 @@
     ctx.restore();
   }
 
+  /*
+   * Grignotor le Mimic : un coffre de bois cerclé d'or, couvercle qui s'ouvre sur des rangées de dents,
+   * une langue baveuse et deux yeux jaunes au fond. o.swing : il claque des mâchoires. Petites pattes griffues.
+   */
+  function mimic(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const phase = o.phase || 0;
+    const step = Math.sin(t * 9 + (o.seed || 0));
+    shadow(ctx, 56, 44);
+    ctx.save();
+    ctx.lineJoin = 'round';
+    // pattes griffues
+    ctx.fillStyle = '#3b2412';
+    for (const [x, k] of [[-38, 1], [-16, -1], [14, 1], [36, -1]]) {
+      const lift = Math.max(0, step * k) * 5;
+      ctx.beginPath(); ctx.moveTo(x - 6, 30); ctx.lineTo(x + 6, 30); ctx.lineTo(x + 4, 42 - lift); ctx.lineTo(x - 4, 42 - lift); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8e2cf';
+      ctx.beginPath(); ctx.moveTo(x - 5, 42 - lift); ctx.lineTo(x - 2, 47 - lift); ctx.lineTo(x, 42 - lift); ctx.lineTo(x + 2, 47 - lift); ctx.lineTo(x + 5, 42 - lift); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#3b2412';
+    }
+    const open = 0.32 + Math.sin(t * 2.6) * 0.06 + swing * 0.5 + phase * 0.04;
+    // intérieur de la gueule
+    const hx = -52;
+    const hy = -6;
+    const lidEnd = { x: hx + Math.cos(-open) * 104, y: hy + Math.sin(-open) * 104 };
+    const mouth = ctx.createLinearGradient(0, lidEnd.y, 0, hy);
+    mouth.addColorStop(0, '#2a0508');
+    mouth.addColorStop(1, '#6e0f1a');
+    ctx.fillStyle = mouth;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(lidEnd.x, lidEnd.y); ctx.lineTo(52, hy); ctx.closePath(); ctx.fill();
+    // yeux au fond de la gueule
+    ctx.save();
+    ctx.shadowColor = o.enraged ? '#ff3b2a' : '#ffd23f';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = o.enraged ? '#ff6b4a' : '#ffe14a';
+    const ey = hy - 16 * open / 0.32;
+    ctx.beginPath(); ctx.ellipse(-14, ey, 6, 4, -0.2, 0, Math.PI * 2); ctx.ellipse(8, ey - 2, 6, 4, 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#1a0306';
+    ctx.beginPath(); ctx.ellipse(-13, ey, 1.6, 3.4, 0, 0, Math.PI * 2); ctx.ellipse(9, ey - 2, 1.6, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+    // corps du coffre (planches, cerclages dorés)
+    const wood = ctx.createLinearGradient(0, -6, 0, 40);
+    wood.addColorStop(0, '#9a6230');
+    wood.addColorStop(1, '#5a3315');
+    ctx.fillStyle = wood;
+    ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    ctx.lineWidth = 2;
+    rr(ctx, -54, -6, 108, 46, 6); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(40,20,5,.5)';
+    ctx.lineWidth = 1.2;
+    for (const y of [8, 22]) { ctx.beginPath(); ctx.moveTo(-52, y); ctx.lineTo(52, y); ctx.stroke(); }
+    const gold = o.enraged ? '#e0603a' : '#d9a441';
+    ctx.fillStyle = gold;
+    for (const x of [-44, 36]) { rr(ctx, x, -6, 8, 46, 2); ctx.fill(); }
+    ctx.fillStyle = shade(gold, 0.35);
+    for (const [x, y] of [[-40, 0], [-40, 32], [40, 0], [40, 32]]) { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill(); }
+    // dents du bas
+    ctx.fillStyle = '#f4ecd6';
+    ctx.strokeStyle = 'rgba(90,60,30,.6)';
+    ctx.lineWidth = 0.8;
+    for (let x = -46; x <= 44; x += 10) {
+      ctx.beginPath(); ctx.moveTo(x, -5); ctx.lineTo(x + 4.5, -15 - (x % 20 === 0 ? 3 : 0)); ctx.lineTo(x + 9, -5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    // langue baveuse qui pend sur le devant
+    const sway = Math.sin(t * 3.2) * 6;
+    ctx.fillStyle = '#e0607e';
+    ctx.strokeStyle = '#8a2038';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(18, -8); ctx.quadraticCurveTo(58, -14, 56 + sway * 0.3, 16 + swing * 6);
+    ctx.quadraticCurveTo(52 + sway, 34, 42 + sway, 30); ctx.quadraticCurveTo(40, 8, 8, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(138,32,56,.6)';
+    ctx.beginPath(); ctx.moveTo(26, -6); ctx.quadraticCurveTo(48, -6, 48 + sway * 0.6, 22); ctx.stroke();
+    // bave
+    ctx.fillStyle = 'rgba(200,240,255,.7)';
+    const drip = (t * 1.3 + (o.seed || 0)) % 1;
+    ctx.beginPath(); ctx.ellipse(46 + sway, 32 + drip * 16, 2, 3 + drip * 2, 0, 0, Math.PI * 2); ctx.fill();
+    // couvercle (articulé à l'arrière)
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(-open);
+    const lid = ctx.createLinearGradient(0, -34, 0, 0);
+    lid.addColorStop(0, '#b47a3e');
+    lid.addColorStop(1, '#6e4019');
+    ctx.fillStyle = lid;
+    ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -18); ctx.quadraticCurveTo(52, -42, 104, -18); ctx.lineTo(104, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = gold;
+    rr(ctx, 8, -26, 8, 26, 2); ctx.fill();
+    rr(ctx, 88, -26, 8, 26, 2); ctx.fill();
+    // serrure (devient un œil quand il s'énerve)
+    ctx.fillStyle = shade(gold, 0.2);
+    rr(ctx, 94, -12, 12, 14, 3); ctx.fill();
+    ctx.fillStyle = phase > 0 ? '#ff3b2a' : '#2a1606';
+    ctx.beginPath(); ctx.arc(100, -6, 2.6, 0, Math.PI * 2); ctx.fill();
+    // dents du haut
+    ctx.fillStyle = '#f4ecd6';
+    ctx.strokeStyle = 'rgba(90,60,30,.6)';
+    ctx.lineWidth = 0.8;
+    for (let x = 4; x <= 94; x += 10) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 4.5, 11 + (x % 20 === 4 ? 3 : 0)); ctx.lineTo(x + 9, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+    flashOver(ctx, o.flash, () => { rr(ctx, -54, -40, 108, 80, 8); ctx.fill(); });
+    ctx.restore();
+  }
+
+  /*
+   * Givrenoire la Liche de glace : squelette mage dans une robe déchirée bleu nuit, couronne de glace,
+   * yeux cyan, bâton surmonté d'un cristal de givre. Elle flotte, des volutes de froid sous sa robe.
+   */
+  function liche(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const float = Math.sin(t * 2 + (o.seed || 0)) * 4;
+    shadow(ctx, 30, 42);
+    ctx.save();
+    ctx.translate(0, float - 6);
+    ctx.lineJoin = 'round';
+    // volutes de froid
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 5; i++) {
+      const k = (t * 0.6 + i / 5) % 1;
+      ctx.fillStyle = `rgba(140,220,255,${0.25 * (1 - k)})`;
+      ctx.beginPath(); ctx.ellipse(-18 + i * 9 + Math.sin(t * 2 + i) * 4, 40 + k * 10, 8 + k * 8, 4 + k * 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // robe déchirée
+    const robe = ctx.createLinearGradient(0, -30, 0, 44);
+    robe.addColorStop(0, '#2c4a78');
+    robe.addColorStop(1, '#0d1a33');
+    ctx.fillStyle = robe;
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
+    ctx.lineWidth = 2;
+    const w = Math.sin(t * 3) * 3;
+    ctx.beginPath();
+    ctx.moveTo(-15, -30); ctx.lineTo(15, -30); ctx.lineTo(27, 30);
+    ctx.lineTo(20 + w, 42); ctx.lineTo(13, 32); ctx.lineTo(6 - w, 44); ctx.lineTo(-1, 33); ctx.lineTo(-8 + w, 45); ctx.lineTo(-14, 32); ctx.lineTo(-22 - w, 42); ctx.lineTo(-27, 30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // givre sur la robe
+    ctx.strokeStyle = 'rgba(190,240,255,.55)';
+    ctx.lineWidth = 1.2;
+    for (const [x, y] of [[-10, 6], [8, 18], [-4, 26]]) {
+      for (let a = 0; a < 3; a++) { const ang = a * Math.PI / 3; ctx.beginPath(); ctx.moveTo(x - Math.cos(ang) * 4, y - Math.sin(ang) * 4); ctx.lineTo(x + Math.cos(ang) * 4, y + Math.sin(ang) * 4); ctx.stroke(); }
+    }
+    // cage thoracique visible
+    ctx.strokeStyle = '#d8e6ee';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-9, -22 + i * 6); ctx.quadraticCurveTo(0, -18 + i * 6, 9, -22 + i * 6); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(0, -2); ctx.stroke();
+    // épaulières de glace
+    ctx.fillStyle = '#9fe6ff';
+    ctx.strokeStyle = 'rgba(30,80,120,.7)';
+    ctx.lineWidth = 1.2;
+    for (const k of [-1, 1]) { ctx.beginPath(); ctx.moveTo(14 * k, -32); ctx.lineTo(26 * k, -40); ctx.lineTo(22 * k, -28); ctx.lineTo(30 * k, -30); ctx.lineTo(20 * k, -22); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    // crâne
+    ctx.fillStyle = '#e9f1f4';
+    ctx.strokeStyle = 'rgba(40,60,80,.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(1, -46, 12, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    rr(ctx, -6, -38, 14, 8, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5a6a78';
+    for (let i = 0; i < 4; i++) ctx.fillRect(-4 + i * 3.4, -36, 1.2, 5);
+    // orbites et yeux cyan
+    ctx.fillStyle = '#0a1420';
+    ctx.beginPath(); ctx.ellipse(-4, -47, 4, 4.5, 0, 0, Math.PI * 2); ctx.ellipse(7, -47, 4, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#5fe0ff';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = o.enraged ? '#ff9ad0' : '#bff6ff';
+    ctx.beginPath(); ctx.arc(-4, -47, 1.8, 0, Math.PI * 2); ctx.arc(7, -47, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // couronne de glace
+    ctx.fillStyle = 'rgba(170,235,255,.95)';
+    ctx.strokeStyle = 'rgba(40,110,160,.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-12, -56); ctx.lineTo(-10, -68); ctx.lineTo(-5, -58); ctx.lineTo(0, -76); ctx.lineTo(5, -58); ctx.lineTo(10, -70); ctx.lineTo(13, -56);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // bras osseux et bâton à cristal
+    ctx.save();
+    ctx.translate(18, -8);
+    ctx.rotate(0.1 - swing * 0.6);
+    ctx.fillStyle = '#6b7d8c';
+    rr(ctx, -2, -58, 4, 88, 2); ctx.fill();
+    const glow = 0.6 + Math.sin(t * 4) * 0.2 + swing * 0.4;
+    ctx.save();
+    ctx.shadowColor = '#7fe8ff';
+    ctx.shadowBlur = 16 + swing * 10;
+    ctx.fillStyle = `rgba(190,245,255,${0.7 + glow * 0.3})`;
+    ctx.strokeStyle = '#2a7fb0';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, -84 - swing * 4); ctx.lineTo(8, -66); ctx.lineTo(0, -56); ctx.lineTo(-8, -66); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+    ctx.strokeStyle = '#d8e6ee';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(10, -24); ctx.lineTo(18, -10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-10, -24); ctx.quadraticCurveTo(-22, -10, -16, 2); ctx.stroke();
+    flashOver(ctx, o.flash, () => {
+      ctx.beginPath(); ctx.moveTo(-15, -30); ctx.lineTo(15, -30); ctx.lineTo(27, 40); ctx.lineTo(-27, 40); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(1, -46, 14, 15, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  /*
+   * Maexxna la Veuve noire : grosse araignée noire luisante, sablier rouge sur l'abdomen, huit pattes articulées
+   * qui marchent, crochets verts qui gouttent de venin, yeux rouges. o.small : version araignée (petites créatures).
+   */
+  function maexxna(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const small = !!o.small;
+    const walk = t * (small ? 16 : 7) + (o.seed || 0);
+    if (!small) shadow(ctx, 70, 30);
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const body = o.enraged ? '#2a0a10' : '#121018';
+    // pattes (4 paires)
+    const legs = [[-82, 0], [-44, 1], [34, 0], [78, 1], [-96, 1], [-60, 0], [54, 1], [94, 0]];
+    legs.forEach(([fx, k], i) => {
+      const back = i >= 4;
+      const lift = Math.max(0, Math.sin(walk + k * Math.PI + i * 0.4)) * 7;
+      const ax = 12 + (i % 4) * 4 - 8;
+      const ay = -14;
+      const kx = ax + (fx - ax) * 0.45;
+      const ky = -52 - (i % 4 === 1 || i % 4 === 2 ? 6 : 0) - lift * 0.6;
+      ctx.strokeStyle = back ? '#08070c' : '#1d1a26';
+      ctx.lineWidth = small ? 4 : 5.5;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(kx, ky); ctx.lineTo(fx, 28 - lift); ctx.stroke();
+      ctx.strokeStyle = 'rgba(120,110,150,.35)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(ax, ay - 1); ctx.lineTo(kx, ky - 1); ctx.stroke();
+    });
+    // abdomen
+    const ab = ctx.createRadialGradient(-36, -38, 4, -28, -24, 40);
+    ab.addColorStop(0, '#4a4458');
+    ab.addColorStop(0.35, body);
+    ab.addColorStop(1, '#000');
+    ctx.fillStyle = ab;
+    ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    ctx.lineWidth = 2;
+    const pulse = 1 + Math.sin(t * 2.5) * 0.02;
+    ctx.beginPath(); ctx.ellipse(-30, -24, 36 * pulse, 30 * pulse, -0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // sablier rouge
+    ctx.save();
+    ctx.shadowColor = '#ff2040';
+    ctx.shadowBlur = small ? 4 : 10;
+    ctx.fillStyle = '#e8203c';
+    ctx.beginPath(); ctx.moveTo(-40, -42); ctx.lineTo(-24, -42); ctx.lineTo(-32, -30); ctx.lineTo(-24, -18); ctx.lineTo(-40, -18); ctx.lineTo(-32, -30); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // reflet
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.ellipse(-40, -40, 10, 5, -0.5, 0, Math.PI * 2); ctx.fill();
+    // céphalothorax
+    const th = ctx.createRadialGradient(14, -22, 2, 18, -14, 22);
+    th.addColorStop(0, '#3a3546');
+    th.addColorStop(1, body);
+    ctx.fillStyle = th;
+    ctx.beginPath(); ctx.ellipse(18, -14, 22, 17, 0.1, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // yeux rouges (8)
+    ctx.save();
+    ctx.shadowColor = '#ff1a2a';
+    ctx.shadowBlur = small ? 3 : 8;
+    ctx.fillStyle = '#ff3344';
+    for (const [x, y, r] of [[30, -22, 3], [36, -19, 3.4], [26, -16, 2], [33, -12, 2.2], [22, -24, 1.6], [38, -14, 1.6]]) {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // crochets venimeux
+    const bite = swing * 0.5;
+    ctx.fillStyle = '#2b2735';
+    for (const k of [-1, 1]) {
+      ctx.save();
+      ctx.translate(38, -6 + k * 4);
+      ctx.rotate(k * (0.3 + bite));
+      ctx.beginPath(); ctx.moveTo(0, -3); ctx.quadraticCurveTo(12, 0, 8, 12); ctx.lineTo(4, 4); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    if (!small) {
+      ctx.fillStyle = 'rgba(120,255,90,.8)';
+      const drip = (t * 1.6 + (o.seed || 0)) % 1;
+      ctx.beginPath(); ctx.ellipse(46, 6 + drip * 14, 1.8, 2.6 + drip * 2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    flashOver(ctx, o.flash, () => {
+      ctx.beginPath(); ctx.ellipse(-30, -24, 36, 30, -0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(18, -14, 22, 17, 0.1, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Petite araignée de la nuée de Maexxna.
+  function araignee(ctx, o) {
+    shadow(ctx, 12, 16);
+    ctx.save();
+    ctx.translate(2, 10);
+    ctx.scale(0.28, 0.28);
+    maexxna(ctx, Object.assign({}, o, { small: true }));
+    ctx.restore();
+  }
+
+  // Cocon de soie de Maexxna : un héros y est enfermé (on devine sa silhouette), il palpite.
+  function cocon(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const throb = 1 + Math.sin(t * 5 + (o.seed || 0)) * 0.04;
+    shadow(ctx, 16, 18);
+    ctx.save();
+    ctx.translate(0, -4);
+    ctx.scale(throb, 1 / throb);
+    const g = ctx.createRadialGradient(-5, -16, 3, 0, -4, 30);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.6, '#e4e0ea');
+    g.addColorStop(1, '#a7a0b6');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = 'rgba(80,70,100,.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, -4, 17, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(70,60,90,.18)';
+    ctx.beginPath(); ctx.arc(0, -16, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 2, 8, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,140,170,.7)';
+    ctx.lineWidth = 1;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath(); ctx.moveTo(-17, -4 + i * 7); ctx.quadraticCurveTo(0, -8 + i * 7 + Math.sin(i) * 3, 17, -2 + i * 7); ctx.stroke();
+    }
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -4, 17, 26, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
     const f = (c) => Math.max(0, Math.min(255, Math.round(k >= 0 ? c + (255 - c) * k : c * (1 + k))));
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, gobelin_violet: gobelinViolet, rat, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan };
+  const DRAW = { gobelin, gobelin_violet: gobelinViolet, rat, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan, mimic, liche, maexxna, araignee, cocon };
   // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
-  const BOSS_KINDS = ['troll', 'dragon', 'sorcier'];
+  const BOSS_KINDS = ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna'];
 
   function drawMonster(ctx, x, y, m, o = {}) {
     const draw = DRAW[m.kind];
@@ -763,4 +1095,25 @@
   }
 
   window.drawMonster = drawMonster;
+
+  /*
+   * Familier : la version miniature d'un boss (même dessin, en petit, avec des joues roses).
+   * (x, y) : ses pieds au sol. o = { facing, t, size (1 = taille de l'enclos), flash, swing, sleep }
+   */
+  const PET_DRAW = {
+    troll: { scale: 0.42, lift: 24 }, dragon: { scale: 0.36, lift: 16 }, sorcier: { scale: 0.46, lift: 18 },
+    mimic: { scale: 0.42, lift: 16 }, liche: { scale: 0.46, lift: 18 }, maexxna: { scale: 0.4, lift: 6 },
+  };
+  function drawPet(ctx, x, y, species, o = {}) {
+    const P = PET_DRAW[species];
+    if (!P) return;
+    const size = o.size || 1;
+    const sc = P.scale * size;
+    ctx.save();
+    if (o.sleep) { ctx.translate(x, y); ctx.scale(1, 0.92 + Math.sin((o.t || 0) / 600) * 0.03); ctx.translate(-x, -y); }
+    drawMonster(ctx, x, y - P.lift * sc, { kind: species }, { scale: sc, facing: o.facing || 1, t: o.sleep ? 0 : o.t, seed: o.seed || 0, flash: o.flash, swing: o.swing });
+    ctx.restore();
+  }
+  window.drawPet = drawPet;
+  window.PET_DRAW = PET_DRAW;
 })();

@@ -170,7 +170,10 @@ test('[SOLO-6] défi des boss : boss à ta mesure, renforcé selon la difficult�
   assert.deepStrictEqual(Object.keys(Rules.BOSS_CHALLENGE), ['normal', 'heroique', 'legendaire']);
   const st = Rules.bossStats(1, 'troll', 10);
   const normal = soloBattle('boss', { level: 10 }, { boss: 'troll', difficulty: 'normal', level: 10 });
-  assert.deepStrictEqual(Rules.BOSS_SOLO_SCALE, { troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 } });
+  assert.deepStrictEqual(Rules.BOSS_SOLO_SCALE, {
+    troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 },
+    mimic: { hp: 0.55, damage: 1.45 }, liche: { hp: 0.7, damage: 1.7 }, maexxna: { hp: 0.6, damage: 1.3 },
+  });
   assert.deepStrictEqual(['normal', 'heroique', 'legendaire'].map((d) => [Rules.BOSS_CHALLENGE[d].hp, Rules.BOSS_CHALLENGE[d].damage]), [[0.7, 0.7], [1.4, 1.25], [2.4, 1.6]]);
   assert.strictEqual(normal.boss.maxHp, Math.round(st.maxHp * 1.1 * 0.7));
   assert.strictEqual(normal.boss.damage, Math.round(st.damage * 2.1 * 0.7 * 10) / 10);

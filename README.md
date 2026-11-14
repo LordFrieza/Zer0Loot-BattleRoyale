@@ -241,15 +241,16 @@ de la file, confirme les `!join` et annonce le vainqueur.
     `n` profondeurs nettoyées : 2/3 × `(25n + 2n²)` XP, 2/3 × `(20n + 1,5n²)` golds, 1 coffre tous les 5 (ex. profondeur 10 : 300 XP,
     233 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
-  - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
+  - **Défi des boss** : l'un des 6 boss (Troll, Dragon, Magicien, Mimic, Liche de glace, Maexxna), seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
     2 coffres), Héroïque (900, 750, 3) ou Légendaire (1 500, 1 350, 6). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
     Les boss sont nettement renforcés en solo (le Légendaire est réservé aux meilleurs builds) ; la vie et les dégâts du
     joueur sont ajustés par classe (Archer, Mage et Assassin renforcés, régénération du Prêtre réduite), et un Prêtre seul
     ne purifie pas sa propre malédiction face au Magicien.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
-    « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon ou Malvorath le Magicien des ténèbres.
-    Même récompense pour les trois, même rage finale à 2 min 30.
+    « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon, Malvorath le Magicien des ténèbres,
+    Grignotor le Mimic, Givrenoire la Liche de glace ou Maexxna la Veuve noire. Même récompense pour tous, même rage
+    finale à 2 min 30. Chaque boss vaincu a 5 % de chance de laisser son **familier** à chaque héros (voir plus bas).
   - **Grokk le Troll** : vie et dégâts selon le nombre
     de combattants au lancement (200 PV + 300 PV par combattant, puis +6 % par niveau moyen des joueurs au-delà du 1, ×2,5 au plus). Coup de massue qui touche les voisins, attaques
     spéciales annoncées au sol (onde de choc, rocher sur le plus gros groupe). Grosse barre de vie avec coches à 66 % et
@@ -267,6 +268,25 @@ de la file, confirme les `!join` et annonce le vainqueur.
     de 120 px purifie aussitôt, lui compris, sauf seul en Défi des boss) et **zones d'ombre** sous les pieds des combattants. À **70 %** et **20 %**,
     **bouclier** : il est intouchable tant que ses 4 **cristaux** tiennent (et ils le soignent). À **45 %**, il se
     **dédouble** en 3 illusions fragiles qui attaquent aussi : les dégâts de zone font la différence.
+  - **Grignotor le Mimic** (200 PV + 280 par combattant) : un coffre aux dents acérées. Il **vomit** en cône le contenu
+    de son ventre (armes : gros dégâts ; os : saignement ; bile : poison et ralentissement ; pièces : héros assommés) et
+    **bondit** sur le héros le plus éloigné. À **75 %**, **50 %** et **25 %**, il **copie** un héros au hasard : 2, 4 puis
+    6 copies de niveau 1 (même classe, même apparence) qui le protègent (−40 % de dégâts subis tant qu'elles sont debout).
+  - **Givrenoire la Liche de glace** (260 PV + 420 par combattant) : attaque de loin et **gèle** des héros 5 s (1 à la
+    fois, puis 2 sous 66 %), de nouveau 10 s plus tard. Gelé : il ne bouge plus, n'attaque plus, ne remplit plus sa
+    stamina et perd 1 PV par seconde, mais personne ne peut le toucher et on peut le soigner. Pics de glace sous les
+    héros et nova de givre (ralentissement). À **33 %**, elle **relève tous les héros morts** depuis le début (ils
+    combattent pour elle et s'effondrent à sa mort) ; si personne n'est tombé, elle gèle 3 héros, puis 2.
+  - **Maexxna la Veuve noire** (200 PV + 280 par combattant) : araignée géante aux morsures venimeuses. Elle tisse des
+    **toiles** partout (héros ralentis de 65 %), crache sa toile et son venin, appelle des **nuées d'araignées**. À
+    **70 %** et **20 %**, elle enferme des héros dans des **cocons** à briser ; à **45 %**, elle remonte au **plafond**
+    (pluie de toiles et de venin, grosse nuée) et redescend plus rapide ; **frénésie** sous 20 %.
+  - **Boss Rush** (coopératif, dès 1 joueur) : les boss s'enchaînent au hasard (chacun une fois avant de revenir, jamais
+    deux fois de suite), de plus en plus forts (+30 % de vie et +12 % de dégâts par boss passé). Entre deux boss, le chat
+    vote 40 s (`!1`, `!2`, `!3` ou sur le site) : **un bonus** tiré au hasard pour le reste de la run (fureur, peau de
+    pierre, adrénaline, vol de vie, ronces, vigueur, sève de vie, second souffle), **une résurrection** (ou un grand soin
+    si personne n'est tombé) ou **Quitte ou double** (boss suivants ×1,25, mais golds et XP tout de suite). Fin quand
+    tout le monde tombe : pour k boss vaincus, 300 + 400 + … XP et autant de golds, et 2 coffres par boss, pour tous.
   - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline
     (grand cercle doré) se tient au sol ; chaque seconde dessus rapporte 2 points à chacun, **5 points si l'on y est
     seul** (le Roi 👑), et chaque kill 2 points. Hors de la colline, un combattant sans ennemi à portée y retourne. Toutes les 30 s, la colline change de place (annoncée en pointillés 5 s avant). Les morts
@@ -335,7 +355,17 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
-- **Succès** : 65 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
+- **Familiers** (onglet Familier) : un boss vaincu (Combat de Boss, Boss Rush, Défi des boss) a **5 % de chance** de
+  laisser sa version miniature à chaque héros (une espèce par boss ; un doublon donne 150 XP au familier et un festin).
+  Dans un **enclos animé** (ciel selon l'heure, objets achetés, familier qui se promène et réagit), le familier
+  **principal** a faim, soif et envie de jouer (besoins qui baissent avec le temps). Si sa satisfaction est d'au moins
+  50 %, il ramène une **trouvaille** toutes les 4 h (plus souvent avec ses niveaux, 3 en attente au plus) : arme (Troll),
+  golds (Dragon), XP (Magicien), coffre (Mimic), potion et parfois une Clé de boss (Liche), armure ou bijou (Maexxna).
+  On le caresse, on joue avec lui, on le nourrit (épicerie ; chaque espèce a son plat préféré) : il gagne de l'XP et
+  des niveaux (20 au plus). Objets d'enclos à acheter une fois (fleurs, lanternes, gamelle, fontaine, coffre à jouets,
+  mare, niche, statue). **3 jours d'affilée au-dessus de 80 %** : il devient **compagnon de combat** et suit son héros
+  dans l'arène (cosmétique). Les autres familiers se reposent (leurs besoins ne baissent pas).
+- **Succès** : 74 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
@@ -344,7 +374,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   en Expédition et record de salle du Raid de Donjon. Chaque classement indique ce qu'il compte.
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
-- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss, effacement d'un
+- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / familier, effacement d'un
   visage dessiné, bannissement (déconnexion
   immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
@@ -398,13 +428,14 @@ Toutes les valeurs d'équilibrage sont centralisées dans [`shared/rules.js`](sh
 ```
 server/
   index.js    serveur Express + Socket.IO, routes, sessions, récompenses
-  battle.js   file d'attente et simulation du combat (côté serveur, 20 ticks/s) : Battle Royale, Boss, Donjon
+  battle.js   file d'attente et simulation du combat (côté serveur, 20 ticks/s) : tous les modes, boss et Boss Rush
+  market.js   marché entre joueurs (ordres, courrier, historique)
   bets.js     paris sur le vainqueur (mises, répartition des gains, remboursements)
   game.js     personnages : XP, coffres, objets, équipement, liaison Twitch
   twitch.js   lecture du chat (tmi.js), bot, OAuth
   db.js       stockage JSON (data/db.json)
 shared/rules.js  règles et formules (utilisées par le serveur et le navigateur)
-public/          pages HTML, CSS et scripts du navigateur
+public/          pages HTML, CSS et scripts du navigateur (pets.js : onglet Familier et enclos animé)
 test/            tests (npm test)
 ```
 

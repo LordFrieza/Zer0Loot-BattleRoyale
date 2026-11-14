@@ -410,16 +410,26 @@
     { id: 'sold10', metric: 'sold', goal: 10, name: 'Négociant', desc: 'Vendre 10 objets au marché', gold: 200 },
     { id: 'bought1', metric: 'bought', goal: 1, name: 'Client', desc: 'Acheter 1 objet au marché', gold: 20 },
     { id: 'techs1', metric: 'techs', goal: 1, name: 'Technicien', desc: 'Équiper une technique (onglet Style de combat)', gold: 30 },
+    { id: 'mimic1', metric: 'mimicWins', goal: 1, name: 'Briseur de coffres', desc: 'Vaincre le Mimic (Combat de Boss, Boss Rush ou Défi des boss)', gold: 150 },
+    { id: 'liche1', metric: 'licheWins', goal: 1, name: 'Dégel', desc: 'Vaincre la Liche de glace', gold: 150 },
+    { id: 'maexxna1', metric: 'maexxnaWins', goal: 1, name: 'Arachnophobe', desc: 'Vaincre Maexxna la Veuve noire', gold: 150 },
+    { id: 'rush3', metric: 'rushBest', goal: 3, name: 'Enchaîneur', desc: 'Vaincre 3 boss dans une même partie de Boss Rush', gold: 150 },
+    { id: 'rush6', metric: 'rushBest', goal: 6, name: 'Marathonien des boss', desc: 'Vaincre 6 boss dans une même partie de Boss Rush', gold: 600 },
+    { id: 'pet1', metric: 'pets', goal: 1, name: 'Ami des bêtes', desc: 'Obtenir un familier (5 % de chance par boss vaincu)', gold: 100 },
+    { id: 'pet3', metric: 'pets', goal: 3, name: 'Ménagerie', desc: 'Posséder 3 familiers différents', gold: 400 },
+    { id: 'petFollow1', metric: 'petFollowers', goal: 1, name: 'Inséparables', desc: 'Débloquer un compagnon de combat (3 jours de bonheur au-dessus de 80 %)', gold: 300 },
+    { id: 'petFinds20', metric: 'petFinds', goal: 20, name: 'Bon chien-chien', desc: 'Récupérer 20 trouvailles de ton familier', gold: 200 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
-    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought'];
+    'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
+    'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
-  const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier' };
+  const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
-  const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins' };
+  const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins', mimic: 'mimicWins', liche: 'licheWins', maexxna: 'maexxnaWins' };
   // Défi des boss réussi en Héroïque ou Légendaire : débloque la peau légendaire du boss.
   const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier' };
 
@@ -458,7 +468,7 @@
     },
     boss: {
       label: 'Combat de Boss', icon: '👹', color: '#7ccf6a', coop: true, minPlayers: 1,
-      desc: 'Tout le monde s\'allie contre un boss géant (Troll, Dragon ou Magicien des ténèbres). On gagne ensemble… ou on perd ensemble.',
+      desc: 'Tout le monde s\'allie contre un boss géant (Troll, Dragon, Magicien, Mimic, Liche de glace ou Maexxna). On gagne ensemble… ou on perd ensemble.',
     },
     dungeon: {
       label: 'Raid de Donjon', icon: '🏰', color: '#5fd3ff', coop: true, minPlayers: 1,
@@ -471,6 +481,10 @@
     clans: {
       label: 'Guerre des clans', icon: '⚔️', color: '#ff6b9a', coop: false, minPlayers: 2,
       desc: 'Rouges contre Bleus (!rouge ou !bleu) : détruisez le cristal adverse et protégez le vôtre. Les morts reviennent, de plus en plus tard.',
+    },
+    rush: {
+      label: 'Boss Rush', icon: '💀', color: '#ff4d6d', coop: true, minPlayers: 1,
+      desc: 'Les boss s\'enchaînent, de plus en plus forts ! Entre deux boss, le chat vote : bonus, résurrection ou quitte ou double. Jusqu\'où irez-vous ?',
     },
     gold: {
       label: 'Golden Shower', icon: '🪙', color: '#ffd23f', coop: false, bonus: true, minPlayers: 1,
@@ -678,7 +692,135 @@
     reward: { xp: 500, gold: 500, chests: 3 },
   };
 
-  const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER };
+  /*
+   * Grignotor le Mimic : un coffre aux dents acérées. À 75 %, 50 % et 25 % de vie, il « copie » un héros au hasard
+   * (2, puis 4, puis 6 copies de niveau 1) qui le protègent : tant que ses copies sont debout, il subit moitié moins
+   * de dégâts. Il vomit le contenu de son ventre (armes, os, bile, pièces : effets différents) et bondit sur les héros.
+   */
+  const MIMIC = {
+    id: 'mimic',
+    kind: 'mimic',
+    name: 'Grignotor le Mimic',
+    short: 'Grignotor',
+    icon: '🧰',
+    color: '#d9a441',
+    desc: 'Un coffre affamé : il copie les héros (2, 4 puis 6 copies), vomit armes, os, bile et pièces, et bondit sur sa proie.',
+    marks: [0.75, 0.5, 0.25],
+    hpBase: 200,
+    hpPerPlayer: 280,
+    damageBase: 5.5,
+    damagePerPlayer: 0.2,
+    cooldown: 1.5, // morsures
+    speed: 66,
+    radius: 50,
+    reduction: 0.2,
+    precision: 0.2,
+    dodge: 0.02,
+    range: 40,
+    cleaveRadius: 70,
+    cleaveRatio: 0.5,
+    specialEvery: 6.5, // en alternance : vomi (cône vers le plus gros groupe), puis bond sur le héros le plus éloigné
+    // Contenu du vomi, tiré au hasard : dégâts directs, saignement, poison + ralentissement, ou assommé.
+    vomit: {
+      warn: 1.3, length: 330, angle: 0.45,
+      loot: {
+        armes: { label: 'Armes rouillées', icon: '🗡️', color: '#c9ccd6', ratio: 1.1 },
+        os: { label: 'Os pointus', icon: '🦴', color: '#efe6cf', ratio: 0.5, bleed: 0.03, duration: 5 },
+        bile: { label: 'Bile acide', icon: '🤢', color: '#8fe04a', ratio: 0.35, poison: 0.025, duration: 5, slow: 0.5 },
+        pieces: { label: 'Pièces maudites', icon: '🪙', color: '#ffd23f', ratio: 0.6, stun: 1.2 },
+      },
+    },
+    leap: { warn: 1.2, radius: 110, ratio: 0.8 },
+    // Copies de niveau 1 d'un héros (stats de sa classe sans équipement), un peu renforcées avec le niveau moyen.
+    copies: { at: [0.75, 0.5, 0.25], counts: [2, 4, 6], hpMult: 1, damageMult: 0.5, guard: 0.6 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  /*
+   * Givrenoire la Liche de glace : un squelette mage qui attaque de loin. Elle gèle des héros (5 s, puis de nouveau
+   * 10 s plus tard) : un héros gelé subit 1 dégât par seconde, ne peut plus être ciblé, ne bouge plus, n'attaque plus
+   * et ne remplit plus sa stamina, mais peut être soigné. Phase 1 : 1 puis 1 héros ; phase 2 (66 %) : 2 puis 2 ;
+   * phase 3 (33 %) : elle relève tous les héros morts depuis le début (serviteurs qui meurent avec elle), sinon 3 puis 2.
+   * Elle fait aussi jaillir des pics de glace sous les héros et souffle une nova de givre autour d'elle.
+   */
+  const LICHE = {
+    id: 'liche',
+    kind: 'liche',
+    name: 'Givrenoire la Liche de glace',
+    short: 'Givrenoire',
+    icon: '❄️',
+    color: '#7fd8ff',
+    desc: 'Attaque de loin, gèle les héros (1, 2 puis 3 à la fois), fait jaillir des pics de glace et relève les morts pour se défendre.',
+    marks: [0.66, 0.33],
+    hpBase: 260,
+    hpPerPlayer: 420,
+    damageBase: 8,
+    damagePerPlayer: 0.2,
+    cooldown: 1.4, // éclats de glace
+    speed: 50,
+    radius: 32,
+    reduction: 0.12,
+    precision: 0.25,
+    dodge: 0.04,
+    range: 280,
+    projectile: 'ice',
+    blinkEvery: 20,
+    specialEvery: 7.5, // en alternance : pics de glace sous des héros, puis nova de givre autour d'elle
+    freeze: { first: 6, duration: 5, gap: 10, dps: 1, pattern: [[1, 1], [2, 2], [3, 2]] },
+    spikes: { base: 2, perPlayers: 8, max: 5, radius: 70, warn: 1.4, ratio: 0.9, slow: 0.6, slowFor: 3 },
+    nova: { radius: 170, warn: 1.2, ratio: 0.8, slow: 0.5, slowFor: 4 },
+    raise: { at: 0.33, hpRatio: 0.6, damageRatio: 0.6 }, // serviteurs : héros morts relevés avec 60 % de leurs stats
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  /*
+   * Maexxna la Veuve noire : araignée géante au venin puissant. Elle tisse des toiles partout (les héros y sont très
+   * ralentis), crache sa toile et du venin, et appelle des nuées d'araignées. À 70 % et 20 %, elle enferme des héros
+   * dans des cocons (à briser pour les libérer) ; à 45 %, elle remonte au plafond, fait pleuvoir toiles et venin et
+   * lâche une nuée, puis redescend en frénésie.
+   */
+  const MAEXXNA = {
+    id: 'maexxna',
+    kind: 'maexxna',
+    name: 'Maexxna la Veuve noire',
+    short: 'Maexxna',
+    icon: '🕷️',
+    color: '#c0203a',
+    desc: 'Tisse des toiles qui ralentissent, empoisonne, appelle des nuées d\'araignées, enferme des héros dans des cocons.',
+    marks: [0.7, 0.45, 0.2],
+    hpBase: 200,
+    hpPerPlayer: 280,
+    damageBase: 5,
+    damagePerPlayer: 0.2,
+    cooldown: 1.3, // morsures venimeuses
+    speed: 74,
+    radius: 54,
+    reduction: 0.15,
+    precision: 0.2,
+    dodge: 0.03,
+    range: 45,
+    poison: { dot: 0.012, duration: 4 }, // chaque morsure empoisonne (1,2 % de la vie max par seconde)
+    specialEvery: 7, // en alternance : jet de toile (dégâts + toile au sol), puis crachat de venin en cône
+    webs: { max: 8, life: 14, radius: 95, slow: 0.35, dropEvery: 5 },
+    webShot: { warn: 1.2, radius: 90, ratio: 0.6 },
+    spray: { warn: 1.3, length: 300, angle: 0.5, ratio: 0.45, poison: 0.02, duration: 5 },
+    spiders: { every: 14, per: 3, min: 2, max: 10, alive: 14, hpBase: 30, hpPerPlayer: 4, damageRatio: 0.25, speed: 118, radius: 11, cooldown: 0.9, range: 26, poison: { dot: 0.008, duration: 3 } },
+    cocoon: { at: [0.7, 0.2], base: 1, perPlayers: 6, max: 4, hpBase: 60, hpPerPlayer: 8, dps: 0.015, hold: 10 },
+    ceiling: { at: 0.45, duration: 12, rainEvery: 1.5, rainRadius: 80, rainWarn: 1.2, rainRatio: 0.5, rainPoison: 0.02, spiderWave: 2, returnAttackSpeedMult: 1.2 },
+    frenzy: { at: 0.2, attackSpeedMult: 1.2, speedMult: 1.2 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER, mimic: MIMIC, liche: LICHE, maexxna: MAEXXNA };
 
   /*
    * V2 : les boss sont plus résistants (×1,25), et encore plus face à des combattants expérimentés :
@@ -695,6 +837,67 @@
       maxHp: Math.round((B.hpBase + B.hpPerPlayer * n) * BOSS_SCALE.hpMult * bossLevelScale(avgLevel)),
       damage: Math.round((B.damageBase + B.damagePerPlayer * n) * 10) / 10,
     };
+  }
+
+  /*
+   * Boss Rush : les boss s'enchaînent au hasard (jamais deux fois le même d'affilée), de plus en plus forts.
+   * Après chaque boss vaincu, le chat vote (40 s) : un bonus aléatoire pour la suite de la run, ressusciter un héros
+   * au hasard (ou un grand soin si personne n'est tombé), ou « Quitte ou double » (boss suivants +25 % de puissance,
+   * golds et XP tout de suite pour tous). La run s'arrête quand tous les héros sont tombés.
+   */
+  const RUSH = {
+    hpPerRound: 0.3, // boss n°k : vie × (1 + 0,3 × (k − 1))…
+    damagePerRound: 0.12, // … et dégâts × (1 + 0,12 × (k − 1))
+    healBetween: 0.3, // les survivants récupèrent 30 % de leur vie entre deux boss
+    stages: { intro: 3.2, down: 3.5 }, // arrivée du boss, puis mort du boss (avant le vote)
+    poll: { duration: 40 },
+    defiMult: 1.25, // « Quitte ou double » : boss suivants ×1,25 (cumulable)
+    defiGold: 40, // … et tout de suite 40 golds et 50 XP par boss vaincu, pour tous
+    defiXp: 50,
+    revive: 0.6, // ressuscité avec 60 % de sa vie
+    perBoss: { xp: 300, gold: 300, chests: 2, growth: 100 }, // récompense du boss n°k : 300 + 100 × (k − 1) XP et golds, 2 coffres
+  };
+  // Bonus aléatoires du vote (permanents jusqu'à la fin de la run, cumulables).
+  const RUSH_BOONS = {
+    rage: { icon: '😡', label: 'Fureur', color: '#ff3c28', desc: 'Dégâts des héros ×1,2 pour le reste de la run.', effect: { damage: 1.2 } },
+    armure: { icon: '🛡️', label: 'Peau de pierre', color: '#5fd3ff', desc: 'Dégâts subis ×0,8 pour le reste de la run.', effect: { taken: 0.8 } },
+    vitesse: { icon: '⚡', label: 'Adrénaline', color: '#ffe63c', desc: 'Vitesse et vitesse d\'attaque ×1,15 pour le reste de la run.', effect: { speed: 1.15, attackSpeed: 1.15 } },
+    vampire: { icon: '🧛', label: 'Soif de sang', color: '#c0102c', desc: '+10 % de vol de vie pour le reste de la run.', effect: { lifesteal: 0.1 } },
+    ronces: { icon: '🌵', label: 'Armure de ronces', color: '#3ddc5a', desc: 'Les héros renvoient 20 % des dégâts reçus pour le reste de la run.', effect: { thorns: 0.2 } },
+    vigueur: { icon: '❤️', label: 'Vigueur', color: '#ff4d6d', desc: 'Vie max +25 % et soin complet des survivants.', effect: { maxHp: 1.25, heal: 1 } },
+    regen: { icon: '🌿', label: 'Sève de vie', color: '#7ccf6a', desc: 'Les héros régénèrent 0,8 % de leur vie par seconde pour le reste de la run.', effect: { regen: 0.008 } },
+    stamina: { icon: '🔋', label: 'Second souffle', color: '#ffe066', desc: 'La barre d\'ultime des survivants se remplit entièrement.', effect: { stamina: 1 } },
+  };
+  // Les trois choix du vote : !1 / !2 / !3, ou leur commande.
+  const RUSH_CHOICES = {
+    bonus: { cmd: '!bonus', icon: '🎲', label: 'Bonus', color: '#ffc21a' },
+    resu: { cmd: '!resu', icon: '👼', label: 'Résurrection', color: '#fff2a8', desc: 'Un héros tombé, tiré au hasard, revient à la vie avec 60 % de sa vie.' },
+    soin: { cmd: '!resu', icon: '💖', label: 'Grand soin', color: '#ff8fb8', desc: 'Personne n\'est tombé : les survivants sont soignés à 100 %.' },
+    defi: { cmd: '!defi', icon: '💀', label: 'Quitte ou double', color: '#9b59ff' },
+  };
+  function rushChoiceFromCommand(command, options) {
+    const n = /^!(\d)$/.exec(command);
+    if (n) return options[Number(n[1]) - 1] || null;
+    return options.find((id) => RUSH_CHOICES[id] && RUSH_CHOICES[id].cmd === command) || null;
+  }
+  // Puissance du boss n°k (vie, dégâts), × le multiplicateur « Quitte ou double ».
+  function rushScale(round, mult = 1) {
+    const k = Math.max(1, round) - 1;
+    return { hp: (1 + RUSH.hpPerRound * k) * mult, damage: (1 + RUSH.damagePerRound * k) * mult };
+  }
+  // Récompense de fin de run pour `killed` boss vaincus (null si aucun).
+  function rushReward(killed) {
+    const n = Math.max(0, Math.floor(killed || 0));
+    if (!n) return null;
+    const P = RUSH.perBoss;
+    const each = (k) => P.xp + P.growth * (k - 1);
+    let xp = 0;
+    for (let k = 1; k <= n; k++) xp += each(k);
+    return { bosses: n, xp, gold: xp, chests: P.chests * n };
+  }
+  // « Quitte ou double » : golds et XP versés tout de suite après le boss n°k.
+  function rushDefiReward(killed) {
+    return { xp: RUSH.defiXp * killed, gold: RUSH.defiGold * killed, chests: 0 };
   }
 
   // ---------- Raid de Donjon ----------
@@ -1287,7 +1490,10 @@
    * renforcé selon la difficulté. Une victoire compte pour l'exploit « vaincre ce boss seul ».
    */
   // Les boss sont pensés pour un groupe : seul, leur vie et leurs dégâts de base sont réduits (puis la difficulté).
-  const BOSS_SOLO_SCALE = { troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 } };
+  const BOSS_SOLO_SCALE = {
+    troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 },
+    mimic: { hp: 0.55, damage: 1.45 }, liche: { hp: 0.7, damage: 1.7 }, maexxna: { hp: 0.6, damage: 1.3 },
+  };
   // Seul face au boss, les classes fragiles à distance sont désavantagées : vie et dégâts du joueur ajustés par classe.
   const BOSS_SOLO_CLASS = {
     guerrier: { hp: 1, damage: 1 }, archer: { hp: 2, damage: 1.5 }, mage: { hp: 1.6, damage: 1.3 },
@@ -1302,6 +1508,143 @@
     expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
     boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire. Coûte 1 Clé de boss (trouvée dans l\'Expédition).' },
   };
+
+  // ---------- Familiers (onglet Familier) ----------
+  /*
+   * Un boss vaincu (Combat de Boss, Boss Rush, Défi des boss) a 5 % de chance de laisser sa version miniature à chaque
+   * héros humain. Le familier vit dans l'enclos ; seul le familier principal a des besoins (Faim, Soif, Joie, de 0 à
+   * 100, qui baissent avec le temps) et ramène des trouvailles : toutes les quelques heures, si sa satisfaction
+   * (moyenne des besoins) est d'au moins 50 %, il rapporte un cadeau selon son espèce (3 en attente au plus).
+   * Les autres familiers se reposent (leurs besoins ne baissent pas). S'occuper de lui (nourrir, abreuver, caresser,
+   * jouer) lui donne de l'expérience : ses niveaux raccourcissent l'attente et grossissent les trouvailles.
+   * 3 jours d'affilée au-dessus de 80 % : il devient un compagnon de combat (il te suit dans l'arène, purement cosmétique).
+   */
+  const PET = {
+    dropChance: 0.05,
+    needs: ['faim', 'soif', 'joie'],
+    decay: { faim: 2, soif: 2.5, joie: 1.5 }, // points perdus par heure (avant les objets de l'enclos)
+    start: { faim: 80, soif: 80, joie: 80 },
+    findThreshold: 50, // satisfaction minimum pour ramener une trouvaille
+    findEveryH: 4, // heures entre deux trouvailles au niveau 1…
+    findLevelCut: 0.025, // … −2,5 % par niveau (×0,5 au plus)
+    maxFinds: 3,
+    followThreshold: 80,
+    followDays: 3,
+    maxLevel: 20,
+    nameMax: 16,
+    duplicateXp: 150, // familier déjà obtenu : il gagne 150 XP (et un Festin royal)
+    stepMs: 10 * 60 * 1000, // pas de la simulation des besoins
+    actions: {
+      caresser: { label: 'Caresser', icon: '🤚', cooldownMs: 30 * 60 * 1000, joie: 10, xp: 5 },
+      jouer: { label: 'Jouer', icon: '🎾', cooldownMs: 2 * 3600 * 1000, joie: 25, faim: -8, soif: -8, xp: 15 },
+    },
+    favoriteMult: 1.5, // plat préféré de l'espèce : effet ×1,5
+  };
+  const PET_FOODS = {
+    croquettes: { label: 'Croquettes', icon: '🍪', kind: 'food', price: 12, faim: 30, xp: 6 },
+    gigot: { label: 'Gigot', icon: '🍖', kind: 'food', price: 35, faim: 65, joie: 5, xp: 12 },
+    festin: { label: 'Festin royal', icon: '🍱', kind: 'food', price: 90, faim: 100, soif: 10, joie: 20, xp: 25 },
+    eau: { label: 'Eau fraîche', icon: '💧', kind: 'drink', price: 6, soif: 40, xp: 4 },
+    jus: { label: 'Jus de baies', icon: '🧃', kind: 'drink', price: 30, soif: 100, joie: 5, xp: 10 },
+  };
+  const PET_FOOD_MAX = 99;
+  // Objets de l'enclos (achetés une fois) : besoins qui baissent moins vite, trouvailles plus fréquentes ou plus grosses.
+  const PET_ENCLOS = {
+    fleurs: { label: 'Parterre de fleurs', icon: '🌷', price: 150, desc: 'Joie −10 % moins vite. Ça sent bon !', effect: { joie: 0.9 } },
+    lanternes: { label: 'Lanternes féeriques', icon: '🏮', price: 300, desc: 'Les caresses donnent +5 de Joie. Elles brillent la nuit.', effect: { caress: 5 } },
+    gamelle: { label: 'Gamelle automatique', icon: '🥣', price: 600, desc: 'Faim −35 % moins vite.', effect: { faim: 0.65 } },
+    fontaine: { label: 'Fontaine enchantée', icon: '⛲', price: 600, desc: 'Soif −35 % moins vite.', effect: { soif: 0.65 } },
+    jouets: { label: 'Coffre à jouets', icon: '🧸', price: 750, desc: 'Joie −30 % moins vite, et jouer donne +10 de Joie.', effect: { joie: 0.7, play: 10 } },
+    mare: { label: 'Petite mare', icon: '🪷', price: 900, desc: 'Soif −20 % et Joie −10 % moins vite.', effect: { soif: 0.8, joie: 0.9 } },
+    niche: { label: 'Niche douillette', icon: '🏠', price: 1200, desc: 'Trouvailles 15 % plus fréquentes.', effect: { find: 0.85 } },
+    statue: { label: 'Statue dorée', icon: '🗿', price: 2500, desc: 'Trouvailles de golds et d\'XP +25 %.', effect: { reward: 1.25 } },
+  };
+  // Espèces (une par boss) : plat préféré et trouvaille rapportée.
+  const PETS = {
+    troll: { name: 'Mini Grokk', favorite: 'gigot', find: 'arme', findLabel: 'une arme au hasard', color: '#7ccf6a' },
+    dragon: { name: 'Mini Pyrax', favorite: 'festin', find: 'gold', findLabel: 'des golds', color: '#ff6b2a' },
+    sorcier: { name: 'Mini Malvorath', favorite: 'jus', find: 'xp', findLabel: 'de l\'XP', color: '#9b59ff' },
+    mimic: { name: 'Mini Grignotor', favorite: 'croquettes', find: 'chest', findLabel: 'un coffre de loot', color: '#d9a441' },
+    liche: { name: 'Mini Givrenoire', favorite: 'eau', find: 'potion', findLabel: 'une potion (et parfois une Clé de boss)', color: '#7fd8ff' },
+    maexxna: { name: 'Mini Maexxna', favorite: 'gigot', find: 'armure', findLabel: 'une pièce d\'armure ou un bijou', color: '#c0203a' },
+  };
+  function petXpToNext(level) {
+    return 40 + 20 * Math.max(1, level);
+  }
+  // Effets cumulés des objets de l'enclos : { faim, soif, joie (multiplicateurs de baisse), find, reward, caress, play }
+  function petEnclosEffects(owned) {
+    const out = { faim: 1, soif: 1, joie: 1, find: 1, reward: 1, caress: 0, play: 0 };
+    for (const id of owned || []) {
+      const e = PET_ENCLOS[id] && PET_ENCLOS[id].effect;
+      if (!e) continue;
+      for (const k of ['faim', 'soif', 'joie', 'find', 'reward']) if (e[k]) out[k] *= e[k];
+      if (e.caress) out.caress += e.caress;
+      if (e.play) out.play += e.play;
+    }
+    return out;
+  }
+  function petSatisfaction(needs) {
+    return Math.round(((needs.faim || 0) + (needs.soif || 0) + (needs.joie || 0)) / 3 * 10) / 10;
+  }
+  // Intervalle entre deux trouvailles (ms), selon le niveau et la niche.
+  function petFindEvery(level, effects) {
+    const cut = Math.max(0.5, 1 - PET.findLevelCut * (Math.max(1, level) - 1));
+    return PET.findEveryH * 3600 * 1000 * cut * (effects ? effects.find : 1);
+  }
+  /*
+   * Fait vivre un familier de pet.at jusqu'à `now` (fonction pure, la même côté serveur et navigateur).
+   * Familier principal : besoins qui baissent, trouvailles (si satisfaction ≥ 50 %), série au-dessus de 80 %.
+   * Familier au repos : rien ne bouge (son horloge avance seulement).
+   * Retourne une copie mise à jour + { found, unlocked } (trouvailles gagnées, compagnon débloqué pendant ce laps).
+   */
+  function petAdvance(pet, enclos, now, active) {
+    const out = JSON.parse(JSON.stringify(pet));
+    const res = { pet: out, found: 0, unlocked: false };
+    const at = Number.isFinite(out.at) ? out.at : now;
+    if (now <= at) { out.at = Math.max(at, Math.min(now, at)); return res; }
+    const fx = petEnclosEffects(enclos);
+    const every = petFindEvery(out.level, fx);
+    if (!active) {
+      out.at = now;
+      if (Number.isFinite(out.findAt)) out.findAt += now - at; // l'attente reprend où elle s'était arrêtée
+      if (out.streakAt != null) out.streakAt += now - at;
+      return res;
+    }
+    if (!Number.isFinite(out.findAt)) out.findAt = at + every;
+    let t = at;
+    const maxSpan = 40 * 24 * 3600 * 1000; // au-delà, plus rien ne change (besoins à zéro)
+    if (now - t > maxSpan) {
+      t = now - maxSpan;
+      if (out.findAt < t) out.findAt = t + every;
+    }
+    while (t < now) {
+      const t2 = Math.min(now, t + PET.stepMs);
+      const h = (t2 - t) / 3600000;
+      for (const k of PET.needs) out.needs[k] = Math.max(0, Math.min(100, (out.needs[k] || 0) - PET.decay[k] * fx[k] * h));
+      const sat = petSatisfaction(out.needs);
+      while (out.findAt <= t2) {
+        if (sat >= PET.findThreshold && (out.finds || 0) < PET.maxFinds) { out.finds = (out.finds || 0) + 1; res.found += 1; }
+        out.findAt += every;
+      }
+      if (sat >= PET.followThreshold) {
+        if (out.streakAt == null) out.streakAt = t;
+        if (!out.follower && t2 - out.streakAt >= PET.followDays * 24 * 3600 * 1000) { out.follower = true; res.unlocked = true; }
+      } else out.streakAt = null;
+      t = t2;
+    }
+    for (const k of PET.needs) out.needs[k] = Math.round(out.needs[k] * 100) / 100;
+    out.at = now;
+    return res;
+  }
+  // Valeur d'une trouvaille (golds / XP) selon l'espèce et le niveau.
+  function petFindValue(species, level, effects) {
+    const L = Math.max(1, level);
+    const r = effects ? effects.reward : 1;
+    const find = PETS[species] && PETS[species].find;
+    if (find === 'gold') return Math.round((50 + 15 * L) * r);
+    if (find === 'xp') return Math.round((80 + 25 * L) * r);
+    return 0;
+  }
 
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
 
@@ -1574,6 +1917,8 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
+    MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushReward, rushDefiReward,
+    PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

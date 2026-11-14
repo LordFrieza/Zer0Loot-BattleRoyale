@@ -978,3 +978,63 @@ test('[CHEST-4] badge « Nouveau ! » : objets de coffre marqués, retirés par 
   assert.strictEqual(inv.filter((i) => i.isNew).length, Rules.ITEMS_PER_CHEST - 2);
   assert.strictEqual(db.state.users[id].character.inventory.find((i) => i.id === inv[0].id).isNew, undefined, 'sauvegardé');
 });
+
+test('[PET-1, PET-5, PET-7, PET-8, RUSH-2, RUSH-4] familiers et Boss Rush via l\'API', async () => {
+  const s = client();
+  const id = (await register(s, 'pl_pets')).id;
+  await s.post('/api/class', { cls: 'guerrier' });
+  assert.match((await s.post('/api/pet/action', { kind: 'caresser' })).data.error, /pas encore de familier/);
+  // L'admin donne un familier
+  assert.strictEqual((await give(id, { pet: 'dragon' })).status, 200);
+  let ch = (await meOf(s)).character;
+  assert.deepStrictEqual([ch.pets.list.length, ch.pets.active], [1, 'dragon']);
+  assert.strictEqual((await s.post('/api/pet/action', { kind: 'caresser' })).status, 200);
+  assert.match((await s.post('/api/pet/action', { kind: 'caresser' })).data.error, /repos/);
+  await give(id, { gold: 500 });
+  assert.strictEqual((await s.post('/api/pet/food/buy', { food: 'festin', count: 2 })).status, 200);
+  const fed = await s.post('/api/pet/feed', { food: 'festin' });
+  assert.deepStrictEqual([fed.status, fed.data.favorite], [200, true], 'le festin est le plat préféré du dragon');
+  assert.strictEqual((await s.post('/api/pet/enclos/buy', { item: 'fleurs' })).status, 200);
+  assert.strictEqual((await s.post('/api/pet/rename', { id: 'dragon', name: '  Braisou<b>  ' })).data.name, 'Braisoub');
+  assert.match((await s.post('/api/pet/collect')).data.error, /Aucune trouvaille/);
+  assert.match((await s.post('/api/pet/follow', { id: 'dragon' })).data.error, /pas encore prêt/);
+  // Trouvailles en attente puis récupération
+  const pet = db.state.users[id].character.pets.list[0];
+  pet.finds = 2;
+  const gold = (await meOf(s)).character.gold;
+  const col = await s.post('/api/pet/collect');
+  assert.strictEqual(col.data.gifts.length, 2);
+  assert.strictEqual((await meOf(s)).character.gold, gold + 2 * Rules.petFindValue('dragon', pet.level));
+  // Compagnon de combat débloqué : il suit le héros dans les parties
+  pet.follower = true;
+  assert.strictEqual((await s.post('/api/pet/follow', { id: 'dragon' })).data.follow, 'dragon');
+  // Boss Rush : un boss vaincu compte tout de suite, puis récompense de fin selon les boss vaincus
+  await admin.post('/api/admin/battle/reset');
+  assert.strictEqual((await admin.post('/api/admin/queue/open', { seconds: 60, mode: 'rush' })).status, 200);
+  assert.strictEqual((await s.post('/api/queue/join')).status, 200);
+  assert.strictEqual((await admin.post('/api/admin/battle/start')).status, 200);
+  battle.stopLoop();
+  assert.strictEqual(battle.players[0].pet, 'dragon', 'le compagnon suit son héros');
+  for (let i = 0; i < 70; i++) battle.tick(0.05);
+  const first = battle.bossId;
+  const before = (await meOf(s)).character;
+  battle.kill(battle.players[0], battle.boss);
+  battle.tick(0.05);
+  ch = (await meOf(s)).character;
+  assert.strictEqual(ch.counters.bossWins, before.counters.bossWins + 1);
+  assert.strictEqual(ch.counters[Rules.BOSS_WIN_COUNTER[first]], (before.counters[Rules.BOSS_WIN_COUNTER[first]] || 0) + 1);
+  for (let i = 0; i < 80; i++) battle.tick(0.05);
+  assert.ok(battle.publicPoll() && battle.publicPoll().rush);
+  assert.strictEqual((await s.post('/api/poll/vote', { choice: 'defi' })).data.choice, 'defi');
+  battle.closePoll();
+  ch = (await meOf(s)).character;
+  assert.strictEqual(ch.gold, before.gold + Rules.RUSH.defiGold, 'quitte ou double : golds tout de suite');
+  for (let i = 0; i < 70; i++) battle.tick(0.05);
+  battle.kill(battle.boss, battle.players[0]);
+  battle.tick(0.05);
+  assert.strictEqual(battle.phase, 'ended');
+  ch = (await meOf(s)).character;
+  assert.strictEqual(ch.counters.rushBest, 1);
+  assert.strictEqual(ch.gold, before.gold + Rules.RUSH.defiGold + Rules.rushReward(1).gold);
+  await admin.post('/api/admin/battle/reset');
+});

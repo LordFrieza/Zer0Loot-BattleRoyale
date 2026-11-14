@@ -68,7 +68,7 @@ class Battle extends EventEmitter {
     return {
       phase: this.phase,
       mode: this.mode,
-      boss: this.mode === 'boss' ? this.bossId : null,
+      boss: this.mode === 'boss' || (this.mode === 'rush' && this.rush) ? this.bossId : null,
       queueEndsAt: this.queueEndsAt,
       participants: [...this.participants.values()].map((p) => ({
         key: p.key, name: p.name, bot: !!p.bot, level: p.level, cls: p.cls || null, look: p.look, app: p.app || null, title: p.title || null,
@@ -91,6 +91,7 @@ class Battle extends EventEmitter {
     if (!Rules.GAME_MODES[mode]) throw new Error('Mode de jeu inconnu');
     if (mode === 'boss' && !Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
     this.bossId = mode === 'boss' ? bossId : 'troll';
+    this.rush = null;
     this.stopLoop();
     this.emit('cleared'); // la bataille précédente n'aura pas lieu : paris remboursés
     this.participants.clear();
@@ -128,6 +129,8 @@ class Battle extends EventEmitter {
     this.koth = null;
     this.clans = null;
     this.gold = null;
+    this.rush = null;
+    this.webs = [];
     this.slams = [];
     this.result = null;
     this.changed();
@@ -195,6 +198,8 @@ class Battle extends EventEmitter {
     this.koth = null;
     this.clans = null;
     this.gold = null;
+    this.rush = null;
+    this.webs = [];
     this.firstBlood = false;
     this.event = event;
     this.fogs = [];
@@ -221,6 +226,8 @@ class Battle extends EventEmitter {
       this.setupClans();
     } else if (this.mode === 'boss') {
       this.setupBoss();
+    } else if (this.mode === 'rush') {
+      this.setupRush();
     } else {
       // Écran noir « SALLE 1 », puis les aventuriers entrent par la gauche.
       this.dungeon = {
@@ -296,6 +303,7 @@ class Battle extends EventEmitter {
       cooldown: s.cooldown || Rules.BASE_ATTACK_COOLDOWN,
       lifesteal: s.lifesteal || 0,
       clan: p.clan || null,
+      pet: p.pet || null, // compagnon de combat (familier débloqué, purement cosmétique)
       luck: s.luck || 0, // Ruée vers l'or : agrandit le rayon de ramassage
       precision: s.precision || 0,
       thorns: s.thorns || 0,
@@ -327,17 +335,34 @@ class Battle extends EventEmitter {
   // ---------- Combat de Boss ----------
 
   setupBoss() {
-    const B = Rules.BOSSES[this.bossId];
+    const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
+    this.players.forEach((f, i) => Object.assign(f, positions[i]));
+    this.adds = []; // œufs, dragonnets, cristaux, illusions, copies, serviteurs, araignées, cocons
+    this.addSeq = 0;
+    this.webs = [];
+    this.spawnBoss(this.bossId);
+  }
+
+  /*
+   * Fait entrer un boss. `scale` : multiplicateurs supplémentaires { hp, damage } (Boss Rush).
+   * Les créatures du boss précédent (Boss Rush) ont déjà disparu.
+   */
+  spawnBoss(bossId, scale = { hp: 1, damage: 1 }) {
+    const B = Rules.BOSSES[bossId];
     const avgLevel = this.players.reduce((a, p) => a + (p.level || 1), 0) / Math.max(1, this.players.length);
     const st = Rules.bossStats(this.players.length, B.id, avgLevel);
+    const addScale = { hp: Rules.bossLevelScale(avgLevel) * scale.hp, damage: scale.damage }; // copies du Mimic
     if (this.solo) { // Défi des boss : renforcé selon la difficulté choisie
       const D = Rules.BOSS_CHALLENGE[this.solo.difficulty] || Rules.BOSS_CHALLENGE.normal;
       const sc = Rules.BOSS_SOLO_SCALE[B.id];
       st.maxHp = Math.round(st.maxHp * sc.hp * D.hp);
       st.damage = Math.round(st.damage * sc.damage * D.damage * 10) / 10;
+      addScale.hp *= D.hp;
+      addScale.damage *= D.damage;
     }
-    const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
-    this.players.forEach((f, i) => Object.assign(f, positions[i]));
+    st.maxHp = Math.round(st.maxHp * scale.hp);
+    st.damage = Math.round(st.damage * scale.damage * 10) / 10;
+    this.fighters = this.fighters.filter((f) => f !== this.boss);
     this.boss = fighter({
       key: 'boss',
       name: B.name,
@@ -360,6 +385,7 @@ class Battle extends EventEmitter {
       range: B.range || 40,
       kite: B.kite || 0,
       projectile: B.projectile || null,
+      poison: B.poison ? { ...B.poison } : null, // morsures venimeuses (Maexxna)
       cleave: B.cleaveRadius ? { r: B.cleaveRadius, ratio: B.cleaveRatio } : false,
       cd: 1,
     });
@@ -367,30 +393,51 @@ class Battle extends EventEmitter {
     Object.assign(this.boss, {
       phase: 0,
       enraged: false,
+      bornAt: this.time, // la rage finale et la durée maximale comptent depuis son arrivée (Boss Rush)
+      addScale,
       flying: false, // Dragon en vol : intouchable au corps à corps
-      away: false, // Dragon parti au nid : intouchable
+      away: false, // Dragon parti au nid, Maexxna au plafond : intouchable
       shielded: false, // Magicien derrière son bouclier : intouchable
+      guarded: false, // Mimic protégé par ses copies : dégâts subis réduits
+      leaping: false, // Mimic en plein bond
       flyMinRange: B.flight ? B.flight.minRange : 0,
       slamEvery: every, // attaques spéciales (le nom vient du Troll)
       slamIn: every * 0.7,
       nextSpecial: 0,
       blinkIn: B.blinkEvery || 0,
-      script: [], // grandes étapes à franchir selon la vie (vol, nid, bouclier, illusions)
+      script: [], // grandes étapes à franchir selon la vie (vol, nid, bouclier, illusions, copies, cocons…)
       stage: null, // étape en cours : { kind, until, … }
     });
-    if (B.flight) for (const at of B.flight.at) this.boss.script.push({ at, kind: 'flight' });
-    if (B.nest) this.boss.script.push({ at: B.nest.at, kind: 'nest' });
-    if (B.shield) for (const at of B.shield.at) this.boss.script.push({ at, kind: 'shield' });
-    if (B.clones) this.boss.script.push({ at: B.clones.at, kind: 'clones' });
-    this.boss.script.sort((a, c) => c.at - a.at);
-    this.adds = []; // œufs, dragonnets, cristaux, illusions
-    this.addSeq = 0;
-    this.fighters.push(this.boss);
+    const b = this.boss;
+    if (B.flight) for (const at of B.flight.at) b.script.push({ at, kind: 'flight' });
+    if (B.nest) b.script.push({ at: B.nest.at, kind: 'nest' });
+    if (B.shield) for (const at of B.shield.at) b.script.push({ at, kind: 'shield' });
+    if (B.clones) b.script.push({ at: B.clones.at, kind: 'clones' });
+    if (B.copies) B.copies.at.forEach((at, i) => b.script.push({ at, kind: 'copies', count: B.copies.counts[i] }));
+    if (B.freeze) {
+      b.script.push({ at: B.marks[0], kind: 'chill' }); // phase 2 : 2 héros gelés à la fois
+      b.script.push({ at: B.raise.at, kind: 'raise' }); // phase 3 : les morts se relèvent (sinon 3 puis 2 gelés)
+      b.ice = { next: this.time + B.freeze.first, step: 0, level: 0, last: [] };
+      b.copied = [];
+    }
+    if (B.copies) b.copied = [];
+    if (B.cocoon) for (const at of B.cocoon.at) b.script.push({ at, kind: 'cocoon' });
+    if (B.ceiling) b.script.push({ at: B.ceiling.at, kind: 'ceiling' });
+    if (B.frenzy) b.script.push({ at: B.frenzy.at, kind: 'frenzy' });
+    if (B.webs) {
+      b.webIn = 2;
+      b.spiderIn = B.spiders.every * 0.6;
+    }
+    b.script.sort((a, c) => c.at - a.at);
+    this.fighters.push(b);
+    return b;
   }
 
   // Intouchable pour cet attaquant ? (Dragon en vol ou parti, Magicien protégé par son bouclier)
   immune(target, attacker) {
     if (target.away || target.shielded || target.protectUntil > this.time) return true;
+    // Gelé par la Liche, ou enfermé dans un cocon de Maexxna : on ne peut plus le cibler ni le blesser.
+    if (target.iceUntil > this.time || target.cocooned) return true;
     return !!(target.flying && attacker && attacker.range < target.flyMinRange);
   }
 
@@ -407,7 +454,7 @@ class Battle extends EventEmitter {
         b.slamEvery *= 0.8;
         this.events.push({ t: 'bossPhase', phase: b.phase, label: ph.label });
       }
-      if (!b.enraged && this.time >= B.enrageAt) {
+      if (!b.enraged && this.time - (b.bornAt || 0) >= B.enrageAt) {
         b.enraged = true;
         b.dmgMult *= B.enrageMult;
         this.events.push({ t: 'bossEnrage' });
@@ -419,11 +466,21 @@ class Battle extends EventEmitter {
         if (step.kind === 'flight') this.startFlight(B);
         else if (step.kind === 'nest') this.startNest(B);
         else if (step.kind === 'shield') this.startShield(B);
-        else this.splitClones(B);
+        else if (step.kind === 'clones') this.splitClones(B);
+        else if (step.kind === 'copies') this.spawnCopies(B, step.count);
+        else if (step.kind === 'chill') this.licheChill(B);
+        else if (step.kind === 'raise') this.licheRaise(B);
+        else if (step.kind === 'cocoon') this.spinCocoons(B);
+        else if (step.kind === 'ceiling') this.startCeiling(B);
+        else if (step.kind === 'frenzy') this.startFrenzy(B);
       }
       if (b.stage) this.updateStage(dt, B);
       else this.bossSpecials(dt, B);
       if (b.bossId === 'sorcier') this.updateCurses(B);
+      if (B.copies) b.guarded = this.adds.some((a) => a.kind === 'copie' && a.alive);
+      if (B.freeze) this.updateFreeze(dt, B);
+      if (B.webs) this.updateWebs(dt, B);
+      if (B.cocoon) this.updateCocoons(dt, B);
     }
     this.resolveSlams(dt);
   }
@@ -461,6 +518,50 @@ class Battle extends EventEmitter {
       } else {
         this.slams.push({ kind: 'tail', x: b.x, y: b.y, r: B.tail.radius, t: B.tail.warn, warn: B.tail.warn, ratio: B.tail.ratio });
       }
+    } else if (B.id === 'mimic') {
+      if (n === 0) {
+        // Vomi : le contenu de son ventre, en cône vers le plus gros groupe
+        const V = B.vomit;
+        const ids = Object.keys(V.loot);
+        const loot = ids[Math.floor(Math.random() * ids.length)];
+        const L = V.loot[loot];
+        const spot = densestSpot(heroes, 120);
+        const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
+        this.slams.push({
+          kind: 'vomit', cone: true, loot, x: b.x, y: b.y, r: V.length, angle, half: V.angle, t: V.warn, warn: V.warn, ratio: L.ratio,
+          bleed: L.bleed, poison: L.poison, duration: L.duration, slow: L.slow, stun: L.stun,
+        });
+        this.events.push({ t: 'vomitWarn', loot });
+      } else {
+        // Bond sur le héros le plus éloigné (il atterrit à l'impact)
+        const far = heroes.reduce((a, h) => (Math.hypot(h.x - b.x, h.y - b.y) > Math.hypot(a.x - b.x, a.y - b.y) ? h : a), heroes[0]);
+        b.leaping = true;
+        b.targetKey = null;
+        this.slams.push({ kind: 'leap', leap: true, x: far.x, y: far.y, r: B.leap.radius, t: B.leap.warn, warn: B.leap.warn, ratio: B.leap.ratio, fx: b.x, fy: b.y });
+      }
+    } else if (B.id === 'liche') {
+      if (n === 0) {
+        // Pics de glace sous quelques héros (dégâts + ralentissement)
+        const S = B.spikes;
+        const count = Math.min(S.max, S.base + Math.floor(heroes.length / S.perPlayers));
+        const pick = [...heroes].sort(() => Math.random() - 0.5).slice(0, count);
+        for (const h of pick) this.slams.push({ kind: 'spike', x: h.x, y: h.y, r: S.radius, t: S.warn, warn: S.warn, ratio: S.ratio, slow: S.slow, duration: S.slowFor });
+      } else {
+        const N = B.nova;
+        this.slams.push({ kind: 'nova', x: b.x, y: b.y, r: N.radius, t: N.warn, warn: N.warn, ratio: N.ratio, slow: N.slow, duration: N.slowFor, follow: true });
+      }
+    } else if (B.id === 'maexxna') {
+      if (n === 0) {
+        // Jet de toile sur le plus gros groupe : dégâts, puis une toile reste au sol
+        const W = B.webShot;
+        const spot = densestSpot(heroes, W.radius);
+        this.slams.push({ kind: 'webshot', web: true, x: spot.x, y: spot.y, r: W.radius, t: W.warn, warn: W.warn, ratio: W.ratio, fx: b.x, fy: b.y - 30 });
+      } else {
+        const S = B.spray;
+        const spot = densestSpot(heroes, 120);
+        const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
+        this.slams.push({ kind: 'spray', cone: true, x: b.x, y: b.y, r: S.length, angle, half: S.angle, t: S.warn, warn: S.warn, ratio: S.ratio, poison: S.poison, duration: S.duration });
+      }
     } else {
       // Malédiction sur quelques combattants, puis zones d'ombre sous leurs pieds
       if (n === 0) this.castCurse(B, heroes);
@@ -478,14 +579,25 @@ class Battle extends EventEmitter {
   resolveSlams(dt) {
     const b = this.boss;
     for (const s of this.slams) {
+      // La nova de la Liche part de là où elle se trouve au moment de l'impact.
+      if (s.follow && b.alive) { s.x = b.x; s.y = b.y; }
       s.t -= dt;
       if (s.t > 0) continue;
-      this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r });
+      this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, loot: s.loot });
       if (s.kind === 'land') this.land(s);
+      if (s.leap) { b.leaping = false; b.x = s.x; b.y = s.y; b.slamIn = Math.max(b.slamIn, b.slamEvery * 0.5); }
       if (!b.alive) continue;
+      if (s.web) this.addWeb(s.x, s.y);
       const raw = b.damage * b.dmgMult * s.ratio;
       for (const f of this.players) {
-        if (f.alive && inSlam(s, f)) this.hit(b, f, raw * (0.9 + Math.random() * 0.2), { splash: true });
+        if (!f.alive || !inSlam(s, f) || this.immune(f, b)) continue;
+        if (raw > 0) this.hit(b, f, raw * (0.9 + Math.random() * 0.2), { splash: true });
+        if (!f.alive) continue;
+        // Effets du vomi du Mimic, des pics de la Liche, du venin de Maexxna
+        if (s.bleed) this.addBuff(f, 'saignement', s.duration, { poison: s.bleed, tick: this.time + 0.5, src: b });
+        if (s.poison) this.addBuff(f, 'venin', s.duration, { poison: s.poison, tick: this.time + 0.5, src: b });
+        if (s.slow) this.addBuff(f, s.kind === 'vomit' ? 'bile' : 'givre', s.duration, { speed: s.slow });
+        if (s.stun) this.stun(f, s.stun);
       }
     }
     this.slams = this.slams.filter((s) => s.t > 0);
@@ -542,6 +654,26 @@ class Battle extends EventEmitter {
         b.x = ARENA.w - 160;
         b.y = 180;
         this.startFlight(B, true);
+      }
+    } else if (st.kind === 'ceiling') {
+      // Maexxna au plafond : pluie de toiles et de venin sur des héros au hasard, puis elle redescend, frénétique.
+      const C = B.ceiling;
+      st.rainIn -= dt;
+      if (st.rainIn <= 0 && heroes.length) {
+        st.rainIn = C.rainEvery;
+        const h = heroes[Math.floor(Math.random() * heroes.length)];
+        this.slams.push({ kind: 'webrain', web: true, x: h.x, y: h.y, r: C.rainRadius, t: C.rainWarn, warn: C.rainWarn, ratio: C.rainRatio, poison: C.rainPoison, duration: 4, fx: h.x, fy: -40 });
+      }
+      if (this.time >= st.until) {
+        b.away = false;
+        b.stage = null;
+        b.cooldown /= C.returnAttackSpeedMult;
+        const spot = heroes.length ? densestSpot(heroes, 120) : { x: ARENA.w / 2, y: ARENA.h / 2 };
+        b.x = spot.x;
+        b.y = spot.y;
+        b.slamIn = b.slamEvery * 0.6;
+        this.events.push({ t: 'bossReturn', label: 'MAEXXNA REDESCEND, FOLLE DE RAGE !', x: Math.round(b.x), y: Math.round(b.y), drop: true });
+        this.slams.push({ kind: 'land', x: b.x, y: b.y, r: 120, t: 0.01, warn: 0.01, ratio: 0.8 });
       }
     } else if (st.kind === 'shield') {
       const crystals = this.adds.filter((a) => a.kind === 'cristal' && a.alive);
@@ -651,6 +783,215 @@ class Battle extends EventEmitter {
       });
     }
     this.events.push({ t: 'clones', count: C.count });
+  }
+
+  // ---------- Mimic : copies de niveau 1 d'un héros ----------
+
+  spawnCopies(B, count) {
+    const b = this.boss;
+    const heroes = this.players.filter((p) => p.alive);
+    if (!heroes.length) return;
+    // Un héros pas encore copié si possible
+    const fresh = heroes.filter((h) => !b.copied.includes(h.key));
+    const pool = fresh.length ? fresh : heroes;
+    const h = pool[Math.floor(Math.random() * pool.length)];
+    b.copied.push(h.key);
+    const C = B.copies;
+    const st = Rules.derive(Rules.emptyStats(), {}, h.cls); // niveau 1, sans équipement
+    const combat = Rules.classInfo(h.cls).combat;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+      const hp = Math.round(st.maxHp * C.hpMult * b.addScale.hp);
+      this.addMonster({
+        kind: 'copie', name: `Copie de ${h.name}`, copyOf: h.key, cls: h.cls, look: h.look, app: h.app, level: 1,
+        x: Math.max(40, Math.min(ARENA.w - 40, b.x + Math.cos(a) * (b.r + 40))), y: Math.max(40, Math.min(ARENA.h - 40, b.y + Math.sin(a) * (b.r + 40))),
+        hp, damage: st.damage * C.damageMult * b.addScale.damage, speed: st.speed, cooldown: st.cooldown || Rules.BASE_ATTACK_COOLDOWN,
+        reduction: st.reduction, dodge: st.dodge, crit: st.crit || 0, precision: st.precision || 0,
+        range: combat.range || 40, kite: combat.kite || 0, projectile: combat.projectile || null,
+        aoeRadius: combat.aoeRadius || 0, aoeRatio: combat.aoeRatio || 0, recovery: combat.recovery || 0,
+      });
+    }
+    this.events.push({ t: 'copies', count, to: h.key, name: h.name, x: Math.round(b.x), y: Math.round(b.y) });
+  }
+
+  // ---------- Liche de glace : gel, phases, serviteurs ----------
+
+  licheChill() {
+    const b = this.boss;
+    if (b.ice) b.ice.level = 1;
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LE FROID S\'INTENSIFIE !', sub: 'Elle gèle désormais 2 héros à la fois !' });
+  }
+
+  licheRaise(B) {
+    const b = this.boss;
+    const dead = this.players.filter((p) => !p.alive);
+    if (!dead.length) {
+      if (b.ice) b.ice.level = 2;
+      this.events.push({ t: 'bossPhase', phase: b.phase, label: 'L\'HIVER ÉTERNEL !', sub: 'Personne n\'est tombé… elle gèle 3 héros, puis 2 !' });
+      return;
+    }
+    b.ice = null; // elle se concentre sur ses serviteurs
+    const R = B.raise;
+    const list = [];
+    for (const p of dead) {
+      const m = this.addMonster({
+        kind: 'serviteur', name: `${p.name} (serviteur)`, raisedFrom: p.key, cls: p.cls, look: p.look, app: p.app, level: p.level,
+        x: p.x, y: p.y, hp: Math.round(p.maxHp * R.hpRatio), damage: p.damage * R.damageRatio, speed: p.speed * 0.9, cooldown: p.cooldown,
+        reduction: p.reduction, dodge: p.dodge, crit: p.crit, precision: p.precision, range: p.range, kite: p.kite, projectile: p.projectile,
+        aoeRadius: p.aoeRadius, aoeRatio: p.aoeRatio, recovery: p.recovery, cd: 1.2,
+      });
+      list.push(m.key);
+    }
+    this.events.push({ t: 'raise', list, count: list.length });
+  }
+
+  updateFreeze(dt, B) {
+    const b = this.boss;
+    const F = B.freeze;
+    // Dégâts du gel : 1 par seconde
+    for (const p of this.players) {
+      if (!p.alive || p.iceUntil <= this.time) continue;
+      p.iceTick = (p.iceTick || 0) + dt;
+      if (p.iceTick >= 1) {
+        p.iceTick -= 1;
+        p.hp -= F.dps;
+        this.events.push({ t: 'hit', from: b.key, to: p.key, dmg: F.dps, ice: true });
+        if (p.hp <= 0) { p.iceUntil = 0; this.kill(b, p); }
+      }
+    }
+    const ice = b.ice;
+    if (!ice || b.stage || this.time < ice.next) return;
+    const pattern = F.pattern[Math.min(F.pattern.length - 1, ice.level)];
+    const count = pattern[ice.step % pattern.length];
+    ice.step += 1;
+    ice.next = this.time + F.duration + F.gap;
+    const free = this.players.filter((p) => p.alive && p.iceUntil <= this.time && !p.cocooned);
+    // « un autre personnage » : ceux qui viennent d'être gelés passent après les autres
+    const fresh = free.filter((p) => !ice.last.includes(p.key)).sort(() => Math.random() - 0.5);
+    const again = free.filter((p) => ice.last.includes(p.key)).sort(() => Math.random() - 0.5);
+    const pick = fresh.concat(again).slice(0, count);
+    ice.last = pick.map((p) => p.key);
+    for (const p of pick) {
+      p.iceUntil = this.time + F.duration;
+      p.iceTick = 0;
+      p.targetKey = null;
+      this.events.push({ t: 'freeze', to: p.key, duration: F.duration });
+    }
+    // Plus personne ne cible un héros gelé
+    for (const f of this.fighters) if (f.targetKey && pick.some((p) => p.key === f.targetKey)) f.targetKey = null;
+  }
+
+  // ---------- Maexxna : toiles, araignées, cocons, plafond, frénésie ----------
+
+  addWeb(x, y) {
+    const W = Rules.MAEXXNA.webs;
+    this.webs.push({ id: (this.webSeq = (this.webSeq || 0) + 1), x, y, r: W.radius, until: this.time + W.life });
+    if (this.webs.length > W.max) this.webs.shift();
+  }
+
+  updateWebs(dt, B) {
+    const b = this.boss;
+    const W = B.webs;
+    this.webs = this.webs.filter((w) => w.until > this.time);
+    // Les toiles collent : les héros dedans sont très ralentis.
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      if (this.webs.some((w) => Math.hypot(p.x - w.x, p.y - w.y) <= w.r)) this.addBuff(p, 'toile', 0.25, { speed: W.slow });
+    }
+    const heroes = this.players.filter((p) => p.alive);
+    if (!heroes.length) return;
+    // Elle tisse aussi en passant : une toile sous un héros au hasard
+    b.webIn -= dt;
+    if (b.webIn <= 0) {
+      b.webIn = W.dropEvery;
+      const h = heroes[Math.floor(Math.random() * heroes.length)];
+      this.addWeb(h.x + (Math.random() - 0.5) * 60, h.y + (Math.random() - 0.5) * 40);
+      this.events.push({ t: 'webDrop', x: Math.round(h.x), y: Math.round(h.y) });
+    }
+    b.spiderIn -= dt;
+    if (b.spiderIn <= 0) {
+      b.spiderIn = B.spiders.every;
+      this.spawnSpiders(B, 1);
+    }
+  }
+
+  spawnSpiders(B, waves) {
+    const S = B.spiders;
+    const b = this.boss;
+    const alive = this.adds.filter((a) => a.kind === 'araignee' && a.alive).length;
+    const count = Math.min(S.alive - alive, Math.max(S.min, Math.min(S.max, Math.ceil(this.players.length / S.per))) * waves);
+    if (count <= 0) return;
+    const pos = spawnPositions(count, { x0: 80, y0: 80, x1: ARENA.w - 80, y1: ARENA.h - 60 });
+    for (const p of pos) {
+      this.addMonster({
+        kind: 'araignee', name: 'Araignée', x: p.x, y: p.y, r: S.radius,
+        hp: Math.round((S.hpBase + S.hpPerPlayer * this.players.length) * b.addScale.hp), damage: b.damage * S.damageRatio,
+        speed: S.speed, cooldown: S.cooldown, range: S.range, dodge: 0.1, poison: { ...S.poison },
+      });
+    }
+    this.events.push({ t: 'spiders', count });
+  }
+
+  spinCocoons(B) {
+    const C = B.cocoon;
+    const b = this.boss;
+    const heroes = this.players.filter((p) => p.alive && !p.cocooned && p.iceUntil <= this.time);
+    const count = Math.min(C.max, C.base + Math.floor(this.players.length / C.perPlayers), heroes.length);
+    const pick = heroes.sort(() => Math.random() - 0.5).slice(0, count);
+    const hp = Math.round((C.hpBase + C.hpPerPlayer * this.players.length) * b.addScale.hp);
+    for (const h of pick) {
+      const c = this.addMonster({ kind: 'cocon', name: `Cocon (${h.name})`, x: h.x, y: h.y, r: 20, hp, inert: true, holds: h.key, until: this.time + C.hold });
+      h.cocooned = c.key;
+      h.targetKey = null;
+      h.cocoonTick = 0;
+      this.events.push({ t: 'cocoon', to: h.key, cocoon: c.key });
+    }
+    for (const f of this.fighters) if (f.targetKey && pick.some((p) => p.key === f.targetKey)) f.targetKey = null;
+    if (pick.length) this.events.push({ t: 'bossPhase', phase: b.phase, label: 'MAEXXNA TISSE SES COCONS !', sub: 'Brisez les cocons pour libérer vos alliés !' });
+  }
+
+  updateCocoons(dt, B) {
+    for (const p of this.players) {
+      if (!p.cocooned) continue;
+      const c = this.adds.find((a) => a.key === p.cocooned);
+      // Le cocon finit par céder tout seul (au bout de cocoon.hold secondes)
+      if (!p.alive || !c || !c.alive || this.time >= c.until) { this.freeCocoon(p, c); continue; }
+      p.x = c.x;
+      p.y = c.y;
+      p.cocoonTick += dt;
+      if (p.cocoonTick >= 0.5) {
+        p.cocoonTick -= 0.5;
+        const dmg = Math.max(1, Math.round(p.maxHp * B.cocoon.dps * 0.5));
+        p.hp -= dmg;
+        this.events.push({ t: 'hit', from: this.boss.key, to: p.key, dmg, poison: true });
+        if (p.hp <= 0) { p.cocooned = null; this.kill(this.boss, p); if (c.alive) { c.alive = false; c.hp = 0; this.events.push({ t: 'vanish', to: c.key }); } }
+      }
+    }
+  }
+
+  freeCocoon(p, c) {
+    if (!p.cocooned) return;
+    p.cocooned = null;
+    if (c && c.alive) { c.alive = false; c.hp = 0; this.events.push({ t: 'vanish', to: c.key }); }
+    if (p.alive) this.events.push({ t: 'freed', to: p.key });
+  }
+
+  startCeiling(B) {
+    const b = this.boss;
+    const C = B.ceiling;
+    b.away = true;
+    b.targetKey = null;
+    b.stage = { kind: 'ceiling', until: this.time + C.duration, rainIn: 1 };
+    this.spawnSpiders(B, C.spiderWave);
+    this.events.push({ t: 'bossCeiling', duration: C.duration });
+  }
+
+  startFrenzy(B) {
+    const b = this.boss;
+    b.cooldown /= B.frenzy.attackSpeedMult;
+    b.speed *= B.frenzy.speedMult;
+    b.spiderIn = Math.min(b.spiderIn, 2);
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'MAEXXNA ENTRE EN FRÉNÉSIE !', sub: 'Elle mord plus vite et court plus vite !' });
   }
 
   addMonster(o) {
@@ -829,6 +1170,7 @@ class Battle extends EventEmitter {
   // ---------- Sondage du donjon (toutes les 5 salles) ----------
 
   openPoll() {
+    if (this.mode === 'rush') return this.openRushPoll();
     const d = this.dungeon;
     // Les bonus du sondage précédent s'arrêtent ici.
     for (const p of this.players) p.buffs = p.buffs.filter((b) => !b.boon);
@@ -844,17 +1186,39 @@ class Battle extends EventEmitter {
     this.changed();
   }
 
+  // Boss Rush : bonus tiré au hasard, résurrection (ou grand soin si personne n'est tombé), quitte ou double.
+  openRushPoll() {
+    const r = this.rush;
+    const boons = Object.keys(Rules.RUSH_BOONS);
+    const someoneDead = this.players.some((p) => !p.alive);
+    const options = ['bonus', someoneDead ? 'resu' : 'soin', 'defi'];
+    r.poll = { round: r.round, options, votes: new Map(), boon: boons[Math.floor(Math.random() * boons.length)], dirty: false, pushAt: 0 };
+    r.stage = 'poll';
+    r.stageT = 0;
+    this.events.push({ t: 'poll', options });
+    this.emit('pollStart', this.publicPoll());
+    this.changed();
+  }
+
+  // Sondage en cours : celui du donjon, ou le vote entre deux boss du Boss Rush.
+  pollHost() {
+    return this.mode === 'rush' ? this.rush : this.dungeon;
+  }
+
   pollCounts() {
-    const poll = this.dungeon.poll;
+    const poll = this.pollHost().poll;
     const votes = [...poll.votes.values()];
+    // Boss Rush : chaque choix porte sa description (le bonus et le quitte ou double dépendent de la run).
+    if (this.mode === 'rush') return poll.options.map((id) => ({ id, votes: votes.filter((v) => v === id).length, ...this.rushChoiceInfo(id) }));
     return poll.options.map((id) => ({ id, votes: votes.filter((v) => v === id).length }));
   }
 
   publicPoll() {
-    const d = this.dungeon;
+    const d = this.pollHost();
     if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
-    const left = Math.max(0, Rules.DUNGEON_POLL.duration - d.stageT);
-    return { room: d.room, options: this.pollCounts(), endsAt: Date.now() + Math.round(left * 1000) };
+    const rush = this.mode === 'rush';
+    const left = Math.max(0, (rush ? Rules.RUSH.poll.duration : Rules.DUNGEON_POLL.duration) - d.stageT);
+    return { room: rush ? d.round : d.room, rush: rush || undefined, options: this.pollCounts(), endsAt: Date.now() + Math.round(left * 1000) };
   }
 
   /*
@@ -862,10 +1226,12 @@ class Battle extends EventEmitter {
    * `choice` : identifiant du bonus (site) ou commande de chat (!vie, !1…). Retourne le bonus choisi, ou null.
    */
   vote(voter, choice) {
-    const d = this.dungeon;
+    const d = this.pollHost();
     if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
     const options = d.poll.options;
-    const id = options.includes(choice) ? choice : Rules.boonFromCommand(String(choice || '').toLowerCase(), options);
+    const command = String(choice || '').toLowerCase();
+    const id = options.includes(choice) ? choice
+      : this.mode === 'rush' ? Rules.rushChoiceFromCommand(command, options) : Rules.boonFromCommand(command, options);
     if (!id) return null;
     d.poll.votes.set(voter, id);
     d.poll.dirty = true;
@@ -874,12 +1240,13 @@ class Battle extends EventEmitter {
 
   // Fin du sondage (minuteur ou admin) : le bonus le plus voté l'emporte, égalité tirée au sort.
   closePoll() {
-    const d = this.dungeon;
+    const d = this.pollHost();
     if (this.phase !== 'battle' || !d || d.stage !== 'poll') return null;
     const counts = this.pollCounts();
     const top = Math.max(...counts.map((c) => c.votes));
     const best = counts.filter((c) => c.votes === top);
     const id = best[Math.floor(Math.random() * best.length)].id;
+    if (this.mode === 'rush') return this.closeRushPoll(id, counts);
     const outcome = this.applyBoon(id);
     d.lastPoll = { room: d.room, id, counts, ...outcome };
     d.poll = null;
@@ -888,6 +1255,20 @@ class Battle extends EventEmitter {
     this.setStage('exit');
     this.changed();
     return d.lastPoll;
+  }
+
+  closeRushPoll(id, counts) {
+    const r = this.rush;
+    const info = this.rushChoiceInfo(id);
+    const outcome = this.applyRushChoice(id);
+    r.lastPoll = { round: r.round, id, counts, info, ...outcome };
+    r.poll = null;
+    this.events.push({ t: 'pollEnd', id, counts, info, revived: outcome.revived ? outcome.revived.key : undefined });
+    this.emit('pollEnd', r.lastPoll, this.players);
+    // Les survivants soufflent un peu, puis le boss suivant arrive.
+    for (const p of this.players) if (p.alive) this.heal(p, p.maxHp * Rules.RUSH.healBetween);
+    this.nextRushBoss();
+    return r.lastPoll;
   }
 
   applyBoon(id) {
@@ -999,6 +1380,7 @@ class Battle extends EventEmitter {
   tick(dt) {
     this.time += dt;
     if (this.mode === 'dungeon' && this.dungeon.stage !== 'fight') this.tickDungeonStage(dt);
+    else if (this.mode === 'rush' && this.rush.stage !== 'fight') this.tickRushStage(dt);
     else if (this.mode === 'gold') this.tickGold(dt);
     else this.tickFight(dt);
     this.emit('frame', this.frame());
@@ -1023,9 +1405,10 @@ class Battle extends EventEmitter {
       if (!f.started) { f.started = true; this.triggerPotion(f, 'start'); }
       this.checkHpPotion(f);
       // Barre de stamina (ultime de l'arbre de compétences)
-      if (f.ult) f.stamina = Math.min(1, f.stamina + dt / f.staminaTime);
-      // Gelé (Blizzard, Châtiment) : ne fait rien ; le Dragon en vol ou au nid suit son propre script.
-      if (this.time < f.stunUntil || f.flying || f.away) continue;
+      const iced = this.time < f.iceUntil || f.cocooned;
+      if (f.ult && !iced) f.stamina = Math.min(1, f.stamina + dt / f.staminaTime);
+      // Gelé (Blizzard, Châtiment, Liche), dans un cocon, ou boss en plein script (vol, nid, plafond, bond) : ne fait rien.
+      if (this.time < f.stunUntil || iced || f.flying || f.away || f.leaping) continue;
 
       /*
        * Aggro : l'ennemi le plus proche ; un Guerrier « paraît » plus proche (il attire l'aggro).
@@ -1132,7 +1515,9 @@ class Battle extends EventEmitter {
           // Les plus gros poussent les petits ; un cristal ne bouge jamais.
           const ma = a.r * a.r;
           const mb = b.r * b.r;
-          const shareA = a.isCrystal ? 0 : b.isCrystal ? 1 : mb / (ma + mb);
+          const fixedA = a.isCrystal || a.iceUntil > this.time || a.cocooned || a.inert;
+          const fixedB = b.isCrystal || b.iceUntil > this.time || b.cocooned || b.inert;
+          const shareA = fixedA && fixedB ? 0.5 : fixedA ? 0 : fixedB ? 1 : mb / (ma + mb);
           const shareB = 1 - shareA;
           a.x -= (dx / d) * overlap * shareA; a.y -= (dy / d) * overlap * shareA;
           b.x += (dx / d) * overlap * shareB; b.y += (dy / d) * overlap * shareB;
@@ -1165,7 +1550,7 @@ class Battle extends EventEmitter {
     if (this.mode === 'br') this.checkBrEnd();
     else if (this.mode === 'koth') this.checkKothEnd();
     else if (this.mode === 'clans') this.checkClansEnd();
-    else if (this.mode === 'boss') this.checkBossEnd();
+    else if (this.mode === 'boss' || this.mode === 'rush') this.checkBossEnd();
     else this.checkDungeonEnd();
   }
 
@@ -1480,11 +1865,149 @@ class Battle extends EventEmitter {
 
   checkBossEnd() {
     if (!this.boss.alive) {
-      // Les œufs, dragonnets, cristaux et illusions disparaissent avec leur maître.
-      for (const a of this.adds) if (a.alive) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
-      this.finishCoop(true);
-    } else if (!this.players.some((p) => p.alive) || this.time > MAX_DURATION) this.finishCoop(false);
+      // Les œufs, dragonnets, cristaux, illusions, copies, serviteurs, araignées et cocons disparaissent avec leur maître.
+      this.clearAdds();
+      if (this.mode === 'rush') this.rushBossDown();
+      else this.finishCoop(true);
+    } else if (!this.players.some((p) => p.alive) || this.time - (this.boss.bornAt || 0) > MAX_DURATION) this.finishCoop(false);
   }
+
+  clearAdds() {
+    for (const a of this.adds || []) if (a.alive) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
+    this.webs = [];
+    for (const p of this.players) { p.iceUntil = 0; p.cocooned = null; }
+  }
+
+  // ---------- Boss Rush ----------
+
+  setupRush() {
+    this.rush = {
+      round: 0, killed: 0, stage: 'intro', stageT: 0, mult: 1, boons: [], defeated: [], bag: [], last: null,
+      poll: null, lastPoll: null,
+    };
+    const positions = spawnPositions(this.players.length, { x0: 60, y0: 70, x1: 470, y1: ARENA.h - 60 });
+    this.players.forEach((f, i) => Object.assign(f, positions[i]));
+    this.adds = [];
+    this.addSeq = 0;
+    this.webs = [];
+    this.nextRushBoss();
+  }
+
+  // Boss suivant : tiré au hasard (chacun une fois avant de revenir, jamais deux fois de suite), de plus en plus fort.
+  nextRushBoss() {
+    const r = this.rush;
+    if (!r.bag.length) {
+      r.bag = Object.keys(Rules.BOSSES).sort(() => Math.random() - 0.5);
+      if (r.bag[0] === r.last && r.bag.length > 1) r.bag.push(r.bag.shift());
+    }
+    const id = r.bag.shift();
+    r.last = id;
+    r.round += 1;
+    this.bossId = id;
+    this.slams = [];
+    this.zones = [];
+    this.adds = (this.adds || []).filter((a) => a.alive);
+    this.fighters = this.fighters.filter((f) => f === this.boss || f.team === HEROES || f.alive);
+    this.spawnBoss(id, Rules.rushScale(r.round, r.mult));
+    this.boss.x = ARENA.w * 0.72;
+    r.stage = 'intro';
+    r.stageT = 0;
+    this.events.push({ t: 'rushBoss', round: r.round, boss: id });
+    this.changed();
+  }
+
+  rushBossDown() {
+    const r = this.rush;
+    r.killed += 1;
+    r.defeated.push(this.boss.bossId);
+    r.stage = 'down';
+    r.stageT = 0;
+    this.slams = [];
+    this.emit('rushBossDown', { boss: this.boss.bossId, killed: r.killed, round: r.round }, this.players);
+    this.changed();
+  }
+
+  tickRushStage(dt) {
+    const r = this.rush;
+    const S = Rules.RUSH.stages;
+    r.stageT += dt;
+    const heroes = this.players.filter((p) => p.alive);
+    for (const p of heroes) { p.targetKey = null; if (p.regen) this.heal(p, p.maxHp * p.regen * dt); }
+    if (r.stage === 'intro') {
+      if (r.stageT >= S.intro) {
+        r.stage = 'fight';
+        r.stageT = 0;
+        this.boss.bornAt = this.time;
+        this.changed();
+      }
+    } else if (r.stage === 'down') {
+      if (r.stageT >= S.down) this.openPoll();
+    } else if (r.stage === 'poll') {
+      if (r.poll.dirty && this.time >= r.poll.pushAt) {
+        r.poll.dirty = false;
+        r.poll.pushAt = this.time + 1;
+        this.changed();
+      }
+      if (r.stageT >= Rules.RUSH.poll.duration) this.closePoll();
+    }
+  }
+
+  // Description d'un choix du vote du Boss Rush (le bonus et le « quitte ou double » dépendent de la run).
+  rushChoiceInfo(id) {
+    const r = this.rush;
+    const C = Rules.RUSH_CHOICES[id];
+    const info = { icon: C.icon, label: C.label, color: C.color, desc: C.desc, cmd: C.cmd };
+    if (id === 'bonus' && r.poll) {
+      const bn = Rules.RUSH_BOONS[r.poll.boon];
+      Object.assign(info, { icon: bn.icon, label: `Bonus : ${bn.label}`, color: bn.color, desc: bn.desc });
+    } else if (id === 'defi') {
+      const g = Rules.rushDefiReward(r.killed);
+      info.desc = `Les boss suivants ont +${Math.round((Rules.RUSH.defiMult - 1) * 100)} % de vie et de dégâts, mais tous les héros gagnent tout de suite ${g.gold} golds et ${g.xp} XP.`;
+    }
+    return info;
+  }
+
+  applyRushChoice(id) {
+    const r = this.rush;
+    const out = {};
+    const heroes = this.players.filter((p) => p.alive);
+    if (id === 'bonus') {
+      const boon = r.poll.boon;
+      r.boons.push(boon);
+      for (const p of heroes) this.applyRushBoon(p, boon, r.boons.length);
+      out.boon = boon;
+    } else if (id === 'resu') {
+      const dead = this.players.filter((p) => !p.alive);
+      const p = dead[Math.floor(Math.random() * dead.length)];
+      if (p) {
+        Object.assign(p, {
+          alive: true, hp: Math.round(p.maxHp * Rules.RUSH.revive), diedAt: null, buffs: [], stunUntil: 0, iceUntil: 0, cocooned: null, targetKey: null,
+          x: 120 + Math.random() * 260, y: 120 + Math.random() * (ARENA.h - 220),
+        });
+        r.boons.forEach((boon, i) => this.applyRushBoon(p, boon, i + 1, true)); // il retrouve les bonus de la run
+        this.events.push({ t: 'revive', to: p.key });
+        out.revived = { key: p.key, name: p.name };
+      }
+    } else if (id === 'soin') {
+      for (const p of heroes) this.heal(p, p.maxHp);
+    } else if (id === 'defi') {
+      r.mult *= Rules.RUSH.defiMult;
+      out.reward = Rules.rushDefiReward(r.killed);
+    }
+    return out;
+  }
+
+  // Bonus permanent du Boss Rush sur un héros (n : numéro du bonus, pour cumuler deux fois le même).
+  applyRushBoon(p, id, n, silent = false) {
+    const e = Rules.RUSH_BOONS[id].effect;
+    const mods = { damage: e.damage, taken: e.taken, speed: e.speed, attackSpeed: e.attackSpeed, lifesteal: e.lifesteal, thorns: e.thorns, regen: e.regen };
+    if (Object.values(mods).some((v) => v)) this.addBuff(p, `rush_${id}_${n}`, Infinity, { boon: true, ...mods });
+    if (e.maxHp) { const k = p.hp / p.maxHp; p.maxHp = Math.round(p.maxHp * e.maxHp); p.hp = Math.round(p.maxHp * k); }
+    if (!silent && e.heal) this.heal(p, p.maxHp * e.heal);
+    if (!silent && e.stamina && p.ult) p.stamina = Math.min(1, p.stamina + e.stamina);
+  }
+
+
 
   checkDungeonEnd() {
     if (!this.players.some((p) => p.alive)) this.finishCoop(false);
@@ -1980,6 +2503,7 @@ class Battle extends EventEmitter {
   hit(attacker, target, raw, opts = {}) {
     if (!target.alive || this.immune(target, attacker)) return;
     if (target.isCrystal && this.clans && this.clans.overtime) raw *= Rules.CLANS.overtimeMult; // mort subite
+    if (target.guarded) raw *= Rules.MIMIC.copies.guard; // Mimic protégé par ses copies
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
@@ -2042,7 +2566,12 @@ class Battle extends EventEmitter {
       victim.respawnAt = this.time + Rules.KOTH.respawn;
       if (killer && killer.team !== victim.team) killer.score += Rules.KOTH.points.kill;
     }
-    if (victim === this.boss) this.events.push({ t: 'bossDown', x: Math.round(victim.x), y: Math.round(victim.y) });
+    if (victim === this.boss) this.events.push({ t: 'bossDown', x: Math.round(victim.x), y: Math.round(victim.y), boss: victim.bossId });
+    // Cocon de Maexxna brisé : le héros est libéré.
+    if (victim.kind === 'cocon' && victim.holds) {
+      const held = this.players.find((p) => p.key === victim.holds);
+      if (held && held.cocooned === victim.key) { held.cocooned = null; if (held.alive) this.events.push({ t: 'freed', to: held.key }); }
+    }
     // Flammèche abattue pendant l'envol : le dragon brûle et devra se poser plus tôt.
     if (victim.kind === 'flammeche' && this.boss && this.boss.alive && this.boss.flying && this.boss.stage) {
       const S = Rules.BOSSES.dragon.sprites;
@@ -2114,7 +2643,13 @@ class Battle extends EventEmitter {
       if (this.abandoned) this.result.abandoned = true;
       if (this.solo.training) this.result.training = true; // entraînement : rien n'est gagné
     }
-    if (this.mode === 'boss') {
+    if (this.mode === 'rush') {
+      const r = this.rush;
+      this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
+      this.result.rush = { killed: r.killed, round: r.round, defeated: [...r.defeated], boons: [...r.boons], mult: Math.round(r.mult * 1000) / 1000 };
+      this.result.victory = r.killed > 0;
+      this.result.reward = Rules.rushReward(r.killed);
+    } else if (this.mode === 'boss') {
       this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
       this.result.reward = victory ? { ...Rules.BOSSES[this.boss.bossId].reward } : null;
       if (this.solo) {
@@ -2156,12 +2691,15 @@ class Battle extends EventEmitter {
       boss: b ? {
         key: b.key, id: b.bossId, name: b.name, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, phase: b.phase, enraged: b.enraged, alive: b.alive,
         flying: b.flying || undefined, away: b.away || undefined, shielded: b.shielded || undefined,
+        guarded: b.guarded || undefined, leaping: b.leaping || undefined,
+        // Liche : prochain gel (secondes) ; nombre de héros gelés
+        freezeIn: b.ice ? Math.max(0, Math.round((b.ice.next - this.time) * 10) / 10) : undefined,
         // Compte à rebours de l'étape en cours (vol, nid), pour la barre du boss
         timer: b.stage && b.stage.until > this.time ? { kind: b.stage.kind, left: Math.round((b.stage.until - this.time) * 10) / 10 } : undefined,
       } : null,
       slams: this.slams.map((s) => ({
         kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / s.warn) * 100) / 100, w: s.warn,
-        fx: s.fx && Math.round(s.fx), fy: s.fy && Math.round(s.fy),
+        fx: s.fx != null ? Math.round(s.fx) : undefined, fy: s.fy != null ? Math.round(s.fy) : undefined, loot: s.loot,
         a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
       })),
       gold: this.gold ? {
@@ -2197,6 +2735,12 @@ class Battle extends EventEmitter {
         relicChoice: d.relicChoice ? { options: d.relicChoice, left: Math.max(0, Math.round((Rules.EXPEDITION.relicTimeout - d.stageT) * 10) / 10) } : undefined,
       } : null,
       solo: this.soloInfo(),
+      webs: this.webs && this.webs.length ? this.webs.map((w) => ({ id: w.id, x: Math.round(w.x), y: Math.round(w.y), r: w.r, left: Math.round((w.until - this.time) * 10) / 10 })) : undefined,
+      rush: this.rush ? {
+        round: this.rush.round, killed: this.rush.killed, stage: this.rush.stage, stageT: Math.round(this.rush.stageT * 100) / 100,
+        mult: Math.round(this.rush.mult * 1000) / 1000, boons: this.rush.boons, defeated: this.rush.defeated,
+        poll: this.rush.poll ? { options: this.pollCounts(), left: Math.max(0, Math.round((Rules.RUSH.poll.duration - this.rush.stageT) * 10) / 10) } : null,
+      } : null,
       zones: (this.zones || []).map((z) => ({
         kind: z.kind, x: Math.round(z.x), y: Math.round(z.y), r: z.r,
         p: z.kind === 'poison' ? Math.round((z.t / z.life) * 100) / 100 : Math.round((1 - z.t / z.warn) * 100) / 100,
@@ -2217,6 +2761,9 @@ class Battle extends EventEmitter {
         chests: this.gold ? f.chestsGot : undefined,
         respawn: !f.alive && f.respawnAt != null ? Math.max(0, Math.round((f.respawnAt - this.time) * 10) / 10) : undefined,
         protect: f.protectUntil > this.time || undefined,
+        ice: f.iceUntil > this.time ? Math.round((f.iceUntil - this.time) * 10) / 10 : undefined, // gelé par la Liche (secondes restantes)
+        cocooned: f.cocooned ? true : undefined,
+        pet: f.pet || undefined, // familier qui suit le héros (cosmétique)
         fx: fxOf(f, this.time),
       })),
       events: this.events,
@@ -2229,7 +2776,7 @@ function inSlam(s, f) {
   const dx = f.x - s.x;
   const dy = f.y - s.y;
   const dist = Math.hypot(dx, dy);
-  if (s.kind !== 'cone') return dist <= s.r;
+  if (s.kind !== 'cone' && !s.cone) return dist <= s.r;
   if (dist > s.r + f.r) return false;
   let diff = Math.abs(Math.atan2(dy, dx) - s.angle);
   if (diff > Math.PI) diff = 2 * Math.PI - diff;
@@ -2257,7 +2804,7 @@ function fighter(fields) {
     cd: 0, dmgMult: 1, targetKey: null, alive: true, kills: 0, dealt: 0,
     chain: 0, lastKillAt: -Infinity, healAcc: 0, diedAt: null, diedRoom: null,
     spec: null, ult: null, staminaTime: 0, stamina: 0, consumable: null, potionUsed: false, started: false, engaged: false,
-    buffs: [], stunUntil: 0,
+    buffs: [], stunUntil: 0, iceUntil: 0, cocooned: null,
     stance: 'equilibre', targetPref: 'proche', recovery: 0, recoverUntil: 0,
     techs: [], techCd: {}, nextCrit: false, secondWindUsed: false,
   }, fields);
@@ -2268,6 +2815,7 @@ function fxOf(f, time) {
   if (!f.alive) return undefined;
   const fx = f.buffs.filter((b) => !b.boon && !b.relic).map((b) => b.kind); // les bonus de sondage s'affichent dans le bandeau du donjon
   if (time < f.stunUntil) fx.push(f.stunKind || 'frozen');
+  if (time < f.iceUntil) fx.push('iceblock');
   if (f.buffs.some((b) => b.invisible)) fx.push('invisible');
   return fx.length ? fx : undefined;
 }

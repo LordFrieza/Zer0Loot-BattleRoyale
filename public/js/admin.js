@@ -59,7 +59,7 @@ function renderModes() {
   // Le bouton de lancement suit le mode de la file ouverte (ou le mode choisi s'il n'y a pas de file).
   const live = queue && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.mode : selectedMode;
   const liveBoss = Rules.BOSSES[queue && queue.boss && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.boss : selectedBoss];
-  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : '⚔️ LANCER LA BATAILLE';
+  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : live === 'rush' ? '💀 LANCER LE BOSS RUSH' : '⚔️ LANCER LA BATAILLE';
 }
 
 $('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
@@ -97,8 +97,8 @@ function renderPoll() {
   $('poll-admin').style.display = poll ? '' : 'none';
   if (!poll) return;
   const total = poll.options.reduce((a, o) => a + o.votes, 0);
-  $('poll-admin').innerHTML = `<b>🗳️ Sondage de la salle ${poll.room}</b> <span class="countdown" id="poll-cd"></span>
-    ${poll.options.map((o) => { const b = Rules.DUNGEON_BOONS[o.id]; return `<div style="--c:${b.color}">${b.icon} <b>${b.label}</b> <span class="muted">${b.cmd}</span> — ${o.votes} voix${total ? ` (${Math.round((o.votes / total) * 100)} %)` : ''}</div>`; }).join('')}
+  $('poll-admin').innerHTML = `<b>🗳️ ${poll.rush ? `Vote après le boss n°${poll.room}` : `Sondage de la salle ${poll.room}`}</b> <span class="countdown" id="poll-cd"></span>
+    ${poll.options.map((o) => { const b = o.label ? o : Rules.DUNGEON_BOONS[o.id]; return `<div style="--c:${b.color}">${b.icon} <b>${b.label}</b> <span class="muted">${b.cmd}</span> — ${o.votes} voix${total ? ` (${Math.round((o.votes / total) * 100)} %)` : ''}</div>`; }).join('')}
     <button class="secondary small" id="poll-close">Clore le sondage maintenant</button>`;
   $('poll-close').onclick = () => run('/api/admin/poll/close');
   tickPoll();
@@ -169,7 +169,7 @@ function renderPlayers() {
         <td>${p.record.wins} / ${p.record.kills} / ${p.record.battles}</td>
         <td><div class="row" style="gap:4px;flex-wrap:nowrap">
           <input type="number" min="1" value="100" data-amount>
-          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option><option value="keys">clés de boss</option></select>
+          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option><option value="keys">clés de boss</option><option value="pet">familier (au hasard)</option></select>
           <button class="small" data-give>Donner</button></div></td>
         <td><button class="small ${p.banned ? 'secondary' : 'danger'}" data-ban="${p.banned ? '0' : '1'}">${p.banned ? 'Débannir' : 'Bannir'}</button></td>
       </tr>`;
@@ -179,10 +179,10 @@ function renderPlayers() {
       const row = b.closest('tr');
       const amount = Number(row.querySelector('[data-amount]').value);
       const kind = row.querySelector('[data-kind]').value;
-      const r = await run(`/api/admin/players/${row.dataset.id}/give`, { [kind]: amount });
+      const r = await run(`/api/admin/players/${row.dataset.id}/give`, { [kind]: kind === 'pet' ? 'random' : amount });
       if (r) {
         const p = playersList.find((x) => x.id === row.dataset.id);
-        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : kind === 'keys' ? 'clé(s) de boss' : 'XP'} donné(s) à ${p.name}`);
+        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : kind === 'keys' ? 'clé(s) de boss' : kind === 'pet' ? 'familier' : 'XP'} donné(s) à ${p.name}`);
         loadPlayers();
       }
     };

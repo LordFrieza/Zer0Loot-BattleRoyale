@@ -54,6 +54,12 @@ function upgrade(character) {
   if (character.soloActive === undefined) character.soloActive = null;
   // 1.4 : Clés de boss (une offerte aux anciens personnages, qui pouvaient jusqu'ici défier les boss avec l'énergie)
   if (!Number.isFinite(character.bossKeys)) character.bossKeys = Rules.SOLO.startKeys;
+  // 1.5 : familiers (enclos vide pour les anciens personnages)
+  if (!character.pets || !Array.isArray(character.pets.list)) character.pets = newPets();
+  if (!character.pets.food) character.pets.food = {};
+  if (!Array.isArray(character.pets.enclos)) character.pets.enclos = [];
+  if (character.pets.active === undefined) character.pets.active = null;
+  if (character.pets.follow === undefined) character.pets.follow = null;
   // 1.3 : courrier (ventes, expirations) et historique du marché
   if (!Array.isArray(character.mail)) character.mail = [];
   if (!Array.isArray(character.marketLog)) character.marketLog = [];
@@ -101,6 +107,7 @@ function newCharacter() {
     energy: { value: Rules.SOLO.energyMax, at: Date.now() }, // énergie du mode Solo (voir Rules.energyState)
     soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
     bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
+    pets: newPets(), // familiers (onglet Familier)
     mail: [], // courrier : [{ id, at, text, read, kind }] (ventes au marché, objets revenus…)
     marketLog: [], // historique du marché : [{ at, kind: listed|sold|bought|cancelled|expired, item, price, … }]
   };
@@ -708,7 +715,15 @@ function clearDrawing(character) {
 
 // ---------- Admin ----------
 
-function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys = 0 }) {
+function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys = 0, pet = null }) {
+  // Familier (pour tester l'enclos) : l'espèce demandée, ou une espèce pas encore obtenue
+  if (pet) {
+    upgrade(character);
+    const missing = Object.keys(Rules.PETS).filter((sp) => !character.pets.list.some((p) => p.species === sp));
+    const species = Rules.PETS[pet] ? pet : missing[rand(0, Math.max(0, missing.length - 1))] || Object.keys(Rules.PETS)[0];
+    const r = addPet(character, species);
+    return { pet: r.pet.id, duplicate: r.duplicate };
+  }
   const clean = (v) => Math.max(0, Math.min(1e7, Math.floor(Number(v) || 0)));
   const reward = { gold: clean(gold), chests: clean(chests), xp: clean(xp) };
   const extra = clean(energy);
@@ -738,6 +753,232 @@ function spendEnergy(character, now = Date.now()) {
   }
   character.energy.value -= 1;
   if (st.value === Rules.SOLO.energyMax) character.energy.at = now; // la recharge démarre maintenant
+}
+
+// ---------- Familiers (onglet Familier) ----------
+
+function newPets() {
+  return { list: [], active: null, follow: null, food: {}, enclos: [] };
+}
+
+function findPet(character, id) {
+  const pet = character.pets.list.find((p) => p.id === id);
+  if (!pet) throw new Error('Familier introuvable');
+  return pet;
+}
+
+/*
+ * Fait vivre tous les familiers jusqu'à maintenant (besoins, trouvailles, série de bonheur).
+ * Retourne { found, unlocked: [ids] } pour prévenir le joueur.
+ */
+function petsTick(character, now = Date.now()) {
+  upgrade(character);
+  const P = character.pets;
+  const out = { found: 0, unlocked: [] };
+  for (const pet of P.list) {
+    const r = Rules.petAdvance(pet, P.enclos, now, pet.id === P.active);
+    Object.assign(pet, r.pet); // mis à jour en place (les références restent valables)
+    out.found += r.found;
+    if (r.unlocked) out.unlocked.push(pet.id);
+  }
+  const followers = P.list.filter((p) => p.follower).length;
+  character.counters.petFollowers = Math.max(character.counters.petFollowers || 0, followers);
+  return out;
+}
+
+// Expérience d'un familier : niveaux gagnés (20 au plus).
+function petGainXp(pet, xp) {
+  let levels = 0;
+  pet.xp = (pet.xp || 0) + Math.max(0, Math.round(xp));
+  while (pet.level < Rules.PET.maxLevel && pet.xp >= Rules.petXpToNext(pet.level)) {
+    pet.xp -= Rules.petXpToNext(pet.level);
+    pet.level += 1;
+    levels += 1;
+  }
+  if (pet.level >= Rules.PET.maxLevel) pet.xp = 0;
+  return levels;
+}
+
+/*
+ * Nouveau familier d'espèce `species` (une par boss). Déjà obtenu : il gagne de l'XP et un Festin royal.
+ * Retourne { pet, duplicate, levels }.
+ */
+function addPet(character, species, now = Date.now()) {
+  if (!Rules.PETS[species]) throw new Error('Familier inconnu');
+  petsTick(character, now);
+  const P = character.pets;
+  const have = P.list.find((p) => p.species === species);
+  if (have) {
+    const levels = petGainXp(have, Rules.PET.duplicateXp);
+    P.food.festin = Math.min(Rules.PET_FOOD_MAX, (P.food.festin || 0) + 1);
+    return { pet: have, duplicate: true, levels };
+  }
+  const pet = {
+    id: species, species, name: Rules.PETS[species].name, level: 1, xp: 0,
+    needs: { ...Rules.PET.start }, at: now, findAt: null, finds: 0, streakAt: null, follower: false,
+    caressAt: 0, playAt: 0, obtainedAt: now,
+  };
+  P.list.push(pet);
+  if (!P.active) P.active = pet.id;
+  character.counters.pets = Math.max(character.counters.pets || 0, P.list.length);
+  return { pet, duplicate: false, levels: 0 };
+}
+
+// Tirage du familier après un boss vaincu (5 % par héros). Retourne le résultat d'addPet, ou null.
+function rollPetDrop(character, bossId, chance = Rules.PET.dropChance) {
+  if (!Rules.PETS[bossId] || random() >= chance) return null;
+  return addPet(character, bossId);
+}
+
+function setActivePet(character, id) {
+  petsTick(character);
+  findPet(character, id);
+  character.pets.active = id;
+}
+
+const ACTION_FIELDS = ['faim', 'soif', 'joie'];
+function applyNeeds(pet, gains, mult = 1) {
+  for (const k of ACTION_FIELDS) if (gains[k]) pet.needs[k] = Math.max(0, Math.min(100, pet.needs[k] + gains[k] * (gains[k] > 0 ? mult : 1)));
+}
+
+// Caresser / jouer (gratuit, avec un temps de recharge). Seulement le familier principal.
+function petAction(character, kind, now = Date.now()) {
+  const A = Rules.PET.actions[kind];
+  if (!A) throw new Error('Action inconnue');
+  petsTick(character, now);
+  const P = character.pets;
+  if (!P.active) throw new Error('Tu n\'as pas encore de familier');
+  const pet = findPet(character, P.active);
+  const key = kind === 'caresser' ? 'caressAt' : 'playAt';
+  const wait = (pet[key] || 0) + A.cooldownMs - now;
+  if (wait > 0) {
+    const m = Math.ceil(wait / 60000);
+    throw new Error(`${pet.name} a besoin d'un peu de repos : réessaie dans ${m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'}`);
+  }
+  const fx = Rules.petEnclosEffects(P.enclos);
+  const extra = kind === 'caresser' ? fx.caress : fx.play;
+  applyNeeds(pet, { joie: A.joie + extra, faim: A.faim, soif: A.soif });
+  pet[key] = now;
+  const levels = petGainXp(pet, A.xp);
+  return { pet: pet.id, kind, levels };
+}
+
+// Nourrir / abreuver le familier principal avec un aliment du garde-manger.
+function feedPet(character, foodId, now = Date.now()) {
+  const F = Rules.PET_FOODS[foodId];
+  if (!F) throw new Error('Aliment inconnu');
+  petsTick(character, now);
+  const P = character.pets;
+  if (!P.active) throw new Error('Tu n\'as pas encore de familier');
+  if (!(P.food[foodId] > 0)) throw new Error(`Plus de ${F.label} : achète-en à l'épicerie de l'enclos`);
+  const pet = findPet(character, P.active);
+  const favorite = Rules.PETS[pet.species].favorite === foodId;
+  applyNeeds(pet, F, favorite ? Rules.PET.favoriteMult : 1);
+  P.food[foodId] -= 1;
+  const levels = petGainXp(pet, F.xp * (favorite ? Rules.PET.favoriteMult : 1));
+  return { pet: pet.id, food: foodId, favorite, levels };
+}
+
+function buyPetFood(character, foodId, count = 1) {
+  const F = Rules.PET_FOODS[foodId];
+  if (!F) throw new Error('Aliment inconnu');
+  upgrade(character);
+  count = Math.max(1, Math.min(Rules.PET_FOOD_MAX, Math.floor(Number(count) || 1)));
+  const have = character.pets.food[foodId] || 0;
+  if (have + count > Rules.PET_FOOD_MAX) throw new Error(`Ton garde-manger contient déjà ${have} ${F.label} (${Rules.PET_FOOD_MAX} au plus)`);
+  const cost = F.price * count;
+  if (character.gold < cost) throw new Error(`Il te faut ${cost} golds`);
+  character.gold -= cost;
+  character.pets.food[foodId] = have + count;
+  return { food: foodId, count, cost };
+}
+
+function buyEnclos(character, itemId) {
+  const E = Rules.PET_ENCLOS[itemId];
+  if (!E) throw new Error('Objet d\'enclos inconnu');
+  petsTick(character); // les besoins baissent à l'ancien rythme jusqu'à maintenant
+  if (character.pets.enclos.includes(itemId)) throw new Error('Tu as déjà cet objet dans ton enclos');
+  if (character.gold < E.price) throw new Error(`Il te faut ${E.price} golds`);
+  character.gold -= E.price;
+  character.pets.enclos.push(itemId);
+  return { item: itemId };
+}
+
+// Une trouvaille, selon l'espèce et le niveau du familier.
+function petFind(character, pet, fx) {
+  const L = pet.level;
+  const find = Rules.PETS[pet.species].find;
+  const luck = 10 + 4 * L;
+  if (find === 'gold') { const gold = Rules.petFindValue(pet.species, L, fx); character.gold += gold; return { kind: 'gold', gold }; }
+  if (find === 'xp') { const xp = Rules.petFindValue(pet.species, L, fx); const levels = addXp(character, xp); return { kind: 'xp', xp, levels }; }
+  if (find === 'chest') {
+    const chests = 1 + (random() < 0.03 * L ? 1 : 0);
+    character.chests += chests;
+    return { kind: 'chest', chests };
+  }
+  if (find === 'potion') {
+    const ids = Object.keys(Rules.CONSUMABLES);
+    const id = ids[rand(0, ids.length - 1)];
+    character.consumables[id] = Math.min(Rules.CONSUMABLE_STACK_MAX, (character.consumables[id] || 0) + 1);
+    const out = { kind: 'potion', potion: id };
+    if (L >= 10 && random() < 0.04) { addKeys(character, 1); out.key = 1; }
+    return out;
+  }
+  // Arme (Troll) ou pièce d'armure / bijou (Maexxna)
+  const slots = find === 'arme' ? ['arme'] : Rules.SLOTS.filter((s) => s !== 'arme' && s !== 'secondaire');
+  const item = makeItem(rollRarity(luck), slots[rand(0, slots.length - 1)], { cls: character.cls });
+  item.isNew = true;
+  character.inventory.push(item);
+  return { kind: 'item', item };
+}
+
+// Récupérer les trouvailles en attente de tous ses familiers.
+function collectFinds(character, now = Date.now()) {
+  petsTick(character, now);
+  const P = character.pets;
+  const fx = Rules.petEnclosEffects(P.enclos);
+  const gifts = [];
+  for (const pet of P.list) {
+    while (pet.finds > 0) {
+      pet.finds -= 1;
+      gifts.push({ pet: pet.id, ...petFind(character, pet, fx) });
+    }
+  }
+  if (!gifts.length) throw new Error('Aucune trouvaille à récupérer pour l\'instant');
+  bump(character, 'petFinds', gifts.length);
+  return { gifts };
+}
+
+function renamePet(character, id, name) {
+  upgrade(character);
+  const pet = findPet(character, id);
+  const clean = String(name || '').replace(/[<>]/g, '').trim().slice(0, Rules.PET.nameMax);
+  if (!clean) throw new Error('Donne-lui un nom');
+  pet.name = clean;
+  return { name: clean };
+}
+
+// Compagnon de combat : un familier débloqué (3 jours au-dessus de 80 %) te suit dans l'arène. null : aucun.
+function setPetFollow(character, id) {
+  petsTick(character);
+  if (id === null || id === '') { character.pets.follow = null; return { follow: null }; }
+  const pet = findPet(character, id);
+  if (!pet.follower) throw new Error(`${pet.name} n'est pas encore prêt : garde sa satisfaction au-dessus de ${Rules.PET.followThreshold} % pendant ${Rules.PET.followDays} jours`);
+  character.pets.follow = id;
+  return { follow: id };
+}
+
+// Fusion d'un fantôme : on garde chaque espèce (la plus avancée en cas de doublon) et on additionne les provisions.
+function mergePets(c, g) {
+  if (!g.pets) return;
+  for (const pet of g.pets.list || []) {
+    const mine = c.pets.list.find((p) => p.species === pet.species);
+    if (!mine) c.pets.list.push(pet);
+    else if (pet.level > mine.level || (pet.level === mine.level && pet.xp > mine.xp)) Object.assign(mine, pet);
+  }
+  for (const [id, n] of Object.entries(g.pets.food || {})) c.pets.food[id] = Math.min(Rules.PET_FOOD_MAX, (c.pets.food[id] || 0) + n);
+  for (const id of g.pets.enclos || []) if (!c.pets.enclos.includes(id)) c.pets.enclos.push(id);
+  if (!c.pets.active && c.pets.list.length) c.pets.active = c.pets.list[0].id;
 }
 
 // ---------- Clés de boss (Défi des boss) ----------
@@ -811,6 +1052,7 @@ function absorbGhost(user, ghost) {
   for (const r of Object.keys(c.lootStats)) c.lootStats[r] += g.lootStats[r];
   for (const [id, n] of Object.entries(g.consumables || {})) c.consumables[id] = (c.consumables[id] || 0) + n;
   if (g.consumableSlot) c.consumables[g.consumableSlot] = (c.consumables[g.consumableSlot] || 0) + 1;
+  mergePets(c, g);
   for (const k of Rules.COUNTERS) {
     // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
     c.counters[k] = Rules.MAX_COUNTERS.includes(k) ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
@@ -833,6 +1075,7 @@ function linkTwitch(user, login, displayName, twitchId) {
 
 function publicCharacter(user) {
   const c = upgrade(user.character);
+  petsTick(c);
   const d = derived(c);
   return {
     ...c,
@@ -857,6 +1100,7 @@ module.exports = {
   newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
+  newPets, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, toggleLock, markSeen, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,

@@ -451,6 +451,22 @@
     },
 
     // Ruée vers l'or : pièce ramassée (le « bling » des vieux jeux), coffre, bonus, jackpot.
+    // Familiers : petit gazouillis content, croc-croc du repas, gorgées, trouvaille, nouveau familier
+    petHappy() {
+      [84, 88, 91, 96].forEach((n, i) => tone(midi(n), 0.09, { type: 'sine', vol: 0.07, delay: i * 0.07 }));
+    },
+    petEat() {
+      for (let i = 0; i < 4; i++) tone(midi(48 + (i % 2) * 3), 0.05, { type: 'square', vol: 0.04, delay: i * 0.13 });
+    },
+    petDrink() {
+      for (let i = 0; i < 3; i++) tone(midi(76 - i * 4), 0.08, { type: 'sine', vol: 0.06, delay: i * 0.16 });
+    },
+    petFind() {
+      [79, 84, 88, 91, 96].forEach((n, i) => tone(midi(n), 0.12, { type: 'triangle', vol: 0.08, delay: i * 0.06 }));
+    },
+    petNew() {
+      fanfare([[72, 0, 0.4], [76, 0.4, 0.4], [79, 0.8, 0.4], [84, 1.2, 1.6]], 0.09, 0.12);
+    },
     coin() {
       tone(midi(83), 0.06, { type: 'square', vol: 0.035 });
       tone(midi(88), 0.18, { type: 'square', vol: 0.035, delay: 0.06 });
@@ -606,6 +622,7 @@
     boss: '/audio/boss.mp3', // BOSSFIGHT — Milky Ways
     dungeon: '/audio/donjon.mp3', // Mattashi — The Final Battle
     gold: '/audio/ruee.mp3', // YV Remix (Ruée vers l'or)
+    rush: '/audio/boss.mp3', // Boss Rush : même musique que le Combat de Boss
   };
 
   const music = (function () {

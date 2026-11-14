@@ -279,6 +279,16 @@ app.post('/api/equip', requirePlayer, action((req) => {
 
 app.post('/api/item/lock', requirePlayer, action((req) => game.toggleLock(req.user.character, String(req.body.itemId || ''))));
 
+// ---------- Familiers (onglet Familier) ----------
+app.post('/api/pet/active', requirePlayer, action((req) => game.setActivePet(req.user.character, String(req.body.id || ''))));
+app.post('/api/pet/action', requirePlayer, action((req) => game.petAction(req.user.character, String(req.body.kind || ''))));
+app.post('/api/pet/feed', requirePlayer, action((req) => game.feedPet(req.user.character, String(req.body.food || ''))));
+app.post('/api/pet/food/buy', requirePlayer, action((req) => game.buyPetFood(req.user.character, String(req.body.food || ''), req.body.count)));
+app.post('/api/pet/enclos/buy', requirePlayer, action((req) => game.buyEnclos(req.user.character, String(req.body.item || ''))));
+app.post('/api/pet/collect', requirePlayer, action((req) => game.collectFinds(req.user.character)));
+app.post('/api/pet/rename', requirePlayer, action((req) => game.renamePet(req.user.character, String(req.body.id || ''), req.body.name)));
+app.post('/api/pet/follow', requirePlayer, action((req) => game.setPetFollow(req.user.character, req.body.id ? String(req.body.id) : null)));
+
 // Badge « Nouveau ! » vu (survol) : sauvegardé sans renvoyer la fiche (le client a déjà retiré le badge).
 app.post('/api/items/seen', requirePlayer, (req, res) => {
   try {
@@ -400,7 +410,15 @@ function participantFromUser(user) {
     consumable: c.consumableSlot || null, // potion équipée pour cette partie
     tactics: c.tactics || null, // style de combat (posture, cible, recul)
     techs: c.techs || [], // techniques signature
+    pet: petFollowOf(c), // compagnon de combat (familier débloqué) : purement cosmétique
   };
+}
+
+function petFollowOf(c) {
+  const P = c.pets;
+  if (!P || !P.follow) return null;
+  const pet = P.list.find((x) => x.id === P.follow && x.follower);
+  return pet ? pet.species : null;
 }
 
 // Nœuds d'arbre tirés au hasard pour un combattant non humain (bots, mannequins d'entraînement).
@@ -581,7 +599,8 @@ app.post('/api/admin/queue/open', requireAdmin, action((req) => {
   const mode = req.body.mode || 'br';
   battle.openQueue(seconds, mode, req.body.boss || 'troll');
   const m = Rules.GAME_MODES[mode];
-  const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}` : '';
+  const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}`
+    : mode === 'rush' ? ' (les boss s\'enchaînent, de plus en plus forts !)' : '';
   twitch.say(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
   return { boss: mode === 'boss' ? battle.bossId : null };
 }));
@@ -620,6 +639,7 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
     battle.start(refreshParticipant, null);
     const B = Rules.BOSSES[battle.bossId];
     twitch.say(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
+      : battle.mode === 'rush' ? `💀 BOSS RUSH ! Premier boss : ${B.icon} ${B.name}. Entre chaque boss, le chat vote : !1, !2 ou !3 !`
       : battle.mode === 'gold' ? `🪙 RUÉE VERS L'OR ! Il pleut des pièces et des coffres pendant ${Rules.GOLD.duration} s : chacun garde ce qu'il ramasse !`
       : battle.mode === 'clans' ? '⚔️ Guerre des clans : détruisez le cristal adverse ! 🔴 Rouges contre 🔵 Bleus !'
       : battle.mode === 'koth' ? `👑 Roi de la Colline : tenez la colline pendant ${Math.round(Rules.KOTH.duration / 60 * 10) / 10} min ! Les morts reviennent au combat.`
@@ -737,7 +757,9 @@ battle.on('coopEnd', (result, fighters) => {
       if (Rules.BOSS_WIN_COUNTER[result.boss.id]) game.bump(user.character, Rules.BOSS_WIN_COUNTER[result.boss.id]);
       // Exploit : boss vaincu seul (aucun autre combattant, bot compris) → débloque sa peau légendaire
       if (fighters.length === 1 && Rules.SOLO_BOSS_COUNTER[result.boss.id]) game.bump(user.character, Rules.SOLO_BOSS_COUNTER[result.boss.id]);
+      petDrop(user, result.boss.id);
     }
+    if (result.mode === 'rush' && result.rush) user.character.counters.rushBest = Math.max(user.character.counters.rushBest || 0, result.rush.killed);
     if (result.mode === 'dungeon') user.character.counters.dungeonBest = Math.max(user.character.counters.dungeonBest || 0, result.room);
     if (result.reward) {
       const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
@@ -747,7 +769,10 @@ battle.on('coopEnd', (result, fighters) => {
     pushMe(user);
   }
   db.save();
-  if (result.mode === 'boss') {
+  if (result.mode === 'rush') {
+    const r = result.reward;
+    twitch.say(`💀 Fin du Boss Rush : ${result.rush.killed} boss vaincu${result.rush.killed > 1 ? 's' : ''} !${r ? ` Tous les héros gagnent ${r.chests} coffres, ${r.xp} XP et ${r.gold} golds.` : ' Aucun boss vaincu cette fois…'}`);
+  } else if (result.mode === 'boss') {
     twitch.say(result.victory
       ? `🏆 ${result.boss.name} est vaincu ! Tous les participants gagnent ${result.reward.chests} coffres, ${result.reward.xp} XP et ${result.reward.gold} golds !`
       : `💀 ${result.boss.name} a écrasé tout le monde… Retentez votre chance !`);
@@ -757,6 +782,33 @@ battle.on('coopEnd', (result, fighters) => {
   }
   notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
+});
+
+// ---------- Familiers : 5 % de chance par boss vaincu ----------
+
+function petDrop(user, bossId) {
+  const r = game.rollPetDrop(user.character, bossId);
+  if (!r) return null;
+  const name = user.twitchDisplayName || user.username;
+  io.to('user:' + user.id).emit('pet', { species: r.pet.species, duplicate: r.duplicate, levels: r.levels });
+  if (!r.duplicate) twitch.say(`🐾 Incroyable ! ${name} a obtenu le familier ${Rules.PETS[bossId].name} ! Il l'attend dans son enclos.`);
+  return r;
+}
+
+// Boss Rush : chaque boss vaincu compte (victoires, familier) dès sa chute.
+battle.on('rushBossDown', (info, fighters) => {
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user) continue;
+    game.upgrade(user.character);
+    game.bump(user.character, 'bossWins');
+    if (Rules.BOSS_WIN_COUNTER[info.boss]) game.bump(user.character, Rules.BOSS_WIN_COUNTER[info.boss]);
+    petDrop(user, info.boss);
+    pushMe(user);
+  }
+  db.save();
+  const B = Rules.BOSSES[info.boss];
+  twitch.say(`💥 ${B.icon} ${B.name} est vaincu ! (${info.killed} boss) Votez pour la suite : !1, !2 ou !3`);
 });
 
 // ---------- Ruée vers l'or ----------
@@ -825,12 +877,16 @@ battle.on('clansEnd', (result, fighters) => {
 const boonText = (id) => { const b = Rules.DUNGEON_BOONS[id]; return `${b.icon} ${b.label} (${b.cmd})`; };
 
 battle.on('pollStart', (poll) => {
+  if (poll.rush) {
+    twitch.say(`🗳️ Boss vaincu ! Votez pendant ${Rules.RUSH.poll.duration} s : ${poll.options.map((o, i) => `!${i + 1} ${o.icon} ${o.label}`).join(' · ')}`);
+    return;
+  }
   twitch.say(`🗳️ Salle ${poll.room} franchie ! Votez dans le chat pendant ${Rules.DUNGEON_POLL.duration} s : ${poll.options.map((o) => boonText(o.id)).join(' OU ')}`);
 });
 
 // Bonus immédiat (golds, XP, coffre) : pour TOUS les participants humains, morts compris.
 battle.on('pollEnd', (result, fighters) => {
-  const b = Rules.DUNGEON_BOONS[result.id];
+  const b = result.info || Rules.DUNGEON_BOONS[result.id]; // Boss Rush : description calculée par la bataille
   if (result.reward) {
     for (const f of fighters) {
       const user = f.userId && db.state.users[f.userId];
@@ -916,7 +972,8 @@ app.post('/api/admin/players/:id/give', requireAdmin, action((req) => {
   const user = adminTarget(req);
   const r = game.adminGive(user.character, req.body || {});
   pushMe(user);
-  io.to('user:' + user.id).emit('reward', { type: 'gift', reward: r.reward, levels: r.levels });
+  if (r.pet) io.to('user:' + user.id).emit('pet', { species: r.pet, duplicate: r.duplicate, from: 'admin' });
+  else io.to('user:' + user.id).emit('reward', { type: 'gift', reward: r.reward, levels: r.levels });
   return r;
 }));
 
@@ -1176,6 +1233,7 @@ function soloRewards(user, result) {
   }
   if (result.solo === 'boss' && result.victory) {
     const id = result.boss.id;
+    petDrop(user, id);
     game.bump(c, 'challengeWins');
     if (Rules.SOLO_BOSS_COUNTER[id]) game.bump(c, Rules.SOLO_BOSS_COUNTER[id]);
     if (Rules.BOSS_WIN_COUNTER[id]) game.bump(c, Rules.BOSS_WIN_COUNTER[id]);

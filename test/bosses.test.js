@@ -29,7 +29,7 @@ const tickFor = (b, seconds) => { for (let i = 0; i < Math.round(seconds / 0.05)
 const byCls = (b, cls) => b.players.find((p) => p.cls === cls);
 
 test('[BOSS-8] boss : choix du boss à l\'ouverture de la file, Troll par défaut', () => {
-  assert.deepStrictEqual(Object.keys(Rules.BOSSES), ['troll', 'dragon', 'sorcier']);
+  assert.deepStrictEqual(Object.keys(Rules.BOSSES), ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna']);
   const b = new Battle();
   b.openQueue(60, 'boss');
   clearTimeout(b.queueTimer);
@@ -344,4 +344,239 @@ test('[BOSS-10] boss : plus de vie face à des combattants expérimentés', () =
     const base = Rules.BOSSES[id].hpBase + perPlayer * 4;
     assert.strictEqual(b.boss.maxHp, Math.round(base * 1.6), id);
   }
+});
+
+// ---------- Grignotor le Mimic ----------
+
+test('[MIM-1, MIM-2] Mimic : stats, vomi (contenu au hasard et effets) et bond', () => {
+  const b = fight('mimic', 4);
+  freeze(b);
+  const M = Rules.BOSSES.mimic;
+  const st = Rules.bossStats(4, 'mimic', 1);
+  assert.strictEqual(st.maxHp, M.hpBase + M.hpPerPlayer * 4);
+  assert.deepStrictEqual([b.boss.maxHp, b.boss.r, b.boss.reduction, b.boss.cleave.ratio], [st.maxHp, 50, 0.2, 0.5]);
+  // Vomi de bile : poison + ralentissement sur les combattants du cône
+  const h = b.players[0];
+  h.x = b.boss.x - 100; h.y = b.boss.y;
+  b.slams.push({ kind: 'vomit', cone: true, loot: 'bile', x: b.boss.x, y: b.boss.y, r: 330, angle: Math.PI, half: 0.45, t: 0.01, warn: 1, ratio: 0.35, poison: 0.025, duration: 5, slow: 0.5 });
+  const hp = h.hp;
+  b.resolveSlams(0.05);
+  assert.ok(h.hp < hp, 'dégâts du vomi');
+  assert.ok(h.buffs.some((x) => x.kind === 'venin' && x.poison === 0.025));
+  assert.strictEqual(b.buffMult(h, 'speed'), 0.5);
+  // Os : saignement ; pièces : assommé
+  b.slams.push({ kind: 'vomit', cone: true, loot: 'os', x: b.boss.x, y: b.boss.y, r: 330, angle: Math.PI, half: 0.45, t: 0.01, warn: 1, ratio: 0, bleed: 0.03, duration: 5 });
+  b.slams.push({ kind: 'vomit', cone: true, loot: 'pieces', x: b.boss.x, y: b.boss.y, r: 330, angle: Math.PI, half: 0.45, t: 0.01, warn: 1, ratio: 0, stun: 1.2 });
+  b.resolveSlams(0.05);
+  assert.ok(h.buffs.some((x) => x.kind === 'saignement'));
+  assert.ok(h.stunUntil > b.time);
+  // Attaques spéciales en alternance : vomi (contenu connu), puis bond
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, M);
+  const v = b.slams[b.slams.length - 1];
+  assert.ok(v.kind === 'vomit' && Object.keys(M.vomit.loot).includes(v.loot));
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, M);
+  const leap = b.slams[b.slams.length - 1];
+  assert.strictEqual(leap.kind, 'leap');
+  assert.strictEqual(b.boss.leaping, true, 'ne frappe pas pendant le saut');
+  b.slams = [leap];
+  leap.t = 0.01;
+  b.resolveSlams(0.05);
+  assert.deepStrictEqual([b.boss.leaping, b.boss.x, b.boss.y], [false, leap.x, leap.y], 'il atterrit au point d\'impact');
+});
+
+test('[MIM-3, MIM-4] Mimic : copies de niveau 1 (2, 4 puis 6) qui le protègent', () => {
+  const b = fight('mimic', 3, ['archer', 'mage', 'guerrier']);
+  freeze(b);
+  const counts = [];
+  for (const ratio of [0.74, 0.49, 0.24]) {
+    b.boss.hp = b.boss.maxHp * ratio;
+    const before = b.adds.length;
+    b.updateBoss(0.05);
+    const wave = b.adds.slice(before);
+    counts.push(wave.length);
+    const of = b.players.find((p) => p.key === wave[0].copyOf);
+    const lvl1 = Rules.derive(Rules.emptyStats(), {}, of.cls);
+    assert.ok(wave.every((c) => c.kind === 'copie' && c.cls === of.cls && c.level === 1 && c.team === b.boss.team));
+    assert.strictEqual(wave[0].maxHp, Math.round(lvl1.maxHp * Rules.MIMIC.copies.hpMult * b.boss.addScale.hp));
+  }
+  assert.deepStrictEqual(counts, [2, 4, 6]);
+  assert.strictEqual(new Set(b.boss.copied).size, 3, 'trois héros différents copiés');
+  // Protégé tant qu'une copie est debout
+  assert.strictEqual(b.boss.guarded, true);
+  const hp = b.boss.hp;
+  b.hit(b.players[0], b.boss, 100);
+  assert.strictEqual(hp - b.boss.hp, Math.round(100 * (1 - b.boss.reduction) * Rules.MIMIC.copies.guard));
+  for (const c of b.adds) if (c.alive) b.kill(b.players[0], c);
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.guarded, false);
+  // Les copies disparaissent avec lui
+  b.updateBoss(0.05);
+  b.boss.hp = b.boss.maxHp * 0.1;
+  b.kill(b.players[0], b.boss);
+  b.checkBossEnd();
+  assert.ok(b.adds.every((a) => !a.alive));
+});
+
+// ---------- Givrenoire la Liche de glace ----------
+
+test('[LCH-1, LCH-2, LCH-3] Liche : gel de 1, puis 2 héros ; un héros gelé ne fait rien et ne peut pas être touché', () => {
+  const b = fight('liche', 4);
+  freeze(b);
+  const L = Rules.BOSSES.liche;
+  assert.deepStrictEqual([b.boss.range, b.boss.projectile], [280, 'ice']);
+  assert.strictEqual(b.boss.maxHp, L.hpBase + L.hpPerPlayer * 4);
+  b.boss.slamIn = 999;
+  b.boss.blinkIn = 999;
+  tickFor(b, L.freeze.first + 0.1);
+  const iced = () => b.players.filter((p) => p.iceUntil > b.time);
+  assert.strictEqual(iced().length, 1, 'phase 1 : un héros gelé');
+  const first = iced()[0];
+  first.regen = 0; // (un Prêtre se régénère : on l'ignore ici)
+  first.buffs = [];
+  // Gelé : ni cible, ni dégâts ; 1 PV par seconde ; soignable ; pas de stamina
+  assert.strictEqual(b.immune(first, b.boss), true);
+  const hp = first.hp;
+  b.hit(b.boss, first, 500);
+  assert.strictEqual(first.hp, hp);
+  first.ult = { id: 'test' };
+  first.stamina = 0;
+  first.staminaTime = 1;
+  tickFor(b, 2);
+  assert.strictEqual(first.stamina, 0, 'pas de stamina');
+  first.ult = null;
+  assert.ok(first.hp <= hp - 1 && first.hp >= hp - 3, 'environ 1 PV par seconde');
+  first.hp -= 10;
+  b.heal(first, 5);
+  assert.ok(first.hp > hp - 15, 'peut être soigné');
+  // Fin du gel, puis 10 s d'attente avant le suivant (un autre héros)
+  tickFor(b, L.freeze.duration - 2 + 0.1);
+  assert.strictEqual(iced().length, 0);
+  tickFor(b, L.freeze.gap);
+  assert.strictEqual(iced().length, 1);
+  assert.notStrictEqual(iced()[0], first, 'un autre héros');
+  // Phase 2 (66 %) : 2 héros à la fois
+  b.boss.hp = b.boss.maxHp * 0.6;
+  b.updateBoss(0.05);
+  for (const p of b.players) p.iceUntil = 0;
+  b.boss.ice.next = b.time;
+  b.updateBoss(0.05);
+  assert.strictEqual(iced().length, 2);
+});
+
+test('[LCH-4, LCH-5] Liche : pics et nova de givre ; à 33 %, les morts se relèvent (ou 3 héros gelés)', () => {
+  const b = fight('liche', 5);
+  freeze(b);
+  const L = Rules.BOSSES.liche;
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, L);
+  const spikes = b.slams.filter((s) => s.kind === 'spike');
+  assert.strictEqual(spikes.length, Math.min(L.spikes.max, L.spikes.base + Math.floor(5 / L.spikes.perPlayers)));
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, L);
+  assert.ok(b.slams.some((s) => s.kind === 'nova' && s.r === L.nova.radius));
+  // Deux héros tombés : relevés en serviteurs à 33 %
+  const dead = b.players.slice(0, 2);
+  for (const p of dead) b.kill(b.boss, p);
+  b.slams = [];
+  b.boss.hp = b.boss.maxHp * 0.6;
+  b.updateBoss(0.05);
+  b.boss.hp = b.boss.maxHp * 0.3;
+  b.updateBoss(0.05);
+  const minions = b.adds.filter((a) => a.kind === 'serviteur');
+  assert.strictEqual(minions.length, 2);
+  assert.deepStrictEqual(minions.map((m) => m.raisedFrom).sort(), dead.map((p) => p.key).sort());
+  assert.strictEqual(minions[0].maxHp, Math.round(dead.find((p) => p.key === minions[0].raisedFrom).maxHp * L.raise.hpRatio));
+  assert.strictEqual(b.boss.ice, null, 'elle cesse de geler');
+  b.kill(b.players[3], b.boss);
+  b.checkBossEnd();
+  assert.ok(minions.every((m) => !m.alive), 'ils meurent avec elle');
+  // Personne n'est tombé : 3 puis 2 héros gelés
+  const c = fight('liche', 5);
+  freeze(c);
+  c.boss.slamIn = 999;
+  c.boss.hp = c.boss.maxHp * 0.3;
+  c.updateBoss(0.05);
+  c.updateBoss(0.05);
+  assert.strictEqual(c.boss.ice.level, 2);
+  c.boss.ice.next = c.time;
+  c.updateBoss(0.05);
+  assert.strictEqual(c.players.filter((p) => p.iceUntil > c.time).length, 3);
+});
+
+// ---------- Maexxna la Veuve noire ----------
+
+test('[MXN-1, MXN-2, MXN-3] Maexxna : morsures venimeuses, toiles qui ralentissent, nuées d\'araignées', () => {
+  const b = fight('maexxna', 6);
+  freeze(b);
+  const X = Rules.BOSSES.maexxna;
+  assert.strictEqual(b.boss.maxHp, X.hpBase + X.hpPerPlayer * 6);
+  // Morsure : poison
+  const h = b.players[0];
+  b.boss.precision = 1;
+  b.attack(b.boss, h);
+  assert.ok(h.buffs.some((x) => x.kind === 'poison' && x.poison === X.poison.dot));
+  // Toile sous un héros : très ralenti
+  b.addWeb(h.x, h.y);
+  b.updateWebs(0.05, X);
+  assert.strictEqual(b.buffMult(h, 'speed'), X.webs.slow);
+  for (let i = 0; i < 12; i++) b.addWeb(100 + i * 10, 300);
+  assert.strictEqual(b.webs.length, X.webs.max);
+  b.webs = [];
+  // Jet de toile : une toile reste au sol ; crachat de venin en cône
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, X);
+  const shot = b.slams.find((s) => s.kind === 'webshot');
+  shot.t = 0.01;
+  b.resolveSlams(0.05);
+  assert.strictEqual(b.webs.length, 1);
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, X);
+  assert.ok(b.slams.some((s) => s.kind === 'spray' && s.cone && s.poison === X.spray.poison));
+  // Araignées : clamp(⌈6/3⌉, 2, 10) par nuée, jamais plus de 14 vivantes
+  b.spawnSpiders(X, 1);
+  const spiders = () => b.adds.filter((a) => a.kind === 'araignee' && a.alive);
+  assert.strictEqual(spiders().length, 2);
+  assert.ok(spiders()[0].poison && spiders()[0].poison.dot === X.spiders.poison.dot);
+  for (let i = 0; i < 20; i++) b.spawnSpiders(X, 1);
+  assert.strictEqual(spiders().length, X.spiders.alive);
+});
+
+test('[MXN-4, MXN-5] Maexxna : cocons à briser, plafond puis frénésie', () => {
+  const b = fight('maexxna', 6);
+  freeze(b);
+  const X = Rules.BOSSES.maexxna;
+  b.boss.slamIn = 999;
+  b.boss.hp = b.boss.maxHp * 0.69;
+  b.updateBoss(0.05);
+  const cocoons = b.adds.filter((a) => a.kind === 'cocon');
+  assert.strictEqual(cocoons.length, Math.min(X.cocoon.max, X.cocoon.base + Math.floor(6 / X.cocoon.perPlayers)));
+  const held = b.players.find((p) => p.key === cocoons[0].holds);
+  assert.strictEqual(held.cocooned, cocoons[0].key);
+  assert.strictEqual(b.immune(held, b.boss), true, 'prisonnier : ni ciblé ni blessé');
+  const hp = held.hp;
+  tickFor(b, 1);
+  assert.ok(held.hp < hp, 'il souffre dans le cocon');
+  // Briser le cocon le libère
+  b.kill(b.players.find((p) => !p.cocooned), cocoons[0]);
+  assert.strictEqual(held.cocooned, null);
+  // Le cocon cède seul au bout de 10 s
+  const other = b.players.find((p) => p.cocooned);
+  if (other) { tickFor(b, X.cocoon.hold + 0.2); assert.strictEqual(other.cocooned, null); }
+  // Plafond à 45 % : intouchable, nuée, pluie de toiles ; retour plus rapide
+  const cd = b.boss.cooldown;
+  b.boss.hp = b.boss.maxHp * 0.44;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.away, true);
+  assert.strictEqual(b.immune(b.boss, b.players[0]), true);
+  tickFor(b, X.ceiling.duration + 0.2);
+  assert.strictEqual(b.boss.away, false);
+  assert.ok(Math.abs(b.boss.cooldown - cd / X.ceiling.returnAttackSpeedMult) < 1e-9);
+  // Frénésie à 20 %
+  const speed = b.boss.speed;
+  b.boss.hp = b.boss.maxHp * 0.19;
+  b.updateBoss(0.05);
+  b.updateBoss(0.05);
+  assert.ok(Math.abs(b.boss.speed - speed * X.frenzy.speedMult) < 1e-9);
 });
