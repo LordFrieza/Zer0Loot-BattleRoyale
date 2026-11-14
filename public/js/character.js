@@ -5,6 +5,9 @@ let queue = null;
 let config = null;
 let invFilter = 'all';
 let invStat = 'all'; // filtre par stat : seulement les objets qui ont cette ligne (triés par sa valeur)
+let invSet = 'all'; // filtre par panoplie ('none' : objets hors panoplie)
+const seenIds = new Set(); // déjà vus pendant cette visite (même si la fiche revient du serveur avant l'envoi)
+const isFresh = (item) => (item.isNew && !seenIds.has(item.id) ? 1 : 0);
 let recycleMode = false;
 const selected = new Set();
 let simLuck = null;
@@ -245,10 +248,27 @@ function renderInventory() {
   $('inv-stat-filters').querySelectorAll('[data-st]').forEach((b) => {
     b.onclick = () => { invStat = b.dataset.st; invPage = 0; renderInventory(); };
   });
-  const list = bySlot
+  // Filtre par panoplie (combinable avec les deux autres) : seules les panoplies présentes sont proposées.
+  const byStat = bySlot.filter((item) => invStat === 'all' || item.lines.some((l) => l.stat === invStat));
+  const setCounts = {};
+  for (const item of byStat) {
+    const k = item.set && Rules.SETS[item.set] ? item.set : 'none';
+    setCounts[k] = (setCounts[k] || 0) + 1;
+  }
+  if (invSet !== 'all' && !setCounts[invSet]) invSet = 'all';
+  const setKeys = Object.keys(Rules.SETS).filter((k) => setCounts[k]);
+  $('inv-set-filters').style.display = setKeys.length ? '' : 'none';
+  $('inv-set-filters').innerHTML = `<span class="muted filter-label">Panoplie :</span><button class="${invSet === 'all' ? 'active' : ''}" data-set="all">Toutes</button>`
+    + setKeys.map((k) => { const S = Rules.SETS[k]; return `<button class="${invSet === k ? 'active' : ''}" data-set="${k}" style="--set:${S.color}" title="${esc(S.label)} : ${S.stats.map((st) => Rules.STAT_INFO[st].label).join(' + ')}">${S.icon} ${esc(S.label)} (${setCounts[k]})</button>`; }).join('')
+    + (setCounts.none ? `<button class="${invSet === 'none' ? 'active' : ''}" data-set="none">Sans panoplie (${setCounts.none})</button>` : '');
+  $('inv-set-filters').querySelectorAll('[data-set]').forEach((b) => {
+    b.onclick = () => { invSet = b.dataset.set; invPage = 0; renderInventory(); };
+  });
+  const list = byStat
     .map((item, i) => ({ item, i }))
-    .filter(({ item }) => invStat === 'all' || item.lines.some((l) => l.stat === invStat))
+    .filter(({ item }) => invSet === 'all' || (invSet === 'none' ? !(item.set && Rules.SETS[item.set]) : item.set === invSet))
     .sort((x, y) => (invStat !== 'all' ? statOf(y.item) - statOf(x.item) : 0)
+      || isFresh(y.item) - isFresh(x.item) // les objets « Nouveau ! » d'abord
       || Rules.RARITIES.indexOf(y.item.rarity) - Rules.RARITIES.indexOf(x.item.rarity) || y.i - x.i)
     .map(({ item }) => item);
   // Retire de la sélection les objets qui ne sont plus dans l'inventaire ou plus affichés (filtre, case « autres classes »).
@@ -284,6 +304,23 @@ function renderInventory() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
   });
+  // Badge « Nouveau ! » (objets sortis d'un coffre) : disparaît au premier survol.
+  const byId = new Map(pageItems.map((it) => [it.id, it]));
+  $('inventory').querySelectorAll('.item').forEach((el) => {
+    const item = byId.get(el.dataset.id);
+    if (!item || !isFresh(item)) return;
+    el.classList.add('is-new');
+    el.insertAdjacentHTML('afterbegin', '<div class="new-badge">Nouveau !</div>');
+    el.addEventListener('pointerenter', () => {
+      item.isNew = false;
+      seenIds.add(item.id);
+      el.classList.remove('is-new');
+      el.classList.add('seen');
+      const badge = el.querySelector('.new-badge');
+      if (badge) badge.remove();
+      markSeen(item.id);
+    }, { once: true });
+  });
   $('inventory').querySelectorAll('.item').forEach((el) => {
     el.classList.toggle('selected', recycleMode && selected.has(el.dataset.id));
     el.classList.toggle('protected', isProtected(el.dataset.id));
@@ -300,6 +337,19 @@ function renderInventory() {
   renderRecycleBar(list);
 }
 
+
+// Objets vus : envoyés au serveur par petits paquets (sans recharger la fiche).
+const seenQueue = new Set();
+let seenTimer = null;
+function markSeen(id) {
+  seenQueue.add(id);
+  clearTimeout(seenTimer);
+  seenTimer = setTimeout(() => {
+    const ids = [...seenQueue];
+    seenQueue.clear();
+    fetch('/api/items/seen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }).catch(() => {});
+  }, 600);
+}
 
 // ---------- Presets d'équipement ----------
 const isProtected = (id) => !!(me && me.character.protectedIds.includes(id));
@@ -699,11 +749,15 @@ function renderEnergy() {
   $('energy-chip').title = `Énergie du mode Solo : ${st.value}/${max} (${energyText(st)})`;
   $('energy-bar').innerHTML = `<div class="pips">${Array.from({ length: max }, (_, i) => `<span class="pip ${i < st.value ? 'on' : ''}">⚡</span>`).join('')}</div>
     <div><b>${st.value} / ${max}</b> énergie${st.value > 1 ? 's' : ''} · <span class="muted">${st.nextAt === null ? 'Énergie au maximum' : `Prochaine recharge dans ${energyText(st).replace('+1 dans ', '')}`}</span></div>`;
+  const keys = me.character.bossKeys || 0;
+  $('key-chip').innerHTML = `🗝️ ${keys}`;
+  $('key-chip').title = `Clés de boss : ${keys} (1 par Défi des boss, trouvées dans les reliques de l'Expédition)`;
+  $('key-bar').innerHTML = `<b>🗝️ ${keys}</b> Clé${keys > 1 ? 's' : ''} de boss · <span class="muted">${keys ? '1 clé par défi' : 'Trouve-en dans les reliques de l\'Expédition'}</span>`;
   const busy = soloRunning();
-  const none = st.value < 1;
+  const cost = { 'exp-start': st.value < 1 ? 'Plus d\'énergie' : '', 'boss-start': keys < Rules.SOLO.keyCost ? 'Il te faut une Clé de boss (reliques de l\'Expédition)' : '' };
   for (const id of ['exp-start', 'boss-start']) {
-    $(id).disabled = busy || none || !me.character.cls;
-    $(id).title = !me.character.cls ? 'Choisis d\'abord une classe' : busy ? 'Une partie solo est déjà en cours' : none ? 'Plus d\'énergie' : '';
+    $(id).disabled = busy || !!cost[id] || !me.character.cls;
+    $(id).title = !me.character.cls ? 'Choisis d\'abord une classe' : busy ? 'Une partie solo est déjà en cours' : cost[id];
   }
 }
 
@@ -1423,7 +1477,7 @@ $('fuse-go').onclick = async () => {
     `Chaque équipe a un <b>cristal</b> dans son camp, qui tire sur les ennemis proches. Détruire le cristal adverse = <b>victoire</b>.`,
     `Les combattants foncent vers le cristal adverse, mais défendent le leur et répondent à qui les attaque.`,
     `Les morts <b>reviennent</b> dans leur camp : 5 s après la première mort, puis <b>5 s de plus à chaque mort</b> (${CL.respawn.max} s au plus).`,
-    `L'équipe la moins nombreuse est renforcée (vie et dégâts, jusqu'à ×${String(CL.underdog).replace('.', ',')}).`,
+    `L'équipe la plus <b>faible</b> (puissance totale de ses membres, pas leur nombre) est renforcée : vie et dégâts × √(puissance forte ÷ puissance faible), jusqu'à ×${String(CL.underdog).replace('.', ',')}.`,
     `À ${Math.floor(CL.overtimeAt / 60)} min ${CL.overtimeAt % 60} s, <b>mort subite</b> : les cristaux prennent ×${CL.overtimeMult}. Au bout de ${CL.duration / 60} min, le cristal le moins entamé gagne.`,
     `Chaque membre de l'équipe gagnante : <b>+${CL.reward.xp} XP, +${CL.reward.gold} golds, +${CL.reward.chests} coffre</b> ; le <b>MVP</b> (le plus de dégâts) gagne 1 coffre de plus. Les paris se font sur une <b>équipe</b>.`,
   ].map((x) => `<li>${x}</li>`).join('');
@@ -2043,7 +2097,19 @@ function renderLoot() {
   const myLuck = me.character.derived.luck;
   const luck = simLuck == null ? myLuck : simLuck;
   const table = Rules.lootTable(luck);
-  $('luck-sim').value = Math.min(85, luck);
+  $('luck-sim').value = Math.min(Rules.LUCK_CAP, luck);
+  // Explications générées à partir des règles (toujours à jour)
+  const pctFr = (x) => String(Math.round(x * 1000) / 1000).replace('.', ',');
+  const t0 = Rules.lootTable(0);
+  const tMax = Rules.lootTable(Rules.LUCK_CAP);
+  const list = (t) => Rules.RARITIES.map((r) => `${pctFr(t[r])} % ${Rules.RARITY_INFO[r].label}`).join(', ');
+  $('luck-explain').innerHTML = `Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
+    Avec <b>0 de chance</b> : ${list(t0)}. Chaque point de chance <b>retire ${pctFr(-Rules.LOOT_PER_LUCK[0])} %</b> aux Communs
+    et le redistribue aux raretés supérieures (${Rules.RARITIES.slice(1).map((r, i) => `+${pctFr(Rules.LOOT_PER_LUCK[i + 1])} % ${Rules.RARITY_INFO[r].label}`).join(', ')}),
+    jusqu'au plafond de <b>${Rules.LUCK_CAP}</b> de chance effective : ${list(tMax)}.
+    Les bonus de Chance de ton équipement <b>s'ajoutent</b> à tes points (un objet « +3 Chance » = +3 de chance effective).`;
+  $('rarity-explain').innerHTML = 'Plus la rareté est haute, plus l\'objet a de lignes de stats : '
+    + Rules.RARITIES.map((r) => { const I = Rules.RARITY_INFO[r]; return `${I.label} ${I.lines} ligne${I.lines > 1 ? 's' : ''} (+${I.min} à +${I.max} %)`; }).join(', ') + '.';
   $('luck-sim-val').textContent = luck;
   const stats = me.character.lootStats || {};
   const drawn = Rules.RARITIES.reduce((s, r) => s + (stats[r] || 0), 0);
@@ -2195,6 +2261,7 @@ socket.on('reward', (r) => {
   const gains = [`+${r.reward.xp} XP`];
   if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
   if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
+  if (r.keys) gains.push(`+${r.keys} 🗝️ Clé${r.keys > 1 ? 's' : ''} de boss`);
   const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !`
     : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !` : REWARD_LABELS[r.type];
   const mult = r.mult && r.mult !== 1 ? ` (×${String(r.mult).replace('.', ',')} ${r.mult > 1 ? '⬆️ adversaires plus forts' : '⬇️ adversaires plus faibles'})` : '';

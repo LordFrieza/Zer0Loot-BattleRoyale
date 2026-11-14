@@ -46,15 +46,25 @@ test('[CLAN-1] clans : équipe demandée, sinon la moins nombreuse ; changement 
   assert.strictEqual(br.publicQueue().participants[0].clan, undefined);
 });
 
-test('[CLAN-2, CLAN-3] clans : camps, bonus de l\'équipe la moins nombreuse, cristaux', () => {
+test('[CLAN-2, CLAN-3] clans : camps, bonus de l\'équipe la plus faible (puissance totale), cristaux', () => {
   const b = started(clans(['rouge', 'rouge', 'rouge', 'rouge', 'bleu']));
   assert.ok(team(b, 'rouge').every((p) => p.x <= 430 && p.team === 'rouge'));
   assert.ok(team(b, 'bleu').every((p) => p.x >= 850 && p.team === 'bleu'));
   const [blue] = team(b, 'bleu');
   const [red] = team(b, 'rouge');
   assert.strictEqual(red.maxHp, 1000);
-  assert.strictEqual(blue.maxHp, Math.round(1000 * 1.5), '√4 = 2, plafonné à 1,5');
-  assert.strictEqual(blue.damage, 150);
+  assert.strictEqual(blue.maxHp, Math.round(1000 * 1.75), 'puissances 4 contre 1 : √4 = 2, plafonné à 1,75');
+  assert.strictEqual(blue.damage, 175);
+  // Un joueur très puissant seul contre trois faibles : c'est l'équipe des trois qui est renforcée
+  const s = new Battle();
+  s.openQueue(60, 'clans');
+  clearTimeout(s.queueTimer);
+  s.join({ key: 'fort', name: 'Fort', level: 1, stats: base(), look: {}, clan: 'rouge', power: 60 });
+  for (let i = 0; i < 3; i++) s.join({ key: 'f' + i, name: 'F' + i, level: 1, stats: base(), look: {}, clan: 'bleu', power: 10 });
+  started(s);
+  assert.strictEqual(team(s, 'rouge')[0].maxHp, 1000, 'pas de bonus pour le joueur seul');
+  assert.ok(Math.abs(s.clans.mult.bleu - Math.sqrt(2)) < 1e-9, '√(60 / 30)');
+  assert.ok(team(s, 'bleu').every((p) => p.maxHp === Math.round(1000 * Math.sqrt(2))));
   const { rouge, bleu } = b.clans.crystals;
   assert.strictEqual(rouge.maxHp, 400 + 60 * 1);
   assert.strictEqual(bleu.maxHp, 400 + 60 * 4);

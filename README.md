@@ -130,9 +130,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Chance : points + bonus d'équipement (les lignes de Chance des objets s'ajoutent en points) → table de loot et forge
   - Stamina : +5 % de vitesse de remplissage de la barre de stamina par point (plafond ×2,5). Barre pleine en 40 s
     (Guerrier), 38 s (Archer), 42 s (Mage), 36 s (Assassin), 40 s (Prêtre) sans bonus. Jamais sur les objets.
-- **Table de loot** : chance 0 → 90 / 6,5 / 2,8 / 0,65 / 0,05 % ; chance 10 → 80 / 11,5 / 6,3 / 1,85 / 0,35 % ;
-  chance 85 → 5 / 49 / 32,55 / 10,85 / 2,6 %.
-  Variation linéaire par point de chance, plafonnée à 85 de chance effective.
+- **Table de loot** : chance 0 → 90 / 6,5 / 2,8 / 0,65 / 0,05 % ; chance 40 → 73 / 15 / 8,75 / 2,69 / 0,56 % ;
+  chance 200 → 5 / 49 / 32,55 / 10,85 / 2,6 %.
+  Variation linéaire par point de chance, plafonnée à 200 de chance effective.
 - **Objets** : 8 emplacements (casque, plastron, gants, ceinture, pantalon, boucles d'oreilles, arme, main secondaire).
   Commun 1 ligne (+1–3 %), Peu commun 2 (+2–6 %), Rare 3 (+4–10 %), Épique 4 (+5–15 %), Légendaire 5 (+6–25 %).
   Les fourchettes se chevauchent : un très bon objet Rare peut valoir mieux qu'un Épique moyen (rappel dans la Forge).
@@ -177,7 +177,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Inventaire (coffres, équipement et presets, coffre personnel paginé par 20 objets, forge et alchimie), Arbre de
   compétences, Style de combat, Boutique (potions puis cosmétiques), Solo, Entraînement, Succès, Classements, Règles.
   Pastilles : points à répartir, coffres à ouvrir, points d'arbre, techniques à choisir, énergie, succès à récupérer.
-  L'énergie du mode Solo s'affiche aussi en haut de la page (⚡). Lien direct possible (`/character.html#boutique`).
+  L'énergie du mode Solo (⚡) et les Clés de boss (🗝️) s'affichent aussi en haut de la page. Lien direct possible (`/character.html#boutique`).
 - **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
   n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse). Filtre **par
   stat** (seulement les objets qui ont la Vie, la Force…, triés par la valeur de cette stat), combinable avec
@@ -228,17 +228,19 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
   On peut aussi y **répéter le mode Solo** (Expédition, ou Défi des boss avec boss et difficulté au choix) **sans dépenser
   d'énergie** et sans rien gagner : mêmes règles qu'en Solo (reliques, vitesse ×1 / ×2, pas de potion), 10 min maximum.
-- **Mode Solo** (onglet Solo) : chaque tentative coûte **1 ⚡ énergie** (3 au maximum, +1 toutes les 10 h). Partie
+- **Mode Solo** (onglet Solo) : une Expédition coûte **1 ⚡ énergie** (3 au maximum, +1 toutes les 10 h), un Défi des boss
+  **1 🗝️ Clé de boss** (sans limite, une offerte au départ, affichées en haut de la page à côté de l'énergie). Partie
   privée, visible seulement par le joueur, en vitesse ×1 ou ×2, sans potion ; on peut abandonner, ou fermer la page (la
-  partie continue et les gains arrivent à la fin). Une partie interrompue par un redémarrage rend son énergie.
+  partie continue et les gains arrivent à la fin). Une partie interrompue par un redémarrage rend son énergie (ou sa clé).
   - **Expédition** : descente sans fin, seul contre des monstres de plus en plus forts (croissance exponentielle). Toutes
     les 3 profondeurs, le joueur choisit **une relique parmi 3** (13 reliques cumulables : dégâts, peau de pierre,
-    vitesse, vol de vie, épines, régénération, critique, soin, ultime, pacte sanglant, vie en plus, trésor…). Butin pour
+    vitesse, vol de vie, épines, régénération, critique, soin, ultime, pacte sanglant, vie en plus, trésor…). Une fois sur
+    cinq, l'une des propositions est une **Clé de boss** : la prendre la garantit à la fin de l'expédition. Butin pour
     `n` profondeurs nettoyées : 2/3 × `(25n + 2n²)` XP, 2/3 × `(20n + 1,5n²)` golds, 1 coffre tous les 5 (ex. profondeur 10 : 300 XP,
     233 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
-  - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (300 XP, 250 golds,
-    1 coffre), Héroïque (600, 500, 2) ou Légendaire (1 000, 900, 4). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
+  - **Défi des boss** : le Troll, le Dragon ou le Magicien, seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
+    2 coffres), Héroïque (900, 750, 3) ou Légendaire (1 500, 1 350, 6). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
     Les boss sont nettement renforcés en solo (le Légendaire est réservé aux meilleurs builds) ; la vie et les dégâts du
     joueur sont ajustés par classe (Archer, Mage et Assassin renforcés, régénération du Prêtre réduite), et un Prêtre seul
     ne purifie pas sa propre malédiction face au Magicien.
@@ -274,8 +276,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
     on peut changer d'équipe tant que la bataille n'a pas commencé. Chaque équipe a un **cristal** dans son camp (400 PV +
     60 par adversaire), qui tire sur les ennemis proches : détruire le cristal adverse = victoire. Les combattants foncent
     vers le cristal adverse, mais défendent le leur et répondent à qui les colle. Les morts reviennent dans leur camp au
-    bout de 5 s, puis **5 s de plus à chaque mort** (30 s au plus). L'équipe la moins nombreuse est renforcée (jusqu'à
-    ×1,5 en vie et dégâts). À 1 min 30, **mort subite** : les cristaux prennent ×3 ; à 3 min, le cristal le moins entamé
+    bout de 5 s, puis **5 s de plus à chaque mort** (30 s au plus). L'équipe la plus faible est renforcée selon la
+    **puissance totale** de ses membres (pas leur nombre) : × √(puissance forte ÷ puissance faible), jusqu'à ×1,75 en vie
+    et dégâts. À 1 min 30, **mort subite** : les cristaux prennent ×3 ; à 3 min, le cristal le moins entamé
     gagne. Chaque membre de l'équipe gagnante reçoit 200 XP, 40 golds et 1 coffre, le **MVP** (le plus de dégâts) 1 coffre
     de plus. Les **paris** se font sur une équipe.
   - **Golden Shower** (mode bonus, dès 1 joueur, 75 s) : **pas de combat**. Les personnages se baladent au hasard et
@@ -339,7 +342,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   en Expédition et record de salle du Raid de Donjon. Chaque classement indique ce qu'il compte.
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
-- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie, effacement d'un
+- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss, effacement d'un
   visage dessiné, bannissement (déconnexion
   immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences

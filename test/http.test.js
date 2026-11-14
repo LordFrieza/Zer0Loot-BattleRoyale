@@ -719,7 +719,7 @@ test('[LOOK-5, LOOK-8] bots sans skin interdit ; visage dessiné : enregistremen
   assert.deepStrictEqual([ch.drawing, ch.look.drawing, ch.owned.includes('dessin')], ['', null, true]);
 });
 
-test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo via l\'API : énergie, expédition, défi, redémarrage', async () => {
+test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, SOLO-9, LOOK-7, ACH-4, ADM-3] mode Solo via l\'API : énergie, clés, expédition, défi, redémarrage', async () => {
   const s = client();
   const id = (await register(s, 'pl_solo_v2')).id;
   assert.match((await s.post('/api/solo/start', { kind: 'expedition' })).data.error, /classe/);
@@ -751,6 +751,7 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo v
     if (b.dungeon.stage === 'relic') b.chooseRelic(b.dungeon.relicChoice[0]);
     b.tick(0.05);
   }
+  b.dungeon.keys = 2; // deux Clés de boss ramassées dans les reliques
   const before = (await meOf(s)).character;
   assert.ok(before.soloActive);
   assert.strictEqual((await s.post('/api/solo/abandon')).status, 200);
@@ -759,6 +760,8 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo v
   assert.strictEqual(ch.gold, before.gold + rw.gold);
   assert.deepStrictEqual([ch.counters.expeditionBest, ch.soloActive, ch.consumableSlot], [2, null, 'vie'], 'record, partie terminée, potion intacte');
   assert.strictEqual(ch.counters.relics, b.dungeon.relics.length, 'reliques choisies comptées');
+  assert.strictEqual(ch.bossKeys, before.bossKeys + 2, 'clés de l\'expédition gardées');
+  assert.strictEqual(ch.bossKeys, 3, 'une clé de départ + deux trouvées');
   const board = (await s.get('/api/leaderboard')).data;
   assert.ok(board.expedition.some((p) => p.id === id && p.value === 2), 'classement Expédition');
   assert.strictEqual(solos.has(id), false);
@@ -771,10 +774,10 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo v
   bb.kill(bb.players[0], bb.boss);
   bb.tick(0.05);
   ch = (await meOf(s)).character;
-  assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value], [1, before.gold + rw.gold + 250, 1]);
+  assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value, ch.bossKeys], [1, before.gold + rw.gold + 375, 2, 2],
+    'le défi coûte une clé, pas d\'énergie');
   assert.deepStrictEqual([ch.counters.sorcierWins, ch.counters.challengeWins, ch.counters.heroWins, ch.counters.heroSorcier], [1, 1, 0, 0],
     'Normal : pas de peau légendaire');
-  await give(id, { energy: 1 });
   assert.strictEqual((await s.post('/api/solo/start', { kind: 'boss', boss: 'sorcier', difficulty: 'legendaire' })).status, 200);
   const bh = solos.get(id);
   bh.stopLoop();
@@ -783,6 +786,21 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, LOOK-7, ACH-4, ADM-3] mode Solo v
   ch = (await meOf(s)).character;
   assert.deepStrictEqual([ch.counters.heroSorcier, ch.counters.heroWins, ch.counters.legendWins, ch.counters.challengeWins], [1, 1, 1, 2]);
   assert.strictEqual(Rules.cosmeticLocked(ch, 'peau_spectre'), false, 'Légendaire : peau débloquée');
+  // Redémarrage pendant un défi : la clé est rendue
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'boss', boss: 'troll' })).status, 200);
+  assert.strictEqual(user.character.bossKeys, 0);
+  assert.match((await s.post('/api/solo/start', { kind: 'boss', boss: 'troll' })).data.error, /déjà/);
+  const rb = solos.get(id);
+  rb.stopLoop();
+  rb.removeAllListeners();
+  solos.delete(id);
+  assert.strictEqual(refundSoloRuns(), 1);
+  assert.deepStrictEqual([user.character.bossKeys, game.energyOf(user.character).value], [1, 2], 'clé rendue, énergie intacte');
+  user.character.bossKeys = 0;
+  assert.match((await s.post('/api/solo/start', { kind: 'boss', boss: 'troll' })).data.error, /Il te faut une Clé de boss/);
+  assert.strictEqual((await give(id, { keys: 2 })).status, 200);
+  assert.strictEqual((await meOf(s)).character.bossKeys, 2, 'l\'admin peut donner des clés');
+  user.character.energy.value = 1;
 
   // Redémarrage pendant une partie : énergie rendue
   assert.strictEqual((await s.post('/api/solo/start', { kind: 'expedition' })).status, 200);
@@ -943,4 +961,20 @@ test('[ACC-9] cookie mal encodé : traité comme une session inconnue, le serveu
   const hs = await fetch(base + '/socket.io/?EIO=4&transport=polling', { headers: bad });
   assert.strictEqual(hs.status, 200);
   assert.strictEqual((await client().get('/healthz')).status, 200);
+});
+
+test('[CHEST-4] badge « Nouveau ! » : objets de coffre marqués, retirés par /api/items/seen', async () => {
+  const n = client();
+  const id = (await register(n, 'pl_new_badge')).id;
+  await give(id, { chests: 1 });
+  const open = await n.post('/api/chest/open', {});
+  assert.strictEqual(open.status, 200, JSON.stringify(open.data));
+  let inv = (await meOf(n)).character.inventory;
+  assert.strictEqual(inv.filter((i) => i.isNew).length, Rules.ITEMS_PER_CHEST);
+  assert.strictEqual((await n.post('/api/items/seen', { ids: 'x' })).status, 400);
+  const r = await n.post('/api/items/seen', { ids: [inv[0].id, inv[1].id] });
+  assert.deepStrictEqual(r.data, { ok: true, seen: 2 });
+  inv = (await meOf(n)).character.inventory;
+  assert.strictEqual(inv.filter((i) => i.isNew).length, Rules.ITEMS_PER_CHEST - 2);
+  assert.strictEqual(db.state.users[id].character.inventory.find((i) => i.id === inv[0].id).isNew, undefined, 'sauvegardé');
 });

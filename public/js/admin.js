@@ -169,7 +169,7 @@ function renderPlayers() {
         <td>${p.record.wins} / ${p.record.kills} / ${p.record.battles}</td>
         <td><div class="row" style="gap:4px;flex-wrap:nowrap">
           <input type="number" min="1" value="100" data-amount>
-          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option></select>
+          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option><option value="keys">clés de boss</option></select>
           <button class="small" data-give>Donner</button></div></td>
         <td><button class="small ${p.banned ? 'secondary' : 'danger'}" data-ban="${p.banned ? '0' : '1'}">${p.banned ? 'Débannir' : 'Bannir'}</button></td>
       </tr>`;
@@ -182,7 +182,7 @@ function renderPlayers() {
       const r = await run(`/api/admin/players/${row.dataset.id}/give`, { [kind]: amount });
       if (r) {
         const p = playersList.find((x) => x.id === row.dataset.id);
-        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : 'XP'} donné(s) à ${p.name}`);
+        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : kind === 'keys' ? 'clé(s) de boss' : 'XP'} donné(s) à ${p.name}`);
         loadPlayers();
       }
     };

@@ -103,13 +103,14 @@ const bets = new Bets(battle);
 const leftover = bets.refundAll();
 if (leftover.length) console.log(`[paris] ${leftover.length} pari(s) remboursé(s) après redémarrage`);
 
-// Mode Solo : une partie interrompue par un redémarrage rend son énergie.
+// Mode Solo : une partie interrompue par un redémarrage rend son énergie (ou sa Clé de boss).
 function refundSoloRuns() {
   let n = 0;
   for (const u of Object.values(db.state.users)) {
     const c = u.character;
     if (!c || !c.soloActive) continue;
-    game.addEnergy(c, 1);
+    if (c.soloActive.kind === 'boss') game.addKeys(c, Rules.SOLO.keyCost);
+    else game.addEnergy(c, 1);
     c.soloActive = null;
     n += 1;
   }
@@ -277,6 +278,17 @@ app.post('/api/equip', requirePlayer, action((req) => {
 }));
 
 app.post('/api/item/lock', requirePlayer, action((req) => game.toggleLock(req.user.character, String(req.body.itemId || ''))));
+
+// Badge « Nouveau ! » vu (survol) : sauvegardé sans renvoyer la fiche (le client a déjà retiré le badge).
+app.post('/api/items/seen', requirePlayer, (req, res) => {
+  try {
+    const seen = game.markSeen(req.user.character, req.body.ids);
+    if (seen) db.save();
+    res.json({ ok: true, seen });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 app.post('/api/unequip', requirePlayer, action((req) => {
   game.unequip(req.user.character, req.body.slot);
@@ -1150,10 +1162,13 @@ function soloRewards(user, result) {
   game.upgrade(c);
   c.soloActive = null;
   let levels = 0;
+  // Clés de boss trouvées dans l'Expédition (jamais en répétition) : gardées même en cas de défaite
+  const keys = result.solo === 'expedition' && !result.training ? Math.max(0, result.keys || 0) : 0;
+  if (keys) game.addKeys(c, keys);
   if (result.reward) {
     const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
     levels = game.grant(c, reward);
-    io.to('user:' + user.id).emit('reward', { type: 'solo_' + result.solo, reward, levels, depth: result.depth });
+    io.to('user:' + user.id).emit('reward', { type: 'solo_' + result.solo, reward, levels, depth: result.depth, keys: keys || undefined });
   }
   if (result.solo === 'expedition') {
     c.counters.expeditionBest = Math.max(c.counters.expeditionBest || 0, result.depth || 0);
@@ -1188,7 +1203,8 @@ app.post('/api/solo/start', requirePlayer, (req, res) => {
     const difficulty = kind === 'boss' ? String(req.body.difficulty || 'normal') : null;
     if (kind === 'boss' && !Rules.BOSS_CHALLENGE[difficulty]) throw new Error('Difficulté inconnue');
     if (solos.size >= Rules.SOLO.maxConcurrent) throw new Error('Trop de parties solo en cours, réessaie dans un instant');
-    game.spendEnergy(c);
+    if (kind === 'boss') game.spendKey(c);
+    else game.spendEnergy(c);
     c.soloActive = { kind, startedAt: Date.now() };
     db.save();
 
@@ -1212,7 +1228,7 @@ app.post('/api/solo/start', requirePlayer, (req, res) => {
     b.soloTimer = setTimeout(() => b.abandon(), Rules.SOLO.maxDuration * 1000);
     b.soloTimer.unref(); // n'empêche jamais le processus de s'arrêter
     pushMe(user);
-    res.json({ ok: true, energy: game.energyOf(c) });
+    res.json({ ok: true, energy: game.energyOf(c), bossKeys: c.bossKeys });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

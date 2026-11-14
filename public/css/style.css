@@ -781,6 +781,9 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 /* ---------- Mode Solo (V2) ---------- */
 .energy-chip { font-weight: 900; color: #ffe14a; text-decoration: none; padding: 3px 10px; border: 1px solid rgba(255,225,74,.45); border-radius: 999px; background: rgba(255,225,74,.08); font-size: 14px; }
 .energy-chip:hover { background: rgba(255,225,74,.18); }
+.key-chip { color: #ffb86b; border-color: rgba(255,184,107,.45); background: rgba(255,184,107,.08); }
+.key-chip:hover { background: rgba(255,184,107,.18); }
+.key-bar { margin: 8px 0; font-size: 14px; }
 .solo-panel { border: 1px solid #7a3cff; background: linear-gradient(135deg, rgba(122,60,255,.14), transparent 55%), var(--panel); }
 .energy-bar { display: flex; align-items: center; gap: 14px; margin: 6px 0 14px; font-size: 14px; }
 .energy-bar .pips { display: flex; gap: 6px; }
@@ -825,6 +828,8 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .training-speed [data-tspeed].active { background: var(--accent); color: #fff; }
 .stat-filters { margin-top: -4px; }
 .stat-filters .filter-label { font-size: 12px; align-self: center; margin-right: 2px; }
+.stat-filters [data-set]:not([data-set="all"]):not([data-set="none"]) { border-color: color-mix(in srgb, var(--set) 55%, transparent); }
+.stat-filters [data-set].active:not([data-set="all"]):not([data-set="none"]) { background: color-mix(in srgb, var(--set) 25%, transparent); color: #fff; }
 .gold-chip { font-weight: 900; color: #ffc93a; padding: 3px 10px; border: 1px solid rgba(255,201,58,.45); border-radius: 999px; background: rgba(255,201,58,.08); font-size: 14px; white-space: nowrap; }
 
 /* ---------- Marché ---------- */
@@ -857,3 +862,14 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .rarity-ranges { font-size: 12px; line-height: 1.6; }
 .power-line { color: #ffb347; font-size: 13px; }
 .power-rules p { margin: 6px 0; font-size: 14px; }
+
+/* « Nouveau ! » : objet sorti d'un coffre, pas encore survolé */
+.item.is-new { padding-top: 22px; border-color: #ff2a3d; box-shadow: 0 0 0 1px #ff2a3d, 0 0 16px rgba(255,42,61,.55); animation: newGlow 1.4s infinite alternate; }
+@keyframes newGlow { from { box-shadow: 0 0 0 1px #ff2a3d, 0 0 8px rgba(255,42,61,.35); } to { box-shadow: 0 0 0 1px #ff2a3d, 0 0 22px rgba(255,42,61,.8); } }
+.item .new-badge {
+  position: absolute; top: -12px; right: -8px; z-index: 2; pointer-events: none;
+  background: linear-gradient(180deg, #ff4d5e, #d1112a); color: #fff; font-weight: 900; font-size: 15px; letter-spacing: .5px;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 8px; border: 2px solid #fff; transform: rotate(6deg);
+  box-shadow: 0 3px 10px rgba(0,0,0,.45); text-shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+.item.seen { transition: border-color .4s, box-shadow .4s; }

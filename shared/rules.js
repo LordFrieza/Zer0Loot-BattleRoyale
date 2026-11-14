@@ -105,24 +105,27 @@
   }
 
   /*
-   * Table de loot (V2 : Épique et Légendaire plus rares, surtout pour les gros chanceux).
-   * Chance 0  : 90 / 6,5 / 2,8 / 0,65 / 0,05
-   * Chance 10 : 80 / 11,5 / 6,3 / 1,85 / 0,35
-   * Chance 85 : 5 / 49 / 32,55 / 10,85 / 2,6
-   * Chaque point de chance déplace linéairement les probabilités (−1 % commun,
-   * +0,5 % peu commun, +0,35 % rare, +0,12 % épique, +0,03 % légendaire).
-   * Plafond à 85 de chance effective pour garder un minimum de communs.
+   * Table de loot. Les probabilités évoluent linéairement de la chance 0 au plafond (200 depuis la 1.3 : les mêmes
+   * taux qu'avant à 85, atteints plus progressivement).
+   * Chance 0   : 90 / 6,5 / 2,8 / 0,65 / 0,05
+   * Chance 40  : 73 / 15 / 8,75 / 2,69 / 0,56
+   * Chance 200 : 5 / 49 / 32,55 / 10,85 / 2,6
    */
   const LOOT_BASE = [90, 6.5, 2.8, 0.65, 0.05];
-  const LOOT_PER_LUCK = [-1, 0.5, 0.35, 0.12, 0.03];
-  const LUCK_CAP = 85;
+  const LUCK_CAP = 200;
+  const LOOT_AT_CAP = [5, 49, 32.55, 10.85, 2.6]; // taux au plafond de chance
+  const LOOT_PER_LUCK = LOOT_BASE.map((b, i) => (LOOT_AT_CAP[i] - b) / LUCK_CAP); // par point de chance
 
   function lootTable(luck) {
     const l = Math.max(0, Math.min(LUCK_CAP, luck || 0));
-    const table = {};
+    const table = { [RARITIES[0]]: 0 };
+    let rest = 100;
     RARITIES.forEach((r, i) => {
-      table[r] = Math.round((LOOT_BASE[i] + LOOT_PER_LUCK[i] * l) * 100) / 100;
+      if (i === 0) return;
+      table[r] = Math.round((LOOT_BASE[i] + (LOOT_AT_CAP[i] - LOOT_BASE[i]) * l / LUCK_CAP) * 100) / 100;
+      rest -= table[r];
     });
+    table[RARITIES[0]] = Math.round(rest * 100) / 100; // Commun = le reste : total de 100 % pile
     return table;
   }
 
@@ -498,12 +501,13 @@
     crystal: { hpBase: 400, hpPerEnemy: 60, radius: 34, damage: 10, cooldown: 1.2, range: 170 },
     respawn: { base: 5, step: 5, max: 30 },
     protect: 1.5,
-    underdog: 1.5, // bonus max (vie et dégâts) de l'équipe la moins nombreuse : √(grande / petite)
+    underdog: 1.75, // bonus max (vie et dégâts) de l'équipe la plus faible : √(puissance forte / puissance faible)
     // Ciblage : un cristal « paraît » plus proche ; un ennemi près de notre cristal ou collé à nous passe avant.
     aggro: { crystal: 0.35, defendRadius: 260, defend: 0.5, selfDefense: 90, close: 0.3 },
     reward: { xp: 200, gold: 40, chests: 1 }, // pour chaque humain de l'équipe gagnante
     mvpChests: 1, // + 1 coffre pour le meilleur combattant (le plus de dégâts)
   };
+  // `big` / `small` : puissance totale (somme des puissances, PWR-1) de l'équipe forte et de l'équipe faible.
   function clanUnderdog(big, small) {
     if (!small || !big || small >= big) return 1;
     return Math.min(CLANS.underdog, Math.sqrt(big / small));
@@ -1169,7 +1173,7 @@
 
   // ---------- Mode Solo (V2) ----------
   /*
-   * Énergie : 3 au maximum, +1 toutes les 10 h ; une tentative (Expédition ou Défi des boss) coûte 1 énergie.
+   * Énergie : 3 au maximum, +1 toutes les 10 h ; une Expédition coûte 1 énergie (le Défi des boss, 1 Clé de boss).
    * Les parties solo sont simulées à part (comme l'entraînement), sans potion, et ne sont vues que par le joueur.
    */
   const SOLO = {
@@ -1178,6 +1182,11 @@
     maxConcurrent: 30,
     speeds: [1, 2],
     maxDuration: 20 * 60, // garde-fou (s) : au-delà, l'expédition s'arrête avec ses gains
+    // 1.4 : Clés de boss, sans limite. Le Défi des boss coûte 1 clé (pas d'énergie). On les trouve dans les choix
+    // de reliques de l'Expédition (relique « Clé de boss », proposée au hasard) ; chaque personnage en reçoit une au départ.
+    keyCost: 1,
+    startKeys: 1,
+    keyChance: 0.2, // chance qu'un choix de reliques propose une Clé de boss
   };
 
   // Énergie après recharge : { value, at } → { value, at, nextAt } (at = début de la recharge en cours).
@@ -1269,6 +1278,8 @@
     pacte: { label: 'Pacte sanglant', icon: '🩸', desc: '+30 % de dégâts, mais +15 % de dégâts subis', effect: { damage: 1.3, taken: 1.15 } },
     plume: { label: 'Plume de phénix', icon: '🪶', desc: 'Une vie en plus (renaît à 50 %)', effect: { life: 0.5 } },
     tresor: { label: 'Carte au trésor', icon: '🗺️', desc: '+25 % d\'XP et de golds à la fin', effect: { reward: 1.25 } },
+    // Rare : jamais tirée avec les autres, elle remplace une des propositions (SOLO.keyChance). Gardée même en cas de défaite.
+    cle_boss: { label: 'Clé de boss', icon: '🗝️', desc: '+1 Clé de boss à la fin de l\'expédition (pour le Défi des boss)', effect: { key: 1 }, rare: true },
   };
 
   /*
@@ -1283,13 +1294,13 @@
     assassin: { hp: 1.3, damage: 1.15 }, pretre: { hp: 1, damage: 1, regen: 0.4 }, none: { hp: 1, damage: 1 },
   };
   const BOSS_CHALLENGE = {
-    normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 300, gold: 250, chests: 1 } },
-    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 600, gold: 500, chests: 2 } },
-    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1000, gold: 900, chests: 4 } },
+    normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 450, gold: 375, chests: 2 } },
+    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 900, gold: 750, chests: 3 } },
+    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1500, gold: 1350, chests: 6 } },
   };
   const SOLO_MODES = {
     expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
-    boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire.' },
+    boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire. Coûte 1 Clé de boss (trouvée dans l\'Expédition).' },
   };
 
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
@@ -1553,7 +1564,7 @@
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
     FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
-    LUCK_CAP, LOOT_BASE, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
+    LUCK_CAP, LOOT_BASE, LOOT_AT_CAP, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,

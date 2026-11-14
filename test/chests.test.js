@@ -75,3 +75,20 @@ test('[EQP-3] recyclage : un objet équipé ne peut pas être recyclé', () => {
   assert.strictEqual(c.equipment.ceinture.id, item.id);
   assert.strictEqual(c.gold, 0);
 });
+
+test('[CHEST-4] objets de coffre marqués « Nouveau » jusqu\'au survol, à l\'équipement ou à la vente', () => {
+  const c = game.newCharacter();
+  c.chests = 2;
+  const { items } = game.openChest(c);
+  assert.strictEqual(items.length, Rules.ITEMS_PER_CHEST);
+  assert.ok(items.every((it) => it.isNew === true));
+  assert.strictEqual(game.markSeen(c, [items[0].id, 'inconnu']), 1);
+  assert.strictEqual(items[0].isNew, undefined);
+  assert.strictEqual(game.markSeen(c, [items[0].id]), 0, 'déjà vu');
+  assert.throws(() => game.markSeen(c, 'pas une liste'), /invalide/);
+  game.equip(c, items[1].id);
+  assert.strictEqual(c.equipment[items[1].slot].isNew, undefined, 'équipé : plus nouveau');
+  assert.strictEqual(items[2].isNew, true);
+  // La forge ne marque pas ses objets
+  assert.strictEqual(game.makeItem('rare').isNew, undefined);
+});

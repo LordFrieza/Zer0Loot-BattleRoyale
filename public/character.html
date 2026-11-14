@@ -18,6 +18,7 @@
       <button type="button" class="mail-btn" id="mail-btn" title="Courrier">✉️<span class="mail-count" id="mail-count"></span></button>
       <span class="gold-chip" id="gold-chip" title="Tes golds"></span>
       <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
+      <a href="#solo" class="energy-chip key-chip" id="key-chip" title="Clés de boss (Défi des boss)"></a>
       <span id="who"></span>
       <div id="sound-ctl"></div>
       <button class="secondary small" onclick="logout()">Déconnexion</button>
@@ -161,6 +162,7 @@
         <span class="muted">(armes et objets secondaires équipables, mais sans ton bonus de classe)</span></label>
       <div class="inv-filters" id="inv-filters"></div>
       <div class="inv-filters stat-filters" id="inv-stat-filters"></div>
+      <div class="inv-filters stat-filters" id="inv-set-filters"></div>
       <div class="inventory" id="inventory"></div>
       <div class="pager" id="inv-pager"></div>
     </div>
@@ -361,8 +363,9 @@
     <section class="tab" data-tab="solo">
     <div class="panel solo-panel" id="solo-panel">
       <h2>🕳️ Mode Solo <span class="sub">Ton aventure à toi, quand tu veux</span><button class="help-btn" type="button">?</button></h2>
-      <p class="muted help">Chaque tentative coûte <b>1 ⚡ énergie</b>. Tu en as <b>3 au maximum</b>, et tu en regagnes
-        <b>une toutes les 10 heures</b>. Les potions ne servent pas en solo. Tu peux regarder la partie en vitesse ×1 ou ×2,
+      <p class="muted help">Une Expédition coûte <b>1 ⚡ énergie</b>. Tu en as <b>3 au maximum</b>, et tu en regagnes
+        <b>une toutes les 10 heures</b>. Le Défi des boss coûte <b>1 🗝️ Clé de boss</b> : tu les trouves au hasard parmi les
+        reliques de l'Expédition, et tu peux en garder autant que tu veux. Les potions ne servent pas en solo. Tu peux regarder la partie en vitesse ×1 ou ×2,
         et même fermer la page : elle continue et tes gains sont crédités à la fin.</p>
       <div class="energy-bar" id="energy-bar"></div>
       <div class="solo-modes" id="solo-modes">
@@ -371,6 +374,8 @@
           <p>Descends le plus profond possible, seul face aux monstres. Toutes les <b>3 profondeurs</b>, choisis une
             <b>relique</b> parmi 3 : elle reste active jusqu'à la fin et se cumule avec les autres. Tu gagnes de l'XP et des golds
             pour chaque étage nettoyé, et <b>1 coffre tous les 5 étages</b> — même si tu tombes.</p>
+          <p class="muted">🗝️ De temps en temps, une <b>Clé de boss</b> fait partie des reliques proposées : prends-la et elle
+            est à toi à la fin de l'expédition (même si tu tombes), à la place d'un bonus de combat.</p>
           <div class="solo-rewards" id="exp-rewards"></div>
           <div class="solo-record" id="exp-record"></div>
           <div class="row"><button class="gold" id="exp-start">🕳️ Partir en expédition (1 ⚡)</button></div>
@@ -381,7 +386,8 @@
             Le vaincre en <b>Héroïque ou Légendaire</b> débloque sa <b>peau légendaire</b> à la boutique !</p>
           <div class="solo-boss-pick" id="solo-boss-pick"></div>
           <div class="solo-diff-pick" id="solo-diff-pick"></div>
-          <div class="row"><button class="gold" id="boss-start">👹 Lancer le défi (1 ⚡)</button></div>
+          <div class="key-bar" id="key-bar"></div>
+          <div class="row"><button class="gold" id="boss-start">👹 Lancer le défi (1 🗝️)</button></div>
         </div>
       </div>
       <div class="solo-run" id="solo-run">
@@ -503,21 +509,15 @@
 
     <div class="panel" id="loot-info">
       <h2>🍀 Comment fonctionne la chance ?</h2>
-      <p class="muted">Chaque coffre contient 3 objets. La rareté de chaque objet est tirée selon le tableau ci-dessous.
-        Avec <b>0 de chance</b>, les probabilités sont 90 % Commun, 6 % Peu commun, 3 % Rare, 0,9 % Épique et 0,1 % Légendaire.
-        Chaque point de chance <b>retire 1 %</b> aux Communs et le redistribue aux raretés supérieures
-        (+0,4 % Peu commun, +0,3 % Rare, +0,21 % Épique, +0,09 % Légendaire). La chance effective est plafonnée à
-        <b>85</b>. Les bonus de Chance de ton équipement <b>s'ajoutent</b> à tes points (un objet « +3 Chance » = +3 de chance effective).</p>
-      <p class="muted">Plus la rareté est haute, plus l'objet a de lignes de stats et de gros bonus :
-        Commun 1 ligne (+1 à 3 %), Peu commun 2 lignes (+4 à 6 %), Rare 3 lignes (+7 à 10 %),
-        Épique 4 lignes (+11 à 15 %), Légendaire 5 lignes (+15 à 25 %).</p>
+      <p class="muted" id="luck-explain"></p>
+      <p class="muted" id="rarity-explain"></p>
       <p class="muted">La colonne <b>« Tes tirages »</b> compte les objets réellement sortis de tes coffres. Sur quelques coffres,
         le hasard peut surprendre (un Légendaire dès le début, ou aucun Rare pendant longtemps) ; plus tu en ouvres, plus
         tes résultats se rapprochent des probabilités affichées.</p>
       <div id="loot-table"></div>
       <div class="luck-sim">
         <span class="muted">Simuler une chance de</span>
-        <input type="range" id="luck-sim" min="0" max="85" step="1" style="flex:1">
+        <input type="range" id="luck-sim" min="0" max="200" step="1" style="flex:1">
         <b id="luck-sim-val" style="width:40px"></b>
         <button class="secondary small" id="luck-reset">Ma chance</button>
       </div>

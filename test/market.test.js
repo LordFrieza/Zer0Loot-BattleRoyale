@@ -112,3 +112,11 @@ test('[MKT-5] courrier et historique : limités, lus, et ajoutés aux anciennes 
   game.upgrade(old);
   assert.deepStrictEqual([old.mail, old.marketLog], [[], []]);
 });
+
+test('[CHEST-4, MKT-1] un objet « Nouveau » mis en vente perd sa marque', () => {
+  const s = player(1000);
+  const it = give(s);
+  it.isNew = true;
+  const { order } = market.sell(s, it.id, 50);
+  assert.strictEqual(order.item.isNew, undefined);
+});

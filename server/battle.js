@@ -226,7 +226,7 @@ class Battle extends EventEmitter {
       this.dungeon = {
         room: 0, stage: 'dark', stageT: (this.solo ? Rules.EXPEDITION.stages : Rules.DUNGEON.stages).dark * 0.35, fightStart: 0, enraged: false,
         poll: null, lastPoll: null, boons: [], monsterMult: 1, rewardMult: 1, // sondages (voir DUNGEON_POLL)
-        cleared: 0, relics: [], relicChoice: null, // Expédition (mode Solo)
+        cleared: 0, relics: [], relicChoice: null, keys: 0, // Expédition (mode Solo) ; keys : Clés de boss trouvées
       };
       this.monsters = [];
       for (const p of this.players) { p.x = -60; p.y = ARENA.h / 2; }
@@ -254,6 +254,7 @@ class Battle extends EventEmitter {
       difficulty: this.solo.difficulty || undefined,
       // Gains déjà assurés (Expédition) : les étages nettoyés
       reward: this.solo.kind === 'expedition' && d ? Rules.expeditionReward(d.cleared, d.rewardMult) : undefined,
+      keys: this.solo.kind === 'expedition' && d && d.keys ? d.keys : undefined, // Clés de boss déjà assurées
     };
   }
 
@@ -928,9 +929,13 @@ class Battle extends EventEmitter {
   openRelics() {
     const d = this.dungeon;
     const hero = this.players[0];
-    const pool = Object.keys(Rules.RELICS).filter((id) => !Rules.RELICS[id].needsUlt || (hero && hero.ult));
+    const pool = Object.keys(Rules.RELICS).filter((id) => !Rules.RELICS[id].rare && (!Rules.RELICS[id].needsUlt || (hero && hero.ult)));
     const options = [];
     while (options.length < Rules.EXPEDITION.relicChoices && pool.length) options.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    // Clé de boss : de temps en temps, elle remplace une proposition (jamais en répétition : elle ne rapporterait rien).
+    if (!this.solo.training && options.length && Math.random() < Rules.SOLO.keyChance) {
+      options[Math.floor(Math.random() * options.length)] = 'cle_boss';
+    }
     d.relicChoice = options;
     this.setStage('relic');
     this.events.push({ t: 'relics', options });
@@ -962,6 +967,7 @@ class Battle extends EventEmitter {
       if (e.life) { p.extraLives = (p.extraLives || 0) + 1; p.reviveRatio = e.life; }
     }
     if (e.reward) d.rewardMult *= e.reward;
+    if (e.key) d.keys += e.key;
   }
 
   // Au-delà de DUNGEON.enrageAt secondes dans une salle, les monstres frappent de plus en plus fort.
@@ -1304,7 +1310,10 @@ class Battle extends EventEmitter {
     }
     const size = { rouge: 0, bleu: 0 };
     for (const p of this.players) size[p.clan] += 1;
-    const mult = { rouge: Rules.clanUnderdog(size.bleu, size.rouge), bleu: Rules.clanUnderdog(size.rouge, size.bleu) };
+    // Bonus de l'équipe la plus faible : selon la puissance totale de chaque équipe (pas le nombre de joueurs).
+    const power = { rouge: 0, bleu: 0 };
+    for (const p of this.players) power[p.clan] += p.power || 1;
+    const mult = { rouge: Rules.clanUnderdog(power.bleu, power.rouge), bleu: Rules.clanUnderdog(power.rouge, power.bleu) };
     const area = { rouge: { x0: 150, y0: 80, x1: 430, y1: ARENA.h - 80 }, bleu: { x0: ARENA.w - 430, y0: 80, x1: ARENA.w - 150, y1: ARENA.h - 80 } };
     const crystals = {};
     for (const clan of ['rouge', 'bleu']) {
@@ -1322,7 +1331,7 @@ class Battle extends EventEmitter {
       });
       this.fighters.push(crystals[clan]);
     }
-    this.clans = { crystals, kills: { rouge: 0, bleu: 0 }, overtime: false, mult, area };
+    this.clans = { crystals, kills: { rouge: 0, bleu: 0 }, overtime: false, mult, power, area };
   }
 
   updateClans() {
@@ -2118,6 +2127,7 @@ class Battle extends EventEmitter {
       this.result.room = d.room;
       this.result.depth = d.cleared;
       this.result.relics = [...d.relics];
+      this.result.keys = d.keys;
       this.result.reward = Rules.expeditionReward(d.cleared, d.rewardMult);
       if (d.rewardMult !== 1) this.result.rewardMult = Math.round(d.rewardMult * 1000) / 1000;
     } else {

@@ -4,12 +4,14 @@ const { Rules, game } = require('./helpers');
 
 test('[LOOT-3] table de loot : valeurs du cahier des charges', () => {
   assert.deepStrictEqual(Rules.lootTable(0), { commun: 90, peu_commun: 6.5, rare: 2.8, epique: 0.65, legendaire: 0.05 });
-  assert.deepStrictEqual(Rules.lootTable(10), { commun: 80, peu_commun: 11.5, rare: 6.3, epique: 1.85, legendaire: 0.35 });
-  assert.deepStrictEqual(Rules.lootTable(85), { commun: 5, peu_commun: 49, rare: 32.55, epique: 10.85, legendaire: 2.6 });
+  assert.deepStrictEqual(Rules.lootTable(40), { commun: 73, peu_commun: 15, rare: 8.75, epique: 2.69, legendaire: 0.56 });
+  assert.strictEqual(Rules.LUCK_CAP, 200);
+  assert.deepStrictEqual(Rules.lootTable(200), { commun: 5, peu_commun: 49, rare: 32.55, epique: 10.85, legendaire: 2.6 }, 'les taux d\'avant à 85');
+  assert.ok(Rules.lootTable(85).legendaire < 2.6, '85 de chance ne suffit plus pour le maximum');
 });
 
 test('[LOOT-3] table de loot : total à 100 % et plafond', () => {
-  for (const luck of [0, 5, 33, 85, 500]) {
+  for (const luck of [0, 5, 33, 85, 137, 200, 500]) {
     const sum = Object.values(Rules.lootTable(luck)).reduce((a, b) => a + b, 0);
     assert.ok(Math.abs(sum - 100) < 1e-6, `luck ${luck} → ${sum}`);
   }
@@ -66,6 +68,6 @@ test('[STAT-5] chance : les bonus d\'équipement s\'ajoutent (même avec 0 point
   c.inventory.push(ring);
   game.equip(c, ring.id);
   assert.strictEqual(game.derived(c).luck, 3);
-  assert.strictEqual(game.publicCharacter({ character: c }).lootTable.commun, 87);
+  assert.strictEqual(game.publicCharacter({ character: c }).lootTable.commun, 88.72);
   assert.strictEqual(Rules.fuseUpgradeChance('commun', game.derived(c).luck), 41.5);
 });

@@ -52,6 +52,8 @@ function upgrade(character) {
   // V2 : énergie du mode Solo (pleine pour les anciens personnages) et partie solo en cours
   if (!character.energy || !Number.isFinite(character.energy.value)) character.energy = { value: Rules.SOLO.energyMax, at: Date.now() };
   if (character.soloActive === undefined) character.soloActive = null;
+  // 1.4 : Clés de boss (une offerte aux anciens personnages, qui pouvaient jusqu'ici défier les boss avec l'énergie)
+  if (!Number.isFinite(character.bossKeys)) character.bossKeys = Rules.SOLO.startKeys;
   // 1.3 : courrier (ventes, expirations) et historique du marché
   if (!Array.isArray(character.mail)) character.mail = [];
   if (!Array.isArray(character.marketLog)) character.marketLog = [];
@@ -98,6 +100,7 @@ function newCharacter() {
     drawingVer: 0, // version du dessin (les clients le gardent en cache)
     energy: { value: Rules.SOLO.energyMax, at: Date.now() }, // énergie du mode Solo (voir Rules.energyState)
     soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
+    bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
     mail: [], // courrier : [{ id, at, text, read, kind }] (ventes au marché, objets revenus…)
     marketLog: [], // historique du marché : [{ at, kind: listed|sold|bought|cancelled|expired, item, price, … }]
   };
@@ -249,6 +252,7 @@ function openChest(character) {
   const luck = derived(character).luck;
   const items = [];
   for (let i = 0; i < Rules.ITEMS_PER_CHEST; i++) items.push(makeItem(rollRarity(luck), null, { cls: character.cls }));
+  for (const it of items) it.isNew = true; // badge « Nouveau ! » jusqu'à ce que le joueur le survole (markSeen)
   character.inventory.push(...items);
   upgrade(character);
   for (const it of items) character.lootStats[it.rarity] += 1;
@@ -288,6 +292,7 @@ function equip(character, itemId) {
   const idx = character.inventory.findIndex((i) => i.id === itemId);
   if (idx < 0) throw new Error('Objet introuvable');
   const item = character.inventory[idx];
+  delete item.isNew;
   character.inventory.splice(idx, 1);
   const previous = character.equipment[item.slot];
   if (previous) character.inventory.push(previous);
@@ -429,6 +434,18 @@ function toggleLock(character, itemId) {
   if (item.locked) delete item.locked;
   else item.locked = true;
   return { locked: !!item.locked };
+}
+
+// Objets « Nouveau ! » vus (survolés) : le badge disparaît. Retourne le nombre d'objets mis à jour.
+function markSeen(character, itemIds) {
+  upgrade(character);
+  if (!Array.isArray(itemIds)) throw new Error('Liste d\'objets invalide');
+  const ids = new Set(itemIds.slice(0, 500).map(String));
+  let n = 0;
+  for (const item of character.inventory.concat(Object.values(character.equipment).filter(Boolean))) {
+    if (item.isNew && ids.has(item.id)) { delete item.isNew; n += 1; }
+  }
+  return n;
 }
 
 // Enregistre l'équipement actuel dans un nouveau preset, ou remplace un preset existant (id).
@@ -690,14 +707,16 @@ function clearDrawing(character) {
 
 // ---------- Admin ----------
 
-function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0 }) {
+function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys = 0 }) {
   const clean = (v) => Math.max(0, Math.min(1e7, Math.floor(Number(v) || 0)));
   const reward = { gold: clean(gold), chests: clean(chests), xp: clean(xp) };
   const extra = clean(energy);
-  if (!reward.gold && !reward.chests && !reward.xp && !extra) throw new Error('Rien à donner');
+  const extraKeys = Math.min(1000, clean(keys));
+  if (!reward.gold && !reward.chests && !reward.xp && !extra && !extraKeys) throw new Error('Rien à donner');
   if (extra) addEnergy(character, extra);
+  if (extraKeys) addKeys(character, extraKeys);
   const levels = grant(character, reward);
-  return { reward, levels, energy: extra || undefined };
+  return { reward, levels, energy: extra || undefined, keys: extraKeys || undefined };
 }
 
 // ---------- Énergie du mode Solo ----------
@@ -718,6 +737,19 @@ function spendEnergy(character, now = Date.now()) {
   }
   character.energy.value -= 1;
   if (st.value === Rules.SOLO.energyMax) character.energy.at = now; // la recharge démarre maintenant
+}
+
+// ---------- Clés de boss (Défi des boss) ----------
+
+function spendKey(character) {
+  upgrade(character);
+  if (character.bossKeys < Rules.SOLO.keyCost) throw new Error('Il te faut une Clé de boss : trouve-en dans les reliques de l\'Expédition');
+  character.bossKeys -= Rules.SOLO.keyCost;
+}
+
+function addKeys(character, n = 1) {
+  upgrade(character);
+  character.bossKeys += Math.max(0, Math.floor(n) || 0);
 }
 
 // Rend de l'énergie (remboursement, cadeau de l'admin), sans dépasser le maximum.
@@ -823,9 +855,9 @@ function publicCharacter(user) {
 module.exports = {
   newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
-  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy,
+  bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
-  protectedIds, toggleLock, savePreset, applyPreset, deletePreset,
+  protectedIds, toggleLock, markSeen, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,
   talentState, learnTalent, resetTalents,
 };

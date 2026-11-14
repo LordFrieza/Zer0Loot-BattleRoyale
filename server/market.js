@@ -92,6 +92,7 @@ function sell(user, itemId, price, now = Date.now()) {
   if (c.gold < tax) throw new Error(`Mettre en vente à ce prix coûte ${tax} golds de taxe`);
   c.gold -= tax;
   c.inventory = c.inventory.filter((i) => i.id !== item.id);
+  delete item.isNew;
   const order = { id: crypto.randomUUID(), sellerId: user.id, item, price, createdAt: now, expiresAt: now + M.durationMs };
   state().orders.push(order);
   log(user, { at: now, kind: 'listed', item: itemLabel(item), rarity: item.rarity, price, tax });

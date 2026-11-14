@@ -188,11 +188,62 @@ test('[SOLO-6] défi des boss : boss à ta mesure, renforcé selon la difficult�
   leg.kill(leg.players[0], leg.boss);
   leg.tick(0.05);
   assert.deepStrictEqual([res.solo, res.victory, res.difficulty, res.boss.id], ['boss', true, 'legendaire', 'troll']);
-  assert.deepStrictEqual(res.reward, { xp: 1000, gold: 900, chests: 4 });
+  assert.deepStrictEqual(res.reward, { xp: 1500, gold: 1350, chests: 6 });
+  // 1.4 : butin +50 % (arrondi) depuis l'arrivée des Clés de boss
+  assert.deepStrictEqual(['normal', 'heroique', 'legendaire'].map((d) => Rules.BOSS_CHALLENGE[d].reward),
+    [{ xp: 450, gold: 375, chests: 2 }, { xp: 900, gold: 750, chests: 3 }, { xp: 1500, gold: 1350, chests: 6 }]);
   normal.on('coopEnd', (r) => { res = r; });
   normal.kill(normal.boss, normal.players[0]);
   normal.tick(0.05);
   assert.deepStrictEqual([res.victory, res.reward], [false, null]);
+});
+
+test('[SOLO-9] clés de boss : une au départ, sans limite, trouvées dans les reliques, 1 par défi', () => {
+  const c = game.newCharacter();
+  assert.strictEqual(c.bossKeys, 1, 'une clé offerte au départ');
+  const old = game.newCharacter();
+  delete old.bossKeys;
+  game.upgrade(old);
+  assert.strictEqual(old.bossKeys, 1, 'anciennes sauvegardes : une clé offerte');
+  game.spendKey(c);
+  assert.strictEqual(c.bossKeys, 0);
+  assert.throws(() => game.spendKey(c), /Il te faut une Clé de boss/);
+  game.addKeys(c, 250);
+  assert.strictEqual(c.bossKeys, 250, 'pas de maximum');
+  assert.deepStrictEqual(game.adminGive(c, { keys: 3 }).keys, 3);
+  assert.strictEqual(c.bossKeys, 253);
+  // La Clé de boss n'est jamais tirée comme une relique ordinaire, seulement à SOLO.keyChance
+  assert.ok(Rules.RELICS.cle_boss.rare);
+  const real = Math.random;
+  try {
+    Math.random = () => 0; // tirage forcé : la clé est proposée
+    const b = soloBattle('expedition');
+    runUntil(b, (x) => x.dungeon.stage === 'relic');
+    assert.ok(b.dungeon.relicChoice.includes('cle_boss'));
+    assert.strictEqual(new Set(b.dungeon.relicChoice).size, 3);
+    assert.strictEqual(b.chooseRelic('cle_boss'), 'cle_boss');
+    assert.strictEqual(b.frame().solo.keys, 1);
+    let res = null;
+    b.on('coopEnd', (r) => { res = r; });
+    b.abandon();
+    assert.strictEqual(res.keys, 1, 'gardée à la fin de l\'expédition');
+    Math.random = () => 0.99; // au-dessus de keyChance : pas de clé
+    const n = soloBattle('expedition');
+    runUntil(n, (x) => x.dungeon.stage === 'relic');
+    assert.ok(!n.dungeon.relicChoice.includes('cle_boss'));
+    // Répétition (entraînement) : jamais de clé
+    Math.random = () => 0;
+    const t = new Battle({ solo: { kind: 'expedition', level: 1, training: true } });
+    t.openQueue(60, 'dungeon', 'troll');
+    clearTimeout(t.queueTimer);
+    t.join({ key: 'u1', userId: 1, name: 'Solo', level: 1, cls: 'mage', look: {}, stats: base({ maxHp: 1000, speed: 100 }) });
+    t.start(null, null);
+    t.stopLoop();
+    runUntil(t, (x) => x.dungeon.stage === 'relic');
+    assert.ok(!t.dungeon.relicChoice.includes('cle_boss'));
+  } finally {
+    Math.random = real;
+  }
 });
 
 test('[SOLO-8] défi du Magicien : un Prêtre seul ne se purifie pas lui-même (en groupe, si)', () => {
