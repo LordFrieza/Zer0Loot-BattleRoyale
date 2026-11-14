@@ -174,7 +174,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
     donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
     (profondeur 25 en Expédition), aura du champion (100 victoires).
 - **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
-  Inventaire (coffres, équipement et presets, coffre personnel paginé par 20 objets, forge et alchimie), Arbre de
+  Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
+  avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
+  jusqu'au survol, forge et alchimie), Arbre de
   compétences, Style de combat, Boutique (potions puis cosmétiques), Solo, Entraînement, Succès, Classements, Règles.
   Pastilles : points à répartir, coffres à ouvrir, points d'arbre, techniques à choisir, énergie, succès à récupérer.
   L'énergie du mode Solo (⚡) et les Clés de boss (🗝️) s'affichent aussi en haut de la page. Lien direct possible (`/character.html#boutique`).

@@ -147,12 +147,15 @@ function renderEquipment() {
     const lines = item.lines.map((l) => Rules.formatLine(l.stat, l.value)).join('<br>');
     const cb = Rules.itemClassBonus(item, me.character.cls);
     return `<div class="slot filled rarity-${item.rarity}" data-slot="${slot}">
-      <button type="button" class="lock-btn ${item.locked ? 'on' : ''}" data-lock="${item.id}" title="${item.locked ? 'Verrouillé : cliquer pour déverrouiller' : 'Verrouiller (protège de la forge, de l\'alchimie, du recyclage et du marché)'}">${item.locked ? '🔒' : '🔓'}</button>
+      <div class="slot-actions">
+        <button type="button" class="lock-btn ${item.locked ? 'on' : ''}" data-lock="${item.id}" title="${item.locked ? 'Verrouillé : cliquer pour déverrouiller' : 'Verrouiller (protège de la forge, de l\'alchimie, du recyclage et du marché)'}">${item.locked ? '🔒' : '🔓'}</button>
+        <button type="button" class="unequip-btn" data-unequip="${slot}" title="Retirer cet objet (il retourne dans ton coffre personnel)">✕ Retirer</button>
+      </div>
       <div class="slot-label">${label}</div>
       <div class="c-${item.rarity}" style="font-weight:800;margin:4px 0">${esc(item.name)}</div>${lines}${cb ? `<br><span class="cls-bonus">★ ${Rules.formatLine(cb.stat, cb.value)} (bonus de classe)</span>` : ''}</div>`;
   }).join('');
-  $('equipment').querySelectorAll('.slot.filled').forEach((el) => {
-    el.onclick = () => act('/api/unequip', { slot: el.dataset.slot }, 'unequip');
+  $('equipment').querySelectorAll('[data-unequip]').forEach((b) => {
+    b.onclick = () => act('/api/unequip', { slot: b.dataset.unequip }, 'unequip');
   });
   $('equipment').querySelectorAll('[data-lock]').forEach((b) => {
     b.onclick = (e) => { e.stopPropagation(); toggleLock(b.dataset.lock); };

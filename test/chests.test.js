@@ -76,7 +76,7 @@ test('[EQP-3] recyclage : un objet équipé ne peut pas être recyclé', () => {
   assert.strictEqual(c.gold, 0);
 });
 
-test('[CHEST-4] objets de coffre marqués « Nouveau » jusqu\'au survol, à l\'équipement ou à la vente', () => {
+test('[CHEST-4] objets de coffre et de fusion marqués « Nouveau » jusqu\'au survol, à l\'équipement ou à la vente', () => {
   const c = game.newCharacter();
   c.chests = 2;
   const { items } = game.openChest(c);
@@ -89,6 +89,12 @@ test('[CHEST-4] objets de coffre marqués « Nouveau » jusqu\'au survol, à l\'
   game.equip(c, items[1].id);
   assert.strictEqual(c.equipment[items[1].slot].isNew, undefined, 'équipé : plus nouveau');
   assert.strictEqual(items[2].isNew, true);
-  // La forge ne marque pas ses objets
+  // Fusion de la forge : l'objet créé est aussi « Nouveau » (un objet tiré hors coffre/forge ne l'est pas)
   assert.strictEqual(game.makeItem('rare').isNew, undefined);
+  const f = game.newCharacter();
+  f.gold = 10000;
+  for (let i = 0; i < Rules.FUSE_COUNT; i++) f.inventory.push(game.makeItem('commun'));
+  const { item } = game.fuse(f, f.inventory.map((i) => i.id));
+  assert.strictEqual(item.isNew, true);
+  assert.strictEqual(f.inventory.find((i) => i.id === item.id).isNew, true);
 });

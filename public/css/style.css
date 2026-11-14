@@ -175,8 +175,7 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px
   font-size: 12px; position: relative;
 }
 .slot .slot-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-.slot.filled { border-style: solid; cursor: pointer; }
-.slot.filled:hover::after { content: 'Retirer'; position: absolute; top: 6px; right: 8px; color: var(--danger); font-weight: 700; }
+.slot.filled { border-style: solid; }
 
 .item {
   background: var(--bg2); border: 2px solid var(--border); border-radius: 10px; padding: 10px; font-size: 12px;
@@ -337,7 +336,15 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .cls-tag.other { opacity: .65; }
 .cls-bonus { color: #7dff9b; font-weight: 800; font-size: 12px; }
 .slot.filled { position: relative; }
-.lock-btn { position: absolute; top: 6px; right: 6px; background: transparent; border: none; box-shadow: none; padding: 2px 4px; font-size: 14px; cursor: pointer; opacity: .55; }
+.slot-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; align-items: center; }
+.slot.filled .slot-label { padding-right: 104px; }
+.lock-btn { background: transparent; border: none; box-shadow: none; padding: 2px 4px; font-size: 14px; cursor: pointer; opacity: .55; }
+.unequip-btn {
+  background: rgba(255,77,109,.1); border: 1px solid rgba(255,77,109,.45); color: #ff8fa3; box-shadow: none;
+  padding: 2px 8px; font-size: 11px; font-weight: 800; border-radius: 6px; cursor: pointer; opacity: .75; transition: opacity .15s, background .15s;
+}
+.slot.filled:hover .unequip-btn { opacity: 1; }
+.unequip-btn:hover { background: rgba(255,77,109,.28); color: #fff; }
 .lock-btn.on, .lock-btn:hover { opacity: 1; }
 .lock-chip.on { border-color: #ffc93a; color: #ffc93a; }
 .modal { position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center; background: rgba(5,3,18,.85); padding: 20px; backdrop-filter: blur(3px); }

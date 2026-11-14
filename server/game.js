@@ -348,6 +348,7 @@ function fuse(character, itemIds) {
   // 3 pièces de la même panoplie → le résultat fait partie de cette panoplie.
   const sameSet = items[0].set && items.every((i) => i.set === items[0].set) ? items[0].set : undefined;
   const item = makeItem(resultRarity, null, { cls: character.cls, ownChance: 1, set: sameSet });
+  item.isNew = true; // badge « Nouveau ! », comme un objet de coffre
   character.inventory.push(item);
   bump(character, 'fused');
   if (item.rarity === 'legendaire') bump(character, 'legendary');
