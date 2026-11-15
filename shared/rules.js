@@ -1699,18 +1699,18 @@
     eyes: {
       label: 'Yeux',
       options: {
-        points: { label: 'Points' }, ronds: { label: 'Ronds' }, malicieux: { label: 'Malicieux' }, endormis: { label: 'Endormis' },
+        aucun: { label: 'Invisibles' }, points: { label: 'Points' }, ronds: { label: 'Ronds' }, malicieux: { label: 'Malicieux' }, endormis: { label: 'Endormis' },
         colere: { label: 'En colère' }, etoiles: { label: 'Étoiles' }, croix: { label: 'K.O.' },
       },
     },
     brows: {
       label: 'Sourcils',
-      options: { aucun: { label: 'Aucun' }, droits: { label: 'Droits' }, fronces: { label: 'Froncés' }, inquiets: { label: 'Inquiets' }, epais: { label: 'Épais' } },
+      options: { aucun: { label: 'Invisibles' }, droits: { label: 'Droits' }, fronces: { label: 'Froncés' }, inquiets: { label: 'Inquiets' }, epais: { label: 'Épais' } },
     },
     mouth: {
       label: 'Bouche',
       options: {
-        aucune: { label: 'Aucune' }, sourire: { label: 'Sourire' }, grand: { label: 'Grand sourire' }, neutre: { label: 'Neutre' },
+        aucune: { label: 'Invisible' }, sourire: { label: 'Sourire' }, grand: { label: 'Grand sourire' }, neutre: { label: 'Neutre' },
         surprise: { label: 'Surprise' }, grimace: { label: 'Grimace' }, langue: { label: 'Langue' }, crocs: { label: 'Crocs' },
       },
     },

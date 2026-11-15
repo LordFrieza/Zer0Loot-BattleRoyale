@@ -266,6 +266,8 @@
     ctx.lineWidth = 1.3;
     ctx.lineCap = 'round';
     switch (app.eyes) {
+      case 'aucun': // yeux invisibles
+        break;
       case 'ronds':
         for (const ex of [E1, E2]) {
           ctx.fillStyle = '#fff';

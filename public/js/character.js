@@ -1623,7 +1623,7 @@ const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 's
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
   document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === name));
-  document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   try { localStorage.setItem('zl_tab', name); } catch (e) { /* ignore */ }
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
@@ -1631,7 +1631,7 @@ function showTab(name) {
   if (name === 'familier' && me) renderPets();
 }
 
-document.querySelectorAll('#tabs-nav [data-tab]').forEach((b) => {
+document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => {
   b.onclick = () => { showTab(b.dataset.tab); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 });
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));

@@ -13,15 +13,22 @@
 <body>
   <header class="topbar">
     <a class="logo" href="/"><img src="/img/logo.png" alt="Zer0Loot"><small>BATTLE ROYALE</small></a>
+    <nav class="top-tabs" id="top-tabs" aria-label="Infos">
+      <button data-tab="historique" title="Historique"><span class="tt-ico">📜</span><span class="tt-label">Historique</span></button>
+      <button data-tab="statistiques" title="Statistiques"><span class="tt-ico">📊</span><span class="tt-label">Stats</span></button>
+      <button data-tab="succes" title="Succès"><span class="tt-ico">🏅</span><span class="tt-label">Succès</span><span class="tab-badge" data-badge="succes"></span></button>
+      <button data-tab="classements" title="Classements"><span class="tt-ico">🏆</span><span class="tt-label">Classements</span></button>
+      <button data-tab="regles" title="Règles du jeu"><span class="tt-ico">📖</span><span class="tt-label">Règles</span></button>
+    </nav>
     <div class="right">
-      <a href="/arena.html" target="_blank">Arène en direct</a>
+      <a href="/arena.html" target="_blank" class="arena-link" title="Arène en direct">📺<span class="wide-only"> Arène en direct</span></a>
       <button type="button" class="mail-btn" id="mail-btn" title="Courrier">✉️<span class="mail-count" id="mail-count"></span></button>
       <span class="gold-chip" id="gold-chip" title="Tes golds"></span>
       <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
       <a href="#solo" class="energy-chip key-chip" id="key-chip" title="Clés de boss (Défi des boss)"></a>
       <span id="who"></span>
       <div id="sound-ctl"></div>
-      <button class="secondary small" onclick="logout()">Déconnexion</button>
+      <button class="secondary small logout-btn" onclick="logout()" title="Déconnexion"><span class="wide-only">Déconnexion</span><span class="narrow-only">⏻</span></button>
     </div>
   </header>
 
@@ -52,18 +59,13 @@
     <nav class="tabs-nav" id="tabs-nav">
       <button data-tab="perso">🧙 Personnage <span class="tab-badge" data-badge="perso"></span></button>
       <button data-tab="inventaire"><i class="ico-chest"></i> Inventaire <span class="tab-badge" data-badge="inventaire"></span></button>
-      <button data-tab="arbre" id="tab-arbre">🌳 Arbre de compétences <span class="tab-badge" data-badge="arbre"></span></button>
-      <button data-tab="combat">⚔️ Style de combat <span class="tab-badge" data-badge="combat"></span></button>
+      <button data-tab="arbre" id="tab-arbre" title="Arbre de compétences">🌳 Compétences <span class="tab-badge" data-badge="arbre"></span></button>
+      <button data-tab="combat" title="Style de combat">⚔️ Combat <span class="tab-badge" data-badge="combat"></span></button>
       <button data-tab="boutique">🛍️ Boutique</button>
       <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
       <button data-tab="familier">🐾 Familier <span class="tab-badge" data-badge="familier"></span></button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
-      <button data-tab="historique">📜 Historique</button>
-      <button data-tab="statistiques">📊 Statistiques</button>
-      <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
-      <button data-tab="classements">🏆 Classements</button>
-      <button data-tab="regles">📖 Règles</button>
     </nav>
 
     <section class="tab" data-tab="perso">

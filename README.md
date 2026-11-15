@@ -161,7 +161,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   répartie en golds entiers sans perte. Si personne n'a parié sur le gagnant, si la bataille est annulée ou si le serveur
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Apparence** (onglet Personnage, gratuit) : couleur du personnage (15 teintes ou automatique selon le pseudo),
-  7 styles d'yeux, 5 de sourcils, 8 de bouches. Visible sur la fiche, dans l'arène et dans les aperçus.
+  8 styles d'yeux, 5 de sourcils, 8 de bouches (chaque partie peut aussi être invisible). Visible sur la fiche, dans l'arène et dans les aperçus.
 - **Boutique** (onglet Boutique) : 59 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
   chapeaux, capes, chaussures, accessoires de visage, auras animées, et des **skins d'équipement** (plastron, pantalon,
   gants, ceinture) qui remplacent l'apparence de la pièce. Les **skins d'arme et d'objet secondaire** sont réservés à une
@@ -182,8 +182,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
   avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
   jusqu'au survol, forge et alchimie), Arbre de
-  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Entraînement, Historique,
-  Statistiques, Succès, Classements, Règles.
+  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Entraînement (une seule
+  ligne d'onglets, qui défile horizontalement sur petit écran). Les onglets d'infos — Historique, Statistiques, Succès
+  (avec sa pastille), Classements, Règles — sont dans le bandeau du haut, avec leur nom sur grand écran et en icônes
+  sinon ; le lien vers l'arène et la déconnexion passent aussi en icônes pour garder le bandeau sur une ligne.
 - **Historique** (onglet Historique) : les 50 dernières parties (stream et solo, pas l'entraînement) avec le résultat,
   le rang, les kills, les morts, les dégâts infligés et subis, les dégâts sur les boss, la durée, les gains de la partie et
   un détail propre au mode (points et temps sur la colline, équipe et MVP, golds ramassés, % de vie restant du boss, salle,

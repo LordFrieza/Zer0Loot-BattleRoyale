@@ -8,6 +8,13 @@ test('[LOOK-1, LOOK-2, LOOK-3] apparence : options gratuites, cosmétiques à ac
   const c = game.newCharacter();
   game.setLook(c, 'color', 'cyan');
   game.setLook(c, 'eyes', 'etoiles');
+  // Yeux, sourcils et bouche invisibles
+  for (const [part, v] of [['eyes', 'aucun'], ['brows', 'aucun'], ['mouth', 'aucune']]) {
+    assert.match(Rules.APPEARANCE[part].options[v].label, /^Invisible/);
+    game.setLook(c, part, v);
+    assert.strictEqual(c.look[part], v);
+  }
+  game.setLook(c, 'eyes', 'etoiles');
   game.setLook(c, 'color', null);
   assert.strictEqual(c.look.color, null);
   assert.throws(() => game.setLook(c, 'eyes', 'laser'), /inconnue/);
