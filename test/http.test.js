@@ -990,7 +990,7 @@ test('[PET-1, PET-5, PET-7, PET-8, RUSH-2, RUSH-4] familiers et Boss Rush via l\
   assert.deepStrictEqual([ch.pets.list.length, ch.pets.active], [1, 'dragon']);
   assert.strictEqual((await s.post('/api/pet/action', { kind: 'caresser' })).status, 200);
   assert.match((await s.post('/api/pet/action', { kind: 'caresser' })).data.error, /repos/);
-  await give(id, { gold: 500 });
+  await give(id, { gold: 1500 });
   assert.strictEqual((await s.post('/api/pet/food/buy', { food: 'festin', count: 2 })).status, 200);
   const fed = await s.post('/api/pet/feed', { food: 'festin' });
   assert.deepStrictEqual([fed.status, fed.data.favorite], [200, true], 'le festin est le plat préféré du dragon');

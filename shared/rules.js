@@ -1541,23 +1541,23 @@
     favoriteMult: 1.5, // plat préféré de l'espèce : effet ×1,5
   };
   const PET_FOODS = {
-    croquettes: { label: 'Croquettes', icon: '🍪', kind: 'food', price: 12, faim: 30, xp: 6 },
-    gigot: { label: 'Gigot', icon: '🍖', kind: 'food', price: 35, faim: 65, joie: 5, xp: 12 },
-    festin: { label: 'Festin royal', icon: '🍱', kind: 'food', price: 90, faim: 100, soif: 10, joie: 20, xp: 25 },
-    eau: { label: 'Eau fraîche', icon: '💧', kind: 'drink', price: 6, soif: 40, xp: 4 },
-    jus: { label: 'Jus de baies', icon: '🧃', kind: 'drink', price: 30, soif: 100, joie: 5, xp: 10 },
+    croquettes: { label: 'Croquettes', icon: '🍪', kind: 'food', price: 36, faim: 30, xp: 6 },
+    gigot: { label: 'Gigot', icon: '🍖', kind: 'food', price: 105, faim: 65, joie: 5, xp: 12 },
+    festin: { label: 'Festin royal', icon: '🍱', kind: 'food', price: 270, faim: 100, soif: 10, joie: 20, xp: 25 },
+    eau: { label: 'Eau fraîche', icon: '💧', kind: 'drink', price: 18, soif: 40, xp: 4 },
+    jus: { label: 'Jus de baies', icon: '🧃', kind: 'drink', price: 90, soif: 100, joie: 5, xp: 10 },
   };
   const PET_FOOD_MAX = 99;
   // Objets de l'enclos (achetés une fois) : besoins qui baissent moins vite, trouvailles plus fréquentes ou plus grosses.
   const PET_ENCLOS = {
-    fleurs: { label: 'Parterre de fleurs', icon: '🌷', price: 150, desc: 'Joie −10 % moins vite. Ça sent bon !', effect: { joie: 0.9 } },
-    lanternes: { label: 'Lanternes féeriques', icon: '🏮', price: 300, desc: 'Les caresses donnent +5 de Joie. Elles brillent la nuit.', effect: { caress: 5 } },
-    gamelle: { label: 'Gamelle automatique', icon: '🥣', price: 600, desc: 'Faim −35 % moins vite.', effect: { faim: 0.65 } },
-    fontaine: { label: 'Fontaine enchantée', icon: '⛲', price: 600, desc: 'Soif −35 % moins vite.', effect: { soif: 0.65 } },
-    jouets: { label: 'Coffre à jouets', icon: '🧸', price: 750, desc: 'Joie −30 % moins vite, et jouer donne +10 de Joie.', effect: { joie: 0.7, play: 10 } },
-    mare: { label: 'Petite mare', icon: '🪷', price: 900, desc: 'Soif −20 % et Joie −10 % moins vite.', effect: { soif: 0.8, joie: 0.9 } },
-    niche: { label: 'Niche douillette', icon: '🏠', price: 1200, desc: 'Trouvailles 15 % plus fréquentes.', effect: { find: 0.85 } },
-    statue: { label: 'Statue dorée', icon: '🗿', price: 2500, desc: 'Trouvailles de golds et d\'XP +25 %.', effect: { reward: 1.25 } },
+    fleurs: { label: 'Parterre de fleurs', icon: '🌷', price: 600, desc: 'Joie −10 % moins vite. Ça sent bon !', effect: { joie: 0.9 } },
+    lanternes: { label: 'Lanternes féeriques', icon: '🏮', price: 1200, desc: 'Les caresses donnent +5 de Joie. Elles brillent la nuit.', effect: { caress: 5 } },
+    gamelle: { label: 'Gamelle automatique', icon: '🥣', price: 2400, desc: 'Faim −35 % moins vite.', effect: { faim: 0.65 } },
+    fontaine: { label: 'Fontaine enchantée', icon: '⛲', price: 2400, desc: 'Soif −35 % moins vite.', effect: { soif: 0.65 } },
+    jouets: { label: 'Coffre à jouets', icon: '🧸', price: 3000, desc: 'Joie −30 % moins vite, et jouer donne +10 de Joie.', effect: { joie: 0.7, play: 10 } },
+    mare: { label: 'Petite mare', icon: '🪷', price: 3600, desc: 'Soif −20 % et Joie −10 % moins vite.', effect: { soif: 0.8, joie: 0.9 } },
+    niche: { label: 'Niche douillette', icon: '🏠', price: 4800, desc: 'Trouvailles 15 % plus fréquentes.', effect: { find: 0.85 } },
+    statue: { label: 'Statue dorée', icon: '🗿', price: 10000, desc: 'Trouvailles de golds et d\'XP +25 %.', effect: { reward: 1.25 } },
   };
   // Espèces (une par boss) : plat préféré et trouvaille rapportée.
   const PETS = {

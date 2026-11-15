@@ -174,18 +174,20 @@ test('[PET-5, PET-6] soins : caresser, jouer (recharges), nourrir (plat préfér
 
 test('[PET-7] épicerie et objets d\'enclos', () => {
   const c = withPet('troll');
-  c.gold = 200;
-  assert.deepStrictEqual(game.buyPetFood(c, 'croquettes', 5), { food: 'croquettes', count: 5, cost: 60 });
-  assert.strictEqual(c.gold, 140);
-  assert.throws(() => game.buyPetFood(c, 'festin', 2), /180 golds/);
+  assert.deepStrictEqual(Object.values(Rules.PET_FOODS).map((f) => f.price), [36, 105, 270, 18, 90]);
+  assert.deepStrictEqual(Object.values(Rules.PET_ENCLOS).map((e) => e.price), [600, 1200, 2400, 2400, 3000, 3600, 4800, 10000]);
+  c.gold = 300;
+  assert.deepStrictEqual(game.buyPetFood(c, 'croquettes', 5), { food: 'croquettes', count: 5, cost: 180 });
+  assert.strictEqual(c.gold, 120);
+  assert.throws(() => game.buyPetFood(c, 'festin', 2), /540 golds/);
   assert.throws(() => game.buyPetFood(c, 'caviar'), /inconnu/);
   c.pets.food.eau = 98;
   assert.throws(() => game.buyPetFood(c, 'eau', 2), /99 au plus/);
-  c.gold = 700;
+  c.gold = 2500;
   game.buyEnclos(c, 'gamelle');
   assert.deepStrictEqual([c.gold, c.pets.enclos], [100, ['gamelle']]);
   assert.throws(() => game.buyEnclos(c, 'gamelle'), /déjà/);
-  assert.throws(() => game.buyEnclos(c, 'statue'), /2500 golds/);
+  assert.throws(() => game.buyEnclos(c, 'statue'), /10000 golds/);
   assert.deepStrictEqual(Rules.petEnclosEffects(['gamelle', 'jouets', 'lanternes']), { faim: 0.65, soif: 1, joie: 0.7, find: 1, reward: 1, caress: 5, play: 10 });
 });
 
