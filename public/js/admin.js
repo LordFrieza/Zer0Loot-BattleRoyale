@@ -238,3 +238,45 @@ renderEvents();
 renderModes();
 loadPlayers();
 loadLeaderboard();
+
+
+// ---------- Historique global et échanges du marché ----------
+$('history-mode').innerHTML = '<option value="">Tous les modes</option>'
+  + Object.entries(Rules.GAME_MODES).map(([id, M]) => `<option value="${id}">${M.icon} ${M.label}</option>`).join('')
+  + Object.entries(Rules.HISTORY_KINDS).map(([id, K]) => `<option value="${id}">${K.icon} ${K.label}</option>`).join('');
+
+async function loadHistory() {
+  try {
+    const q = encodeURIComponent($('history-search').value.trim());
+    const rows = await api(`/api/admin/history?q=${q}&mode=${$('history-mode').value}&limit=200`);
+    $('admin-history').innerHTML = rows.length ? rows.map((e) => historyRowHtml(e, e.name)).join('') : '<div class="muted">Aucune partie enregistrée.</div>';
+  } catch (err) { $('admin-history').innerHTML = `<div class="muted">${esc(err.message)}</div>`; }
+}
+
+const FLAG_LABEL = { pair: '🔁 même paire', cheap: '🎁 bradé', pricey: '💸 prix fou' };
+async function loadTrades() {
+  try {
+    const q = encodeURIComponent($('trades-search').value.trim());
+    let rows = await api(`/api/admin/market/trades?q=${q}`);
+    if ($('trades-suspect').checked) rows = rows.filter((t) => t.flags.length);
+    $('admin-trades').innerHTML = '<tr><th>Date</th><th>Vendeur</th><th>Acheteur</th><th>Objet</th><th>Prix</th><th>Signaux</th></tr>'
+      + (rows.length ? rows.map((t) => `<tr class="${t.flags.length ? 'suspect' : ''}">
+        <td>${new Date(t.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+        <td>${esc(t.seller)}</td><td>${esc(t.buyer)}</td>
+        <td><b style="color:${Rules.RARITY_INFO[t.rarity].color}">${esc(t.item)}</b></td>
+        <td>${t.price.toLocaleString('fr-FR')} 🪙</td>
+        <td>${t.flags.map((f) => `<span class="flag">${FLAG_LABEL[f]}${f === 'pair' ? ` ×${t.pairCount}` : ''}</span>`).join('') || '—'}</td></tr>`).join('')
+        : '<tr><td colspan="6" class="muted">Aucun échange.</td></tr>');
+  } catch (err) { $('admin-trades').innerHTML = `<tr><td>${esc(err.message)}</td></tr>`; }
+}
+
+let histTimer = null;
+$('history-search').oninput = () => { clearTimeout(histTimer); histTimer = setTimeout(loadHistory, 300); };
+$('history-mode').onchange = loadHistory;
+$('history-refresh').onclick = loadHistory;
+let tradesTimer = null;
+$('trades-search').oninput = () => { clearTimeout(tradesTimer); tradesTimer = setTimeout(loadTrades, 300); };
+$('trades-suspect').onchange = loadTrades;
+$('trades-refresh').onclick = loadTrades;
+loadHistory();
+loadTrades();

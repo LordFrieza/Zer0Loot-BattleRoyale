@@ -942,3 +942,39 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .pet-new-glow { position: absolute; inset: -40%; background: conic-gradient(from 0deg, transparent, rgba(255,210,63,.25), transparent 30%, rgba(61,220,90,.2), transparent 60%); animation: petSpin 6s linear infinite; pointer-events: none; }
 @keyframes petSpin { to { transform: rotate(360deg); } }
 .pet-new-modal canvas { position: relative; }
+
+/* ---------- Historique et statistiques ---------- */
+.hist-list { display: grid; gap: 6px; margin-top: 10px; }
+.hist-row { border: 1px solid var(--border); border-left: 4px solid var(--c); border-radius: 10px; background: var(--bg2); }
+.hist-row summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 150px 82px 1fr auto; gap: 4px 12px; align-items: center; padding: 8px 12px; font-size: 13px; }
+.hist-row summary::-webkit-details-marker { display: none; }
+.hist-row[open] summary { border-bottom: 1px solid var(--border); }
+.hist-kind { font-weight: 800; color: var(--c); }
+.hist-outcome { font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 999px; text-align: center; }
+.hist-outcome.win { background: rgba(61,220,90,.15); color: #3ddc5a; }
+.hist-outcome.loss { background: rgba(255,77,109,.15); color: #ff8fa3; }
+.hist-outcome.end { background: rgba(255,255,255,.08); color: #cfc6ff; }
+.hist-who { font-weight: 800; color: #ffd98a; }
+.hist-detail { color: #e8e2ff; }
+.hist-nums { color: var(--muted); font-size: 12px; text-align: right; }
+.hist-gains { grid-column: 3; color: #3ddc5a; font-size: 12px; }
+.hist-date { color: var(--muted); font-size: 12px; text-align: right; }
+.hist-body { padding: 10px 12px; font-size: 13px; }
+.hist-meta { margin-bottom: 8px; color: #e8e2ff; }
+.hist-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 800px) { .hist-cols { grid-template-columns: 1fr; } .hist-row summary { grid-template-columns: 1fr auto; } .hist-gains { grid-column: auto; } }
+.hist-cols h4 { margin: 0 0 6px; }
+.hist-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; }
+.hist-stats div { display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px dashed rgba(255,255,255,.06); }
+.hist-gear { display: grid; gap: 3px; }
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 10px; }
+.stat-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--bg2); }
+.stat-card h3 { margin: 0 0 8px; font-size: 15px; }
+.stat-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.07); }
+.stat-line b { color: #fff; white-space: nowrap; }
+.admin-trades .flag { display: inline-block; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 800; background: rgba(255,77,109,.18); color: #ff8fa3; margin-right: 3px; }
+.admin-trades tr.suspect td { background: rgba(255,77,109,.06); }
+.hist-row.with-who summary { grid-template-columns: 140px 82px 150px 1fr auto; }
+.hist-row.with-who .hist-gains { grid-column: 4; }
+#admin-history { max-height: 640px; overflow-y: auto; padding-right: 4px; }
+@media (max-width: 800px) { .hist-row.with-who summary { grid-template-columns: 1fr auto; } .hist-row.with-who .hist-gains { grid-column: auto; } }

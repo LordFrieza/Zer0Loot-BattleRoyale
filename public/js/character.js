@@ -67,6 +67,8 @@ function render() {
   renderCombatStyle();
   renderSolo();
   renderPets();
+  renderHistory();
+  renderLifetime();
   renderMail();
   if (marketOrders) renderMarket();
   if (!$('training-level').dataset.set) { $('training-level').value = c.level; $('training-level').dataset.set = '1'; }
@@ -848,6 +850,31 @@ function renderRelicChoiceIn(frame, box, endpoint) {
   });
 }
 
+// Boss Rush en solo (entraînement) : entre deux boss, le joueur choisit en cliquant (bonus, grand soin, quitte ou double).
+function renderRushChoiceIn(frame, box, endpoint) {
+  const poll = frame && frame.phase === 'battle' && frame.rush && frame.rush.poll;
+  if (!poll) { box.classList.remove('show'); box.dataset.key = ''; return; }
+  const key = 'rush' + frame.rush.round + poll.options.map((o) => o.id + o.label).join(',');
+  const left = box.querySelector('.relic-left');
+  if (left) left.textContent = Math.ceil(poll.left) + ' s';
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.innerHTML = `<div class="relic-title">💀 Boss vaincu ! Choisis la suite de ta run <span class="relic-left">${Math.ceil(poll.left)} s</span></div>
+    <div class="relic-cards">${poll.options.map((o) => `<button class="relic-card" data-rush="${o.id}" style="--c:${o.color}"><span class="ic">${o.icon}</span><b>${esc(o.label)}</b><small>${esc(o.desc || '')}</small></button>`).join('')}</div>
+    <div class="muted" style="font-size:12px">Sans choix, la suite est tirée au hasard.</div>`;
+  box.classList.add('show');
+  Sound.play('chestAppear');
+  box.querySelectorAll('[data-rush]').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await api(endpoint, { id: b.dataset.rush });
+        Sound.play('pollEnd');
+        box.classList.remove('show');
+      } catch (err) { toast('⚠️ ' + err.message); }
+    };
+  });
+}
+
 async function startSolo(body) {
   try {
     ensureSoloView();
@@ -1086,8 +1113,10 @@ function setupTraining() {
       $('training-kind').querySelectorAll('[data-kind]').forEach((x) => x.classList.toggle('active', x === b));
       $('training-bot').style.display = trainingKind === 'bot' ? '' : 'none';
       $('training-player').style.display = trainingKind === 'player' ? '' : 'none';
-      $('training-boss').style.display = trainingKind === 'boss' ? '' : 'none';
-      $('training-start').textContent = trainingKind === 'expedition' ? '🕳️ Lancer l\'expédition' : trainingKind === 'boss' ? '👹 Lancer le défi' : '⚔️ Lancer le duel';
+      $('training-boss').style.display = trainingKind === 'boss' || trainingKind === 'rush' ? '' : 'none';
+      $('training-boss-id').style.display = trainingKind === 'rush' ? 'none' : '';
+      $('training-boss-lbl').style.display = trainingKind === 'rush' ? 'none' : '';
+      $('training-start').textContent = trainingKind === 'expedition' ? '🕳️ Lancer l\'expédition' : trainingKind === 'boss' ? '👹 Lancer le défi' : trainingKind === 'rush' ? '💀 Lancer le Boss Rush' : '⚔️ Lancer le duel';
       if (trainingKind === 'player') loadTrainingOpponents();
     };
   });
@@ -1098,11 +1127,13 @@ function setupTraining() {
       ? { opponent: 'bot', cls: $('training-cls').value, level: Number($('training-level').value) }
       : trainingKind === 'player' ? { opponent: 'player', id: $('training-opponent').value }
         : trainingKind === 'boss' ? { opponent: 'boss', boss: $('training-boss-id').value, difficulty: $('training-diff').value, speed: soloSpeed }
-          : { opponent: 'expedition', speed: soloSpeed };
+          : trainingKind === 'rush' ? { opponent: 'rush', difficulty: $('training-diff').value, speed: soloSpeed }
+            : { opponent: 'expedition', speed: soloSpeed };
     try {
       const r = await api('/api/training/start', body);
       $('training-status').textContent = trainingKind === 'expedition' ? 'Expédition d\'entraînement en cours (sans énergie ni récompense)…'
         : trainingKind === 'boss' ? `Défi d'entraînement : ${r.opponent.name} en ${Rules.BOSS_CHALLENGE[r.opponent.difficulty].label}…`
+          : trainingKind === 'rush' ? `Boss Rush d'entraînement en ${Rules.BOSS_CHALLENGE[r.opponent.difficulty].label} : tiens le plus longtemps possible !`
           : `Duel contre ${r.opponent.name} (niv. ${r.opponent.level})…`;
       $('training-stop').disabled = false;
       $('training-arena').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1553,7 +1584,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'entrainement', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -2264,6 +2295,7 @@ socket.on('trainingQueue', (q) => {
     const r = q.result;
     $('training-status').innerHTML = r.solo === 'expedition'
       ? `🕳️ <b>Profondeur ${r.depth} atteinte</b> (entraînement, rien n'est gagné). Relance quand tu veux.`
+      : r.solo === 'rush' ? `💀 <b>Boss Rush : ${r.rush.killed} boss vaincu${r.rush.killed > 1 ? 's' : ''}</b> (entraînement, rien n'est gagné). Relance quand tu veux.`
       : r.victory ? `🏆 <b class="up">${esc(r.boss.name)} vaincu</b> en ${Rules.BOSS_CHALLENGE[r.difficulty].label} ! (entraînement, rien n'est gagné)`
         : `💀 <b class="down">${esc(r.boss.name)} a gagné</b> (${Rules.BOSS_CHALLENGE[r.difficulty].label}). Ajuste ton build et retente !`;
   } else if (q.phase === 'ended' && q.result && q.result.winner) {
@@ -2273,7 +2305,11 @@ socket.on('trainingQueue', (q) => {
     $('training-status').textContent = 'Duel arrêté.';
   }
 });
-socket.on('trainingFrame', (f) => { trainingBus.emit('frame', f); renderRelicChoiceIn(f, $('training-relic'), '/api/training/relic'); });
+socket.on('trainingFrame', (f) => {
+  trainingBus.emit('frame', f);
+  if (f.rush) renderRushChoiceIn(f, $('training-relic'), '/api/training/rush');
+  else renderRelicChoiceIn(f, $('training-relic'), '/api/training/relic');
+});
 socket.on('soloQueue', onSoloQueue);
 // Marché : un ordre a changé quelque part → on rafraîchit si l'onglet est ouvert.
 let marketRefresh = null;

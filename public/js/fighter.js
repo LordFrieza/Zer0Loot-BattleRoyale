@@ -636,6 +636,22 @@
         ctx.fillStyle = 'rgba(255,255,255,.4)';
         ctx.fillRect(-7, 9, 1.2, 8); ctx.fillRect(2, 9, 1.2, 8);
         break;
+      case 'pantalon_smoking':
+        // pantalon noir à pli marqué, bande de satin sur le côté, souliers vernis
+        ctx.fillStyle = c.color;
+        roundRect(ctx, -8, 8, 7, 10, 1.5); ctx.fill();
+        roundRect(ctx, 1, 8, 7, 10, 1.5); ctx.fill();
+        ctx.fillStyle = c.trim;
+        ctx.fillRect(-8, 8.5, 1.2, 9); ctx.fillRect(6.8, 8.5, 1.2, 9);
+        ctx.strokeStyle = 'rgba(255,255,255,.14)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(-4.5, 9); ctx.lineTo(-4.5, 17.5); ctx.moveTo(4.5, 9); ctx.lineTo(4.5, 17.5); ctx.stroke();
+        ctx.fillStyle = '#0a090e';
+        roundRect(ctx, -9, 16, 8.5, 3.5, 1.5); ctx.fill();
+        roundRect(ctx, 0.5, 16, 9, 3.5, 1.5); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.45)';
+        ctx.fillRect(-7, 16.6, 2.5, 0.9); ctx.fillRect(2.5, 16.6, 2.5, 0.9);
+        break;
       default: // pantalon_ninja et autres : couleur + bandes aux chevilles
         ctx.fillStyle = c.color;
         roundRect(ctx, -8, 8, 7, 10, 2); ctx.fill();

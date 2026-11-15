@@ -479,6 +479,7 @@ class Battle extends EventEmitter {
       if (b.bossId === 'sorcier') this.updateCurses(B);
       if (B.copies) b.guarded = this.adds.some((a) => a.kind === 'copie' && a.alive);
       if (B.freeze) this.updateFreeze(dt, B);
+      if (B.escape) this.licheEscape(dt, B);
       if (B.webs) this.updateWebs(dt, B);
       if (B.cocoon) this.updateCocoons(dt, B);
     }
@@ -540,7 +541,19 @@ class Battle extends EventEmitter {
         this.slams.push({ kind: 'leap', leap: true, x: far.x, y: far.y, r: B.leap.radius, t: B.leap.warn, warn: B.leap.warn, ratio: B.leap.ratio, fx: b.x, fy: b.y });
       }
     } else if (B.id === 'liche') {
-      if (n === 0) {
+      // Rotation sur trois attaques : pics, lance de givre, nova
+      const k = (b.licheTurn = ((b.licheTurn || 0) + 1) % 3);
+      b.nextSpecial = 0;
+      if (k === 2) {
+        // Lance de givre : une ligne droite jusqu'au héros le plus éloigné (et au-delà)
+        const L = B.lance;
+        const far = heroes.reduce((a, h) => (Math.hypot(h.x - b.x, h.y - b.y) > Math.hypot(a.x - b.x, a.y - b.y) ? h : a), heroes[0]);
+        const ang = Math.atan2(far.y - b.y, far.x - b.x);
+        this.slams.push({
+          kind: 'lance', line: true, x: b.x, y: b.y, tx: b.x + Math.cos(ang) * L.length, ty: b.y + Math.sin(ang) * L.length, w: L.width,
+          r: L.length, t: L.warn, warn: L.warn, ratio: L.ratio, slow: L.slow, duration: L.slowFor,
+        });
+      } else if (k === 1) {
         // Pics de glace sous quelques héros (dégâts + ralentissement)
         const S = B.spikes;
         const count = Math.min(S.max, S.base + Math.floor(heroes.length / S.perPlayers));
@@ -583,7 +596,7 @@ class Battle extends EventEmitter {
       if (s.follow && b.alive) { s.x = b.x; s.y = b.y; }
       s.t -= dt;
       if (s.t > 0) continue;
-      this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, loot: s.loot });
+      this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, loot: s.loot, tx: s.tx != null ? Math.round(s.tx) : undefined, ty: s.ty != null ? Math.round(s.ty) : undefined });
       if (s.kind === 'land') this.land(s);
       if (s.leap) { b.leaping = false; b.x = s.x; b.y = s.y; b.slamIn = Math.max(b.slamIn, b.slamEvery * 0.5); }
       if (!b.alive) continue;
@@ -815,6 +828,30 @@ class Battle extends EventEmitter {
   }
 
   // ---------- Liche de glace : gel, phases, serviteurs ----------
+
+  // La Liche garde ses distances : un héros trop près → elle se téléporte loin et laisse une explosion de givre.
+  licheEscape(dt, B) {
+    const b = this.boss;
+    const E = B.escape;
+    b.escapeIn = (b.escapeIn || 0) - dt;
+    if (b.escapeIn > 0 || b.stage) return;
+    const close = this.players.some((p) => p.alive && p.iceUntil <= this.time && Math.hypot(p.x - b.x, p.y - b.y) - b.r - p.r <= E.radius);
+    if (!close) return;
+    b.escapeIn = E.cooldown;
+    this.slams.push({ kind: 'frosttrap', x: b.x, y: b.y, r: E.trapRadius, t: E.trapWarn, warn: E.trapWarn, ratio: E.trapRatio, slow: E.trapSlow, duration: E.trapSlowFor });
+    // Un saut court (pas à l'autre bout de l'arène) : le point à E.hop px le plus éloigné des héros
+    const heroes = this.players.filter((p) => p.alive);
+    let best = null;
+    let bestScore = -1;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const p = { x: Math.max(60, Math.min(ARENA.w - 60, b.x + Math.cos(a) * E.hop)), y: Math.max(80, Math.min(ARENA.h - 60, b.y + Math.sin(a) * E.hop)) };
+      const score = Math.min(...heroes.map((h) => Math.hypot(h.x - p.x, h.y - p.y)));
+      if (score > bestScore) { bestScore = score; best = p; }
+    }
+    this.blink(b, best);
+    this.events.push({ t: 'licheEscape' });
+  }
 
   licheChill() {
     const b = this.boss;
@@ -1365,6 +1402,20 @@ class Battle extends EventEmitter {
 
   // ---------- Boucle ----------
 
+  // Statistiques de la partie (historique) : dégâts subis par chacun, dégâts infligés aux boss.
+  tally() {
+    if (!this.events.length) return;
+    let byKey = null;
+    for (const e of this.events) {
+      if ((e.t !== 'hit' && e.t !== 'thorns') || !e.dmg) continue;
+      byKey = byKey || new Map(this.fighters.map((f) => [f.key, f]));
+      const to = byKey.get(e.to);
+      if (to) to.taken += e.dmg;
+      const from = e.from && byKey.get(e.from);
+      if (from && to && to.isBoss) from.bossDealt += e.dmg;
+    }
+  }
+
   stopLoop() {
     clearInterval(this.interval);
     this.interval = null;
@@ -1383,6 +1434,7 @@ class Battle extends EventEmitter {
     else if (this.mode === 'rush' && this.rush.stage !== 'fight') this.tickRushStage(dt);
     else if (this.mode === 'gold') this.tickGold(dt);
     else this.tickFight(dt);
+    this.tally();
     this.emit('frame', this.frame());
     this.events = [];
   }
@@ -1829,7 +1881,7 @@ class Battle extends EventEmitter {
     // Points : 1 par seconde sur la colline, 3 si l'on y est seul (le Roi)
     const inside = this.players.filter((f) => f.alive && Math.hypot(f.x - k.hill.x, f.y - k.hill.y) <= k.hill.r);
     const king = inside.length === 1 ? inside[0] : null;
-    for (const f of inside) f.score += (king ? K.points.king : K.points.hill) * dt;
+    for (const f of inside) { f.score += (king ? K.points.king : K.points.hill) * dt; f.hillTime += dt; }
     const kingKey = king ? king.key : null;
     if (kingKey !== k.king) {
       k.king = kingKey;
@@ -1952,6 +2004,15 @@ class Battle extends EventEmitter {
     }
   }
 
+  // Boss Rush en solo (entraînement) : le joueur choisit lui-même, le choix s'applique tout de suite.
+  chooseRush(id) {
+    const r = this.rush;
+    if (!this.solo || this.phase !== 'battle' || !r || r.stage !== 'poll' || !r.poll.options.includes(id)) return null;
+    r.poll.votes = new Map([['solo', id]]);
+    this.closePoll();
+    return id;
+  }
+
   // Description d'un choix du vote du Boss Rush (le bonus et le « quitte ou double » dépendent de la run).
   rushChoiceInfo(id) {
     const r = this.rush;
@@ -1962,7 +2023,10 @@ class Battle extends EventEmitter {
       Object.assign(info, { icon: bn.icon, label: `Bonus : ${bn.label}`, color: bn.color, desc: bn.desc });
     } else if (id === 'defi') {
       const g = Rules.rushDefiReward(r.killed);
-      info.desc = `Les boss suivants ont +${Math.round((Rules.RUSH.defiMult - 1) * 100)} % de vie et de dégâts, mais tous les héros gagnent tout de suite ${g.gold} golds et ${g.xp} XP.`;
+      const harder = `Les boss suivants ont +${Math.round((Rules.RUSH.defiMult - 1) * 100)} % de vie et de dégâts`;
+      info.desc = this.solo ? `${harder}. Juste pour la gloire (entraînement : rien à gagner).` : `${harder}, mais tous les héros gagnent tout de suite ${g.gold} golds et ${g.xp} XP.`;
+    } else if (id === 'soin' && this.solo) {
+      info.desc = 'Tu es soigné à 100 %.';
     }
     return info;
   }
@@ -2556,9 +2620,9 @@ class Battle extends EventEmitter {
     victim.diedAt = this.time;
     if (this.dungeon) victim.diedRoom = this.dungeon.room;
     this.events.push({ t: 'kill', from: killer ? killer.key : null, to: victim.key });
+    victim.deaths = (victim.deaths || 0) + 1; // (historique ; en Guerre des clans, allonge aussi l'attente)
     if (this.clans && !victim.isCrystal) {
       // Chaque mort allonge l'attente avant de revenir (5 s, 10 s, 15 s… 30 s au plus).
-      victim.deaths = (victim.deaths || 0) + 1;
       victim.respawnAt = this.time + Rules.clanRespawnDelay(victim.deaths);
       if (killer && killer.team !== victim.team && this.clans.kills[killer.team] !== undefined) this.clans.kills[killer.team] += 1;
     }
@@ -2700,6 +2764,7 @@ class Battle extends EventEmitter {
       slams: this.slams.map((s) => ({
         kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / s.warn) * 100) / 100, w: s.warn,
         fx: s.fx != null ? Math.round(s.fx) : undefined, fy: s.fy != null ? Math.round(s.fy) : undefined, loot: s.loot,
+        tx: s.tx != null ? Math.round(s.tx) : undefined, ty: s.ty != null ? Math.round(s.ty) : undefined, w: s.w,
         a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
       })),
       gold: this.gold ? {
@@ -2776,6 +2841,7 @@ function inSlam(s, f) {
   const dx = f.x - s.x;
   const dy = f.y - s.y;
   const dist = Math.hypot(dx, dy);
+  if (s.line) return distToSegment(f, { x: s.x, y: s.y }, { x: s.tx, y: s.ty }) <= s.w / 2 + f.r;
   if (s.kind !== 'cone' && !s.cone) return dist <= s.r;
   if (dist > s.r + f.r) return false;
   let diff = Math.abs(Math.atan2(dy, dx) - s.angle);
@@ -2801,7 +2867,7 @@ function fighter(fields) {
     x: 0, y: 0, r: RADIUS, scale: 1, elite: false,
     reduction: 0, dodge: 0, crit: 0, lifesteal: 0, precision: 0, thorns: 0,
     range: 40, taunt: 1, kite: 0, hunter: false, regen: 0, projectile: null, poison: null, aoeRadius: 0, aoeRatio: 0, cleave: false,
-    cd: 0, dmgMult: 1, targetKey: null, alive: true, kills: 0, dealt: 0,
+    cd: 0, dmgMult: 1, targetKey: null, alive: true, kills: 0, dealt: 0, taken: 0, bossDealt: 0, hillTime: 0,
     chain: 0, lastKillAt: -Infinity, healAcc: 0, diedAt: null, diedRoom: null,
     spec: null, ult: null, staminaTime: 0, stamina: 0, consumable: null, potionUsed: false, started: false, engaged: false,
     buffs: [], stunUntil: 0, iceUntil: 0, cocooned: null,

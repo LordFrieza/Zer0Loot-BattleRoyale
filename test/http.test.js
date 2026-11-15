@@ -1038,3 +1038,80 @@ test('[PET-1, PET-5, PET-7, PET-8, RUSH-2, RUSH-4] familiers et Boss Rush via l\
   assert.strictEqual(ch.gold, before.gold + Rules.RUSH.defiGold + Rules.rushReward(1).gold);
   await admin.post('/api/admin/battle/reset');
 });
+
+test('[HIST-1, HIST-4, LIFE-1, RUSH-5] historique et statistiques via l\'API, vues admin, Boss Rush d\'entraînement', async () => {
+  const s = client();
+  const id = (await register(s, 'pl_hist')).id;
+  await s.post('/api/class', { cls: 'guerrier' });
+  // Une partie de Battle Royale contre un bot : ligne d'historique avec les gains de la partie
+  await admin.post('/api/admin/battle/reset');
+  await admin.post('/api/admin/queue/open', { seconds: 60, mode: 'br' });
+  await s.post('/api/queue/join');
+  await admin.post('/api/admin/queue/bots', { count: 1 });
+  assert.strictEqual((await admin.post('/api/admin/battle/start')).status, 200);
+  battle.stopLoop();
+  const me = battle.players.find((p) => p.userId === id);
+  const bot = battle.players.find((p) => p.key.startsWith('bot'));
+  battle.hit(bot, me, 30);
+  battle.tick(0.05);
+  battle.kill(me, bot);
+  battle.tick(0.05);
+  assert.strictEqual(battle.phase, 'ended');
+  let ch = (await meOf(s)).character;
+  const e = ch.history[0];
+  assert.deepStrictEqual([e.mode, e.outcome, e.rank, e.total, e.kills], ['br', 'win', 1, 2, 1]);
+  assert.ok(e.taken >= 1 && e.dealt >= 1);
+  const kill = Rules.REWARDS.kill;
+  assert.ok(e.gains.gold >= Rules.REWARDS.win.gold * 0.4 + kill.gold * 0.4, 'gains de la partie (participation, kill, victoire)');
+  assert.ok(e.gear && e.stats && e.level === ch.level);
+  assert.deepStrictEqual(ch.lifetime.modes.br, { games: 1, wins: 1 });
+  assert.ok(ch.lifetime.goldEarned >= e.gains.gold);
+  // Solo : l'expédition abandonnée est aussi enregistrée
+  assert.strictEqual((await s.post('/api/solo/start', { kind: 'expedition' })).status, 200);
+  solos.get(id).stopLoop();
+  await s.post('/api/solo/abandon');
+  ch = (await meOf(s)).character;
+  assert.deepStrictEqual([ch.history[0].mode, ch.history[0].details.depth, ch.history[0].details.abandoned], ['expedition', 0, true]);
+  assert.strictEqual(ch.lifetime.expeditions, 1);
+  // Admin : historique de tous les joueurs, filtrable
+  assert.strictEqual((await s.get('/api/admin/history')).status, 403);
+  const all = (await admin.get('/api/admin/history?q=pl_hist')).data;
+  assert.ok(all.length >= 2 && all.every((r) => r.name === 'pl_hist'));
+  assert.ok((await admin.get('/api/admin/history?mode=expedition&q=pl_hist')).data.every((r) => r.mode === 'expedition'));
+  // Admin : échanges du marché et signaux suspects
+  const buyer = client();
+  const buyerId = (await register(buyer, 'pl_hist_buy')).id;
+  await give(buyerId, { gold: 1000 });
+  await give(id, { gold: 1000 });
+  for (let i = 0; i < 3; i++) {
+    const item = game.makeItem(i === 0 ? 'legendaire' : 'commun');
+    db.state.users[id].character.inventory.push(item);
+    const r = await s.post('/api/market/sell', { itemId: item.id, price: Rules.MARKET.minPrice });
+    assert.strictEqual((await buyer.post('/api/market/buy', { orderId: r.data.orderId })).status, 200, JSON.stringify(r.data));
+  }
+  const trades = (await admin.get('/api/admin/market/trades?q=pl_hist')).data;
+  assert.strictEqual(trades.length, 3);
+  assert.ok(trades.every((t) => t.flags.includes('pair') && t.seller === 'pl_hist' && t.buyer === 'pl_hist_buy'));
+  assert.ok(trades.find((t) => t.rarity === 'legendaire').flags.includes('cheap'));
+  assert.strictEqual((await meOf(buyer)).character.lifetime.itemsObtained, 3);
+  // Boss Rush d'entraînement : le choix se fait en cliquant
+  assert.strictEqual((await s.post('/api/training/start', { opponent: 'rush', difficulty: 'normal' })).data.opponent.name, 'Boss Rush');
+  const tb = trainings.get(id);
+  tb.stopLoop();
+  assert.strictEqual(tb.mode, 'rush');
+  for (let i = 0; i < 70; i++) tb.tick(0.05);
+  assert.match((await s.post('/api/training/rush', { id: 'bonus' })).data.error, /pas proposé/);
+  tb.kill(tb.players[0], tb.boss);
+  for (let i = 0; i < 80; i++) tb.tick(0.05);
+  assert.deepStrictEqual(tb.publicPoll().options.map((o) => o.id), ['bonus', 'soin', 'defi'], 'pas de résurrection en solo');
+  assert.strictEqual((await s.post('/api/training/rush', { id: 'defi' })).data.id, 'defi');
+  assert.deepStrictEqual([tb.rush.stage, tb.rush.round, tb.rush.mult], ['intro', 2, Rules.RUSH.defiMult]);
+  const goldBefore = (await meOf(s)).character.gold;
+  tb.kill(tb.boss, tb.players[0]);
+  tb.tick(0.05);
+  ch = (await meOf(s)).character;
+  assert.strictEqual(ch.gold, goldBefore, 'entraînement : rien n\'est gagné');
+  assert.strictEqual(ch.history[0].mode, 'expedition', 'ni enregistré dans l\'historique');
+  await s.post('/api/training/stop');
+  await admin.post('/api/admin/battle/reset');
+});

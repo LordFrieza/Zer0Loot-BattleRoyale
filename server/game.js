@@ -60,6 +60,13 @@ function upgrade(character) {
   if (!Array.isArray(character.pets.enclos)) character.pets.enclos = [];
   if (character.pets.active === undefined) character.pets.active = null;
   if (character.pets.follow === undefined) character.pets.follow = null;
+  // 1.6 : historique des parties et statistiques détaillées (elles démarrent à zéro pour les anciens personnages)
+  if (!Array.isArray(character.history)) character.history = [];
+  if (!character.lifetime) character.lifetime = newLifetime();
+  for (const k of Rules.PLAYER_STAT_KEYS) if (!Number.isFinite(character.lifetime[k])) character.lifetime[k] = 0; // complété en place
+  if (!character.lifetime.modes) character.lifetime.modes = {};
+  for (const m of Object.keys(Rules.GAME_MODES)) if (!character.lifetime.modes[m]) character.lifetime.modes[m] = { games: 0, wins: 0 };
+  if (!character.lifetimeSince) character.lifetimeSince = Date.now();
   // 1.3 : courrier (ventes, expirations) et historique du marché
   if (!Array.isArray(character.mail)) character.mail = [];
   if (!Array.isArray(character.marketLog)) character.marketLog = [];
@@ -108,6 +115,9 @@ function newCharacter() {
     soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
     bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
     pets: newPets(), // familiers (onglet Familier)
+    history: [], // historique des parties (stream et solo), la plus récente en premier
+    lifetime: newLifetime(), // statistiques cumulées (onglet Statistiques)
+    lifetimeSince: Date.now(), // date de début des statistiques détaillées
     mail: [], // courrier : [{ id, at, text, read, kind }] (ventes au marché, objets revenus…)
     marketLog: [], // historique du marché : [{ at, kind: listed|sold|bought|cancelled|expired, item, price, … }]
   };
@@ -152,11 +162,76 @@ function addXp(character, amount) {
   return levels;
 }
 
-function grant(character, reward) {
+// track : compté dans les statistiques (golds gagnés) ; pas pour les cadeaux de l'admin.
+function grant(character, reward, track = true) {
   const levels = addXp(character, reward.xp);
   character.gold += reward.gold;
   character.chests += reward.chests;
+  if (track && reward.gold > 0) addStat(character, 'goldEarned', reward.gold);
   return levels;
+}
+
+// ---------- Statistiques et historique ----------
+
+function newLifetime() {
+  const stats = Object.fromEntries(Rules.PLAYER_STAT_KEYS.map((k) => [k, 0]));
+  stats.modes = Object.fromEntries(Object.keys(Rules.GAME_MODES).map((m) => [m, { games: 0, wins: 0 }]));
+  return stats;
+}
+
+function addStat(character, key, n = 1) {
+  if (!character.lifetime) character.lifetime = newLifetime();
+  character.lifetime[key] = (character.lifetime[key] || 0) + n;
+}
+
+// Photo du personnage au moment de la partie : niveau, classe, puissance, stats et équipement (nom + rareté).
+function snapshot(character) {
+  const d = derived(character);
+  const gear = {};
+  for (const [slot, item] of Object.entries(character.equipment)) if (item) gear[slot] = { name: item.name, rarity: item.rarity, set: item.set || undefined };
+  return {
+    level: character.level, cls: character.cls || null, power: powerOf(character),
+    stats: {
+      maxHp: Math.round(d.maxHp), damage: Math.round(d.damage * 10) / 10, reduction: Math.round(d.reduction * 1000) / 10,
+      dodge: Math.round(d.dodge * 1000) / 10, crit: Math.round((d.crit || 0) * 1000) / 10, speed: Math.round(d.speed),
+      attackSpeed: Math.round((d.attackSpeed || 1) * 100) / 100, lifesteal: Math.round((d.lifesteal || 0) * 1000) / 10,
+      precision: Math.round((d.precision || 0) * 1000) / 10, thorns: Math.round((d.thorns || 0) * 1000) / 10, luck: d.luck || 0,
+    },
+    gear,
+  };
+}
+
+/*
+ * Ligne d'historique d'une partie (stream ou solo) et mise à jour des statistiques cumulées.
+ * entry = { mode, outcome: win|loss|end, rank, total, kills, deaths, dealt, taken, bossDealt, duration, gains, details }
+ */
+function recordActivity(character, entry, now = Date.now()) {
+  upgrade(character);
+  const e = { id: crypto.randomUUID(), at: now, ...entry, ...snapshot(character) };
+  character.history.unshift(e);
+  if (character.history.length > Rules.HISTORY.max) character.history.length = Rules.HISTORY.max;
+  const S = character.lifetime;
+  const online = !!Rules.GAME_MODES[e.mode];
+  if (online) {
+    S.modes[e.mode].games += 1;
+    if (e.outcome === 'win') S.modes[e.mode].wins += 1;
+    if (e.outcome === 'loss') S.losses += 1;
+  }
+  S.deaths += e.deaths || 0;
+  S.damageDealt += e.dealt || 0;
+  S.damageTaken += e.taken || 0;
+  S.bossDamage += e.bossDealt || 0;
+  S.playTime += e.duration || 0;
+  S.maxKills = Math.max(S.maxKills, e.kills || 0);
+  S.maxDamage = Math.max(S.maxDamage, e.dealt || 0);
+  const d = e.details || {};
+  if (e.mode === 'koth') S.hillTime += d.hillTime || 0;
+  if (e.mode === 'dungeon') S.dungeonRooms += d.room || 0;
+  if (e.mode === 'rush') S.rushBosses += d.killed || 0;
+  if (e.mode === 'gold') S.goldShower += d.gold || 0;
+  if (e.mode === 'expedition') { S.expeditions += 1; S.expeditionFloors += d.depth || 0; }
+  if (e.mode === 'challenge') S.challenges += 1;
+  return e;
 }
 
 function allocate(character, stat) {
@@ -260,6 +335,7 @@ function openChest(character) {
   const items = [];
   for (let i = 0; i < Rules.ITEMS_PER_CHEST; i++) items.push(makeItem(rollRarity(luck), null, { cls: character.cls }));
   for (const it of items) it.isNew = true; // badge « Nouveau ! » jusqu'à ce que le joueur le survole (markSeen)
+  addStat(character, 'itemsObtained', items.length);
   character.inventory.push(...items);
   upgrade(character);
   for (const it of items) character.lootStats[it.rarity] += 1;
@@ -357,6 +433,7 @@ function fuse(character, itemIds) {
   const item = makeItem(resultRarity, null, { cls: character.cls, ownChance: 1, set: sameSet });
   item.isNew = true; // badge « Nouveau ! », comme un objet de coffre
   character.inventory.push(item);
+  addStat(character, 'itemsObtained');
   bump(character, 'fused');
   if (item.rarity === 'legendaire') bump(character, 'legendary');
   return { item, upgraded, chance, from: rarity, price };
@@ -731,7 +808,7 @@ function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys =
   if (!reward.gold && !reward.chests && !reward.xp && !extra && !extraKeys) throw new Error('Rien à donner');
   if (extra) addEnergy(character, extra);
   if (extraKeys) addKeys(character, extraKeys);
-  const levels = grant(character, reward);
+  const levels = grant(character, reward, false); // cadeau : pas compté dans les golds gagnés
   return { reward, levels, energy: extra || undefined, keys: extraKeys || undefined };
 }
 
@@ -909,7 +986,7 @@ function petFind(character, pet, fx) {
   const L = pet.level;
   const find = Rules.PETS[pet.species].find;
   const luck = 10 + 4 * L;
-  if (find === 'gold') { const gold = Rules.petFindValue(pet.species, L, fx); character.gold += gold; return { kind: 'gold', gold }; }
+  if (find === 'gold') { const gold = Rules.petFindValue(pet.species, L, fx); character.gold += gold; addStat(character, 'goldEarned', gold); return { kind: 'gold', gold }; }
   if (find === 'xp') { const xp = Rules.petFindValue(pet.species, L, fx); const levels = addXp(character, xp); return { kind: 'xp', xp, levels }; }
   if (find === 'chest') {
     const chests = 1 + (random() < 0.03 * L ? 1 : 0);
@@ -929,6 +1006,7 @@ function petFind(character, pet, fx) {
   const item = makeItem(rollRarity(luck), slots[rand(0, slots.length - 1)], { cls: character.cls });
   item.isNew = true;
   character.inventory.push(item);
+  addStat(character, 'itemsObtained');
   return { kind: 'item', item };
 }
 
@@ -1053,6 +1131,11 @@ function absorbGhost(user, ghost) {
   for (const [id, n] of Object.entries(g.consumables || {})) c.consumables[id] = (c.consumables[id] || 0) + n;
   if (g.consumableSlot) c.consumables[g.consumableSlot] = (c.consumables[g.consumableSlot] || 0) + 1;
   mergePets(c, g);
+  // Historique et statistiques du fantôme : réunis (records au maximum)
+  c.history = c.history.concat(g.history || []).sort((x, y) => y.at - x.at).slice(0, Rules.HISTORY.max);
+  for (const k of Rules.PLAYER_STAT_KEYS) c.lifetime[k] = Rules.PLAYER_STAT_MAX.includes(k) ? Math.max(c.lifetime[k], g.lifetime[k] || 0) : c.lifetime[k] + (g.lifetime[k] || 0);
+  for (const [m, v] of Object.entries(g.lifetime.modes || {})) { const mine = c.lifetime.modes[m] || (c.lifetime.modes[m] = { games: 0, wins: 0 }); mine.games += v.games || 0; mine.wins += v.wins || 0; }
+  c.lifetimeSince = Math.min(c.lifetimeSince, g.lifetimeSince || c.lifetimeSince);
   for (const k of Rules.COUNTERS) {
     // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
     c.counters[k] = Rules.MAX_COUNTERS.includes(k) ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
@@ -1100,6 +1183,7 @@ module.exports = {
   newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
+  newLifetime, addStat, snapshot, recordActivity,
   newPets, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, toggleLock, markSeen, savePreset, applyPreset, deletePreset,

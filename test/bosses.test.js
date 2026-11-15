@@ -465,7 +465,7 @@ test('[LCH-1, LCH-2, LCH-3] Liche : gel de 1, puis 2 héros ; un héros gelé ne
   assert.strictEqual(iced().length, 2);
 });
 
-test('[LCH-4, LCH-5] Liche : pics et nova de givre ; à 33 %, les morts se relèvent (ou 3 héros gelés)', () => {
+test('[LCH-4, LCH-5] Liche : pics, lance et nova de givre ; à 33 %, les morts se relèvent (ou 3 héros gelés)', () => {
   const b = fight('liche', 5);
   freeze(b);
   const L = Rules.BOSSES.liche;
@@ -475,7 +475,10 @@ test('[LCH-4, LCH-5] Liche : pics et nova de givre ; à 33 %, les morts se relè
   assert.strictEqual(spikes.length, Math.min(L.spikes.max, L.spikes.base + Math.floor(5 / L.spikes.perPlayers)));
   b.boss.slamIn = 0;
   b.bossSpecials(0.05, L);
-  assert.ok(b.slams.some((s) => s.kind === 'nova' && s.r === L.nova.radius));
+  assert.ok(b.slams.some((s) => s.kind === 'lance' && s.line && s.w === L.lance.width), 'puis la lance de givre');
+  b.boss.slamIn = 0;
+  b.bossSpecials(0.05, L);
+  assert.ok(b.slams.some((s) => s.kind === 'nova' && s.r === L.nova.radius), 'puis la nova');
   // Deux héros tombés : relevés en serviteurs à 33 %
   const dead = b.players.slice(0, 2);
   for (const p of dead) b.kill(b.boss, p);
@@ -579,4 +582,36 @@ test('[MXN-4, MXN-5] Maexxna : cocons à briser, plafond puis frénésie', () =>
   b.updateBoss(0.05);
   b.updateBoss(0.05);
   assert.ok(Math.abs(b.boss.speed - speed * X.frenzy.speedMult) < 1e-9);
+});
+
+test('[LCH-6] Liche : elle garde ses distances (saut et piège de givre) ; la lance touche toute la ligne', () => {
+  const b = fight('liche', 3);
+  freeze(b);
+  const L = Rules.BOSSES.liche;
+  b.boss.slamIn = 999;
+  b.boss.blinkIn = 999;
+  const h = b.players[0];
+  h.x = b.boss.x - b.boss.r - h.r - 20; h.y = b.boss.y;
+  const from = { x: b.boss.x, y: b.boss.y };
+  b.updateBoss(0.05);
+  const moved = Math.hypot(b.boss.x - from.x, b.boss.y - from.y);
+  assert.ok(moved > L.escape.hop * 0.5 && moved <= L.escape.hop + 1, `saut court (${Math.round(moved)} px)`);
+  const trap = b.slams.find((s) => s.kind === 'frosttrap');
+  assert.ok(trap && trap.x === from.x && trap.r === L.escape.trapRadius, 'explosion de givre là où elle était');
+  // Pas de nouveau saut avant la fin de la recharge
+  h.x = b.boss.x - b.boss.r - h.r - 10; h.y = b.boss.y;
+  const pos = { x: b.boss.x, y: b.boss.y };
+  b.updateBoss(0.05);
+  assert.deepStrictEqual({ x: b.boss.x, y: b.boss.y }, pos);
+  // Lance : un héros sur la ligne est touché et ralenti, un héros à côté non
+  b.slams = [];
+  const [p1, p2] = [b.players[1], b.players[2]];
+  p1.x = b.boss.x + 300; p1.y = b.boss.y;
+  p2.x = b.boss.x + 300; p2.y = b.boss.y + 200;
+  const hp1 = p1.hp;
+  const hp2 = p2.hp;
+  b.slams.push({ kind: 'lance', line: true, x: b.boss.x, y: b.boss.y, tx: b.boss.x + 620, ty: b.boss.y, w: 64, r: 620, t: 0.01, warn: 1, ratio: L.lance.ratio, slow: L.lance.slow, duration: 2 });
+  b.resolveSlams(0.05);
+  assert.ok(p1.hp < hp1 && b.buffMult(p1, 'speed') === L.lance.slow);
+  assert.strictEqual(p2.hp, hp2);
 });

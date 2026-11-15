@@ -159,7 +159,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Apparence** (onglet Personnage, gratuit) : couleur du personnage (15 teintes ou automatique selon le pseudo),
   7 styles d'yeux, 5 de sourcils, 8 de bouches. Visible sur la fiche, dans l'arène et dans les aperçus.
-- **Boutique** (onglet Boutique) : 55 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
+- **Boutique** (onglet Boutique) : 56 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
   chapeaux, capes, chaussures, accessoires de visage, auras animées, et des **skins d'équipement** (plastron, pantalon,
   gants, ceinture) qui remplacent l'apparence de la pièce. Les **skins d'arme et d'objet secondaire** sont réservés à une
   classe (2 armes et 1 objet secondaire par classe) : achetables par tous, portés seulement avec la bonne classe.
@@ -179,7 +179,16 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
   avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
   jusqu'au survol, forge et alchimie), Arbre de
-  compétences, Style de combat, Boutique (potions puis cosmétiques), Solo, Entraînement, Succès, Classements, Règles.
+  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Entraînement, Historique,
+  Statistiques, Succès, Classements, Règles.
+- **Historique** (onglet Historique) : les 50 dernières parties (stream et solo, pas l'entraînement) avec le résultat,
+  le rang, les kills, les morts, les dégâts infligés et subis, les dégâts sur les boss, la durée, les gains de la partie et
+  un détail propre au mode (points et temps sur la colline, équipe et MVP, golds ramassés, % de vie restant du boss, salle,
+  boss vaincus, profondeur…). Une ligne se déplie : niveau, classe, puissance, stats et équipement portés à ce moment-là.
+- **Statistiques** (onglet Statistiques) : tout ce que le personnage a accompli (parties et victoires par mode, défaites,
+  morts, dégâts, temps de jeu et sur la colline, records, boss vaincus, raids, Boss Rush, Solo, golds gagnés, objets
+  obtenus, coffres, forge, marché, paris, potions, collection). Les statistiques détaillées démarrent à la mise à jour ;
+  les compteurs plus anciens (batailles, kills, coffres…) remontent au début.
   Pastilles : points à répartir, coffres à ouvrir, points d'arbre, techniques à choisir, énergie, succès à récupérer.
   L'énergie du mode Solo (⚡) et les Clés de boss (🗝️) s'affichent aussi en haut de la page. Lien direct possible (`/character.html#boutique`).
 - **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
@@ -232,6 +241,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Battle Royale, 2 min 30 maximum, aucune récompense ni statistique ; la potion équipée s'active sans être consommée.
   On peut aussi y **répéter le mode Solo** (Expédition, ou Défi des boss avec boss et difficulté au choix) **sans dépenser
   d'énergie** et sans rien gagner : mêmes règles qu'en Solo (reliques, vitesse ×1 / ×2, pas de potion), 10 min maximum.
+  Et faire un **Boss Rush en solo** (difficulté au choix) : entre deux boss, on choisit soi-même en cliquant (bonus,
+  grand soin ou quitte ou double, pas de résurrection puisqu'on est seul).
 - **Mode Solo** (onglet Solo) : une Expédition coûte **1 ⚡ énergie** (3 au maximum, +1 toutes les 10 h), un Défi des boss
   **1 🗝️ Clé de boss** (sans limite, une offerte au départ, affichées en haut de la page à côté de l'énergie). Partie
   privée, visible seulement par le joueur, en vitesse ×1 ou ×2, sans potion ; on peut abandonner, ou fermer la page (la
@@ -274,10 +285,11 @@ de la file, confirme les `!join` et annonce le vainqueur.
     de son ventre (armes : gros dégâts ; os : saignement ; bile : poison et ralentissement ; pièces : héros assommés) et
     **bondit** sur le héros le plus éloigné. À **75 %**, **50 %** et **25 %**, il **copie** un héros au hasard : 2, 4 puis
     6 copies de niveau 1 (même classe, même apparence) qui le protègent (−40 % de dégâts subis tant qu'elles sont debout).
-  - **Givrenoire la Liche de glace** (260 PV + 420 par combattant) : attaque de loin et **gèle** des héros 5 s (1 à la
+  - **Givrenoire la Liche de glace** (220 PV + 330 par combattant) : attaque de loin et **garde ses distances** (un héros
+    trop près → elle se téléporte 240 px plus loin, au plus toutes les 9 s, en laissant une explosion de givre). Elle **gèle** des héros 5 s (1 à la
     fois, puis 2 sous 66 %), de nouveau 10 s plus tard. Gelé : il ne bouge plus, n'attaque plus, ne remplit plus sa
     stamina et perd 1 PV par seconde, mais personne ne peut le toucher et on peut le soigner. Pics de glace sous les
-    héros et nova de givre (ralentissement). À **33 %**, elle **relève tous les héros morts** depuis le début (ils
+    héros, **lance de givre** (un long couloir qui transperce tous ceux qui s'y trouvent) et nova de givre (ralentissement). À **33 %**, elle **relève tous les héros morts** depuis le début (ils
     combattent pour elle et s'effondrent à sa mort) ; si personne n'est tombé, elle gèle 3 héros, puis 2.
   - **Maexxna la Veuve noire** (200 PV + 280 par combattant) : araignée géante aux morsures venimeuses. Elle tisse des
     **toiles** partout (héros ralentis de 65 %), crache sa toile et son venin, appelle des **nuées d'araignées**. À
@@ -378,7 +390,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
 - **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / familier, effacement d'un
   visage dessiné, bannissement (déconnexion
-  immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests.
+  immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests. **Historique global**
+  (les parties de tous les joueurs, filtres par joueur et par mode) et **échanges du marché** (vendeur, acheteur, objet,
+  prix) avec des signaux de comportement suspect : même vendeur → même acheteur 3 fois ou plus, objet épique ou
+  légendaire bradé au prix minimum, prix 10 fois au-dessus du prix habituel de sa rareté.
 - **Tirages** : générateur aléatoire cryptographique ; un test statistique (`npm test`) vérifie que les fréquences
   observées correspondent à la table. La page perso affiche l'historique réel des tirages de chaque joueur.
 - **Recyclage** : bouton « Recycler » dans le coffre personnel, sélection multiple (ou par rareté), 3 golds par objet

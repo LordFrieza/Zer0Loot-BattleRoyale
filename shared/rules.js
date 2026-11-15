@@ -753,13 +753,13 @@
     short: 'Givrenoire',
     icon: '❄️',
     color: '#7fd8ff',
-    desc: 'Attaque de loin, gèle les héros (1, 2 puis 3 à la fois), fait jaillir des pics de glace et relève les morts pour se défendre.',
+    desc: 'Attaque de loin et se téléporte quand on l\'approche, gèle les héros (1, 2 puis 3 à la fois), lance de givre, pics de glace, et relève les morts pour se défendre.',
     marks: [0.66, 0.33],
-    hpBase: 260,
-    hpPerPlayer: 420,
+    hpBase: 220,
+    hpPerPlayer: 330,
     damageBase: 8,
     damagePerPlayer: 0.2,
-    cooldown: 1.4, // éclats de glace
+    cooldown: 1.25, // éclats de glace
     speed: 50,
     radius: 32,
     reduction: 0.12,
@@ -768,10 +768,14 @@
     range: 280,
     projectile: 'ice',
     blinkEvery: 20,
-    specialEvery: 7.5, // en alternance : pics de glace sous des héros, puis nova de givre autour d'elle
+    // Elle garde ses distances : un héros à moins de 90 px → elle se téléporte 240 px plus loin (toutes les 9 s au plus),
+    // en laissant une explosion de givre là où elle était (annoncée 0,8 s avant).
+    escape: { radius: 90, cooldown: 9, hop: 240, trapRadius: 110, trapWarn: 0.8, trapRatio: 0.7, trapSlow: 0.7, trapSlowFor: 2 },
+    specialEvery: 6.5, // en rotation : pics de glace sous des héros, lance de givre, nova de givre autour d'elle
     freeze: { first: 6, duration: 5, gap: 10, dps: 1, pattern: [[1, 1], [2, 2], [3, 2]] },
-    spikes: { base: 2, perPlayers: 8, max: 5, radius: 70, warn: 1.4, ratio: 0.9, slow: 0.6, slowFor: 3 },
-    nova: { radius: 170, warn: 1.2, ratio: 0.8, slow: 0.5, slowFor: 4 },
+    spikes: { base: 2, perPlayers: 8, max: 5, radius: 70, warn: 1.4, ratio: 0.9, slow: 0.75, slowFor: 2 },
+    nova: { radius: 170, warn: 1.2, ratio: 0.8, slow: 0.65, slowFor: 3 },
+    lance: { length: 620, width: 64, warn: 1.3, ratio: 1.3, slow: 0.6, slowFor: 2 }, // ligne droite vers le héros le plus éloigné
     raise: { at: 0.33, hpRatio: 0.6, damageRatio: 0.6 }, // serviteurs : héros morts relevés avec 60 % de leurs stats
     phases: [],
     enrageAt: 150,
@@ -1367,7 +1371,7 @@
     taxRate: 0.2,
     minPrice: 5,
     maxPrice: 1000000,
-    mailMax: 50, // courriers gardés par joueur (les plus anciens partent)
+    mailMax: 50, tradesMax: 1000, // courriers gardés par joueur (les plus anciens partent)
     historyMax: 40, // lignes d'historique du marché gardées par joueur
   };
   function marketTax(price) {
@@ -1492,7 +1496,7 @@
   // Les boss sont pensés pour un groupe : seul, leur vie et leurs dégâts de base sont réduits (puis la difficulté).
   const BOSS_SOLO_SCALE = {
     troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 },
-    mimic: { hp: 0.55, damage: 1.45 }, liche: { hp: 0.7, damage: 1.7 }, maexxna: { hp: 0.6, damage: 1.3 },
+    mimic: { hp: 0.55, damage: 1.45 }, liche: { hp: 0.55, damage: 1.4 }, maexxna: { hp: 0.6, damage: 1.3 },
   };
   // Seul face au boss, les classes fragiles à distance sont désavantagées : vie et dégâts du joueur ajustés par classe.
   const BOSS_SOLO_CLASS = {
@@ -1646,6 +1650,19 @@
     return 0;
   }
 
+  // ---------- Historique et statistiques ----------
+  const HISTORY = { max: 50 }; // parties gardées par personnage (les plus récentes)
+  // Types de partie de l'historique : les modes du stream, plus le contenu solo.
+  const HISTORY_KINDS = {
+    expedition: { label: 'Expédition', icon: '🕳️', color: '#b98cff' },
+    challenge: { label: 'Défi des boss', icon: '👹', color: '#ff8fa3' },
+  };
+  // Statistiques cumulées (character.lifetime ; character.stats, ce sont les points de caractéristiques) ; les records (PLAYER_STAT_MAX) gardent le maximum.
+  const PLAYER_STAT_KEYS = ['losses', 'deaths', 'damageDealt', 'damageTaken', 'bossDamage', 'hillTime', 'playTime', 'maxKills', 'maxDamage',
+    'expeditions', 'expeditionFloors', 'challenges', 'rushBosses', 'dungeonRooms', 'goldShower',
+    'goldEarned', 'itemsObtained', 'potionsUsed', 'betGold'];
+  const PLAYER_STAT_MAX = ['maxKills', 'maxDamage'];
+
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
 
   // ---------- Raid de Donjon : ambiance qui change toutes les 5 salles ----------
@@ -1770,6 +1787,7 @@
     kilt: { slot: 'pants', label: 'Kilt écossais', price: 300, color: '#b8323c', trim: '#1f4a2a' },
     jambieres: { slot: 'pants', label: 'Jambières d\'acier', price: 450, color: '#a4a9bb', trim: '#5c6074' },
     pantalon_ninja: { slot: 'pants', label: 'Pantalon de ninja', price: 300, color: '#23202c', trim: '#c8323c' },
+    pantalon_smoking: { slot: 'pants', label: 'Pantalon de smoking', price: 450, color: '#15131c', trim: '#3a3550' }, // va avec le Smoking
     // Gants
     gants_dores: { slot: 'gloves', label: 'Gantelets dorés', price: 400, color: '#ffc93a' },
     gants_feu: { slot: 'gloves', label: 'Poings de feu', price: 650, color: '#ff6b2a', trim: '#ffd23f' },
@@ -1926,6 +1944,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushReward, rushDefiReward,
+    HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };

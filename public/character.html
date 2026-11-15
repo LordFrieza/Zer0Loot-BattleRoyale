@@ -59,6 +59,8 @@
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
       <button data-tab="familier">🐾 Familier <span class="tab-badge" data-badge="familier"></span></button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
+      <button data-tab="historique">📜 Historique</button>
+      <button data-tab="statistiques">📊 Statistiques</button>
       <button data-tab="succes">🏅 Succès <span class="tab-badge" data-badge="succes"></span></button>
       <button data-tab="classements">🏆 Classements</button>
       <button data-tab="regles">📖 Règles</button>
@@ -280,7 +282,8 @@
         tirés au hasard) ou face au <b>fantôme</b> d'un autre joueur, avec son build, son arbre et son équipement actuels.
         Ton personnage combat avec tout ce qu'il a, y compris ta potion équipée (activée mais <b>pas consommée</b>).
         Tu peux aussi répéter le <b>mode Solo</b> : l'<b>Expédition</b> ou le <b>Défi des boss</b> (toutes les difficultés),
-        <b>sans dépenser d'énergie</b> (et sans potion, comme en vrai).
+        <b>sans dépenser d'énergie</b> (et sans potion, comme en vrai), et t'essayer au <b>Boss Rush</b> en solo : entre deux
+        boss, c'est toi qui choisis (bonus, grand soin ou quitte ou double) en cliquant sur l'écran.
         Aucune récompense, aucune perte, rien n'est compté dans les classements ni dans les succès.</p>
       <div class="training-controls">
         <div class="chips" id="training-kind">
@@ -288,9 +291,10 @@
           <button class="chip" data-kind="player">👻 Fantôme d'un joueur</button>
           <button class="chip" data-kind="expedition">🕳️ Expédition (Solo)</button>
           <button class="chip" data-kind="boss">👹 Défi des boss (Solo)</button>
+          <button class="chip" data-kind="rush">💀 Boss Rush (seul)</button>
         </div>
         <div class="row" id="training-boss" style="display:none">
-          <label style="margin:0">Boss</label>
+          <label style="margin:0" id="training-boss-lbl">Boss</label>
           <select id="training-boss-id"></select>
           <label style="margin:0">Difficulté</label>
           <select id="training-diff"></select>
@@ -429,6 +433,23 @@
         <div class="pet-box" id="pet-enclos-shop"></div>
       </div>
       <div class="pet-box" id="pet-collection"></div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="historique">
+    <div class="panel">
+      <h2>📜 Historique <span class="sub">Tes dernières parties, sur le stream et en solo</span></h2>
+      <p class="muted" style="font-size:13px">Clique sur une partie pour voir ton niveau, tes stats et l'équipement que tu portais à ce moment-là.</p>
+      <div class="chips" id="history-filters"></div>
+      <div class="hist-list" id="history-list"></div>
+    </div>
+    </section>
+
+    <section class="tab" data-tab="statistiques">
+    <div class="panel">
+      <h2>📊 Statistiques <span class="sub">Tout ce que ton personnage a accompli</span></h2>
+      <p class="muted" style="font-size:13px" id="lifetime-since"></p>
+      <div class="stat-cards" id="lifetime-cards"></div>
     </div>
     </section>
 
@@ -614,6 +635,7 @@
   <script src="/js/leaderboard.js"></script>
   <script src="/js/arena.js"></script>
   <script src="/js/pets.js"></script>
+  <script src="/js/history.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

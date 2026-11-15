@@ -98,6 +98,26 @@
       </div>
     </div>
 
+    <div class="panel" id="history-panel">
+      <h2>📜 Historique global <span class="sub">Les parties de tous les joueurs</span><button class="secondary small" id="history-refresh">↻ Actualiser</button></h2>
+      <div class="row" style="margin-bottom:10px">
+        <input id="history-search" placeholder="Filtrer par joueur…" style="flex:1">
+        <select id="history-mode"></select>
+      </div>
+      <div class="hist-list" id="admin-history"></div>
+    </div>
+
+    <div class="panel" id="trades-panel">
+      <h2>🏪 Échanges du marché <span class="sub">Repérer les comportements suspects</span><button class="secondary small" id="trades-refresh">↻ Actualiser</button></h2>
+      <p class="muted" style="font-size:13px;margin:0 0 8px">Signaux : <span class="flag-help">🔁 même vendeur → même acheteur (3 fois ou plus)</span> ·
+        <span class="flag-help">🎁 objet épique ou légendaire vendu au prix minimum</span> · <span class="flag-help">💸 prix 10 fois au-dessus du prix habituel de sa rareté</span></p>
+      <div class="row" style="margin-bottom:10px">
+        <input id="trades-search" placeholder="Filtrer par vendeur, acheteur ou objet…" style="flex:1">
+        <label class="inv-toggle" style="margin:0"><input type="checkbox" id="trades-suspect"> Seulement les échanges signalés</label>
+      </div>
+      <div class="players-wrap"><table class="players-table admin-trades" id="admin-trades"></table></div>
+    </div>
+
     <div class="panel" id="leaderboard-panel">
       <h2>🏆 Classements <span class="sub">Top 10 des joueurs</span></h2>
       <div id="leaderboard"></div>
@@ -112,6 +132,7 @@
   <script src="/js/sound.js"></script>
   <script src="/js/arena.js"></script>
   <script src="/js/leaderboard.js"></script>
+  <script src="/js/history.js"></script>
   <script src="/js/admin.js"></script>
 </body>
 </html>

@@ -586,7 +586,12 @@ function notifyBets(results) {
   for (const r of results) {
     const user = db.state.users[r.userId];
     if (!user) continue;
-    if (r.outcome === 'won') game.bump(user.character, 'betsWon');
+    if (r.outcome === 'won') {
+      game.bump(user.character, 'betsWon');
+      const profit = Math.max(0, (r.payout || 0) - (r.amount || 0));
+      game.addStat(user.character, 'betGold', profit);
+      game.addStat(user.character, 'goldEarned', profit);
+    }
     pushMe(user);
     io.to('user:' + user.id).emit('bet', r);
   }
@@ -663,6 +668,29 @@ app.post('/api/admin/battle/reset', requireAdmin, action(() => battle.reset()));
 
 // ---------- Récompenses ----------
 
+// Gains de la partie en cours (pour l'historique) : ce qui a été crédité à chaque joueur pendant la partie.
+const battleGains = new Map(); // userId → { xp, gold, chests }
+function grantBattle(user, reward) {
+  const g = battleGains.get(user.id) || { xp: 0, gold: 0, chests: 0 };
+  g.xp += reward.xp || 0;
+  g.gold += reward.gold || 0;
+  g.chests += reward.chests || 0;
+  battleGains.set(user.id, g);
+  return game.grant(user.character, reward);
+}
+
+// Historique : une ligne par participant humain à la fin d'une partie du stream.
+function recordBattle(f, user, outcome, details = {}) {
+  const ranking = (battle.result && battle.result.ranking) || [];
+  const rank = ranking.findIndex((r) => r.key === f.key) + 1;
+  game.recordActivity(user.character, {
+    mode: battle.mode, outcome, rank: rank || undefined, total: ranking.length || undefined,
+    kills: f.kills, deaths: f.deaths || (f.alive ? 0 : 1), dealt: Math.round(f.dealt), taken: Math.round(f.taken),
+    bossDealt: Math.round(f.bossDealt || 0), duration: Math.round(battle.time),
+    gains: battleGains.get(user.id) || { xp: 0, gold: 0, chests: 0 }, details,
+  });
+}
+
 // Événement « Loot double » : XP, golds et coffres ×2 pendant la bataille.
 function scaled(reward) {
   const m = battle.event === 'double' ? 2 : 1;
@@ -686,7 +714,7 @@ battle.on('kill', (killer, victim) => {
   // Tuer plus fort que soi rapporte plus, tuer plus faible rapporte moins.
   const mult = Rules.rewardMultiplier(killer.power, victim && victim.power);
   const reward = balanced(Rules.REWARDS.kill, mult);
-  const levels = game.grant(user.character, reward);
+  const levels = grantBattle(user, reward);
   user.character.record.kills += 1;
   db.save();
   pushMe(user);
@@ -701,7 +729,7 @@ battle.on('streak', (fighter, kind) => {
   const mult = Rules.rewardMultiplier(fighter.power, opponentsPower(fighter, battle.players));
   const reward = Rules.REWARDS[kind] && balanced(Rules.REWARDS[kind], mult);
   if (!reward || !(reward.chests || reward.gold || reward.xp)) { db.save(); pushMe(user); return; }
-  const levels = game.grant(user.character, reward);
+  const levels = grantBattle(user, reward);
   db.save();
   pushMe(user);
   io.to('user:' + user.id).emit('reward', { type: kind, reward, levels, mult });
@@ -713,16 +741,17 @@ battle.on('end', (winner, fighters) => {
     if (!user) continue;
     user.character.record.battles += 1;
     const participation = scaled(Rules.REWARDS.participation);
-    const participationLevels = game.grant(user.character, participation);
+    const participationLevels = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (f === winner) {
       const mult = Rules.rewardMultiplier(f.power, opponentsPower(f, battle.players));
       const win = balanced(Rules.REWARDS.win, mult);
-      const levels = game.grant(user.character, win);
+      const levels = grantBattle(user, win);
       user.character.record.wins += 1;
       if (battle.mode === 'koth') game.bump(user.character, 'kothWins');
       io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels, mult });
     }
+    recordBattle(f, user, f === winner ? 'win' : 'loss', battle.mode === 'koth' ? { score: Math.floor(f.score || 0), hillTime: Math.round(f.hillTime || 0) } : {});
     pushMe(user);
   }
   db.save();
@@ -750,7 +779,7 @@ battle.on('coopEnd', (result, fighters) => {
     game.upgrade(user.character);
     user.character.record.battles += 1;
     const participation = { ...Rules.REWARDS.participation };
-    const participationLevels = game.grant(user.character, participation);
+    const participationLevels = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (result.mode === 'boss' && result.victory) {
       game.bump(user.character, 'bossWins');
@@ -763,9 +792,13 @@ battle.on('coopEnd', (result, fighters) => {
     if (result.mode === 'dungeon') user.character.counters.dungeonBest = Math.max(user.character.counters.dungeonBest || 0, result.room);
     if (result.reward) {
       const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
-      const levels = game.grant(user.character, reward);
+      const levels = grantBattle(user, reward);
       io.to('user:' + user.id).emit('reward', { type: result.mode, reward, levels, room: result.room });
     }
+    const details = result.mode === 'dungeon' ? { room: result.room }
+      : result.mode === 'rush' ? { killed: result.rush.killed, defeated: result.rush.defeated, boss: result.boss.id }
+        : { boss: result.boss.id, bossHp: Math.round((result.boss.hp / result.boss.maxHp) * 100) };
+    recordBattle(f, user, result.mode === 'dungeon' ? 'end' : result.victory ? 'win' : 'loss', details);
     pushMe(user);
   }
   db.save();
@@ -823,8 +856,9 @@ battle.on('goldEnd', (result, fighters) => {
     const reward = { xp: Rules.REWARDS.participation.xp, gold: f.goldGot, chests: f.chestsGot + best };
     game.upgrade(user.character);
     user.character.counters.goldBest = Math.max(user.character.counters.goldBest || 0, f.goldGot);
-    const levels = game.grant(user.character, reward);
+    const levels = grantBattle(user, reward);
     io.to('user:' + user.id).emit('reward', { type: 'gold', reward, levels, best: !!best });
+    recordBattle(f, user, best ? 'win' : 'end', { gold: f.goldGot, chests: f.chestsGot, best: !!best });
     pushMe(user);
   }
   db.save();
@@ -843,7 +877,7 @@ battle.on('clansEnd', (result, fighters) => {
     if (!user) continue;
     user.character.record.battles += 1;
     const participation = { ...Rules.REWARDS.participation };
-    const pl = game.grant(user.character, participation);
+    const pl = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
     // Récompenses équilibrées : puissance moyenne de l'équipe adverse ÷ la sienne.
     const mult = Rules.rewardMultiplier(f.power, opponentsPower(f, fighters));
@@ -851,15 +885,16 @@ battle.on('clansEnd', (result, fighters) => {
       user.character.record.wins += 1;
       game.bump(user.character, 'clansWins');
       const reward = Rules.scaleReward(result.reward, mult);
-      const levels = game.grant(user.character, reward);
+      const levels = grantBattle(user, reward);
       io.to('user:' + user.id).emit('reward', { type: 'clans', reward, levels, clan: result.winner, mult });
     }
     if (result.mvp && result.mvp.key === f.key) {
       game.bump(user.character, 'clansMvp');
       const mvp = Rules.scaleReward({ xp: 0, gold: 0, chests: Rules.CLANS.mvpChests }, mult);
-      game.grant(user.character, mvp);
+      grantBattle(user, mvp);
       io.to('user:' + user.id).emit('reward', { type: 'mvp', reward: mvp, levels: 0, mult });
     }
+    recordBattle(f, user, f.clan === result.winner ? 'win' : 'loss', { clan: f.clan, mvp: !!(result.mvp && result.mvp.key === f.key) });
     pushMe(user);
   }
   db.save();
@@ -891,7 +926,7 @@ battle.on('pollEnd', (result, fighters) => {
     for (const f of fighters) {
       const user = f.userId && db.state.users[f.userId];
       if (!user) continue;
-      const levels = game.grant(user.character, result.reward);
+      const levels = grantBattle(user, result.reward);
       io.to('user:' + user.id).emit('reward', { type: 'poll', reward: result.reward, levels, boon: result.id });
       pushMe(user);
     }
@@ -962,6 +997,53 @@ app.get('/api/admin/players', requireAdmin, (req, res) => {
   }));
 });
 
+// Historique global : les parties de tous les joueurs (filtres : joueur, mode), les plus récentes d'abord.
+app.get('/api/admin/history', requireAdmin, (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const mode = String(req.query.mode || '');
+  const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 200));
+  const rows = [];
+  for (const u of players()) {
+    const name = u.twitchDisplayName || u.username;
+    if (q && !name.toLowerCase().includes(q) && !(u.twitchLogin || '').includes(q)) continue;
+    for (const e of u.character.history || []) {
+      if (mode && e.mode !== mode) continue;
+      rows.push({ ...e, userId: u.id, name });
+    }
+  }
+  rows.sort((a, b) => b.at - a.at);
+  res.json(rows.slice(0, limit));
+});
+
+/*
+ * Échanges du marché (tous les joueurs), avec des signaux de comportement suspect :
+ *  - pair : le même vendeur a vendu au moins 3 fois au même acheteur ;
+ *  - cheap : objet épique ou légendaire vendu au prix minimum (cadeau déguisé ?) ;
+ *  - pricey : prix au moins 10 fois au-dessus du prix médian de sa rareté.
+ */
+app.get('/api/admin/market/trades', requireAdmin, (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const all = market.trades();
+  const pairs = {};
+  const byRarity = {};
+  for (const t of all) {
+    pairs[t.sellerId + '>' + t.buyerId] = (pairs[t.sellerId + '>' + t.buyerId] || 0) + 1;
+    (byRarity[t.rarity] = byRarity[t.rarity] || []).push(t.price);
+  }
+  const median = {};
+  for (const [r, list] of Object.entries(byRarity)) { const sorted = [...list].sort((a, b) => a - b); median[r] = sorted[Math.floor(sorted.length / 2)]; }
+  const rows = all
+    .filter((t) => !q || t.seller.toLowerCase().includes(q) || t.buyer.toLowerCase().includes(q) || t.item.toLowerCase().includes(q))
+    .map((t) => {
+      const flags = [];
+      if (pairs[t.sellerId + '>' + t.buyerId] >= 3) flags.push('pair');
+      if ((t.rarity === 'epique' || t.rarity === 'legendaire') && t.price <= Rules.MARKET.minPrice) flags.push('cheap');
+      if (median[t.rarity] && byRarity[t.rarity].length >= 5 && t.price >= median[t.rarity] * 10) flags.push('pricey');
+      return { ...t, flags, pairCount: pairs[t.sellerId + '>' + t.buyerId] };
+    });
+  res.json(rows.slice(0, 300));
+});
+
 function adminTarget(req) {
   const user = db.state.users[req.params.id];
   if (!user || user.role !== 'player' || !user.character) throw new Error('Joueur introuvable');
@@ -1020,11 +1102,13 @@ battle.on('frame', (f) => io.emit('frame', f));
 
 // Au lancement d'une partie, la potion équipée par chaque joueur est utilisée (elle quitte son emplacement).
 battle.on('start', (fighters) => {
+  battleGains.clear();
   if (battle.mode === 'gold') return; // pas de combat dans le mode bonus : la potion reste pour la prochaine partie
   for (const f of fighters) {
     const user = f.userId && db.state.users[f.userId];
     if (!user || !f.consumable) continue;
     game.useConsumable(user.character);
+    game.addStat(user.character, 'potionsUsed');
     pushMe(user);
   }
   db.save();
@@ -1061,15 +1145,16 @@ app.post('/api/training/start', requirePlayer, (req, res) => {
     if (!user.character.cls) throw new Error('Choisis d\'abord une classe');
     stopTraining(user.id);
     if (trainings.size >= Rules.TRAINING.maxConcurrent) throw new Error('Trop d\'entraînements en cours, réessaie dans un instant');
-    // Répétition du mode Solo (Expédition ou Défi des boss) : sans énergie, sans récompense, rien n'est compté.
-    if (req.body.opponent === 'expedition' || req.body.opponent === 'boss') {
+    // Répétition du mode Solo (Expédition, Défi des boss) ou Boss Rush en solo : sans énergie, sans récompense,
+    // rien n'est compté.
+    if (req.body.opponent === 'expedition' || req.body.opponent === 'boss' || req.body.opponent === 'rush') {
       const kind = req.body.opponent;
       const bossId = kind === 'boss' ? String(req.body.boss || 'troll') : 'troll';
       if (!Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
-      const difficulty = kind === 'boss' ? String(req.body.difficulty || 'normal') : null;
-      if (kind === 'boss' && !Rules.BOSS_CHALLENGE[difficulty]) throw new Error('Difficulté inconnue');
+      const difficulty = kind !== 'expedition' ? String(req.body.difficulty || 'normal') : null;
+      if (kind !== 'expedition' && !Rules.BOSS_CHALLENGE[difficulty]) throw new Error('Difficulté inconnue');
       const b = new Battle({ solo: { kind, level: user.character.level, difficulty, training: true } });
-      b.openQueue(60, kind === 'boss' ? 'boss' : 'dungeon', bossId);
+      b.openQueue(60, kind === 'boss' ? 'boss' : kind === 'rush' ? 'rush' : 'dungeon', bossId);
       clearTimeout(b.queueTimer);
       b.join({ ...participantFromUser(user), consumable: null });
       const room = 'user:' + user.id;
@@ -1084,7 +1169,8 @@ app.post('/api/training/start', requirePlayer, (req, res) => {
       const B = Rules.BOSSES[bossId];
       res.json({ ok: true, opponent: kind === 'boss'
         ? { name: B.name, level: user.character.level, difficulty }
-        : { name: 'Expédition', level: user.character.level } });
+        : kind === 'rush' ? { name: 'Boss Rush', level: user.character.level, difficulty }
+          : { name: 'Expédition', level: user.character.level } });
       return;
     }
     let opponent;
@@ -1132,6 +1218,12 @@ function trainingSolo(req) {
 app.post('/api/training/relic', requirePlayer, action((req) => {
   const id = trainingSolo(req).chooseRelic(String(req.body.id || ''));
   if (!id) throw new Error('Cette relique n\'est pas proposée');
+  return { id };
+}));
+// Boss Rush d'entraînement : le choix entre deux boss se fait en cliquant (pas de vote du chat).
+app.post('/api/training/rush', requirePlayer, action((req) => {
+  const id = trainingSolo(req).chooseRush(String(req.body.id || ''));
+  if (!id) throw new Error('Ce choix n\'est pas proposé');
   return { id };
 }));
 app.post('/api/training/speed', requirePlayer, action((req) => {
@@ -1214,7 +1306,7 @@ function endSolo(userId) {
   solos.delete(userId);
 }
 
-function soloRewards(user, result) {
+function soloRewards(user, result, f = null) {
   const c = user.character;
   game.upgrade(c);
   c.soloActive = null;
@@ -1244,6 +1336,17 @@ function soloRewards(user, result) {
     }
     if (result.difficulty === 'legendaire') game.bump(c, 'legendWins');
   }
+  // Historique : expédition (profondeur) ou défi (vie restante du boss)
+  game.recordActivity(c, {
+    mode: result.solo === 'expedition' ? 'expedition' : 'challenge',
+    outcome: result.solo === 'expedition' ? 'end' : result.victory ? 'win' : 'loss',
+    kills: f ? f.kills : 0, deaths: f && !f.alive ? 1 : 0, dealt: f ? Math.round(f.dealt) : 0, taken: f ? Math.round(f.taken) : 0,
+    bossDealt: f ? Math.round(f.bossDealt || 0) : 0, duration: result.duration,
+    gains: { xp: result.reward ? result.reward.xp : 0, gold: result.reward ? result.reward.gold : 0, chests: result.reward ? result.reward.chests : 0, keys: keys || undefined },
+    details: result.solo === 'expedition'
+      ? { depth: result.depth || 0, relics: (result.relics || []).length, abandoned: !!result.abandoned }
+      : { boss: result.boss.id, difficulty: result.difficulty, bossHp: Math.round((result.boss.hp / result.boss.maxHp) * 100), abandoned: !!result.abandoned },
+  });
   db.save();
   pushMe(user);
 }
@@ -1273,9 +1376,9 @@ app.post('/api/solo/start', requirePlayer, (req, res) => {
     const room = 'user:' + user.id;
     b.on('queue', (q) => io.to(room).emit('soloQueue', q));
     b.on('frame', (f) => io.to(room).emit('soloFrame', f));
-    b.on('coopEnd', (result) => {
+    b.on('coopEnd', (result, players) => {
       clearTimeout(b.soloTimer);
-      soloRewards(user, result);
+      soloRewards(user, result, players[0]);
       // La partie reste affichée (résultat) jusqu'à la suivante ; plus rien ne tourne.
       setImmediate(() => { if (solos.get(user.id) === b) { b.removeAllListeners(); solos.delete(user.id); } });
     });

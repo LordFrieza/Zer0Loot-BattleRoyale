@@ -117,6 +117,13 @@ function buy(user, orderId, now = Date.now()) {
   seller.character.gold += order.price;
   game.bump(seller.character, 'sold');
   game.bump(c, 'bought');
+  game.addStat(seller.character, 'goldEarned', order.price);
+  game.addStat(c, 'itemsObtained');
+  // Journal global des échanges (vue admin : repérer les comportements suspects)
+  const st2 = state();
+  if (!Array.isArray(st2.trades)) st2.trades = [];
+  st2.trades.unshift({ at: now, sellerId: seller.id, seller: nameOf(seller), buyerId: user.id, buyer: nameOf(user), item: order.item.name, rarity: order.item.rarity, slot: order.item.slot, price: order.price, listedAt: order.createdAt });
+  if (st2.trades.length > M.tradesMax) st2.trades.length = M.tradesMax;
   const label = itemLabel(order.item);
   log(user, { at: now, kind: 'bought', item: label, rarity: order.item.rarity, price: order.price, other: nameOf(seller) });
   log(seller, { at: now, kind: 'sold', item: label, rarity: order.item.rarity, price: order.price, other: nameOf(user) });
@@ -141,4 +148,8 @@ function readMail(user) {
   for (const m of user.character.mail) m.read = true;
 }
 
-module.exports = { state, sweep, list, ordersOf, sell, buy, cancel, readMail };
+function trades() {
+  return state().trades || [];
+}
+
+module.exports = { state, sweep, list, ordersOf, sell, buy, cancel, readMail, trades };

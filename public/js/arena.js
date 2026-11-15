@@ -42,7 +42,7 @@
   }
   const TINTS = { copie: 'sepia(0.7) saturate(1.8) hue-rotate(-12deg) brightness(1.08)', serviteur: 'grayscale(0.7) hue-rotate(170deg) saturate(2.2) brightness(1.15)' };
   // Couleur des zones d'impact selon l'attaque
-  const SLAM_RGB = { void: '170,80,255', rock: '255,150,40', leap: '255,170,60', spike: '120,220,255', nova: '120,220,255', webshot: '235,235,245', webrain: '235,235,245', spray: '120,230,70' };
+  const SLAM_RGB = { void: '170,80,255', rock: '255,150,40', leap: '255,170,60', spike: '120,220,255', nova: '120,220,255', lance: '140,230,255', frosttrap: '140,230,255', webshot: '235,235,245', webrain: '235,235,245', spray: '120,230,70' };
   const CONE_KINDS = ['cone', 'vomit', 'spray'];
 
   function hexRgb(hex) {
@@ -484,7 +484,17 @@
           (this.gushes = this.gushes || []).push({ x: e.x, y: e.y, r: e.r, a: s.a || 0, half: s.half || 0.45, icon: L ? L.icon : '💥', color: L ? L.color : '#fff', life: 0.9, seed: Math.random() * 100, bile: e.kind === 'spray' || e.loot === 'bile' });
           this.shake = Math.max(this.shake || 0, 0.3);
           if (window.Sound) Sound.play(e.kind === 'spray' ? 'voidBlast' : 'slam');
-        } else if (e.t === 'slam' && (e.kind === 'spike' || e.kind === 'nova')) {
+        } else if (e.t === 'slam' && e.kind === 'lance') {
+          const tx = e.tx != null ? e.tx : e.x + 600;
+          const ty = e.ty != null ? e.ty : e.y;
+          this.beams.push({ path: [{ x: e.x, y: e.y - 20 }, { x: tx, y: ty - 20 }], width: 18, color: '#bff6ff', t: 0, dur: 0.5 });
+          for (let k = 0; k <= 6; k++) this.spark(e.x + (tx - e.x) * k / 6, e.y + (ty - e.y) * k / 6 - 10, '#dff8ff', 8);
+          this.shake = Math.max(this.shake || 0, 0.4);
+          if (window.Sound) Sound.play('ult', 'perforante');
+        } else if (e.t === 'licheEscape') {
+          const boss = this.disp.get('boss');
+          if (boss) this.spark(boss.x, boss.y - 40, '#bff6ff', 20);
+        } else if (e.t === 'slam' && (e.kind === 'spike' || e.kind === 'nova' || e.kind === 'frosttrap')) {
           this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.6, color: 'ice' });
           this.spark(e.x, e.y, '#bff6ff', e.kind === 'nova' ? 50 : 26);
           if (e.kind === 'spike') (this.spikes = this.spikes || []).push({ x: e.x, y: e.y, r: e.r, life: 1 });
@@ -937,7 +947,17 @@
         ctx.strokeStyle = `rgba(${rgb},${blink})`;
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 8]);
-        if (CONE_KINDS.includes(s.kind)) {
+        if (s.kind === 'lance' && s.tx != null) {
+          // Lance de givre : couloir annoncé au sol, qui se remplit
+          const ang = Math.atan2(s.ty - s.y, s.tx - s.x);
+          const len = Math.hypot(s.tx - s.x, s.ty - s.y);
+          ctx.translate(s.x, s.y + 10);
+          ctx.rotate(ang);
+          ctx.strokeRect(0, -s.w / 2, len, s.w);
+          ctx.setLineDash([]);
+          ctx.fillStyle = `rgba(${rgb},${0.1 + s.p * 0.3})`;
+          ctx.fillRect(0, -s.w / 2, len * s.p, s.w);
+        } else if (CONE_KINDS.includes(s.kind)) {
           ctx.translate(s.x, s.y + 10);
           ctx.scale(1, 0.75);
           ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, s.r, s.a - s.half, s.a + s.half); ctx.closePath(); ctx.stroke();
@@ -1453,7 +1473,7 @@
       if (f.mode === 'dungeon' && f.dungeon && f.dungeon.poll && f.phase === 'battle') this.drawPoll(f.dungeon.poll, t);
       if (f.rush && f.phase === 'battle') {
         if (f.rush.stage === 'intro') this.drawRushIntro(f, dt, t);
-        if (f.rush.poll) this.drawPoll(f.rush.poll, t, true);
+        if (f.rush.poll && !f.solo) this.drawPoll(f.rush.poll, t, true); // (en solo : cartes cliquables sous l'arène)
       }
     }
 
@@ -2743,6 +2763,8 @@
       ctx.translate(W / 2, 140); ctx.scale(s, s); ctx.translate(-W / 2, -140);
       if (r.solo === 'expedition') {
         this.title(`🕳️ PROFONDEUR ${r.depth} ATTEINTE`, 140, 56, '#c9a8ff', '#7a3cff');
+      } else if (r.solo === 'rush') {
+        this.title(`💀 BOSS RUSH : ${r.rush.killed} BOSS VAINCU${r.rush.killed > 1 ? 'S' : ''}`, 140, 52, r.rush.killed ? '#ffc21a' : '#ff4d6d', '#ff2a2a');
       } else {
         const short = (Rules.BOSSES[r.boss.id] || Rules.BOSS).short.toUpperCase();
         if (r.victory) this.title(`🏆 ${short} EST VAINCU ! 🏆`, 140, 56, '#ffc21a', '#ff9a00');
@@ -2752,6 +2774,9 @@
       let sub;
       if (r.solo === 'expedition') {
         sub = r.abandoned ? 'Tu es remonté à la surface avec ton butin.' : `Tombé à la profondeur ${r.room} après ${formatCountdown(r.duration * 1000)}.`;
+      } else if (r.solo === 'rush') {
+        const icons = r.rush.defeated.map((id) => (Rules.BOSSES[id] || Rules.BOSS).icon).join(' ');
+        sub = r.abandoned ? `Run abandonnée. ${icons}` : `${icons}${icons ? '  ·  ' : ''}${Rules.BOSSES[r.boss.id].short} t'a arrêté en ${formatCountdown(r.duration * 1000)}.`;
       } else {
         const D = Rules.BOSS_CHALLENGE[r.difficulty];
         sub = r.victory
