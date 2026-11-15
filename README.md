@@ -116,6 +116,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   double kill (2 kills d'affilée en moins de 8 s) = +1 coffre ; triple kill = annonce seulement ;
   massacre (5 kills dans la bataille) = +2 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
+- **Répartition des points** (onglet Personnage) : le bouton **+** place un point libre tout de suite ; le bouton **−**
+  retire un point pour le replacer ailleurs : les changements s'affichent en direct, puis on **valide** d'un coup
+  (50 golds par point retiré, 500 golds au plus ; placer des points libres reste gratuit).
 - **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement et de classe) :
   - Vie : 100 PV + 10 par point
   - Force : 10 dégâts + 2 par point
@@ -159,7 +162,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   redémarre pendant la file, toutes les mises sont remboursées. La cagnotte s'affiche aussi sur l'écran de stream.
 - **Apparence** (onglet Personnage, gratuit) : couleur du personnage (15 teintes ou automatique selon le pseudo),
   7 styles d'yeux, 5 de sourcils, 8 de bouches. Visible sur la fiche, dans l'arène et dans les aperçus.
-- **Boutique** (onglet Boutique) : 56 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
+- **Boutique** (onglet Boutique) : 59 cosmétiques purement visuels achetés avec des golds (150 à 2 000) :
   chapeaux, capes, chaussures, accessoires de visage, auras animées, et des **skins d'équipement** (plastron, pantalon,
   gants, ceinture) qui remplacent l'apparence de la pièce. Les **skins d'arme et d'objet secondaire** sont réservés à une
   classe (2 armes et 1 objet secondaire par classe) : achetables par tous, portés seulement avec la bonne classe.
@@ -170,9 +173,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Visage à dessiner** (1 500 golds) : le joueur dessine son visage (grille 12 × 12, 8 couleurs) dans l'onglet
     Personnage ; il remplace yeux, sourcils et bouche en bataille. L'arène ne reçoit qu'une référence et charge le dessin
     une fois ; l'admin peut effacer un dessin inapproprié (liste des joueurs).
-  - **Cosmétiques d'exploit** (8), visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
-    d'ogre / de dragon / spectrale (vaincre le Troll / le Dragon / le Magicien en **Défi des boss, en Héroïque ou
-    Légendaire**), couronne d'os (salle 30 du
+  - **Cosmétiques d'exploit** (11), visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
+    d'ogre / de dragon / spectrale / gueule de mimic / liche glaciaire / carapace de veuve noire (vaincre le Troll / le
+    Dragon / le Magicien / le Mimic / la Liche de glace / Maexxna en **Défi des boss, en Héroïque ou Légendaire**), couronne d'os (salle 30 du
     donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
     (profondeur 25 en Expédition), aura du champion (100 victoires).
 - **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
@@ -288,7 +291,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Givrenoire la Liche de glace** (220 PV + 330 par combattant) : attaque de loin et **garde ses distances** (un héros
     trop près → elle se téléporte 240 px plus loin, au plus toutes les 9 s, en laissant une explosion de givre). Elle **gèle** des héros 5 s (1 à la
     fois, puis 2 sous 66 %), de nouveau 10 s plus tard. Gelé : il ne bouge plus, n'attaque plus, ne remplit plus sa
-    stamina et perd 1 PV par seconde, mais personne ne peut le toucher et on peut le soigner. Pics de glace sous les
+    stamina et perd 1,5 % de sa vie max par seconde (5 % seul, en Défi des boss), mais personne ne peut le toucher et on peut le soigner. Pics de glace sous les
     héros, **lance de givre** (un long couloir qui transperce tous ceux qui s'y trouvent) et nova de givre (ralentissement). À **33 %**, elle **relève tous les héros morts** depuis le début (ils
     combattent pour elle et s'effondrent à sa mort) ; si personne n'est tombé, elle gèle 3 héros, puis 2.
   - **Maexxna la Veuve noire** (200 PV + 280 par combattant) : araignée géante aux morsures venimeuses. Elle tisse des

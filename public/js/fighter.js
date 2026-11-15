@@ -897,6 +897,66 @@
         ctx.fillStyle = shade(c.color, -0.3);
         for (const [sx, sy] of [[-5, -19], [-3, -13], [-7, -14], [-2, -22]]) { ctx.beginPath(); ctx.arc(sx, sy, 1.1, 0, Math.PI); ctx.fill(); }
         break;
+      case 'peau_mimic': {
+        // un couvercle de coffre cerclé d'or, entrouvert sur une rangée de dents, et une langue qui pend
+        const open = 0.18 + Math.max(0, Math.sin(performance.now() / 380)) * 0.12;
+        ctx.save();
+        ctx.translate(-10, -22);
+        ctx.rotate(-open);
+        ctx.fillStyle = '#8a5a2b';
+        ctx.strokeStyle = INK; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -4); ctx.quadraticCurveTo(10, -10, 20, -4); ctx.lineTo(20, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffc93a';
+        ctx.fillRect(2, -6, 2, 6); ctx.fillRect(16, -6, 2, 6);
+        ctx.fillStyle = '#f5ead0';
+        for (let x = 1; x < 19; x += 3.6) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 1.6, 2.6); ctx.lineTo(x + 3.2, 0); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+        ctx.fillStyle = '#f5ead0';
+        for (let x = -8; x < 8; x += 3.6) { ctx.beginPath(); ctx.moveTo(x, -22); ctx.lineTo(x + 1.6, -24.4); ctx.lineTo(x + 3.2, -22); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle = '#e0607e';
+        ctx.beginPath(); ctx.ellipse(5, -8.5, 2, 3.2, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(60,30,10,.25)';
+        ctx.fillRect(-10, -18, 20, 1.2);
+        break;
+      }
+      case 'peau_liche': {
+        // crâne pâle, couronne de glace, yeux qui brillent d'un bleu froid, volutes de givre
+        ctx.fillStyle = 'rgba(170,235,255,.95)';
+        ctx.strokeStyle = 'rgba(40,110,160,.85)'; ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-8, -24); ctx.lineTo(-7, -30); ctx.lineTo(-4, -25.5); ctx.lineTo(0, -33); ctx.lineTo(4, -25.5); ctx.lineTo(7, -30); ctx.lineTo(8.5, -24);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.save();
+        ctx.shadowColor = '#5fe0ff'; ctx.shadowBlur = 6;
+        ctx.fillStyle = '#9ff0ff';
+        ctx.beginPath(); ctx.arc(-1.5, -17, 1.6, 0, Math.PI * 2); ctx.arc(5, -17, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(70,90,110,.6)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(-2, -11); ctx.lineTo(7, -11); ctx.stroke();
+        for (let x = -1; x < 7; x += 2) { ctx.beginPath(); ctx.moveTo(x, -12.2); ctx.lineTo(x, -9.8); ctx.stroke(); }
+        const t = performance.now() / 1000;
+        ctx.fillStyle = 'rgba(200,245,255,.7)';
+        for (let i = 0; i < 3; i++) { const k = (t * 0.7 + i / 3) % 1; ctx.beginPath(); ctx.arc(-9 + i * 9, -26 - k * 10, 1.2 * (1 - k) + 0.3, 0, Math.PI * 2); ctx.fill(); }
+        break;
+      }
+      case 'peau_maexxna':
+        // grappe d'yeux rouges, crochets verts et sablier rouge sur le front
+        ctx.save();
+        ctx.shadowColor = '#ff1a2a'; ctx.shadowBlur = 4;
+        ctx.fillStyle = '#ff3344';
+        for (const [ex, ey, r] of [[1, -21, 1.2], [5, -21, 1.2], [-1.5, -18.5, 0.9], [7.5, -18.5, 0.9], [2.5, -24, 0.8], [-3.5, -22, 0.7]]) { ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+        ctx.fillStyle = '#e8203c';
+        ctx.beginPath(); ctx.moveTo(-4, -25); ctx.lineTo(-1, -25); ctx.lineTo(-2.5, -23); ctx.lineTo(-1, -21); ctx.lineTo(-4, -21); ctx.lineTo(-2.5, -23); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#7dff6a';
+        ctx.beginPath(); ctx.moveTo(1, -11); ctx.lineTo(2.2, -7); ctx.lineTo(3, -11); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(5, -11); ctx.lineTo(6.2, -7); ctx.lineTo(7, -11); ctx.closePath(); ctx.fill();
+        // pattes d'araignée dans le dos
+        ctx.strokeStyle = '#15121b'; ctx.lineWidth = 1.6;
+        for (const [d, h] of [[-1, 0], [-1, 5], [1, 0], [1, 5]]) {
+          ctx.beginPath(); ctx.moveTo(-9 * d * -1 + (d > 0 ? 0 : 0), -4 + h); ctx.lineTo(d * 16, -12 + h); ctx.lineTo(d * 19, 2 + h); ctx.stroke();
+        }
+        break;
       default:
     }
   }

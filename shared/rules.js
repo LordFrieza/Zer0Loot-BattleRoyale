@@ -423,7 +423,7 @@
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
     'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
-    'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds'];
+    'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
   const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
@@ -431,7 +431,7 @@
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
   const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins', mimic: 'mimicWins', liche: 'licheWins', maexxna: 'maexxnaWins' };
   // Défi des boss réussi en Héroïque ou Légendaire : débloque la peau légendaire du boss.
-  const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier' };
+  const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier', mimic: 'heroMimic', liche: 'heroLiche', maexxna: 'heroMaexxna' };
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -772,7 +772,8 @@
     // en laissant une explosion de givre là où elle était (annoncée 0,8 s avant).
     escape: { radius: 90, cooldown: 9, hop: 240, trapRadius: 110, trapWarn: 0.8, trapRatio: 0.7, trapSlow: 0.7, trapSlowFor: 2 },
     specialEvery: 6.5, // en rotation : pics de glace sous des héros, lance de givre, nova de givre autour d'elle
-    freeze: { first: 6, duration: 5, gap: 10, dps: 1, pattern: [[1, 1], [2, 2], [3, 2]] },
+    // dps : part de la vie max perdue par seconde dans la glace (soloDps : seul, en Défi des boss ou en Boss Rush solo)
+    freeze: { first: 6, duration: 5, gap: 10, dps: 0.015, soloDps: 0.05, pattern: [[1, 1], [2, 2], [3, 2]] },
     spikes: { base: 2, perPlayers: 8, max: 5, radius: 70, warn: 1.4, ratio: 0.9, slow: 0.75, slowFor: 2 },
     nova: { radius: 170, warn: 1.2, ratio: 0.8, slow: 0.65, slowFor: 3 },
     lance: { length: 620, width: 64, warn: 1.3, ratio: 1.3, slow: 0.6, slowFor: 2 }, // ligne droite vers le héros le plus éloigné
@@ -1112,9 +1113,15 @@
   const TALENT_RESET_PRICE = 250;
 
   // Remise à zéro des points de caractéristiques : 50 golds par point placé, jamais plus de 500 golds.
+  // Répartition des points : chaque point retiré d'une caractéristique (pour le replacer ailleurs) coûte 50 golds,
+  // 500 golds au plus pour une même validation. Placer des points libres est gratuit.
   const STAT_RESET = { perPoint: 50, max: 500 };
   function statResetPrice(points) {
     return Math.min(STAT_RESET.max, STAT_RESET.perPoint * points);
+  }
+  // Points retirés entre deux répartitions (from → to, { stat: points })
+  function statPointsMoved(from, to) {
+    return STATS.reduce((sum, st) => sum + Math.max(0, (from[st] || 0) - (to[st] || 0)), 0);
   }
 
   function talentPoints(level) {
@@ -1817,6 +1824,9 @@
     peau_ogre: { slot: 'body', label: 'Peau d\'ogre', price: 0, color: '#7fae4f', unlock: { metric: 'heroTroll', goal: 1, desc: 'Vaincre le Troll en Défi des boss, en Héroïque ou Légendaire' } },
     peau_dragon: { slot: 'body', label: 'Écailles de dragon', price: 0, color: '#c8423a', unlock: { metric: 'heroDragon', goal: 1, desc: 'Vaincre le Dragon en Défi des boss, en Héroïque ou Légendaire' } },
     peau_spectre: { slot: 'body', label: 'Forme spectrale', price: 0, color: '#b8d8ff', unlock: { metric: 'heroSorcier', goal: 1, desc: 'Vaincre le Magicien des ténèbres en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_mimic: { slot: 'body', label: 'Gueule de mimic', price: 0, color: '#b9813f', unlock: { metric: 'heroMimic', goal: 1, desc: 'Vaincre le Mimic en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_liche: { slot: 'body', label: 'Liche glaciaire', price: 0, color: '#d6ebf3', unlock: { metric: 'heroLiche', goal: 1, desc: 'Vaincre la Liche de glace en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_maexxna: { slot: 'body', label: 'Carapace de veuve noire', price: 0, color: '#2a2433', unlock: { metric: 'heroMaexxna', goal: 1, desc: 'Vaincre Maexxna en Défi des boss, en Héroïque ou Légendaire' } },
     // Auras
     aura_feu: { slot: 'aura', label: 'Aura de feu', price: 1000, color: '#ff6b2a' },
     aura_glace: { slot: 'aura', label: 'Aura de glace', price: 1000, color: '#7fd8ff' },
@@ -1942,7 +1952,7 @@
     BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
-    STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
+    STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushReward, rushDefiReward,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,

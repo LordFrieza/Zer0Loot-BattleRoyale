@@ -55,3 +55,31 @@ test('[STAT-9] remise à zéro des caractéristiques : 50 golds par point, 500 a
   assert.deepStrictEqual(game.resetStats(c), { price: 500, refunded: 30 });
   assert.strictEqual(c.gold, 100);
 });
+
+test('[STAT-10] répartition en direct : déplacer des points, validation payante au point retiré', () => {
+  const c = game.newCharacter();
+  c.stats = { ...Rules.emptyStats(), force: 5, vie: 3 };
+  c.skillPoints = 2;
+  c.gold = 1000;
+  // Placer ses points libres : gratuit
+  assert.deepStrictEqual(game.respecStats(c, { esquive: 2 }), { price: 0, moved: 0, skillPoints: 0 });
+  assert.strictEqual(c.stats.esquive, 2);
+  // Déplacer 3 points de force vers la vitesse : 150 golds
+  assert.deepStrictEqual(game.respecStats(c, { force: 2, vitesse: 3 }), { price: 150, moved: 3, skillPoints: 0 });
+  assert.deepStrictEqual([c.stats.force, c.stats.vitesse, c.gold], [2, 3, 850]);
+  // Retirer des points sans tout replacer : ils redeviennent libres (et c'est payant)
+  assert.deepStrictEqual(game.respecStats(c, { vie: 0 }), { price: 150, moved: 3, skillPoints: 3 });
+  // Plafond de 500 golds
+  c.stats = { ...Rules.emptyStats(), force: 30 };
+  c.skillPoints = 0;
+  assert.strictEqual(game.respecStats(c, { force: 0, vie: 30 }).price, Rules.STAT_RESET.max);
+  // Refus
+  assert.throws(() => game.respecStats(c, { vie: 31 }), /que 30 point/);
+  assert.throws(() => game.respecStats(c, { vie: -1, force: 31 }), /invalide/);
+  assert.throws(() => game.respecStats(c, { vie: 1.5 }), /invalide/);
+  assert.throws(() => game.respecStats(c, { magie: 1 }), /inconnue/);
+  assert.throws(() => game.respecStats(c, {}), /Aucun changement/);
+  c.gold = 10;
+  assert.throws(() => game.respecStats(c, { vie: 29, force: 1 }), /50 golds/);
+  assert.strictEqual(Rules.statPointsMoved({ force: 5, vie: 1 }, { force: 2, vie: 4 }), 3);
+});

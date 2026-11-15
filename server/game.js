@@ -255,6 +255,35 @@ function resetStats(character) {
   return { price, refunded: placed };
 }
 
+/*
+ * Nouvelle répartition des points de caractéristiques, validée d'un coup : `target` = { stat: points }.
+ * Le total ne peut pas dépasser les points placés + les points libres ; chaque point retiré d'une
+ * caractéristique coûte Rules.STAT_RESET.perPoint golds (Rules.STAT_RESET.max au plus).
+ */
+function respecStats(character, target) {
+  upgrade(character);
+  if (!target || typeof target !== 'object') throw new Error('Répartition invalide');
+  const next = {};
+  for (const st of Rules.STATS) {
+    const v = target[st] === undefined ? character.stats[st] || 0 : Number(target[st]);
+    if (!Number.isInteger(v) || v < 0) throw new Error('Répartition invalide');
+    next[st] = v;
+  }
+  if (Object.keys(target).some((k) => !Rules.STATS.includes(k))) throw new Error('Stat inconnue');
+  const placed = Rules.STATS.reduce((sum, st) => sum + (character.stats[st] || 0), 0);
+  const total = placed + character.skillPoints;
+  const wanted = Rules.STATS.reduce((sum, st) => sum + next[st], 0);
+  if (wanted > total) throw new Error(`Tu n'as que ${total} point(s) à répartir`);
+  const moved = Rules.statPointsMoved(character.stats, next);
+  const price = Rules.statResetPrice(moved);
+  if (!moved && wanted === placed) throw new Error('Aucun changement à valider');
+  if (character.gold < price) throw new Error(`Cette répartition coûte ${price} golds`);
+  character.gold -= price;
+  for (const st of Rules.STATS) character.stats[st] = next[st];
+  character.skillPoints = total - wanted;
+  return { price, moved, skillPoints: character.skillPoints };
+}
+
 // Générateur cryptographique : tirages équitables et imprévisibles.
 function random() {
   return crypto.randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
@@ -1183,7 +1212,7 @@ module.exports = {
   newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
-  newLifetime, addStat, snapshot, recordActivity,
+  newLifetime, addStat, snapshot, recordActivity, respecStats,
   newPets, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, toggleLock, markSeen, savePreset, applyPreset, deletePreset,

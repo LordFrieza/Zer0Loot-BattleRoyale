@@ -978,3 +978,11 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .hist-row.with-who .hist-gains { grid-column: 4; }
 #admin-history { max-height: 640px; overflow-y: auto; padding-right: 4px; }
 @media (max-width: 800px) { .hist-row.with-who summary { grid-template-columns: 1fr auto; } .hist-row.with-who .hist-gains { grid-column: auto; } }
+
+/* Répartition des points en direct */
+.stat-btns { white-space: nowrap; }
+.stat-btns button { width: 28px; height: 28px; padding: 0; border-radius: 8px; font-weight: 900; }
+.stat-btns .minus { background: rgba(255,77,109,.15); border: 1px solid rgba(255,77,109,.5); color: #ff8fa3; margin-right: 4px; }
+.stat-btns button:disabled { opacity: .3; }
+tr.stat-changed td { background: rgba(255,210,63,.07); }
+.respec-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid rgba(255,210,63,.45); border-radius: 10px; background: rgba(255,210,63,.08); }

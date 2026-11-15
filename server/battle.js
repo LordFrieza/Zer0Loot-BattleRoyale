@@ -891,8 +891,9 @@ class Battle extends EventEmitter {
       p.iceTick = (p.iceTick || 0) + dt;
       if (p.iceTick >= 1) {
         p.iceTick -= 1;
-        p.hp -= F.dps;
-        this.events.push({ t: 'hit', from: b.key, to: p.key, dmg: F.dps, ice: true });
+        const dmg = Math.max(1, Math.round(p.maxHp * (this.solo ? F.soloDps : F.dps))); // la glace ronge la vie max chaque seconde
+        p.hp -= dmg;
+        this.events.push({ t: 'hit', from: b.key, to: p.key, dmg, ice: true });
         if (p.hp <= 0) { p.iceUntil = 0; this.kill(b, p); }
       }
     }

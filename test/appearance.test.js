@@ -59,7 +59,7 @@ test('[LOOK-5] skins d\'équipement et skins réservés à une classe', () => {
 test('[LOOK-6] cosmétiques d\'exploit : visibles, verrouillés, puis gratuits', () => {
   const exploits = Object.entries(Rules.COSMETICS).filter(([, it]) => it.unlock);
   assert.deepStrictEqual(exploits.map(([id]) => id).sort(),
-    ['aura_champion', 'bottes_legende', 'cape_guerre', 'couronne_os', 'masque_abysses', 'peau_dragon', 'peau_ogre', 'peau_spectre']);
+    ['aura_champion', 'bottes_legende', 'cape_guerre', 'couronne_os', 'masque_abysses', 'peau_dragon', 'peau_liche', 'peau_maexxna', 'peau_mimic', 'peau_ogre', 'peau_spectre']);
   assert.deepStrictEqual(Rules.COSMETICS.peau_ogre.unlock, { metric: 'heroTroll', goal: 1, desc: 'Vaincre le Troll en Défi des boss, en Héroïque ou Légendaire' });
   const c = game.newCharacter();
   c.gold = 10000;
@@ -138,4 +138,20 @@ test('[LOOK-9] articles « Vide » : 100 golds, cachent la pièce équipée, pou
   assert.strictEqual(Rules.achievementValue(c, 'cosmetics'), 0);
   game.buyCosmetic(c, 'pirate');
   assert.strictEqual(Rules.achievementValue(c, 'cosmetics'), 1);
+});
+
+test('[LOOK-6, LOOK-7] peaux légendaires des nouveaux boss : vaincre le Mimic, la Liche ou Maexxna en Héroïque ou Légendaire', () => {
+  for (const [id, boss, metric] of [['peau_mimic', 'mimic', 'heroMimic'], ['peau_liche', 'liche', 'heroLiche'], ['peau_maexxna', 'maexxna', 'heroMaexxna']]) {
+    const it = Rules.COSMETICS[id];
+    assert.deepStrictEqual([it.slot, it.price, it.unlock.metric, it.unlock.goal], ['body', 0, metric, 1]);
+    assert.strictEqual(Rules.HERO_BOSS_COUNTER[boss], metric);
+    assert.ok(Rules.COUNTERS.includes(metric));
+    const c = game.newCharacter();
+    assert.strictEqual(Rules.cosmeticLocked(c, id), true);
+    assert.throws(() => game.buyCosmetic(c, id), /Exploit requis/);
+    c.counters[metric] = 1;
+    assert.strictEqual(Rules.cosmeticLocked(c, id), false);
+    game.buyCosmetic(c, id);
+    assert.strictEqual(c.look.body, id);
+  }
 });

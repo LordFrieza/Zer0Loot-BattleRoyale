@@ -103,38 +103,72 @@ function classMod(stat) {
   return `<div class="${cls}" style="font-size:12px">${parts.join(' ')} ${ci.icon} classe</div>`;
 }
 
+// Répartition des points en cours (null : pas de modification en attente)
+let statDraft = null;
+
 function renderStats() {
   const c = me.character;
-  $('skill-banner').innerHTML = c.skillPoints > 0
-    ? `<div class="skill-banner">✨ ${c.skillPoints} point(s) de compétence à répartir !</div>`
+  const placed = Rules.STATS.reduce((sum, s) => sum + (c.stats[s] || 0), 0);
+  const total = placed + c.skillPoints;
+  const draft = statDraft;
+  const used = draft ? Rules.STATS.reduce((sum, s) => sum + draft[s], 0) : placed;
+  const free = total - used;
+  $('skill-banner').innerHTML = free > 0
+    ? `<div class="skill-banner">✨ ${free} point(s) de compétence à répartir !</div>`
     : '';
   $('stats').innerHTML = Rules.STATS.map((s) => {
     const info = Rules.STAT_INFO[s];
     const gear = c.gear[s];
-    return `<tr>
+    const pts = draft ? draft[s] : c.stats[s];
+    const diff = draft ? draft[s] - c.stats[s] : 0;
+    return `<tr class="${diff ? 'stat-changed' : ''}">
       <td class="stat-name">${info.icon} ${info.label}</td>
       <td class="stat-desc help">${info.desc}</td>
-      <td class="stat-pts">${c.stats[s]}</td>
+      <td class="stat-pts">${pts}${diff ? ` <small class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</small>` : ''}</td>
       <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}${talentMod(s)}</td>
-      <td class="stat-value">${Rules.describeDerived(s, c.derived)}</td>
-      <td>${c.skillPoints > 0 ? `<button class="plus" data-stat="${s}" title="Ajouter un point">+</button>` : ''}</td>
+      <td class="stat-value">${draft && diff ? '<span class="muted">après validation</span>' : Rules.describeDerived(s, c.derived)}</td>
+      <td class="stat-btns">
+        <button class="minus" data-minus="${s}" title="Retirer un point (pour le replacer ailleurs)" ${pts > 0 ? '' : 'disabled'}>−</button>
+        <button class="plus" data-stat="${s}" title="Ajouter un point" ${free > 0 ? '' : 'disabled'}>+</button>
+      </td>
     </tr>`;
   }).join('');
-  $('stats').querySelectorAll('.plus').forEach((b) => {
-    b.onclick = () => act('/api/stats/allocate', { stat: b.dataset.stat }, 'levelUp');
+  $('stats').querySelectorAll('[data-stat]').forEach((b) => {
+    b.onclick = () => {
+      // Sans modification en cours, placer un point libre se fait tout de suite (gratuit).
+      if (!statDraft) { act('/api/stats/allocate', { stat: b.dataset.stat }, 'levelUp'); return; }
+      statDraft[b.dataset.stat] += 1;
+      renderStats();
+    };
   });
-  // Remise à zéro : 50 golds par point placé, 500 golds au maximum
-  const placed = Rules.STATS.reduce((sum, s) => sum + (c.stats[s] || 0), 0);
-  const price = Rules.statResetPrice(placed);
-  $('stats-reset').innerHTML = placed
-    ? `<button class="secondary small" id="stats-reset-btn" ${c.gold < price ? 'disabled' : ''}>↺ Remettre mes ${placed} point(s) à zéro (${price} 🪙)</button>
-      <span class="muted">${Rules.STAT_RESET.perPoint} golds par point placé, ${Rules.STAT_RESET.max} golds maximum.</span>`
-    : '';
-  const btn = $('stats-reset-btn');
-  if (btn) btn.onclick = async () => {
-    if (!confirm(`Remettre tes ${placed} point(s) de caractéristiques à zéro pour ${price} golds ? Tu pourras les répartir à nouveau.`)) return;
-    const r = await act('/api/stats/reset', {}, 'reroll');
-    if (r) toast(`↺ ${r.refunded} point(s) de compétence à répartir à nouveau !`);
+  $('stats').querySelectorAll('[data-minus]').forEach((b) => {
+    b.onclick = () => {
+      if (!statDraft) statDraft = Object.fromEntries(Rules.STATS.map((st) => [st, c.stats[st] || 0]));
+      statDraft[b.dataset.minus] -= 1;
+      Sound.play('chestHit', 1);
+      renderStats();
+    };
+  });
+  // Validation : 50 golds par point retiré, 500 golds au plus ; placer des points libres est gratuit.
+  if (!draft) {
+    $('stats-reset').innerHTML = placed
+      ? `<span class="muted">Clique sur <b>−</b> pour retirer des points et les replacer ailleurs : tu valides ensuite d'un coup
+        (${Rules.STAT_RESET.perPoint} golds par point retiré, ${Rules.STAT_RESET.max} golds au plus).</span>`
+      : '';
+    return;
+  }
+  const moved = Rules.statPointsMoved(c.stats, draft);
+  const price = Rules.statResetPrice(moved);
+  const changed = moved > 0 || used !== placed;
+  $('stats-reset').innerHTML = `<div class="respec-bar">
+      <span>🔁 <b>${moved}</b> point(s) déplacé(s)${free > 0 ? ` · <b>${free}</b> à placer` : ''} · coût : <b>${price} 🪙</b></span>
+      <button class="gold small" id="respec-ok" ${!changed || c.gold < price ? 'disabled' : ''}>✔ Valider la répartition</button>
+      <button class="secondary small" id="respec-cancel">Annuler</button>
+      ${c.gold < price ? '<span class="down">Pas assez de golds</span>' : ''}</div>`;
+  $('respec-cancel').onclick = () => { statDraft = null; renderStats(); };
+  $('respec-ok').onclick = async () => {
+    const r = await act('/api/stats/respec', { stats: statDraft }, 'levelUp');
+    if (r) { statDraft = null; renderStats(); toast(`🔁 Nouvelle répartition validée${r.price ? ` pour ${r.price} golds` : ''} !`); }
   };
 }
 

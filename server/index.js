@@ -323,6 +323,7 @@ app.post('/api/talent/learn', requirePlayer, action((req) => game.learnTalent(re
 app.post('/api/tactics', requirePlayer, action((req) => game.setTactics(req.user.character, req.body || {})));
 app.post('/api/techs', requirePlayer, action((req) => game.setTechniques(req.user.character, req.body.techs)));
 app.post('/api/stats/reset', requirePlayer, action((req) => game.resetStats(req.user.character)));
+app.post('/api/stats/respec', requirePlayer, action((req) => game.respecStats(req.user.character, req.body.stats)));
 app.post('/api/talent/reset', requirePlayer, action((req) => game.resetTalents(req.user.character)));
 
 // ---------- Liaison Twitch ----------

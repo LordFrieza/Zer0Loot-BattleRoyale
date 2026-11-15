@@ -421,7 +421,7 @@ test('[MIM-3, MIM-4] Mimic : copies de niveau 1 (2, 4 puis 6) qui le protègent'
 
 // ---------- Givrenoire la Liche de glace ----------
 
-test('[LCH-1, LCH-2, LCH-3] Liche : gel de 1, puis 2 héros ; un héros gelé ne fait rien et ne peut pas être touché', () => {
+test('[LCH-1, LCH-2, LCH-3] Liche : gel de 1, puis 2 héros ; un héros gelé ne fait rien, ne peut pas être touché et perd une part de sa vie max', () => {
   const b = fight('liche', 4);
   freeze(b);
   const L = Rules.BOSSES.liche;
@@ -446,7 +446,8 @@ test('[LCH-1, LCH-2, LCH-3] Liche : gel de 1, puis 2 héros ; un héros gelé ne
   tickFor(b, 2);
   assert.strictEqual(first.stamina, 0, 'pas de stamina');
   first.ult = null;
-  assert.ok(first.hp <= hp - 1 && first.hp >= hp - 3, 'environ 1 PV par seconde');
+  const perSec = Math.max(1, Math.round(first.maxHp * L.freeze.dps));
+  assert.ok(first.hp <= hp - perSec && first.hp >= hp - 3 * perSec, `environ ${perSec} PV (1,5 % de la vie max) par seconde`);
   first.hp -= 10;
   b.heal(first, 5);
   assert.ok(first.hp > hp - 15, 'peut être soigné');
@@ -614,4 +615,23 @@ test('[LCH-6] Liche : elle garde ses distances (saut et piège de givre) ; la la
   b.resolveSlams(0.05);
   assert.ok(p1.hp < hp1 && b.buffMult(p1, 'speed') === L.lance.slow);
   assert.strictEqual(p2.hp, hp2);
+});
+
+test('[LCH-3] Liche : seul (Défi des boss), la glace ronge 5 % de la vie max par seconde', () => {
+  const b = new Battle({ solo: { kind: 'boss', level: 1, difficulty: 'normal' } });
+  b.openQueue(60, 'boss', 'liche');
+  clearTimeout(b.queueTimer);
+  b.join({ key: 'u1', userId: 1, name: 'S', level: 1, cls: 'guerrier', stats: Rules.derive({}, {}, 'guerrier'), look: {} });
+  b.start(null, null);
+  b.stopLoop();
+  freeze(b);
+  b.boss.slamIn = 999;
+  b.boss.blinkIn = 999;
+  b.boss.escapeIn = 999;
+  const p = b.players[0];
+  p.regen = 0;
+  p.iceUntil = b.time + 5;
+  const hp = p.hp;
+  tickFor(b, 3.01);
+  assert.strictEqual(hp - p.hp, 3 * Math.max(1, Math.round(p.maxHp * Rules.BOSSES.liche.freeze.soloDps)));
 });
