@@ -852,7 +852,9 @@
    */
   const RUSH = {
     hpPerRound: 0.3, // boss n°k : vie × (1 + 0,3 × (k − 1))…
-    damagePerRound: 0.12, // … et dégâts × (1 + 0,12 × (k − 1))
+    damagePerRound: 0.3, // … et dégâts × (1 + 0,3 × (k − 1)) × 1,08^(k − 1) : la montée s'accélère
+    damageGrowth: 1.08,
+    boonMax: 2, // un même bonus permanent se prend 2 fois au plus par run
     healBetween: 0.3, // les survivants récupèrent 30 % de leur vie entre deux boss
     stages: { intro: 3.2, down: 3.5 }, // arrivée du boss, puis mort du boss (avant le vote)
     poll: { duration: 40 },
@@ -871,7 +873,7 @@
     ronces: { icon: '🌵', label: 'Armure de ronces', color: '#3ddc5a', desc: 'Les héros renvoient 20 % des dégâts reçus pour le reste de la run.', effect: { thorns: 0.2 } },
     vigueur: { icon: '❤️', label: 'Vigueur', color: '#ff4d6d', desc: 'Vie max +25 % et soin complet des survivants.', effect: { maxHp: 1.25, heal: 1 } },
     regen: { icon: '🌿', label: 'Sève de vie', color: '#7ccf6a', desc: 'Les héros régénèrent 0,8 % de leur vie par seconde pour le reste de la run.', effect: { regen: 0.008 } },
-    stamina: { icon: '🔋', label: 'Second souffle', color: '#ffe066', desc: 'La barre d\'ultime des survivants se remplit entièrement.', effect: { stamina: 1 } },
+    stamina: { icon: '🔋', label: 'Second souffle', color: '#ffe066', desc: 'La barre d\'ultime des survivants se remplit entièrement.', effect: { stamina: 1 }, unlimited: true },
   };
   // Les trois choix du vote : !1 / !2 / !3, ou leur commande.
   const RUSH_CHOICES = {
@@ -888,7 +890,12 @@
   // Puissance du boss n°k (vie, dégâts), × le multiplicateur « Quitte ou double ».
   function rushScale(round, mult = 1) {
     const k = Math.max(1, round) - 1;
-    return { hp: (1 + RUSH.hpPerRound * k) * mult, damage: (1 + RUSH.damagePerRound * k) * mult };
+    return { hp: (1 + RUSH.hpPerRound * k) * mult, damage: (1 + RUSH.damagePerRound * k) * Math.pow(RUSH.damageGrowth, k) * mult };
+  }
+  // Bonus que le vote peut encore proposer : un bonus permanent déjà pris `boonMax` fois sort du tirage
+  // (« Second souffle », effet immédiat, reste toujours possible).
+  function rushBoonPool(taken = []) {
+    return Object.keys(RUSH_BOONS).filter((id) => RUSH_BOONS[id].unlimited || taken.filter((b) => b === id).length < RUSH.boonMax);
   }
   // Récompense de fin de run pour `killed` boss vaincus (null si aucun).
   function rushReward(killed) {
@@ -1953,7 +1960,7 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushReward, rushDefiReward,
+    MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,

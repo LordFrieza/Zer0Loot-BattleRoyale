@@ -301,9 +301,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
     **70 %** et **20 %**, elle enferme des héros dans des **cocons** à briser ; à **45 %**, elle remonte au **plafond**
     (pluie de toiles et de venin, grosse nuée) et redescend plus rapide ; **frénésie** sous 20 %.
   - **Boss Rush** (coopératif, dès 1 joueur) : les boss s'enchaînent au hasard (chacun une fois avant de revenir, jamais
-    deux fois de suite), de plus en plus forts (+30 % de vie et +12 % de dégâts par boss passé). Entre deux boss, le chat
+    deux fois de suite), de plus en plus forts : +30 % de vie par boss passé, et des dégâts qui s'accélèrent (× (1 + 0,3 × (k − 1)) ×
+    1,08^(k − 1), soit ×3 au 5e boss, ×7,4 au 10e, ×15,3 au 15e). Entre deux boss, le chat
     vote 40 s (`!1`, `!2`, `!3` ou sur le site) : **un bonus** tiré au hasard pour le reste de la run (fureur, peau de
-    pierre, adrénaline, vol de vie, ronces, vigueur, sève de vie, second souffle), **une résurrection** (ou un grand soin
+    pierre, adrénaline, vol de vie, ronces, vigueur, sève de vie, second souffle ; un même bonus permanent 2 fois au plus), **une résurrection** (ou un grand soin
     si personne n'est tombé) ou **Quitte ou double** (boss suivants ×1,25, mais golds et XP tout de suite). Fin quand
     tout le monde tombe : pour k boss vaincus, 300 + 400 + … XP et autant de golds, et 2 coffres par boss, pour tous.
   - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline

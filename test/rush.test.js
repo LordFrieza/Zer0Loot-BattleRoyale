@@ -26,7 +26,10 @@ test('[RUSH-1] Boss Rush : boss tirés au hasard (tous avant de revenir, jamais 
   assert.strictEqual(Rules.GAME_MODES.rush.coop, true);
   assert.deepStrictEqual(Rules.rushScale(1), { hp: 1, damage: 1 });
   const s3 = Rules.rushScale(3, 1.25);
-  assert.ok(Math.abs(s3.hp - 1.6 * 1.25) < 1e-9 && Math.abs(s3.damage - 1.24 * 1.25) < 1e-9);
+  assert.ok(Math.abs(s3.hp - 1.6 * 1.25) < 1e-9 && Math.abs(s3.damage - 1.6 * 1.08 * 1.08 * 1.25) < 1e-9);
+  // Les dégâts s'accélèrent : bien plus que la vie au fil des boss
+  assert.ok(Math.abs(Rules.rushScale(10).damage - 3.7 * Math.pow(1.08, 9)) < 1e-9);
+  assert.ok(Rules.rushScale(15).damage > 15);
   const b = rush(3);
   const events = [];
   b.on('frame', (f) => events.push(...f.events));
@@ -57,7 +60,7 @@ test('[RUSH-1] Boss Rush : boss tirés au hasard (tous avant de revenir, jamais 
   assert.ok(events.some((e) => e.t === 'rushBoss' && e.round === 2));
 });
 
-test('[RUSH-2] Boss Rush : à la chute du boss, créatures effacées, rushBossDown, puis vote à trois choix', () => {
+test('[RUSH-2, RUSH-3] Boss Rush : à la chute du boss, créatures effacées, rushBossDown, puis vote à trois choix', () => {
   const b = rush(3);
   tickFor(b, Rules.RUSH.stages.intro + 0.1);
   const add = b.addMonster({ kind: 'araignee', name: 'x', x: 100, y: 100, hp: 10 });
@@ -79,6 +82,14 @@ test('[RUSH-2] Boss Rush : à la chute du boss, créatures effacées, rushBossDo
   assert.deepStrictEqual(poll.options.map((o) => o.id), ['bonus', 'soin', 'defi'], 'personne n\'est tombé : grand soin');
   assert.ok(poll.options.every((o) => o.label && o.desc && o.icon));
   assert.ok(Rules.RUSH_BOONS[b.rush.poll.boon]);
+  // Un bonus permanent déjà pris 2 fois n'est plus tiré ; « Second souffle » reste toujours possible
+  assert.deepStrictEqual(Rules.rushBoonPool([]), Object.keys(Rules.RUSH_BOONS));
+  const pool = Rules.rushBoonPool(['rage', 'rage', 'armure', 'stamina', 'stamina']);
+  assert.ok(!pool.includes('rage') && pool.includes('armure') && pool.includes('stamina'));
+  const all = Object.keys(Rules.RUSH_BOONS).flatMap((id) => [id, id]);
+  assert.deepStrictEqual(Rules.rushBoonPool(all), ['stamina']);
+  b.rush.boons = ['rage', 'rage'];
+  for (let i = 0; i < 30; i++) { b.openRushPoll(); assert.notStrictEqual(b.rush.poll.boon, 'rage'); }
   // Votes : !1/!2/!3, commandes, une voix par personne (la dernière compte)
   assert.strictEqual(b.vote('t:a', '!3'), 'defi');
   assert.strictEqual(b.vote('t:b', '!bonus'), 'bonus');

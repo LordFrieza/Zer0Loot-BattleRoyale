@@ -1227,7 +1227,7 @@ class Battle extends EventEmitter {
   // Boss Rush : bonus tiré au hasard, résurrection (ou grand soin si personne n'est tombé), quitte ou double.
   openRushPoll() {
     const r = this.rush;
-    const boons = Object.keys(Rules.RUSH_BOONS);
+    const boons = Rules.rushBoonPool(r.boons);
     const someoneDead = this.players.some((p) => !p.alive);
     const options = ['bonus', someoneDead ? 'resu' : 'soin', 'defi'];
     r.poll = { round: r.round, options, votes: new Map(), boon: boons[Math.floor(Math.random() * boons.length)], dirty: false, pushAt: 0 };

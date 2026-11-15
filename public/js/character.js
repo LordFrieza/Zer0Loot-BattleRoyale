@@ -1528,8 +1528,8 @@ $('fuse-go').onclick = async () => {
   });
   const RU = Rules.RUSH;
   $('rush-rules').innerHTML = [
-    `Un boss tiré au hasard ouvre la run (chacun passe une fois avant de revenir, jamais deux fois de suite). Le boss n°k a <b>+${pct(RU.hpPerRound)} de vie</b> et <b>+${pct(RU.damagePerRound)} de dégâts</b> par boss déjà passé.`,
-    `Après chaque boss vaincu, le chat vote ${RU.poll.duration} s (<code>!1</code>, <code>!2</code>, <code>!3</code>, ou sur le site) : <b>🎲 un bonus</b> tiré au hasard pour le reste de la run, <b>👼 une résurrection</b> (un héros tombé au hasard, à ${pct(RU.revive)} de sa vie ; ou <b>💖 un grand soin</b> si personne n'est tombé), ou <b>💀 Quitte ou double</b> : boss suivants <b>×${String(RU.defiMult).replace('.', ',')}</b>, mais ${RU.defiGold} golds et ${RU.defiXp} XP par boss vaincu tout de suite pour tous.`,
+    `Un boss tiré au hasard ouvre la run (chacun passe une fois avant de revenir, jamais deux fois de suite). Le boss n°k a <b>+${pct(RU.hpPerRound)} de vie</b> par boss déjà passé, et ses <b>dégâts montent de plus en plus vite</b> : ×${[5, 10, 15].map((k) => `${String(Math.round(Rules.rushScale(k).damage * 10) / 10).replace('.', ',')} au ${k}<sup>e</sup>`).join(', ')}.`,
+    `Après chaque boss vaincu, le chat vote ${RU.poll.duration} s (<code>!1</code>, <code>!2</code>, <code>!3</code>, ou sur le site) : <b>🎲 un bonus</b> tiré au hasard pour le reste de la run (le même ${RU.boonMax} fois au plus), <b>👼 une résurrection</b> (un héros tombé au hasard, à ${pct(RU.revive)} de sa vie ; ou <b>💖 un grand soin</b> si personne n'est tombé), ou <b>💀 Quitte ou double</b> : boss suivants <b>×${String(RU.defiMult).replace('.', ',')}</b>, mais ${RU.defiGold} golds et ${RU.defiXp} XP par boss vaincu tout de suite pour tous.`,
     `Les survivants récupèrent ${pct(RU.healBetween)} de leur vie entre deux boss. La run s'arrête quand <b>tout le monde est tombé</b> (ou qu'un boss tient ${Math.floor(300 / 60)} min).`,
     `Chaque boss vaincu compte pour ses succès et peut laisser un <b>familier</b> (5 %).`,
   ].map((x) => `<li>${x}</li>`).join('');
