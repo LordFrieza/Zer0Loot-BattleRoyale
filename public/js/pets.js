@@ -493,9 +493,23 @@
       ctx.beginPath(); ctx.moveTo(x - 50, y - 36); ctx.lineTo(x, y - 76); ctx.lineTo(x + 50, y - 36); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#2a1608';
       ctx.beginPath(); ctx.arc(x, y + 2, 20, Math.PI, 0); ctx.lineTo(x + 20, y + 16); ctx.lineTo(x - 20, y + 16); ctx.fill();
-      ctx.fillStyle = '#ffe27a'; ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center';
+      // plaque au nom du familier principal, centrée entre le toit et la porte (police réduite si le nom est long)
       const pet = activePet();
-      ctx.fillText(pet ? pet.name.slice(0, 10) : '', x, y - 30);
+      if (pet) {
+        let size = 11;
+        ctx.font = `700 ${size}px sans-serif`;
+        while (size > 7 && ctx.measureText(pet.name).width > 64) { size -= 1; ctx.font = `700 ${size}px sans-serif`; }
+        const w = Math.min(70, ctx.measureText(pet.name).width + 10);
+        ctx.fillStyle = '#5a2a14';
+        ctx.fillRect(x - w / 2, y - 35, w, 14);
+        ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 1;
+        ctx.strokeRect(x - w / 2 + 0.5, y - 34.5, w - 1, 13);
+        ctx.fillStyle = '#ffe27a';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pet.name, x, y - 27.5, 64);
+        ctx.textBaseline = 'alphabetic';
+      }
     }
     if (own.has('gamelle')) {
       const { x, y } = SPOTS.gamelle;

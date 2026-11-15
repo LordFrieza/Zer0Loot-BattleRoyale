@@ -981,7 +981,7 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 
 /* Répartition des points en direct */
 .stat-btns { white-space: nowrap; }
-.stat-btns button { width: 28px; height: 28px; padding: 0; border-radius: 8px; font-weight: 900; }
+.stat-btns button { width: 30px; height: 30px; padding: 0; border-radius: 8px; font-weight: 900; font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
 .stat-btns .minus { background: rgba(255,77,109,.15); border: 1px solid rgba(255,77,109,.5); color: #ff8fa3; margin-right: 4px; }
 .stat-btns button:disabled { opacity: .3; }
 tr.stat-changed td { background: rgba(255,210,63,.07); }
