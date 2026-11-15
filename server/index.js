@@ -450,8 +450,8 @@ function makeNpc(key, name, level, cls) {
   const app = { ...Rules.DEFAULT_LOOK };
   for (const part of Object.keys(Rules.APPEARANCE)) app[part] = anyOf(Rules.APPEARANCE[part].options);
   if (Math.random() < 0.35) {
-    // Jamais de cosmétique d'exploit, de dessin ni de skin d'une autre classe sur un bot
-    const pool = Object.fromEntries(Object.entries(Rules.COSMETICS).filter(([, it]) => !it.unlock && it.slot !== 'drawing' && (!it.cls || it.cls === cls)));
+    // Jamais de cosmétique d'exploit, de dessin, d'article « Vide » ni de skin d'une autre classe sur un bot
+    const pool = Object.fromEntries(Object.entries(Rules.COSMETICS).filter(([, it]) => !it.unlock && !it.empty && it.slot !== 'drawing' && (!it.cls || it.cls === cls)));
     const id = anyOf(pool);
     app[Rules.COSMETICS[id].slot] = id;
   }

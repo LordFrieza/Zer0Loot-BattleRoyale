@@ -111,3 +111,31 @@ test('[LOOK-8] choisir des yeux, des sourcils ou une bouche retire le visage des
     assert.strictEqual(c.drawing, pixels, 'le dessin reste enregistré');
   }
 });
+
+test('[LOOK-9] articles « Vide » : 100 golds, cachent la pièce équipée, pour toutes les classes', () => {
+  const slots = ['hat', 'chest', 'pants', 'gloves', 'belt', 'weapon', 'offhand'];
+  const empties = Object.entries(Rules.COSMETICS).filter(([, it]) => it.empty);
+  assert.deepStrictEqual(empties.map(([, it]) => it.slot).sort(), [...slots].sort(), 'un par emplacement d\'équipement');
+  assert.ok(empties.every(([, it]) => it.price === 100 && !it.cls && !it.unlock));
+  const c = game.newCharacter();
+  c.cls = 'guerrier';
+  c.gold = 1000;
+  const r = game.buyCosmetic(c, 'vide_weapon');
+  assert.deepStrictEqual([r.price, r.worn, c.look.weapon, c.gold], [100, true, 'vide_weapon', 900], 'porté par n\'importe quelle classe');
+  game.buyCosmetic(c, 'vide_hat');
+  assert.strictEqual(c.look.hat, 'vide_hat');
+  game.setLook(c, 'hat', null);
+  assert.strictEqual(c.look.hat, null);
+  assert.throws(() => game.setLook(c, 'chest', 'vide_hat'), /inconnu/);
+  // Purement visuel : les stats ne bougent pas
+  const helm = game.makeItem('epique', 'casque');
+  c.inventory.push(helm);
+  game.equip(c, helm.id);
+  const before = game.derived(c);
+  game.setLook(c, 'hat', 'vide_hat');
+  assert.deepStrictEqual(game.derived(c), before);
+  // Ils ne comptent pas pour les succès de cosmétiques
+  assert.strictEqual(Rules.achievementValue(c, 'cosmetics'), 0);
+  game.buyCosmetic(c, 'pirate');
+  assert.strictEqual(Rules.achievementValue(c, 'cosmetics'), 1);
+});

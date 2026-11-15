@@ -958,9 +958,10 @@
       ctx.fillStyle = skin;
       ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.quadraticCurveTo(6, 14, 2 + w, 20); ctx.quadraticCurveTo(-2, 14, -6 - w, 19); ctx.quadraticCurveTo(-8, 12, -9, 6); ctx.fill();
     } else {
-      if (pants) drawPantsSkin(ctx, app.pants, pants, skin);
+      if (pants && !pants.empty) drawPantsSkin(ctx, app.pants, pants, skin);
       else {
-        ctx.fillStyle = look.pantalon ? RC[look.pantalon] : '#3a3350';
+        // (article « Vide » : on cache le pantalon équipé, comme s'il n'y en avait pas)
+        ctx.fillStyle = look.pantalon && !pants ? RC[look.pantalon] : '#3a3350';
         roundRect(ctx, -8, 8, 7, 10, 2); ctx.fill();
         roundRect(ctx, 1, 8, 7, 10, 2); ctx.fill();
       }
@@ -969,14 +970,15 @@
 
     // objet secondaire de la classe (couleur de rareté s'il est équipé, ou skin de la classe)
     const offSkin = skinOf(app, 'offhand', f.cls);
-    if (offSkin) drawOffhandSkin(ctx, app.offhand, offSkin);
+    if (offSkin && offSkin.empty) { /* « Vide » : aucun objet secondaire */ } else if (offSkin) drawOffhandSkin(ctx, app.offhand, offSkin);
     else if (offhandKind) drawOffhand(ctx, offhandKind, look.secondaire ? RC[look.secondaire] : METAL);
 
     // corps / plastron
     const chest = skinOf(app, 'chest', f.cls);
-    if (chest) drawChestSkin(ctx, app.chest, chest);
+    if (chest && !chest.empty) drawChestSkin(ctx, app.chest, chest);
     else {
-      ctx.fillStyle = body && app.body === 'peau_dragon' && !look.plastron ? shade(skin, -0.2) : look.plastron ? RC[look.plastron] : cloth;
+      const plastron = chest ? null : look.plastron; // « Vide » : simple tunique
+      ctx.fillStyle = body && app.body === 'peau_dragon' && !plastron ? shade(skin, -0.2) : plastron ? RC[plastron] : cloth;
       roundRect(ctx, -10, -8, 20, 18, 6); ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.35)';
       ctx.lineWidth = 1;
@@ -987,7 +989,9 @@
 
     // ceinture
     const belt = skinOf(app, 'belt', f.cls);
-    if (belt) {
+    if (belt && belt.empty) {
+      // « Vide » : aucune ceinture
+    } else if (belt) {
       drawBeltSkin(ctx, app.belt, belt);
     } else if (look.ceinture) {
       ctx.fillStyle = RC[look.ceinture];
@@ -1016,7 +1020,9 @@
     }
 
     // chapeau (cosmétique) sinon casque (équipement)
-    if (cosmetic(app.hat)) {
+    if (cosmetic(app.hat) && cosmetic(app.hat).empty) {
+      // « Vide » : tête nue, même avec un casque équipé
+    } else if (cosmetic(app.hat)) {
       drawHat(ctx, app.hat);
     } else if (look.casque) {
       drawHelmet(ctx, RC[look.casque]);
@@ -1030,18 +1036,18 @@
     ctx.translate(11, 0);
     ctx.rotate(ranged ? 0.15 + swing * 0.4 : 0.25 + swing * 1.45);
     const weaponSkin = skinOf(app, 'weapon', f.cls);
-    if (weaponSkin) drawWeaponSkin(ctx, app.weapon, weaponSkin);
+    if (weaponSkin && weaponSkin.empty) { /* « Vide » : mains nues */ } else if (weaponSkin) drawWeaponSkin(ctx, app.weapon, weaponSkin);
     else drawWeapon(ctx, weaponKind, look.arme ? RC[look.arme] : METAL);
     ctx.restore();
 
     // mains / gants
     const gloves = skinOf(app, 'gloves', f.cls);
-    const backHand = offhandKind !== 'bouclier' && !(offSkin && app.offhand === 'bouclier_dragon');
-    if (gloves) {
+    const backHand = (offhandKind !== 'bouclier' || (offSkin && offSkin.empty)) && !(offSkin && app.offhand === 'bouclier_dragon');
+    if (gloves && !gloves.empty) {
       drawGloveSkin(ctx, app.gloves, gloves, 11, 1);
       if (backHand) drawGloveSkin(ctx, app.gloves, gloves, -11, 1);
     } else {
-      ctx.fillStyle = look.gants ? RC[look.gants] : skin;
+      ctx.fillStyle = look.gants && !gloves ? RC[look.gants] : skin; // « Vide » : mains nues
       ctx.beginPath();
       ctx.arc(11, 1, 3.6, 0, Math.PI * 2);
       ctx.fill();

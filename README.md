@@ -163,6 +163,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   chapeaux, capes, chaussures, accessoires de visage, auras animées, et des **skins d'équipement** (plastron, pantalon,
   gants, ceinture) qui remplacent l'apparence de la pièce. Les **skins d'arme et d'objet secondaire** sont réservés à une
   classe (2 armes et 1 objet secondaire par classe) : achetables par tous, portés seulement avec la bonne classe.
+  Un article **« Vide »** à 100 golds par emplacement (casque, plastron, pantalon, gants, ceinture, arme, objet
+  secondaire) cache la pièce équipée (tête nue, simple tunique, mains nues…) sans toucher à ses stats.
   Essayage sur l'aperçu avant achat ; un article acheté se porte / retire gratuitement. **Un chapeau remplace l'apparence
   du casque** (le casque reste équipé et ses bonus actifs). Succès liés : « Coquet » (1 article) et « Icône de mode » (10).
   - **Visage à dessiner** (1 500 golds) : le joueur dessine son visage (grille 12 × 12, 8 couleurs) dans l'onglet

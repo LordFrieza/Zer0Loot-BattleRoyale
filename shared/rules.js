@@ -436,7 +436,7 @@
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
     if (metric === 'level') return character.level || 1;
-    if (metric === 'cosmetics') return (character.owned || []).length;
+    if (metric === 'cosmetics') return (character.owned || []).filter((id) => !(COSMETICS[id] && COSMETICS[id].empty)).length; // les articles « Vide » ne comptent pas
     if (metric === 'setPieces') return Math.max(0, ...setBonus(character.equipment).sets.map((x) => x.pieces));
     return (character.counters && character.counters[metric]) || 0;
   }
@@ -1722,6 +1722,14 @@
    * il se récupère alors gratuitement.
    */
   const COSMETICS = {
+    // « Vide » : cache la pièce d'équipement portée (aucun casque, aucun plastron…), sans toucher à ses stats.
+    vide_hat: { slot: 'hat', label: 'Vide (aucun casque)', price: 100, empty: true, color: '#8a8a96' },
+    vide_chest: { slot: 'chest', label: 'Vide (aucun plastron)', price: 100, empty: true, color: '#8a8a96' },
+    vide_pants: { slot: 'pants', label: 'Vide (aucun pantalon)', price: 100, empty: true, color: '#8a8a96' },
+    vide_gloves: { slot: 'gloves', label: 'Vide (aucuns gants)', price: 100, empty: true, color: '#8a8a96' },
+    vide_belt: { slot: 'belt', label: 'Vide (aucune ceinture)', price: 100, empty: true, color: '#8a8a96' },
+    vide_weapon: { slot: 'weapon', label: 'Vide (aucune arme)', price: 100, empty: true, color: '#8a8a96' },
+    vide_offhand: { slot: 'offhand', label: 'Vide (aucun objet secondaire)', price: 100, empty: true, color: '#8a8a96' },
     // Chapeaux
     sorcier: { slot: 'hat', label: 'Chapeau de sorcier', price: 300, color: '#5b3fd1' },
     pirate: { slot: 'hat', label: 'Tricorne de pirate', price: 350, color: '#2b2233' },
