@@ -862,7 +862,7 @@
     defiGold: 40, // … et tout de suite 40 golds et 50 XP par boss vaincu, pour tous
     defiXp: 50,
     revive: 0.6, // ressuscité avec 60 % de sa vie
-    perBoss: { xp: 300, gold: 300, chests: 2, growth: 100 }, // récompense du boss n°k : 300 + 100 × (k − 1) XP et golds, 2 coffres
+    perBoss: { xp: 150, gold: 150, chests: 1, growth: 50 }, // récompense du boss n°k : 150 + 50 × (k − 1) XP et golds, 1 coffre
   };
   // Bonus aléatoires du vote (permanents jusqu'à la fin de la run, cumulables).
   const RUSH_BOONS = {

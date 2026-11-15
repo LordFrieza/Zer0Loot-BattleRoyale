@@ -161,8 +161,8 @@ test('[RUSH-3] Boss Rush : quitte ou double, bonus permanents, résurrection, so
 
 test('[RUSH-4] Boss Rush : fin quand tout le monde tombe, récompense selon les boss vaincus', () => {
   assert.strictEqual(Rules.rushReward(0), null);
-  assert.deepStrictEqual(Rules.rushReward(1), { bosses: 1, xp: 300, gold: 300, chests: 2 });
-  assert.deepStrictEqual(Rules.rushReward(3), { bosses: 3, xp: 1200, gold: 1200, chests: 6 });
+  assert.deepStrictEqual(Rules.rushReward(1), { bosses: 1, xp: 150, gold: 150, chests: 1 });
+  assert.deepStrictEqual(Rules.rushReward(3), { bosses: 3, xp: 600, gold: 600, chests: 3 });
   const b = rush(2);
   let res = null;
   b.on('coopEnd', (r) => { res = r; });

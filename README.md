@@ -306,7 +306,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     vote 40 s (`!1`, `!2`, `!3` ou sur le site) : **un bonus** tiré au hasard pour le reste de la run (fureur, peau de
     pierre, adrénaline, vol de vie, ronces, vigueur, sève de vie, second souffle ; un même bonus permanent 2 fois au plus), **une résurrection** (ou un grand soin
     si personne n'est tombé) ou **Quitte ou double** (boss suivants ×1,25, mais golds et XP tout de suite). Fin quand
-    tout le monde tombe : pour k boss vaincus, 300 + 400 + … XP et autant de golds, et 2 coffres par boss, pour tous.
+    tout le monde tombe : pour k boss vaincus, 150 + 200 + 250 + … XP et autant de golds, et 1 coffre par boss, pour tous.
   - **Roi de la Colline** (chacun pour soi, dès 2 joueurs, 2 min 30) : **personne n'est éliminé**. Une colline
     (grand cercle doré) se tient au sol ; chaque seconde dessus rapporte 2 points à chacun, **5 points si l'on y est
     seul** (le Roi 👑), et chaque kill 2 points. Hors de la colline, un combattant sans ennemi à portée y retourne. Toutes les 30 s, la colline change de place (annoncée en pointillés 5 s avant). Les morts
