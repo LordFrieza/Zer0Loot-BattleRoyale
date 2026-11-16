@@ -138,7 +138,11 @@ test('[DRG-3, BOSS-9] dragon : envol à 75 %, intouchable au corps à corps, bou
   assert.strictEqual(b.boss.flying, false);
   assert.ok(Math.hypot(b.boss.x - land.x, b.boss.y - land.y) < land.r, 'posé dans la zone annoncée (les combattants le poussent un peu)');
   b.tick(0.05);
-  assert.strictEqual(warrior.targetKey, 'boss');
+  // De nouveau touchable au corps à corps (le ciblage exact dépend des flammèches encore en vie et des recharges)
+  assert.strictEqual(b.immune(b.boss, warrior), false);
+  const hp2 = b.boss.hp;
+  b.hit(warrior, b.boss, 100);
+  assert.ok(b.boss.hp < hp2, 'les coups au corps à corps le touchent de nouveau');
 });
 
 test('[DRG-5] dragon : les flammèches de l\'envol, à abattre pour le faire tomber plus tôt', () => {

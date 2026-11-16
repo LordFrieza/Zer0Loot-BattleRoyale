@@ -65,6 +65,7 @@
       <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
       <button data-tab="familier">🐾 Familier <span class="tab-badge" data-badge="familier"></span></button>
+      <button data-tab="casino">🎰 Casino</button>
       <button data-tab="entrainement">🏋️ Entraînement</button>
     </nav>
 
@@ -454,6 +455,22 @@
     </div>
     </section>
 
+    <section class="tab" data-tab="casino">
+    <div class="panel casino-panel">
+      <h2>🎰 Casino <span class="sub">Six jeux tenus par des boss en smoking</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Clique sur une table de la salle (ou sur une carte ci-dessous) pour t'y asseoir. Chaque partie se paie en
+        golds : 10 à 500 par mise, 100 la caisse de Grignotor. Tous les tirages sont faits par le serveur. Les gros gains
+        (10 fois la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde. Joue pour le plaisir : en moyenne,
+        la maison garde quelques pourcents de chaque mise.</p>
+      <div class="casino-scene"><canvas id="casino-canvas" width="1100" height="500"></canvas></div>
+      <div class="casino-games" id="casino-games"></div>
+      <div class="casino-cols">
+        <div class="pet-box" id="casino-feed"></div>
+        <div class="pet-box" id="casino-stats"></div>
+      </div>
+    </div>
+    </section>
+
     <section class="tab" data-tab="historique">
     <div class="panel">
       <h2>📜 Historique <span class="sub">Tes dernières parties, sur le stream et en solo</span></h2>
@@ -646,6 +663,7 @@
   <script src="/js/common.js"></script>
   <script src="/js/fighter.js"></script>
   <script src="/js/monsters.js"></script>
+  <script src="/js/casino-draw.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/chest.js"></script>
   <script src="/js/forge.js"></script>
@@ -654,6 +672,8 @@
   <script src="/js/arena.js"></script>
   <script src="/js/pets.js"></script>
   <script src="/js/history.js"></script>
+  <script src="/js/casino.js"></script>
+  <script src="/js/casino-games.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

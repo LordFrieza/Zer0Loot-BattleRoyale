@@ -1115,3 +1115,38 @@ test('[HIST-1, HIST-4, LIFE-1, RUSH-5] historique et statistiques via l\'API, vu
   await s.post('/api/training/stop');
   await admin.post('/api/admin/battle/reset');
 });
+
+test('[CAS-1, CAS-4, CAS-6, CAS-8] casino via l\'API : salle, parties en cours sans secret, mises', async () => {
+  const s = client();
+  const id = (await register(s, 'pl_casino')).id;
+  await s.post('/api/class', { cls: 'mage' });
+  assert.strictEqual((await client().get('/api/casino')).status, 401, 'réservé aux joueurs connectés');
+  // Salle : soi-même en premier, avec son apparence ; fil des gros gains
+  let room = (await s.get('/api/casino')).data;
+  assert.ok(room.crowd.length >= 1 && room.crowd.length <= Rules.CASINO.crowdMax);
+  assert.deepStrictEqual([room.crowd[0].id, room.crowd[0].me, room.crowd[0].name], [id, true, 'pl_casino']);
+  assert.ok(room.crowd[0].look && room.crowd[0].app);
+  assert.ok(Array.isArray(room.feed));
+  assert.deepStrictEqual(room.sessions, { blackjack: null, glace: null });
+  // Pas assez de golds : refusé
+  assert.match((await s.post('/api/casino/slots', { bet: 500 })).data.error, /Il te faut 500 golds/);
+  await give(id, { gold: 2000 });
+  const spin = await s.post('/api/casino/slots', { bet: 10 });
+  assert.strictEqual(spin.status, 200);
+  assert.strictEqual(spin.data.reels.length, 3);
+  // Parties en cours : la carte cachée de la banque et les fissures ne sont jamais envoyées
+  const deal = (await s.post('/api/casino/blackjack/deal', { bet: 50 })).data;
+  if (!deal.outcome) {
+    room = (await s.get('/api/casino')).data;
+    assert.deepStrictEqual(room.sessions.blackjack.dealer[1], { hidden: true });
+    assert.ok(!JSON.stringify(room).includes('"cracks":['));
+    assert.strictEqual((await s.post('/api/casino/blackjack/stand')).status, 200);
+  }
+  await s.post('/api/casino/glace/start', { bet: 10, mines: 3 });
+  room = (await s.get('/api/casino')).data;
+  assert.strictEqual(room.sessions.glace.cracks, null);
+  const me = (await meOf(s)).character;
+  assert.ok(!JSON.stringify(me).includes('cracks'), 'les parties en cours ne sont pas dans le personnage');
+  assert.ok(me.lifetime.casinoBets >= 3);
+  assert.strictEqual(me.counters.casinoPlays, me.lifetime.casinoBets);
+});

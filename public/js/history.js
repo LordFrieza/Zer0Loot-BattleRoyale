@@ -193,6 +193,8 @@
         ['Paris gagnés (gains nets)', `${fmt(C.betsWon)} (${fmt(L.betGold)} 🪙)`],
         ['Potions utilisées', fmt(L.potionsUsed)],
         ['Golden Shower : record · total ramassé', `${fmt(C.goldBest)} · ${fmt(L.goldShower)} 🪙`],
+        ['Casino : parties · misé · gagné', `${fmt(L.casinoBets)} · ${fmt(L.casinoWagered)} · ${fmt(L.casinoWon)} 🪙`],
+        ['Casino : plus gros gain · jackpots', `${fmt(L.casinoBest)} 🪙 · ${fmt(C.jackpots)}`],
       ]),
       card('🏅 Collection', [
         ['Niveau', fmt(c.level)],

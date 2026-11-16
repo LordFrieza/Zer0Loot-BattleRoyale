@@ -12,6 +12,7 @@ const game = require('./game');
 const twitch = require('./twitch');
 const { Battle } = require('./battle');
 const market = require('./market');
+const casino = require('./casino');
 const { Bets } = require('./bets');
 const Rules = require('../shared/rules');
 
@@ -254,6 +255,41 @@ app.post('/api/class', requirePlayer, action((req) => game.chooseClass(req.user.
 
 app.post('/api/forge/fuse', requirePlayer, action((req) => game.fuse(req.user.character, req.body.itemIds)));
 app.post('/api/forge/batch', requirePlayer, action((req) => game.fuseBatch(req.user.character, req.body.rarity, req.body.count)));
+
+// ---------- Casino ----------
+// Un coup de casino : le résultat est décidé ici ; un gros gain met à jour le fil diffusé à tous.
+function casinoAction(fn) {
+  return action((req) => {
+    const r = fn(req);
+    if (r && r.feed) io.emit('casino', { feed: casino.feed() });
+    return r;
+  });
+}
+// La salle : quelques joueurs (dont soi) qui se promènent entre les tables, le fil des gros gains et ses parties en cours.
+let crowdCache = { at: 0, ids: [] };
+app.get('/api/casino', requirePlayer, (req, res) => {
+  if (Date.now() - crowdCache.at > 60 * 1000) {
+    const pool = Object.values(db.state.users).filter((u) => u.character && !u.banned && u.role === 'player' && (!u.ghost || u.character.record.battles > 0));
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    crowdCache = { at: Date.now(), ids: pool.slice(0, Rules.CASINO.crowdMax).map((u) => u.id) };
+  }
+  const ids = [req.user.id, ...crowdCache.ids.filter((id) => id !== req.user.id)].slice(0, Rules.CASINO.crowdMax);
+  const crowd = ids.map((id) => db.state.users[id]).filter((u) => u && u.character).map((u) => ({
+    id: u.id, me: u.id === req.user.id, name: u.twitchDisplayName || u.username, cls: u.character.cls || null, look: lookOf(u), app: appOf(u),
+  }));
+  res.json({ crowd, feed: casino.feed(), sessions: casino.sessionsOf(req.user) });
+});
+app.post('/api/casino/slots', requirePlayer, casinoAction((req) => casino.slots(req.user, req.body.bet)));
+app.post('/api/casino/roulette', requirePlayer, casinoAction((req) => casino.roulette(req.user, req.body.bets)));
+app.post('/api/casino/gobelets', requirePlayer, casinoAction((req) => casino.gobelets(req.user, req.body.bet, req.body.cup)));
+app.post('/api/casino/caisse', requirePlayer, casinoAction((req) => casino.caisse(req.user)));
+app.post('/api/casino/blackjack/deal', requirePlayer, casinoAction((req) => casino.bjDeal(req.user, req.body.bet)));
+app.post('/api/casino/blackjack/hit', requirePlayer, casinoAction((req) => casino.bjHit(req.user)));
+app.post('/api/casino/blackjack/stand', requirePlayer, casinoAction((req) => casino.bjStand(req.user)));
+app.post('/api/casino/blackjack/double', requirePlayer, casinoAction((req) => casino.bjDouble(req.user)));
+app.post('/api/casino/glace/start', requirePlayer, casinoAction((req) => casino.glaceStart(req.user, req.body.bet, req.body.mines)));
+app.post('/api/casino/glace/pick', requirePlayer, casinoAction((req) => casino.glacePick(req.user, req.body.index)));
+app.post('/api/casino/glace/cash', requirePlayer, casinoAction((req) => casino.glaceCash(req.user)));
 
 app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
 app.post('/api/forge/alchemy', requirePlayer, action((req) => game.alchemy(req.user.character, req.body.itemId, req.body.line, req.body.sacrificeId)));

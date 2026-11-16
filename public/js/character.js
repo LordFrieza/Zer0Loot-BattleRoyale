@@ -30,6 +30,8 @@ function render() {
   $('gold-chip').textContent = `🪙 ${c.gold.toLocaleString('fr-FR')}`;
   $('char-name').textContent = me.twitchDisplayName || me.username;
   window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
+  // Casino : ouvert au chargement de la page (onglet mémorisé) dès que le personnage est connu
+  if (document.querySelector('.tab.active[data-tab="casino"]')) { if (!Casino.active) Casino.enter(); else Casino.renderStats(); }
   const ci = c.cls && Rules.CLASS_INFO[c.cls];
   $('class-badge').innerHTML = c.spec
     ? `<span style="color:${c.spec.color}">${c.spec.icon} ${esc(c.spec.spec)}</span> <span class="muted" style="font-size:12px">(${ci.label})</span>`
@@ -1711,7 +1713,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1722,6 +1724,7 @@ function showTab(name) {
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
   if (name === 'marche' && me) loadMarket();
   if (name === 'familier' && me) renderPets();
+  if (name === 'casino') Casino.enter(); else Casino.leave();
 }
 
 document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => {
@@ -2458,6 +2461,7 @@ socket.on('bet', (r) => {
 });
 
 socket.on('pet', (e) => { if (window.onPetEvent) onPetEvent(e); });
+socket.on('casino', (d) => Casino.onFeed(d.feed));
 socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
   const gains = [`+${r.reward.xp} XP`];

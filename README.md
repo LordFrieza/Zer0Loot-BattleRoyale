@@ -188,7 +188,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
   avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
   jusqu'au survol, forge et alchimie), Arbre de
-  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Entraînement (une seule
+  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Casino, Entraînement (une seule
   ligne d'onglets, qui défile horizontalement sur petit écran). Les onglets d'infos — Historique, Statistiques, Succès
   (avec sa pastille), Classements, Règles — sont dans le bandeau du haut, avec leur nom sur grand écran et en icônes
   sinon ; le lien vers l'arène et la déconnexion passent aussi en icônes pour garder le bandeau sur une ligne.
@@ -381,6 +381,20 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
+- **Casino** (onglet Casino, musique « Luigi's Casino ») : une salle animée où se promènent les personnages des autres
+  joueurs (et le sien), et six jeux tenus par les boss en smoking (mises de 10 à 500 golds, tirages côté serveur) :
+  - **Machine à sous de Pyrax** : 3 rouleaux, trois symboles identiques paient ×5 (cerises) à ×150 (trois 7 : JACKPOT),
+    deux cerises ×2 (taux de retour ≈ 94,6 %).
+  - **Blackjack de Maexxna** : tirer, rester, doubler ; la banque reste sur 17 ; blackjack payé 3 pour 2.
+  - **Roulette de Grokk** : européenne (0 à 36), jusqu'à 12 jetons de 10 à 100 golds (500 au total) : numéro ×36,
+    douzaine / colonne ×3, rouge / noir, pair / impair, 1-18 / 19-36 ×2.
+  - **Caisse de Grignotor** (100 golds) : défilé façon caisse à ouvrir, petits lots 80 % (golds, arme commune ou peu
+    commune), bons lots 19 % (arme rare ou épique, Clé de boss), lots incroyables 1 % (arme légendaire, familier).
+  - **Lac gelé de Givrenoire** : 25 cases dont 3 / 5 / 10 / 15 fissures ; chaque case sûre fait monter le gain, on
+    encaisse quand on veut, une fissure fait tout perdre.
+  - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
+  Les gros gains (10× la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde ; statistiques de
+  casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
 - **Familiers** (onglet Familier) : un boss vaincu (Combat de Boss, Boss Rush, Défi des boss) a **5 % de chance** de
   laisser sa version miniature à chaque héros (une espèce par boss ; un doublon donne 150 XP au familier et un festin).
   Dans un **enclos animé** (ciel selon l'heure, objets achetés, familier qui se promène et réagit), le familier
@@ -393,7 +407,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   dans l'arène (cosmétique). Les autres familiers se reposent (leurs besoins ne baissent pas).
   Sous l'enclos, le **journal des trouvailles** liste les 40 dernières (quel familier, quoi, quand) avec le total de
   tout ce que les familiers ont rapporté depuis le début (trouvailles, golds, XP, coffres, potions, clés, objets).
-- **Succès** : 74 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
+- **Succès** : 77 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, casino, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.

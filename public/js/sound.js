@@ -609,6 +609,51 @@
         fanfare([[72, 0, 1], [76, 1, 1], [79, 2, 4]], 0.12, 0.08, 0.6);
       }
     },
+    // ---------- Casino ----------
+    // Cliquetis d'un rouleau, d'une roue ou du défilé de la caisse (pitch au choix).
+    casinoTick(p = 0) {
+      tone(1400 + p * 40, 0.03, { type: 'square', vol: 0.03 });
+    },
+    reelStop(i = 0) {
+      noise(0.06, { freq: 900, vol: 0.18 });
+      tone(midi(60 + i * 4), 0.12, { type: 'square', vol: 0.06 });
+    },
+    lever() {
+      noise(0.25, { freq: 600, sweep: 2400, vol: 0.12 });
+      tone(180, 0.2, { type: 'sawtooth', vol: 0.05, to: 90 });
+    },
+    chip() {
+      tone(2200, 0.04, { type: 'triangle', vol: 0.06 });
+      tone(3100, 0.05, { type: 'triangle', vol: 0.04, delay: 0.03 });
+    },
+    cardDeal() {
+      noise(0.07, { freq: 4000, filter: 'highpass', vol: 0.14 });
+    },
+    cardFlip() {
+      noise(0.05, { freq: 3000, filter: 'bandpass', vol: 0.12 });
+      tone(900, 0.05, { type: 'triangle', vol: 0.04, delay: 0.02 });
+    },
+    iceSafe(i = 0) {
+      tone(midi(84 + (i % 6) * 2), 0.12, { type: 'triangle', vol: 0.08 });
+      tone(midi(91 + (i % 6) * 2), 0.18, { type: 'sine', vol: 0.05, delay: 0.05 });
+      noise(0.05, { freq: 6000, filter: 'highpass', vol: 0.06 });
+    },
+    iceShatter() {
+      noise(0.7, { freq: 5000, filter: 'highpass', vol: 0.3, sweep: 1200 });
+      tone(120, 0.5, { vol: 0.3, to: 40 });
+    },
+    cupShuffle() {
+      noise(0.09, { freq: 700, vol: 0.12 });
+    },
+    casinoWin(mult = 2) {
+      const big = mult >= 10;
+      const notes = big ? [72, 76, 79, 84, 88, 91] : mult >= 3 ? [72, 76, 79, 84] : [76, 81];
+      notes.forEach((n, i) => tone(midi(n), 0.18, { type: 'square', vol: 0.05, delay: i * 0.07 }));
+      for (let i = 0; i < (big ? 14 : 5); i++) tone(midi(88 + (i % 3) * 4), 0.07, { type: 'triangle', vol: 0.04, delay: 0.25 + i * 0.06 });
+    },
+    casinoLose() {
+      [67, 63, 60].forEach((n, i) => tone(midi(n), 0.22, { type: 'triangle', vol: 0.06, delay: i * 0.16 }));
+    },
     chestCard(rarity) {
       const idx = Rules.RARITIES.indexOf(rarity);
       tone(660 + idx * 120, 0.25, { vol: 0.12 });
@@ -623,6 +668,7 @@
     dungeon: '/audio/donjon.mp3', // Mattashi — The Final Battle
     gold: '/audio/ruee.mp3', // YV Remix (Ruée vers l'or)
     rush: '/audio/boss.mp3', // Boss Rush : même musique que le Combat de Boss
+    casino: '/audio/casino.mp3', // Luigi's Casino (onglet Casino)
   };
 
   const music = (function () {

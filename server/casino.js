@@ -1,0 +1,328 @@
+/*
+ * Casino : six jeux payants, chacun tenu par un boss en smoking. Tout se décide ici, côté serveur, avec le
+ * générateur cryptographique ; le navigateur ne fait que l'animation.
+ *  - Machine à sous (Pyrax), Roulette (Grokk), Gobelets (Malvorath), Caisse (Grignotor) : un appel = un tirage.
+ *  - Blackjack (Maexxna) et Lac gelé (Givrenoire) : une partie en plusieurs coups, gardée dans
+ *    db.state.casino.sessions[userId] (jamais envoyée telle quelle : la carte cachée et les fissures restent secrètes).
+ * La mise est retirée dès le début du coup ; les gains sont crédités à la fin. Les gros gains (≥ 10× la mise, ou un
+ * lot incroyable) sont ajoutés au fil du casino (db.state.casino.feed), que index.js diffuse.
+ */
+const crypto = require('crypto');
+const db = require('./db');
+const game = require('./game');
+const Rules = require('../shared/rules');
+
+const C = Rules.CASINO;
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const SUITS = ['♠', '♥', '♦', '♣'];
+
+function state() {
+  if (!db.state.casino) db.state.casino = {};
+  const s = db.state.casino;
+  if (!s.sessions) s.sessions = {};
+  if (!Array.isArray(s.feed)) s.feed = [];
+  return s;
+}
+
+const random = () => crypto.randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
+const randInt = (min, max) => crypto.randomInt(min, max + 1);
+function weightedPick(entries) {
+  const total = entries.reduce((a, e) => a + e.weight, 0);
+  let r = random() * total;
+  for (const e of entries) { r -= e.weight; if (r < 0) return e; }
+  return entries[entries.length - 1];
+}
+const nameOf = (user) => user.twitchDisplayName || user.username;
+
+function checkBet(character, bet) {
+  const b = Number(bet);
+  if (!C.bets.includes(b)) throw new Error(`Mise possible : ${C.bets.join(', ')} golds`);
+  if (character.gold < b) throw new Error(`Il te faut ${b} golds pour miser`);
+  return b;
+}
+
+// Retire la mise (statistiques : parties, mises).
+function take(character, amount, newGame = true) {
+  game.upgrade(character);
+  character.gold -= amount;
+  game.addStat(character, 'casinoWagered', amount);
+  if (newGame) { game.addStat(character, 'casinoBets'); game.bump(character, 'casinoPlays'); }
+}
+
+// Crédite un gain ; un gros gain part dans le fil du casino. Retourne true si le fil a changé.
+function pay(user, gameId, bet, payout, text) {
+  const c = user.character;
+  if (payout > 0) {
+    c.gold += payout;
+    game.addStat(c, 'casinoWon', payout);
+    c.lifetime.casinoBest = Math.max(c.lifetime.casinoBest || 0, payout);
+  }
+  if (payout > 0 && (payout >= bet * C.bigWin || text)) {
+    addFeed({ name: nameOf(user), game: gameId, amount: payout, bet, text: text || null });
+    return true;
+  }
+  return false;
+}
+
+function addFeed(entry) {
+  const s = state();
+  s.feed.unshift({ at: Date.now(), ...entry });
+  if (s.feed.length > C.feedMax) s.feed.length = C.feedMax;
+}
+
+function feed() {
+  return state().feed;
+}
+
+// ---------- Machine à sous (Pyrax) ----------
+function slots(user, bet) {
+  const c = user.character;
+  const b = checkBet(c, bet);
+  take(c, b);
+  const symbols = Object.entries(C.slots.symbols).map(([id, s]) => ({ id, weight: s.weight }));
+  const reels = [0, 1, 2].map(() => weightedPick(symbols).id);
+  const res = Rules.slotsPayout(reels);
+  const payout = b * res.mult;
+  if (res.kind === 'jackpot') game.bump(c, 'jackpots');
+  const big = pay(user, 'slots', b, payout, res.kind === 'jackpot' ? 'JACKPOT !' : null);
+  return { reels, mult: res.mult, kind: res.kind, payout, bet: b, feed: big };
+}
+
+// ---------- Roulette (Grokk) ----------
+function roulette(user, bets) {
+  const c = user.character;
+  const R = C.roulette;
+  if (!Array.isArray(bets) || !bets.length) throw new Error('Place au moins un jeton');
+  if (bets.length > R.maxBets) throw new Error(`${R.maxBets} paris au plus par lancer`);
+  const clean = bets.map((x) => ({ on: String(x && x.on), amount: Number(x && x.amount) }));
+  for (const x of clean) {
+    if (Rules.rouletteReturn(x.on) === null) throw new Error('Pari inconnu');
+    if (!R.chips.includes(x.amount)) throw new Error(`Jetons possibles : ${R.chips.join(', ')} golds`);
+  }
+  const total = clean.reduce((a, x) => a + x.amount, 0);
+  if (total > C.maxBet) throw new Error(`Mise totale de ${C.maxBet} golds au plus par lancer`);
+  if (c.gold < total) throw new Error(`Il te faut ${total} golds pour ces paris`);
+  take(c, total);
+  const number = randInt(0, 36);
+  let payout = 0;
+  const wins = [];
+  for (const x of clean) {
+    if (Rules.rouletteWins(x.on, number)) { payout += x.amount * Rules.rouletteReturn(x.on); wins.push(x.on); }
+  }
+  const big = pay(user, 'roulette', total, payout, payout >= total * C.bigWin ? `le ${number} !` : null);
+  return { number, color: Rules.rouletteColor(number), wins, payout, bet: total, feed: big };
+}
+
+// ---------- Gobelets du mage (Malvorath) ----------
+function gobelets(user, bet, cup) {
+  const c = user.character;
+  const k = Number(cup);
+  if (!Number.isInteger(k) || k < 0 || k >= C.gobelets.cups) throw new Error('Choisis un gobelet');
+  const b = checkBet(c, bet);
+  take(c, b);
+  const ball = randInt(0, C.gobelets.cups - 1);
+  const payout = ball === k ? Math.floor(b * C.gobelets.pays) : 0;
+  pay(user, 'gobelets', b, payout);
+  return { ball, cup: k, win: ball === k, payout, bet: b };
+}
+
+// ---------- Caisse de Grignotor ----------
+function caisse(user) {
+  const c = user.character;
+  const price = C.caisse.price;
+  if (c.gold < price) throw new Error(`Une caisse coûte ${price} golds`);
+  take(c, price);
+  const lot = weightedPick(C.caisse.loot);
+  const out = { lot: { id: lot.id, tier: lot.tier, label: lot.label, icon: lot.icon }, price };
+  let payout = 0;
+  if (lot.gold) {
+    payout = randInt(lot.gold[0], lot.gold[1]);
+    out.gold = payout;
+  } else if (lot.rarity) {
+    const item = game.makeItem(lot.rarity, 'arme', { cls: c.cls, ownChance: 1 });
+    item.isNew = true;
+    c.inventory.push(item);
+    game.addStat(c, 'itemsObtained');
+    if (item.rarity === 'legendaire') game.bump(c, 'legendary');
+    out.item = item;
+  } else if (lot.keys) {
+    game.addKeys(c, lot.keys);
+    out.keys = lot.keys;
+  } else if (lot.pet) {
+    const species = Object.keys(Rules.PETS);
+    const r = game.addPet(c, species[randInt(0, species.length - 1)]);
+    out.pet = { species: r.pet.species, name: r.pet.name, duplicate: r.duplicate };
+  }
+  if (lot.tier === 'incroyable') game.bump(c, 'casinoLegend');
+  let big = pay(user, 'caisse', price, payout);
+  if (lot.tier === 'incroyable') {
+    addFeed({ name: nameOf(user), game: 'caisse', amount: 0, bet: price, text: out.item ? `${out.item.name} (Légendaire)` : `un ${out.pet.name}` });
+    big = true;
+  }
+  return { ...out, payout, feed: big };
+}
+
+// ---------- Blackjack (Maexxna) ----------
+const card = () => ({ r: RANKS[randInt(0, 12)], s: SUITS[randInt(0, 3)] });
+
+function bjView(bj) {
+  const done = !!bj.outcome;
+  return {
+    bet: bj.bet,
+    doubled: bj.doubled,
+    player: bj.player,
+    dealer: done ? bj.dealer : [bj.dealer[0], { hidden: true }],
+    playerValue: Rules.bjValue(bj.player),
+    dealerValue: done ? Rules.bjValue(bj.dealer) : Rules.bjValue([bj.dealer[0]]),
+    outcome: bj.outcome || null,
+    payout: bj.payout || 0,
+    canDouble: !done && bj.player.length === 2 && !bj.doubled,
+  };
+}
+
+function session(user) {
+  const s = state().sessions;
+  if (!s[user.id]) s[user.id] = {};
+  return s[user.id];
+}
+
+function bjFinish(user, bj) {
+  const pv = Rules.bjValue(bj.player);
+  const dv = Rules.bjValue(bj.dealer);
+  let mult = 0;
+  if (pv.total > 21) bj.outcome = 'bust';
+  else if (pv.blackjack && !dv.blackjack) { bj.outcome = 'blackjack'; mult = C.blackjack.blackjackPays; }
+  else if (dv.total > 21) { bj.outcome = 'win'; mult = 2; }
+  else if (pv.total > dv.total && !dv.blackjack) { bj.outcome = 'win'; mult = 2; }
+  else if (pv.total === dv.total && pv.blackjack === dv.blackjack) { bj.outcome = 'push'; mult = 1; }
+  else bj.outcome = 'lose';
+  bj.payout = Math.floor(bj.bet * mult);
+  const feedChanged = pay(user, 'blackjack', bj.bet, bj.payout);
+  delete session(user).bj;
+  return { ...bjView(bj), feed: feedChanged };
+}
+
+// La banque tire jusqu'à 17 (elle reste aussi sur 17 souple).
+function dealerPlay(bj) {
+  while (Rules.bjValue(bj.dealer).total < C.blackjack.dealerStand) bj.dealer.push(card());
+}
+
+function bjDeal(user, bet) {
+  const c = user.character;
+  const S = session(user);
+  if (S.bj) throw new Error('Termine d\'abord ta main en cours');
+  const b = checkBet(c, bet);
+  take(c, b);
+  const bj = { bet: b, player: [card(), card()], dealer: [card(), card()], doubled: false };
+  S.bj = bj;
+  // Blackjack d'entrée (joueur ou banque) : la main se règle tout de suite.
+  if (Rules.bjValue(bj.player).blackjack || Rules.bjValue(bj.dealer).blackjack) return bjFinish(user, bj);
+  return bjView(bj);
+}
+
+function current(user) {
+  const bj = session(user).bj;
+  if (!bj) throw new Error('Aucune main en cours : mise d\'abord');
+  return bj;
+}
+
+function bjHit(user) {
+  const bj = current(user);
+  bj.player.push(card());
+  const v = Rules.bjValue(bj.player).total;
+  if (v > 21) return bjFinish(user, bj);
+  if (v === 21) { dealerPlay(bj); return bjFinish(user, bj); }
+  return bjView(bj);
+}
+
+function bjStand(user) {
+  const bj = current(user);
+  dealerPlay(bj);
+  return bjFinish(user, bj);
+}
+
+function bjDouble(user) {
+  const bj = current(user);
+  const c = user.character;
+  if (bj.player.length !== 2 || bj.doubled) throw new Error('On ne double que sur les deux premières cartes');
+  if (c.gold < bj.bet) throw new Error(`Il te faut ${bj.bet} golds de plus pour doubler`);
+  take(c, bj.bet, false);
+  bj.bet *= 2;
+  bj.doubled = true;
+  bj.player.push(card());
+  if (Rules.bjValue(bj.player).total <= 21) dealerPlay(bj);
+  return bjFinish(user, bj);
+}
+
+// ---------- Lac gelé (Givrenoire) ----------
+function glaceView(g) {
+  const done = !!g.outcome;
+  const safe = g.revealed.length;
+  return {
+    bet: g.bet,
+    mines: g.mines,
+    revealed: g.revealed,
+    mult: Rules.glaceMult(g.mines, safe),
+    next: safe < C.glace.size - g.mines ? Rules.glaceMult(g.mines, safe + 1) : null,
+    cashable: !done && safe > 0,
+    cracks: done ? g.cracks : null,
+    boom: g.boom == null ? null : g.boom,
+    outcome: g.outcome || null,
+    payout: g.payout || 0,
+  };
+}
+
+function glaceStart(user, bet, mines) {
+  const c = user.character;
+  const S = session(user);
+  if (S.glace) throw new Error('Termine d\'abord ta partie en cours');
+  const m = Number(mines);
+  if (!C.glace.mines.includes(m)) throw new Error(`Nombre de fissures possible : ${C.glace.mines.join(', ')}`);
+  const b = checkBet(c, bet);
+  take(c, b);
+  const cells = Array.from({ length: C.glace.size }, (_, i) => i);
+  for (let i = cells.length - 1; i > 0; i--) { const j = randInt(0, i); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+  S.glace = { bet: b, mines: m, cracks: cells.slice(0, m).sort((x, y) => x - y), revealed: [] };
+  return glaceView(S.glace);
+}
+
+function glaceCurrent(user) {
+  const g = session(user).glace;
+  if (!g) throw new Error('Aucune partie en cours : mise d\'abord');
+  return g;
+}
+
+function glaceEnd(user, g, outcome) {
+  g.outcome = outcome;
+  g.payout = outcome === 'cash' ? Math.floor(g.bet * Rules.glaceMult(g.mines, g.revealed.length)) : 0;
+  const big = pay(user, 'glace', g.bet, g.payout);
+  delete session(user).glace;
+  return { ...glaceView(g), feed: big };
+}
+
+function glacePick(user, index) {
+  const g = glaceCurrent(user);
+  const i = Number(index);
+  if (!Number.isInteger(i) || i < 0 || i >= C.glace.size) throw new Error('Case inconnue');
+  if (g.revealed.includes(i)) throw new Error('Case déjà brisée');
+  if (g.cracks.includes(i)) { g.boom = i; return glaceEnd(user, g, 'boom'); }
+  g.revealed.push(i);
+  if (g.revealed.length === C.glace.size - g.mines) return glaceEnd(user, g, 'cash'); // tout le lac : encaissé d'office
+  return glaceView(g);
+}
+
+function glaceCash(user) {
+  const g = glaceCurrent(user);
+  if (!g.revealed.length) throw new Error('Brise au moins une case avant d\'encaisser');
+  return glaceEnd(user, g, 'cash');
+}
+
+// Parties en cours (rechargement de la page) : vues publiques, sans secret.
+function sessionsOf(user) {
+  const S = state().sessions[user.id] || {};
+  return { blackjack: S.bj ? bjView(S.bj) : null, glace: S.glace ? glaceView(S.glace) : null };
+}
+
+module.exports = {
+  state, feed, slots, roulette, gobelets, caisse, bjDeal, bjHit, bjStand, bjDouble, glaceStart, glacePick, glaceCash, sessionsOf,
+};

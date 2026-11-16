@@ -420,11 +420,15 @@
     { id: 'pet3', metric: 'pets', goal: 3, name: 'Ménagerie', desc: 'Posséder 3 familiers différents', gold: 400 },
     { id: 'petFollow1', metric: 'petFollowers', goal: 1, name: 'Inséparables', desc: 'Débloquer un compagnon de combat (3 jours de bonheur au-dessus de 80 %)', gold: 300 },
     { id: 'petFinds20', metric: 'petFinds', goal: 20, name: 'Bon chien-chien', desc: 'Récupérer 20 trouvailles de ton familier', gold: 200 },
+    { id: 'casino25', metric: 'casinoPlays', goal: 25, name: 'Faites vos jeux', desc: 'Jouer 25 parties au casino', gold: 100 },
+    { id: 'jackpot1', metric: 'jackpots', goal: 1, name: 'JACKPOT !', desc: 'Aligner trois 7 à la machine à sous de Pyrax', gold: 1000 },
+    { id: 'casinoLegend1', metric: 'casinoLegend', goal: 1, name: 'Coup de chance incroyable', desc: 'Gagner un lot incroyable dans la caisse de Grignotor', gold: 500 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
     'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
-    'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds'];
+    'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds',
+    'casinoPlays', 'jackpots', 'casinoLegend'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
   const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
@@ -1666,6 +1670,127 @@
     return 0;
   }
 
+  // ---------- Casino ----------
+  // Six jeux, chacun tenu par un boss en smoking (croupier = identifiant du boss). Tous les tirages se font côté serveur.
+  const CASINO = {
+    bets: [10, 25, 50, 100, 250, 500], // mises proposées
+    maxBet: 500,
+    bigWin: 10, // gain ≥ 10× la mise (ou lot incroyable) : annoncé dans les gros gains du casino
+    feedMax: 15,
+    crowdMax: 18, // joueurs qui se promènent dans la salle
+    games: {
+      slots: { label: 'Machine à sous', icon: '🎰', croupier: 'dragon', color: '#ff6b2a', desc: 'Trois rouleaux : aligne trois symboles identiques. Deux cerises remboursent le double !' },
+      blackjack: { label: 'Blackjack', icon: '🃏', croupier: 'maexxna', color: '#3ddc5a', desc: 'Approche-toi de 21 sans dépasser et bats la banque. Blackjack payé 3 pour 2.' },
+      roulette: { label: 'Roulette', icon: '🎡', croupier: 'troll', color: '#e33', desc: 'Mise sur un numéro, une couleur, la parité ou une douzaine, puis Grokk lance la bille.' },
+      caisse: { label: 'Caisse de Grignotor', icon: '🎁', croupier: 'mimic', color: '#d9a441', desc: 'Un défilé de lots, un seul gagnant : du petit lot au légendaire (1 % de lots incroyables).' },
+      glace: { label: 'Lac gelé', icon: '🧊', croupier: 'liche', color: '#7fd4ff', desc: 'Brise la glace case par case : chaque case sûre fait monter le gain. Une fissure et tout est perdu !' },
+      gobelets: { label: 'Gobelets du mage', icon: '🔮', croupier: 'sorcier', color: '#9b59ff', desc: 'Malvorath cache une bille sous un gobelet et les mélange. Trouve-la !' },
+    },
+    // Machine à sous : même tirage pondéré sur les trois rouleaux ; trois identiques → × mise ; deux cerises → ×2.
+    slots: {
+      symbols: {
+        cerise: { icon: '🍒', weight: 30, pays: 5 },
+        citron: { icon: '🍋', weight: 24, pays: 10 },
+        cloche: { icon: '🔔', weight: 18, pays: 20 },
+        trefle: { icon: '🍀', weight: 13, pays: 40 },
+        diamant: { icon: '💎', weight: 9, pays: 80 },
+        sept: { icon: '7️⃣', weight: 6, pays: 150 }, // JACKPOT
+      },
+      cherries: 2,
+    },
+    // Roulette européenne : 37 cases (0 vert). Retour total (mise comprise) selon le pari.
+    roulette: {
+      red: [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36],
+      maxBets: 12,
+      chips: [10, 25, 50, 100],
+    },
+    // Blackjack : sabot infini, la banque tire jusqu'à 17 (et reste sur 17 souple), doubler sur les 2 premières cartes.
+    blackjack: { blackjackPays: 2.5, dealerStand: 17 },
+    // Lac gelé : 25 cases dont `mines` fissures ; le gain suit la probabilité de survie (avantage de la maison 3 %).
+    glace: { size: 25, mines: [3, 5, 10, 15], edge: 0.97 },
+    // Gobelets : 3 gobelets, la bille sous l'un d'eux ; gagner rend 2,85 × la mise.
+    gobelets: { cups: 3, pays: 2.85 },
+    // Caisse : prix fixe, poids sur 10 000.
+    caisse: {
+      price: 100,
+      tiers: {
+        mauvais: { label: 'Petit lot', color: '#9aa4b2' },
+        correct: { label: 'Bon lot', color: '#4f8cff' },
+        incroyable: { label: 'Lot incroyable', color: '#ffb000' },
+      },
+      loot: [
+        { id: 'golds', tier: 'mauvais', weight: 3500, label: 'Quelques golds', icon: '🪙', gold: [20, 60] },
+        { id: 'commun', tier: 'mauvais', weight: 2500, label: 'Arme commune', icon: '🗡️', rarity: 'commun' },
+        { id: 'peu_commun', tier: 'mauvais', weight: 2000, label: 'Arme peu commune', icon: '🗡️', rarity: 'peu_commun' },
+        { id: 'rare', tier: 'correct', weight: 1200, label: 'Arme rare', icon: '⚔️', rarity: 'rare' },
+        { id: 'epique', tier: 'correct', weight: 500, label: 'Arme épique', icon: '⚔️', rarity: 'epique' },
+        { id: 'cle', tier: 'correct', weight: 200, label: 'Clé de boss', icon: '🗝️', keys: 1 },
+        { id: 'legendaire', tier: 'incroyable', weight: 70, label: 'Arme légendaire', icon: '🌟', rarity: 'legendaire' },
+        { id: 'familier', tier: 'incroyable', weight: 30, label: 'Familier au hasard', icon: '🐾', pet: true },
+      ],
+    },
+  };
+  // Machine à sous : multiplicateur d'une combinaison de 3 symboles.
+  function slotsPayout(reels) {
+    const S = CASINO.slots.symbols;
+    if (reels.length === 3 && reels.every((r) => r === reels[0]) && S[reels[0]]) return { mult: S[reels[0]].pays, kind: reels[0] === 'sept' ? 'jackpot' : 'triple', symbol: reels[0] };
+    if (reels.filter((r) => r === 'cerise').length === 2) return { mult: CASINO.slots.cherries, kind: 'cerises', symbol: 'cerise' };
+    return { mult: 0, kind: null, symbol: null };
+  }
+  // Taux de retour théorique de la machine à sous (≈ 94,6 %).
+  function slotsRtp() {
+    const S = CASINO.slots.symbols;
+    const W = Object.values(S).reduce((a, s) => a + s.weight, 0);
+    const pc = S.cerise.weight / W;
+    return Object.values(S).reduce((a, s) => a + Math.pow(s.weight / W, 3) * s.pays, 0) + 3 * pc * pc * (1 - pc) * CASINO.slots.cherries;
+  }
+  // Roulette : couleur d'un numéro.
+  function rouletteColor(n) {
+    if (n === 0) return 'vert';
+    return CASINO.roulette.red.includes(n) ? 'rouge' : 'noir';
+  }
+  // Paris de la roulette : 'n:17', rouge, noir, pair, impair, manque (1-18), passe (19-36), d1/d2/d3 (douzaines), c1/c2/c3 (colonnes).
+  // Retour total (mise comprise) ; null si le pari est inconnu.
+  function rouletteReturn(on) {
+    if (/^n:(\d|[12]\d|3[0-6])$/.test(on)) return 36;
+    if (['rouge', 'noir', 'pair', 'impair', 'manque', 'passe'].includes(on)) return 2;
+    if (['d1', 'd2', 'd3', 'c1', 'c2', 'c3'].includes(on)) return 3;
+    return null;
+  }
+  function rouletteWins(on, n) {
+    if (on.startsWith('n:')) return Number(on.slice(2)) === n;
+    if (n === 0) return false;
+    switch (on) {
+      case 'rouge': return rouletteColor(n) === 'rouge';
+      case 'noir': return rouletteColor(n) === 'noir';
+      case 'pair': return n % 2 === 0;
+      case 'impair': return n % 2 === 1;
+      case 'manque': return n <= 18;
+      case 'passe': return n >= 19;
+      case 'd1': case 'd2': case 'd3': return Math.ceil(n / 12) === Number(on[1]);
+      case 'c1': case 'c2': case 'c3': return ((n - 1) % 3) + 1 === Number(on[1]);
+      default: return false;
+    }
+  }
+  // Blackjack : valeur d'une main ({ r: 'A'|'2'…'10'|'J'|'Q'|'K' }), as à 11 tant que ça ne dépasse pas 21.
+  function bjValue(cards) {
+    let total = 0;
+    let aces = 0;
+    for (const c of cards) {
+      if (c.r === 'A') { total += 11; aces += 1; } else if (['J', 'Q', 'K'].includes(c.r)) total += 10; else total += Number(c.r);
+    }
+    while (total > 21 && aces) { total -= 10; aces -= 1; }
+    return { total, soft: aces > 0, blackjack: cards.length === 2 && total === 21 };
+  }
+  // Lac gelé : multiplicateur après `safe` cases sûres avec `mines` fissures (arrondi au centième inférieur).
+  function glaceMult(mines, safe) {
+    const N = CASINO.glace.size;
+    let p = 1;
+    for (let i = 0; i < safe; i++) p *= (N - mines - i) / (N - i);
+    if (safe === 0) return 1;
+    return Math.floor((CASINO.glace.edge / p) * 100) / 100;
+  }
+
   // ---------- Historique et statistiques ----------
   const HISTORY = { max: 50 }; // parties gardées par personnage (les plus récentes)
   // Types de partie de l'historique : les modes du stream, plus le contenu solo.
@@ -1676,8 +1801,8 @@
   // Statistiques cumulées (character.lifetime ; character.stats, ce sont les points de caractéristiques) ; les records (PLAYER_STAT_MAX) gardent le maximum.
   const PLAYER_STAT_KEYS = ['losses', 'deaths', 'damageDealt', 'damageTaken', 'bossDamage', 'hillTime', 'playTime', 'maxKills', 'maxDamage',
     'expeditions', 'expeditionFloors', 'challenges', 'rushBosses', 'dungeonRooms', 'goldShower',
-    'goldEarned', 'itemsObtained', 'potionsUsed', 'betGold'];
-  const PLAYER_STAT_MAX = ['maxKills', 'maxDamage'];
+    'goldEarned', 'itemsObtained', 'potionsUsed', 'betGold', 'casinoBets', 'casinoWagered', 'casinoWon', 'casinoBest'];
+  const PLAYER_STAT_MAX = ['maxKills', 'maxDamage', 'casinoBest'];
 
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
 
@@ -1963,6 +2088,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
+    CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
