@@ -382,7 +382,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
 - **Casino** (onglet Casino, musique « Luigi's Casino ») : une salle animée où se promènent les personnages des autres
-  joueurs (et le sien), et six jeux tenus par les boss en smoking (mises de 10 à 500 golds, tirages côté serveur) :
+  joueurs (et le sien) en lançant des répliques au hasard (« Allez, une dernière… », « Encore une défaite et Don Paolo va
+  m'allumer ») — devant une table, ils parlent de ce jeu, et son propre personnage réagit à ses gains —, et six jeux tenus par les boss en smoking (mises de 10 à 500 golds, tirages côté serveur) :
   - **Machine à sous de Pyrax** : 3 rouleaux, trois symboles identiques paient ×5 (cerises) à ×150 (trois 7 : JACKPOT),
     deux cerises ×2 (taux de retour ≈ 94,6 %).
   - **Blackjack de Maexxna** : tirer, rester, doubler ; la banque reste sur 17 ; blackjack payé 3 pour 2.

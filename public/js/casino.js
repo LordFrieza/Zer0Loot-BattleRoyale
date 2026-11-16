@@ -49,6 +49,95 @@
   let data = null; // { crowd, feed, sessions }
   let active = false;
 
+  // ---------- Bavardages des joueurs ----------
+  // Répliques au hasard au-dessus des promeneurs ; devant une table, ils parlent plutôt de ce jeu.
+  const CHATTER = {
+    any: [
+      'Allez, une dernière…', 'Allez… faut que j\'aille payer le crédit…', 'Encore une défaite et Don Paolo va m\'allumer',
+      'C\'était la partie de trop.', 'Je sens que c\'est mon jour !', 'Qui m\'a piqué mon jeton ?!', 'Ma femme croit que je suis au donjon…',
+      'J\'ai misé le loot de la guilde…', 'Un petit légendaire et j\'arrête.', 'J\'ai vendu mon épée pour jouer…',
+      'Plus que 3 golds… tout ou rien !', 'Promis, après je farm.', 'J\'ai une martingale infaillible.', 'Quelqu\'un me prête 100 golds ?',
+      'Le croupier m\'a fait un clin d\'œil…', 'Je joue pour la science.', 'Mon familier va devoir jeûner ce mois-ci.',
+      'Hier j\'étais riche. Hier.', 'Je rembourse demain, juré !', 'Ça va tourner, ça va tourner…',
+      'Ce n\'est pas une addiction, c\'est une stratégie.', 'J\'ai gagné ! Ah non, j\'ai lu à l\'envers.', 'Encore 5 minutes, maman…',
+      'Le jackpot, c\'est pour moi ce soir !', 'Je peux miser mes chaussettes ?', 'Il paraît que Grignotor mord les perdants.',
+      'Don Paolo m\'a dit de rentrer avec ses golds…', 'J\'ai hypothéqué mon enclos.', 'Ma potion de chance n\'a pas marché…',
+      'Je ne suis pas accro, je peux arrêter quand je veux.', 'Si je perds, je dis que c\'était un bot.', 'Quelqu\'un a vu passer mes golds ?',
+    ],
+    slots: ['Allez les 7… LES 7 !', 'Deux cerises… c\'est déjà ça.', 'Ce levier est truqué !', 'Pyrax a cramé ma mise !', 'Trois citrons… non, deux.'],
+    blackjack: ['Carte !', 'Je reste… non, carte !', '21 ! Ah non, 22.', 'Maexxna a huit mains, c\'est pas juste !', 'La banque a encore 21 ?!'],
+    roulette: ['Tout sur le rouge !', 'Le zéro… ENCORE le zéro ?!', 'GROKK, LANCE LA BILLE !', 'Pair, impair… je sais plus.', 'Le 17, c\'est mon chiffre !'],
+    caisse: ['Allez la légendaire !', 'Encore une arme commune…', 'Grignotor m\'a mordu la main !', 'La prochaine, c\'est la bonne.', 'J\'ai vu passer le familier !'],
+    glace: ['Juste une case de plus…', 'J\'aurais dû encaisser…', 'Ça craque, ça craque !', 'Brrr… même mes golds sont gelés.', 'Givrenoire rigole, c\'est mauvais signe.'],
+    gobelets: ['Elle est sous celui du milieu !', 'Il a triché, je l\'ai vu !', 'Mes yeux… trop rapide…', 'Toujours le gobelet de gauche.', 'C\'est de la magie noire !'],
+    meWin: ['YES ! Je suis riche !!!', 'Et ça, c\'est du talent.', 'La banque va sauter !', 'Je savais que c\'était mon jour !'],
+    meLose: ['Allez, une dernière…', 'C\'était la partie de trop.', 'Bon… je rembourse demain.', 'Don Paolo ne doit pas savoir.'],
+  };
+  const BUBBLES_MAX = 3; // répliques affichées en même temps
+  const pickLine = (list) => list[Math.floor(Math.random() * list.length)];
+  function talk(w, text, now = performance.now()) {
+    w.bubble = { text, at: now, until: now + 3200 + text.length * 45 };
+  }
+  function updateChatter(now) {
+    let shown = scene.walkers.filter((w) => w.bubble && w.bubble.until > now).length;
+    for (const w of scene.walkers) {
+      if (w.bubble && w.bubble.until <= now) w.bubble = null;
+      if (!w.talkAt) w.talkAt = now + 3000 + Math.random() * 15000;
+      if (now < w.talkAt || w.bubble || w.me) continue;
+      w.talkAt = now + 9000 + Math.random() * 20000;
+      if (shown >= BUBBLES_MAX) continue;
+      // Arrêté devant une table : une fois sur deux, une réplique sur ce jeu
+      const station = w.wait > 0 && w.to && w.to.station;
+      talk(w, pickLine(station && Math.random() < 0.6 ? CHATTER[station] : CHATTER.any), now);
+      shown += 1;
+    }
+  }
+  function drawBubble(ctx, w, now, placed) {
+    const b = w.bubble;
+    if (!b || b.until <= now) return;
+    const fade = Math.min(1, (now - b.at) / 180, (b.until - now) / 300);
+    const pop = Math.min(1, (now - b.at) / 160);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, fade);
+    ctx.font = '600 11px system-ui, sans-serif';
+    // Retour à la ligne (160 px au plus)
+    const words = b.text.split(' ');
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > 160 && line) { lines.push(line); line = word; } else line = test;
+    }
+    lines.push(line);
+    const lw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
+    const lh = lines.length * 14 + 10;
+    const bx = Math.max(6, Math.min(W - lw - 6, w.x - lw / 2));
+    let by = Math.max(4, w.y - 66 - lh);
+    // Pas de bulles qui se chevauchent : on remonte celle-ci au-dessus de la précédente
+    for (let k = 0; k < 4; k++) {
+      const hit = placed.find((r) => bx < r.x + r.w && bx + lw > r.x && by < r.y + r.h && by + lh + 8 > r.y);
+      if (!hit) break;
+      by = hit.y - lh - 12;
+    }
+    by = Math.max(2, by);
+    placed.push({ x: bx, y: by, w: lw, h: lh + 8 });
+    ctx.translate(w.x, by + lh);
+    ctx.scale(0.7 + pop * 0.3, 0.7 + pop * 0.3);
+    ctx.translate(-w.x, -(by + lh));
+    ctx.fillStyle = w.me ? '#fff6d0' : '#ffffff';
+    ctx.strokeStyle = w.me ? '#ffd34a' : 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, bx, by, lw, lh, 9);
+    ctx.fill(); ctx.stroke();
+    // pointe vers le personnage
+    const tx = Math.max(bx + 10, Math.min(bx + lw - 10, w.x));
+    ctx.beginPath(); ctx.moveTo(tx - 6, by + lh - 1); ctx.lineTo(tx + 6, by + lh - 1); ctx.lineTo(tx, by + lh + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#1a0f24';
+    ctx.textAlign = 'left';
+    lines.forEach((l, i) => ctx.fillText(l, bx + 8, by + 17 + i * 14));
+    ctx.restore();
+  }
+
   function makeWalker(p, i) {
     const start = NODES[Math.floor(Math.random() * 12)];
     return {
@@ -391,6 +480,9 @@
     }
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
+    // Répliques des joueurs, par-dessus tout le reste
+    const placed = [];
+    for (const w of [...scene.walkers].sort((a, b) => (a.me ? 1 : 0) - (b.me ? 1 : 0))) drawBubble(ctx, w, now, placed);
     // Gains qui s'envolent au-dessus des tables
     for (const f of scene.floats) {
       ctx.save();
@@ -411,6 +503,7 @@
     const dt = Math.min(0.05, (now - (scene.last || now)) / 1000);
     scene.last = now;
     updateWalkers(dt);
+    updateChatter(now);
     for (const f of scene.floats) { f.y -= 26 * dt; f.life -= dt / 2.2; }
     scene.floats = scene.floats.filter((f) => f.life > 0);
     if (scene.canvas.offsetParent) drawScene(now);
@@ -457,6 +550,9 @@
   // Le croupier réagit (dans la salle et dans la fenêtre de jeu) ; un gain s'envole au-dessus de sa table.
   function react(id, playerWon, amount) {
     scene.moods[id] = { mood: playerWon ? 'win' : 'lose', until: performance.now() + 2600 };
+    // Mon personnage réagit à mes gains et à mes pertes (de temps en temps pour une perte)
+    const meW = scene.walkers.find((w) => w.me);
+    if (meW && (playerWon || Math.random() < 0.4)) talk(meW, playerWon && amount ? `${pickLine(CHATTER.meWin)} +${fmt(amount)} 🪙` : pickLine(CHATTER.meLose));
     if (playerWon && amount) {
       const s = STATIONS[id];
       scene.floats.push({ x: s.x, y: s.y - 60, text: `+${fmt(amount)} 🪙`, color: '#ffd34a', life: 1 });
