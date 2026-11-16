@@ -145,7 +145,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Fusion (10 / 20 / 40 / 80 / 150 golds selon la rareté) : 3 objets de même rareté → 1 nouvel objet, toujours
     équipable par ta classe. Chance de monter d'une rareté : 40 % (Commun), 30 % (Peu commun), 15 % (Rare), 5 % (Épique),
     + 0,5 % par point de chance effective (max +20 %, moitié moins pour un Épique). Sinon, nouvel objet de même rareté.
-    3 Légendaires → un nouveau Légendaire.
+    3 Légendaires → un nouveau Légendaire. Bouton **🎲 Remplir au hasard** (3 objets non protégés de la rareté choisie).
+  - Forge en série : jusqu'à 30 fusions d'un coup pour une rareté ; les objets sont tirés au hasard dans le coffre
+    (jamais un objet verrouillé ou dans un preset), tout est vérifié avant (objets et golds pour toute la série) ; les
+    objets forgés s'affichent ensemble, améliorations en premier.
+  - Option **⏩ Passer l'animation** (forge et coffres, mémorisée dans le navigateur) : résultat ou loot affiché tout de
+    suite ; Espace / Entrée ouvre le coffre suivant.
   - Relance : remplace une ligne d'un objet (équipé ou non) par une autre stat au hasard, absente de l'objet.
     Prix : 10 / 20 / 40 / 80 / 150 golds selon la rareté.
   - **Alchimie noire** : sacrifie un objet de **même rareté** (+ 15 / 30 / 60 / 120 / 250 golds) pour renforcer une ligne

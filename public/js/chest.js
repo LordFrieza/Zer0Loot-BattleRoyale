@@ -158,17 +158,24 @@
       Sound.bindToggle(el.querySelector('.mute'));
       document.addEventListener('keydown', (e) => {
         if (!this.el.classList.contains('open')) return;
-        if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (this.result && !this.done) this.click(); }
+        if (e.code === 'Space' || e.code === 'Enter') {
+          e.preventDefault();
+          if (this.result && !this.done) this.click();
+          // Coffre ouvert : Espace / Entrée ouvre le suivant, s'il en reste
+          else if (this.done && this.actions.classList.contains('show') && this.hasNext && this.onNext) this.onNext();
+        }
         if (e.code === 'Escape' && this.done) this.close();
       });
     }
 
     /*
      * result = { items, bestRarity, clicks }
-     * opts = { remaining, onNext, onClose }
+     * opts = { remaining, onNext, onClose, instant } — instant : « Passer l'animation », le loot s'affiche tout de suite
      */
     show(result, opts = {}) {
+      clearTimeout(this.burstTimer);
       this.result = result;
+      this.hasNext = opts.remaining > 0;
       this.clicks = 0;
       this.done = false;
       this.onNext = opts.onNext;
@@ -191,6 +198,22 @@
       next.textContent = `Ouvrir le suivant (${opts.remaining} restant${opts.remaining > 1 ? 's' : ''})`;
       this.el.classList.add('open');
       this.rays.style.opacity = 0.15;
+      if (opts.instant) this.revealNow();
+    }
+
+    // Sans animation : pas de clics, les objets apparaissent d'un coup.
+    revealNow() {
+      const { bestRarity, items } = this.result;
+      this.done = true;
+      this.hint.textContent = '';
+      this.counter.textContent = '';
+      this.stage.style.display = 'none';
+      this.setGlow(bestRarity, 0.6);
+      sfx.burst(bestRarity);
+      this.revealEl.innerHTML = items.map((it) => itemHtml(it, '', window.ZL_CLASS)).join('');
+      this.revealEl.classList.add('show');
+      [...this.revealEl.children].forEach((card) => card.classList.add('in'));
+      this.actions.classList.add('show');
     }
 
     setGlow(rarity, intensity) {
@@ -267,7 +290,7 @@
       this.particles.spawn(c.x, c.y, GLOW[bestRarity], 220, 2.2);
       setTimeout(() => this.particles.spawn(c.x, c.y, '#ffffff', 80, 1.6), 120);
 
-      setTimeout(() => {
+      this.burstTimer = setTimeout(() => {
         this.stage.style.display = 'none';
         this.lid.style.transition = '';
         this.counter.textContent = '';

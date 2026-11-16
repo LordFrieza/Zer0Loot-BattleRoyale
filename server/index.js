@@ -253,6 +253,7 @@ app.post('/api/recycle', requirePlayer, action((req) => game.recycle(req.user.ch
 app.post('/api/class', requirePlayer, action((req) => game.chooseClass(req.user.character, String(req.body.cls || ''))));
 
 app.post('/api/forge/fuse', requirePlayer, action((req) => game.fuse(req.user.character, req.body.itemIds)));
+app.post('/api/forge/batch', requirePlayer, action((req) => game.fuseBatch(req.user.character, req.body.rarity, req.body.count)));
 
 app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
 app.post('/api/forge/alchemy', requirePlayer, action((req) => game.alchemy(req.user.character, req.body.itemId, req.body.line, req.body.sacrificeId)));

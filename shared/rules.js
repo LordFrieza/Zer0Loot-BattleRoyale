@@ -274,6 +274,7 @@
    * 3 légendaires → un nouveau légendaire.
    */
   const FUSE_COUNT = 3;
+  const FUSE_BATCH_MAX = 30; // forge en série : 30 fusions au plus d'un coup
   const FUSE_UPGRADE = { commun: 40, peu_commun: 30, rare: 15, epique: 5, legendaire: 0 };
   const FUSE_LUCK_BONUS = 0.5;
   const FUSE_LUCK_BONUS_CAP = 20;
@@ -1949,7 +1950,7 @@
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
-    FUSE_COUNT, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
+    FUSE_COUNT, FUSE_BATCH_MAX, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_AT_CAP, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,

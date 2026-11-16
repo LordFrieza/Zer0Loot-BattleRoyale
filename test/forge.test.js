@@ -129,3 +129,36 @@ test('[FRG-8] alchimie noire : plafond et refus sans rien perdre', () => {
   assert.throws(() => game.alchemy(c, target.id, 0, sacs[1].id), /maximum de l'alchimie \(35\)/);
   assert.strictEqual(c.gold, 750);
 });
+
+test('[FRG-9] forge en série : objets tirés au hasard, jamais protégés, tout vérifié avant de commencer', () => {
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  const commons = Array.from({ length: 10 }, () => game.makeItem('commun'));
+  const rares = [0, 1, 2].map(() => game.makeItem('rare'));
+  commons[0].locked = true; // protégé : jamais fusionné
+  c.inventory.push(...commons, ...rares);
+  c.gold = 25;
+  // Vérifications : rareté, nombre, objets disponibles (9 communs non verrouillés), golds pour toute la série
+  assert.throws(() => game.fuseBatch(c, 'mythique', 1), /Rareté inconnue/);
+  assert.throws(() => game.fuseBatch(c, 'commun', 0), /au moins une/);
+  assert.throws(() => game.fuseBatch(c, 'commun', Rules.FUSE_BATCH_MAX + 1), new RegExp(`${Rules.FUSE_BATCH_MAX} fusions au plus`));
+  assert.throws(() => game.fuseBatch(c, 'commun', 4), /Il faut 12 objets communs non protégés pour 4 fusions \(tu en as 9\)/);
+  assert.throws(() => game.fuseBatch(c, 'commun', 3), /3 fusions coûtent 30 golds/);
+  assert.strictEqual(c.gold, 25, 'rien n\'est débité en cas de refus');
+  assert.strictEqual(c.inventory.length, 13);
+  c.gold = 100;
+  const r = game.fuseBatch(c, 'commun', 3);
+  assert.strictEqual(r.results.length, 3);
+  assert.strictEqual(r.price, 30);
+  assert.strictEqual(r.from, 'commun');
+  assert.strictEqual(r.upgraded, r.results.filter((x) => x.upgraded).length);
+  assert.strictEqual(c.gold, 70);
+  // L'objet verrouillé et les rares restent ; les 9 autres communs sont remplacés par 3 objets forgés
+  const ids = new Set(c.inventory.map((i) => i.id));
+  assert.ok(ids.has(commons[0].id));
+  for (const i of rares) assert.ok(ids.has(i.id));
+  for (const i of commons.slice(1)) assert.ok(!ids.has(i.id));
+  for (const x of r.results) { assert.ok(ids.has(x.item.id)); assert.strictEqual(x.item.isNew, true); }
+  assert.strictEqual(c.inventory.length, 1 + 3 + 3);
+  assert.strictEqual(c.counters.fused, 3);
+});

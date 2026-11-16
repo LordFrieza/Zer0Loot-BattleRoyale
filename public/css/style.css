@@ -410,6 +410,20 @@ body.obs .arena-wrap { border: none; border-radius: 0; width: 100vw; height: 100
 .fuse-slot { min-height: 74px; border: 2px dashed var(--border); border-radius: 10px; display: grid; place-items: center; font-size: 12px; color: var(--muted); padding: 6px; text-align: center; cursor: pointer; }
 .fuse-slot.filled { border-style: solid; color: var(--text); }
 .fuse-info { font-weight: 700; margin-bottom: 10px; min-height: 22px; }
+.fuse-batch { margin-top: 12px; padding: 10px 12px; border: 1px dashed rgba(255, 179, 71, .45); border-radius: 10px; background: rgba(255, 140, 40, .06); }
+.fuse-batch-title { font-weight: 800; margin-bottom: 8px; }
+.fuse-batch-title .muted { font-weight: 400; font-size: 12px; }
+.fuse-batch .row { gap: 8px; align-items: center; flex-wrap: wrap; }
+.fuse-batch select { width: auto; font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; }
+.fuse-batch input[type=number] { width: 70px; padding: 7px 8px; }
+#batch-info { font-size: 13px; margin-top: 6px; }
+.skip-anim { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; margin-top: 10px; }
+.skip-anim input { width: auto; margin: 0; accent-color: var(--accent); }
+.chest-actions .skip-anim { margin-top: 0; }
+/* Résultat d'une forge en série */
+.forge-result.batch .batch-sum { font-weight: 800; margin-bottom: 10px; text-align: center; }
+.forge-result.batch .batch-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-height: 52vh; overflow-y: auto; padding: 4px; }
+.forge-result.batch .batch-grid .item { width: 230px; }
 .forge-pick { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow: auto; }
 .pick-chip { font-size: 12px; padding: 5px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); cursor: pointer; }
 .pick-chip:hover { filter: brightness(1.2); }

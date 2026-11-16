@@ -1272,6 +1272,7 @@ function renderForge() {
   }
   $('fuse-go').textContent = rarity ? `🔨 Forger ! (${price} 🪙)` : '🔨 Forger !';
   $('fuse-go').disabled = fuseSel.length !== Rules.FUSE_COUNT || poor;
+  renderBatch();
   $('fuse-go').title = poor ? `La fusion coûte ${price} golds` : '';
 
   // Filtres par rareté + liste des objets du coffre
@@ -1408,6 +1409,82 @@ function renderRerollPreview(flashIndex) {
   });
 }
 
+// « Passer l'animation » (forge et coffres) : un seul réglage, mémorisé dans le navigateur.
+const skipAnim = {
+  get() { try { return localStorage.getItem('zl_skip_anim') === '1'; } catch (e) { return false; } },
+  set(on) { try { localStorage.setItem('zl_skip_anim', on ? '1' : '0'); } catch (e) { /* ignore */ } this.sync(); },
+  sync() { const on = this.get(); document.querySelectorAll('[data-skip-anim]').forEach((el) => { el.checked = on; }); },
+};
+document.querySelectorAll('[data-skip-anim]').forEach((el) => { el.onchange = () => skipAnim.set(el.checked); });
+skipAnim.sync();
+
+// Remplir la fusion au hasard : rareté déjà en place, sinon celle du filtre, sinon la plus basse qui a 3 objets.
+$('fuse-random').onclick = () => {
+  const inv = me.character.inventory;
+  const free = (r) => inv.filter((i) => i.rarity === r && !fuseSel.includes(i.id) && !isProtected(i.id));
+  const placed = fuseSel.length && inv.find((x) => x.id === fuseSel[0]);
+  const rarity = placed ? placed.rarity
+    : fuseFilter !== 'all' ? fuseFilter
+      : Rules.RARITIES.find((r) => free(r).length >= Rules.FUSE_COUNT);
+  const pool = rarity ? free(rarity) : [];
+  if (fuseSel.length + pool.length < Rules.FUSE_COUNT) { toast(`⚠️ Pas assez d'objets ${rarity ? Rules.RARITY_INFO[rarity].label.toLowerCase() + 's ' : ''}non protégés`); return; }
+  while (fuseSel.length < Rules.FUSE_COUNT) fuseSel.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  Sound.play('chestHit', 3);
+  renderForge();
+};
+
+// Forge en série
+let batchRarity = null;
+function batchAvailable(rarity) {
+  return me.character.inventory.filter((i) => i.rarity === rarity && !isProtected(i.id)).length;
+}
+function batchMax(rarity) {
+  const price = Rules.FUSE_PRICE[rarity];
+  return Math.min(Rules.FUSE_BATCH_MAX, Math.floor(batchAvailable(rarity) / Rules.FUSE_COUNT), Math.floor(me.character.gold / price));
+}
+function renderBatch() {
+  const sel = $('batch-rarity');
+  if (!batchRarity) batchRarity = Rules.RARITIES.find((r) => batchAvailable(r) >= Rules.FUSE_COUNT) || 'commun';
+  sel.innerHTML = Rules.RARITIES.map((r) => `<option value="${r}" ${r === batchRarity ? 'selected' : ''}>${Rules.RARITY_INFO[r].label} (${batchAvailable(r)})</option>`).join('');
+  const max = batchMax(batchRarity);
+  const input = $('batch-count');
+  input.max = Math.max(1, max);
+  let n = Math.floor(Number(input.value)) || 1;
+  if (max >= 1 && n > max) { n = max; input.value = n; }
+  const price = Rules.FUSE_PRICE[batchRarity];
+  const objs = n * Rules.FUSE_COUNT;
+  const avail = batchAvailable(batchRarity);
+  const chance = Rules.fuseUpgradeChance(batchRarity, me.character.derived.luck);
+  const next = Rules.RARITIES[Rules.RARITIES.indexOf(batchRarity) + 1];
+  let why = '';
+  if (avail < objs) why = `il te faut ${objs} objets, tu en as ${avail}`;
+  else if (me.character.gold < n * price) why = `il te manque ${n * price - me.character.gold} 🪙`;
+  $('batch-info').innerHTML = `${n} fusion${n > 1 ? 's' : ''} : <b>${objs} objets</b> détruits, <b>${n * price} 🪙</b>`
+    + (next ? ` · ${fr(chance)} % de chances de <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span> à chaque fusion` : '')
+    + (why ? ` · <span class="down">${why}</span>` : '');
+  $('batch-go').disabled = !!why;
+}
+$('batch-rarity').onchange = (e) => { batchRarity = e.target.value; renderBatch(); };
+$('batch-count').oninput = () => renderBatch();
+$('batch-max').onclick = () => { $('batch-count').value = Math.max(1, batchMax(batchRarity)); renderBatch(); };
+$('batch-go').onclick = async () => {
+  const n = Math.floor(Number($('batch-count').value)) || 1;
+  const label = Rules.RARITY_INFO[batchRarity].label.toLowerCase();
+  if (!confirm(`${n * Rules.FUSE_COUNT} objets ${label}s tirés au hasard (jamais un objet verrouillé ou dans un preset) vont être détruits définitivement pour ${n} fusion${n > 1 ? 's' : ''}. Continuer ?`)) return;
+  let r;
+  opening = true;
+  try {
+    r = await api('/api/forge/batch', { rarity: batchRarity, count: n });
+    me = await api('/api/me');
+  } catch (err) {
+    opening = false;
+    toast('⚠️ ' + err.message);
+    return;
+  }
+  fuseSel.length = 0;
+  forge.playBatch(r, me.character.cls, () => { opening = false; render(); }, skipAnim.get());
+};
+
 $('reroll-item').onchange = (e) => { rerollItemId = e.target.value; renderRerollPreview(); };
 $('fuse-clear').onclick = () => { fuseSel.length = 0; renderForge(); };
 $('fuse-go').onclick = async () => {
@@ -1425,7 +1502,7 @@ $('fuse-go').onclick = async () => {
     return;
   }
   fuseSel.length = 0;
-  forge.play(inputs, r, me.character.cls, () => { opening = false; render(); });
+  forge.play(inputs, r, me.character.cls, () => { opening = false; render(); }, skipAnim.get());
 };
 
 // ---------- Règles des combats ----------
@@ -2264,6 +2341,7 @@ async function openChest() {
     remaining: me.character.chests,
     onNext: openChest,
     onClose: () => { opening = false; render(); },
+    instant: skipAnim.get(),
   });
 }
 

@@ -54,6 +54,11 @@
       this.particles = new window.ZLParticles(el.querySelector('.particles'));
       el.querySelector('.close').onclick = () => this.close();
       Sound.bindToggle(el.querySelector('.mute'));
+      // Entrée / Échap : « Continuer » dès que le résultat est affiché
+      document.addEventListener('keydown', (e) => {
+        if (!this.el.classList.contains('open') || !this.actions.classList.contains('show')) return;
+        if (e.code === 'Enter' || e.code === 'Escape' || e.code === 'Space') { e.preventDefault(); this.close(); }
+      });
     }
 
     anvilTop() {
@@ -71,17 +76,69 @@
     /*
      * inputs : les 3 objets détruits ; outcome : { item, upgraded, from } renvoyé par le serveur.
      */
-    play(inputs, outcome, playerCls, onClose) {
+    play(inputs, outcome, playerCls, onClose, instant = false) {
+      this.reset(onClose);
+      if (instant) { this.reveal(outcome, playerCls); return; } // « Passer l'animation » : résultat tout de suite
+      this.playAnimation(inputs, outcome, playerCls);
+    }
+
+    reset(onClose) {
       this.onClose = onClose;
+      clearTimeout(this.timer);
       this.el.style.setProperty('--glow', '#ff7a1f');
       this.anvil.style.setProperty('--fg', '6px');
       this.heat.setAttribute('opacity', 0);
       this.msg.textContent = 'La forge chauffe…';
       this.result.classList.remove('show');
       this.result.innerHTML = '';
+      this.result.classList.remove('batch');
       this.actions.classList.remove('show');
       this.stage.querySelectorAll('.forge-item').forEach((n) => n.remove());
       this.el.classList.add('open');
+    }
+
+    /*
+     * Forge en série : outcome = { results: [{ item, upgraded }], upgraded, price, from }.
+     * Un coup de marteau (sauf si l'animation est passée), puis tous les objets forgés.
+     */
+    playBatch(outcome, playerCls, onClose, instant = false) {
+      this.reset(onClose);
+      this.msg.textContent = `${outcome.results.length} fusions…`;
+      const show = () => {
+        const best = outcome.results.reduce((b, r) => (Rules.RARITIES.indexOf(r.item.rarity) > Rules.RARITIES.indexOf(b) ? r.item.rarity : b), outcome.from);
+        const color = GLOW[best];
+        this.flash(color);
+        this.anvil.style.setProperty('--fg', '40px');
+        this.heat.setAttribute('opacity', 1);
+        Sound.play('forgeResult', outcome.upgraded > 0, best);
+        const p = this.anvilTop();
+        this.particles.spawn(p.x, p.y, color, outcome.upgraded ? 200 : 90, outcome.upgraded ? 2 : 1.4);
+        const n = outcome.results.length;
+        this.msg.innerHTML = outcome.upgraded
+          ? `✨ ${outcome.upgraded} amélioration${outcome.upgraded > 1 ? 's' : ''} sur ${n} fusions !`
+          : `${n} objets <span class="c-${outcome.from}">${Rules.RARITY_INFO[outcome.from].label}</span> forgés`;
+        // Les améliorations d'abord
+        const sorted = [...outcome.results].sort((a, b) => Rules.RARITIES.indexOf(b.item.rarity) - Rules.RARITIES.indexOf(a.item.rarity));
+        this.result.classList.add('batch');
+        this.result.innerHTML = `<div class="batch-sum muted">${n} fusions · ${outcome.price} 🪙 dépensés</div>`
+          + `<div class="batch-grid">${sorted.map((r) => itemHtml(r.item, '', playerCls)).join('')}</div>`;
+        this.result.classList.add('show');
+        this.timer = setTimeout(() => this.actions.classList.add('show'), instant ? 0 : 400);
+      };
+      if (instant) { show(); return; }
+      this.hammer.classList.remove('strike');
+      void this.hammer.offsetWidth;
+      this.hammer.classList.add('strike');
+      setTimeout(() => {
+        Sound.play('anvil', 2);
+        const p = this.anvilTop();
+        this.particles.spawn(p.x, p.y, '#ffb347', 60, 1.5);
+        this.msg.textContent = 'BAAAM !';
+      }, 170);
+      this.timer = setTimeout(show, 900);
+    }
+
+    playAnimation(inputs, outcome, playerCls) {
 
       // Les 3 objets apparaissent au-dessus de l'enclume…
       const tiles = inputs.map((item, i) => {

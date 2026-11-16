@@ -137,6 +137,7 @@
         <button class="gold" id="open-chest">Ouvrir un coffre</button>
         <button class="secondary" id="buy-1">Acheter 1 coffre (100 🪙)</button>
         <button class="secondary" id="buy-10">Acheter 10 coffres (1000 🪙)</button>
+        <label class="skip-anim" title="Le contenu du coffre s'affiche tout de suite, sans cliquer sur le coffre"><input type="checkbox" data-skip-anim> ⏩ Passer l'animation</label>
       </div>
     </div>
 
@@ -184,7 +185,19 @@
           <p class="muted" id="fuse-prices"></p>
           <div class="fuse-slots" id="fuse-slots"></div>
           <div class="fuse-info" id="fuse-info"></div>
-          <div class="row"><button class="gold" id="fuse-go">🔨 Forger !</button><button class="secondary small" id="fuse-clear">Vider</button></div>
+          <div class="row"><button class="gold" id="fuse-go">🔨 Forger !</button><button class="secondary small" id="fuse-random" title="Place 3 objets au hasard de la rareté choisie (filtre ci-dessous) ou de celle déjà en place">🎲 Remplir au hasard</button><button class="secondary small" id="fuse-clear">Vider</button></div>
+          <div class="fuse-batch">
+            <div class="fuse-batch-title">⚡ Forge en série <span class="muted">— plusieurs fusions d'un coup, objets tirés au hasard (jamais les objets verrouillés ou dans un preset)</span></div>
+            <div class="row">
+              <select id="batch-rarity" aria-label="Rareté des objets à fusionner"></select>
+              <span>×</span>
+              <input type="number" id="batch-count" min="1" value="1" aria-label="Nombre de fusions">
+              <button class="secondary small" id="batch-max">Max</button>
+              <button class="gold small" id="batch-go">⚡ Forger en série</button>
+            </div>
+            <div class="muted" id="batch-info"></div>
+          </div>
+          <label class="skip-anim" title="Le résultat de la forge s'affiche tout de suite"><input type="checkbox" data-skip-anim> ⏩ Passer l'animation</label>
           <div class="inv-filters" id="fuse-filters" style="margin-top:12px"></div>
           <div class="forge-pick" id="fuse-pick"></div>
         </div>

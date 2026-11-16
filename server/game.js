@@ -468,6 +468,37 @@ function fuse(character, itemIds) {
   return { item, upgraded, chance, from: rarity, price };
 }
 
+/*
+ * Forge en série : `count` fusions d'un coup avec des objets de la rareté choisie, tirés au hasard
+ * dans le coffre personnel (jamais un objet protégé, ni un objet forgé pendant la série).
+ * Tout est vérifié avant la première fusion : assez d'objets et assez de golds pour toute la série.
+ */
+function fuseBatch(character, rarity, count) {
+  upgrade(character);
+  if (!Rules.RARITIES.includes(rarity)) throw new Error('Rareté inconnue');
+  const n = Math.floor(Number(count));
+  if (!Number.isFinite(n) || n < 1) throw new Error('Choisis au moins une fusion');
+  if (n > Rules.FUSE_BATCH_MAX) throw new Error(`${Rules.FUSE_BATCH_MAX} fusions au plus d'un coup`);
+  const locked = protectedIds(character);
+  const pool = character.inventory.filter((i) => i.rarity === rarity && !locked.has(i.id));
+  if (pool.length < Rules.FUSE_COUNT * n) {
+    throw new Error(`Il faut ${Rules.FUSE_COUNT * n} objets ${Rules.RARITY_INFO[rarity].label.toLowerCase()}s non protégés pour ${n} fusion${n > 1 ? 's' : ''} (tu en as ${pool.length})`);
+  }
+  const total = Rules.FUSE_PRICE[rarity] * n;
+  if (character.gold < total) throw new Error(`${n} fusion${n > 1 ? 's coûtent' : ' coûte'} ${total} golds`);
+  // Mélange équitable (Fisher-Yates avec le générateur cryptographique)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const results = [];
+  for (let k = 0; k < n; k++) {
+    const ids = pool.slice(k * Rules.FUSE_COUNT, (k + 1) * Rules.FUSE_COUNT).map((i) => i.id);
+    results.push(fuse(character, ids));
+  }
+  return { results, price: total, upgraded: results.filter((r) => r.upgraded).length, from: rarity };
+}
+
 function findItem(character, itemId) {
   return character.inventory.find((i) => i.id === itemId)
     || Object.values(character.equipment).find((i) => i && i.id === itemId)
@@ -1210,7 +1241,7 @@ function publicCharacter(user) {
 
 module.exports = {
   newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
-  openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, reroll, alchemy,
+  openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, fuseBatch, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
   newLifetime, addStat, snapshot, recordActivity, respecStats,
   newPets, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
