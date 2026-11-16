@@ -117,7 +117,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   massacre (5 kills dans la bataille) = +2 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
 - **Répartition des points** (onglet Personnage) : le bouton **+** place un point libre tout de suite ; le bouton **−**
-  retire un point pour le replacer ailleurs : les changements s'affichent en direct, puis on **valide** d'un coup
+  retire un point pour le replacer ailleurs : les changements s'affichent en direct (ancienne valeur barrée → nouvelle
+  valeur de la stat, en vert ou en rouge), puis on **valide** d'un coup
   (50 golds par point retiré, 500 golds au plus ; placer des points libres reste gratuit).
 - **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement et de classe) :
   - Vie : 100 PV + 10 par point

@@ -113,6 +113,22 @@ function renderStats() {
   const draft = statDraft;
   const used = draft ? Rules.STATS.reduce((sum, s) => sum + draft[s], 0) : placed;
   const free = total - used;
+  // Valeurs en direct avec la répartition en cours (même calcul que le serveur : points + panoplies + arbre, équipement, classe)
+  let after = null;
+  if (draft) {
+    const setPts = Rules.setBonus(c.equipment).points;
+    const talentPts = Rules.talentBonus(c.cls, c.talents);
+    const points = Object.fromEntries(Rules.STATS.map((st) => [st, (draft[st] || 0) + (setPts[st] || 0) + (talentPts[st] || 0)]));
+    after = Rules.derive(points, c.gear, c.cls);
+  }
+  const valueCell = (s) => {
+    const now = Rules.describeDerived(s, c.derived);
+    if (!after) return now;
+    const next = Rules.describeDerived(s, after);
+    if (next === now) return now;
+    const better = draft[s] >= c.stats[s]; // plus de points dans une stat = meilleure valeur
+    return `<span class="stat-before">${now}</span><span class="stat-after ${better ? 'up' : 'down'}">→ ${next}</span>`;
+  };
   $('skill-banner').innerHTML = free > 0
     ? `<div class="skill-banner">✨ ${free} point(s) de compétence à répartir !</div>`
     : '';
@@ -126,7 +142,7 @@ function renderStats() {
       <td class="stat-desc help">${info.desc}</td>
       <td class="stat-pts">${pts}${diff ? ` <small class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</small>` : ''}</td>
       <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}${talentMod(s)}</td>
-      <td class="stat-value">${draft && diff ? '<span class="muted">après validation</span>' : Rules.describeDerived(s, c.derived)}</td>
+      <td class="stat-value">${valueCell(s)}</td>
       <td class="stat-btns">
         <button class="minus" data-minus="${s}" title="Retirer un point (pour le replacer ailleurs)" ${pts > 0 ? '' : 'disabled'}>−</button>
         <button class="plus" data-stat="${s}" title="Ajouter un point" ${free > 0 ? '' : 'disabled'}>+</button>
