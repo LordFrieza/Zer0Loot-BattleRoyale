@@ -980,6 +980,23 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .pet-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
 @media (max-width: 900px) { .pet-cols { grid-template-columns: 1fr; } }
 .pet-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--bg2); }
+/* Colonne de gauche : l'enclos, puis le journal des trouvailles qui remplit la hauteur de la fiche */
+.pet-layout { align-items: stretch; }
+.pet-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.pet-log { flex: 1 1 0; min-height: 180px; display: flex; flex-direction: column; }
+.pet-log h3 { margin: 0 0 8px; }
+.pet-log-totals { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; margin-bottom: 8px; }
+.pet-log-total { padding: 2px 8px; border-radius: 10px; background: rgba(255, 255, 255, .06); border: 1px solid var(--border); }
+.pet-log-total.gold, .pet-log-gain.gold { color: #ffd166; }
+.pet-log-total.xp, .pet-log-gain.xp { color: #8fd3ff; }
+.pet-log-total.key, .pet-log-gain.key { color: #ffb86b; }
+.pet-log-list { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; }
+.pet-log-row { display: flex; align-items: center; gap: 8px; padding: 3px 8px 3px 2px; border-radius: 8px; background: rgba(255, 255, 255, .03); font-size: 13px; }
+.pet-log-row canvas { width: 40px; height: 36px; flex: 0 0 auto; }
+.pet-log-main { flex: 1; min-width: 0; }
+.pet-log-when { font-size: 12px; white-space: nowrap; }
+.pet-log-empty { margin: 4px 0; font-size: 13px; }
+@media (max-width: 1000px) { .pet-log { flex: none; } .pet-log-list { flex: none; max-height: 320px; } }
 .pet-box h3 { margin: 0 0 4px; }
 #pet-collection { margin-top: 14px; }
 .pet-shop { display: grid; gap: 6px; margin-top: 8px; }

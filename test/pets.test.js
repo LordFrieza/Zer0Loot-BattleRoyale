@@ -44,7 +44,7 @@ test('[PET-2] enclos : anciennes sauvegardes, familier principal, fusion d\'un f
   const old = game.newCharacter();
   delete old.pets;
   game.upgrade(old);
-  assert.deepStrictEqual(old.pets, { list: [], active: null, follow: null, food: {}, enclos: [] });
+  assert.deepStrictEqual(old.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 } });
   const c = withPet('troll');
   game.addPet(c, 'mimic');
   assert.strictEqual(c.pets.active, 'troll');
@@ -220,4 +220,45 @@ test('[PET-8] compagnon de combat : 3 jours au-dessus de 80 %, puis il suit son 
   b.start(null, null);
   b.stopLoop();
   assert.strictEqual(b.frame().fighters.find((f) => f.key === 'u1').pet, 'mimic');
+});
+
+test('[PET-10] journal de l\'enclos : une ligne par trouvaille (40 au plus), totaux, fusion d\'un fantôme', () => {
+  const H = 3600 * 1000;
+  const c = withPet('dragon', 0);
+  game.addPet(c, 'liche', 0);
+  const [dragon, liche] = c.pets.list;
+  dragon.finds = 2;
+  liche.finds = 1;
+  dragon.at = liche.at = 5 * H;
+  const r = game.collectFinds(c, 5 * H);
+  const log = c.pets.log;
+  assert.strictEqual(log.length, 3);
+  assert.ok(log.every((e) => e.at === 5 * H));
+  const gold = log.filter((e) => e.kind === 'gold');
+  assert.strictEqual(gold.length, 2);
+  assert.ok(gold.every((e) => e.pet === dragon.id && e.species === 'dragon' && e.name === dragon.name && e.gold === Rules.petFindValue('dragon', 1)));
+  const potion = log.find((e) => e.kind === 'potion');
+  assert.strictEqual(potion.potion, r.gifts.find((g) => g.kind === 'potion').potion);
+  assert.deepStrictEqual(c.pets.totals, { finds: 3, gold: 2 * Rules.petFindValue('dragon', 1), xp: 0, chests: 0, potions: 1, keys: potion.key || 0, items: 0 });
+  // Objet : nom, rareté et emplacement seulement ; la plus récente en premier ; 40 lignes au plus
+  const t = withPet('troll', 0);
+  for (let i = 1; i <= 45; i++) { t.pets.list[0].finds = 1; t.pets.list[0].at = i * H; game.collectFinds(t, i * H); }
+  assert.strictEqual(t.pets.log.length, Rules.PET.logMax);
+  assert.strictEqual(t.pets.log[0].at, 45 * H);
+  assert.deepStrictEqual(Object.keys(t.pets.log[0].item).sort(), ['name', 'rarity', 'slot']);
+  assert.strictEqual(t.pets.totals.items, 45, 'les totaux comptent tout, même au-delà du journal');
+  // Ancien personnage : journal vide ; fantôme : journaux réunis et totaux additionnés
+  const old = game.newCharacter();
+  delete old.pets.log; delete old.pets.totals;
+  game.upgrade(old);
+  assert.deepStrictEqual([old.pets.log, old.pets.totals.finds], [[], 0]);
+  const db = require('../server/db');
+  db.state.users.pg = { id: 'pg', ghost: true, twitchLogin: 'ghost_petlog', role: 'player', character: t };
+  const owner = { id: 'po', username: 'po', role: 'player', character: c };
+  db.state.users.po = owner;
+  game.linkTwitch(owner, 'ghost_petlog', 'G');
+  assert.strictEqual(owner.character.pets.log.length, Rules.PET.logMax);
+  assert.strictEqual(owner.character.pets.log[0].at, 45 * H);
+  assert.strictEqual(owner.character.pets.totals.finds, 48);
+  assert.strictEqual(owner.character.pets.totals.items, 45);
 });

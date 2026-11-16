@@ -390,6 +390,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   des niveaux (20 au plus). Objets d'enclos à acheter une fois (fleurs, lanternes, gamelle, fontaine, coffre à jouets,
   mare, niche, statue). **3 jours d'affilée au-dessus de 80 %** : il devient **compagnon de combat** et suit son héros
   dans l'arène (cosmétique). Les autres familiers se reposent (leurs besoins ne baissent pas).
+  Sous l'enclos, le **journal des trouvailles** liste les 40 dernières (quel familier, quoi, quand) avec le total de
+  tout ce que les familiers ont rapporté depuis le début (trouvailles, golds, XP, coffres, potions, clés, objets).
 - **Succès** : 74 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de

@@ -1551,6 +1551,7 @@
     followDays: 3,
     maxLevel: 20,
     nameMax: 16,
+    logMax: 40, // trouvailles gardées dans le journal de l'enclos (les plus récentes)
     duplicateXp: 150, // familier déjà obtenu : il gagne 150 XP (et un Festin royal)
     stepMs: 10 * 60 * 1000, // pas de la simulation des besoins
     actions: {

@@ -71,6 +71,7 @@
         de laisser sa version miniature à chaque héros. Il viendra vivre ici, et tu pourras t'en occuper.</p></div>`;
     }
     renderSide();
+    renderLog();
     renderPantry();
     renderEnclosShop();
     renderCollection();
@@ -84,6 +85,62 @@
       <span class="pet-need-ico">${N.icon}</span><span class="pet-need-lbl">${N.label}</span>
       <span class="pet-need-bar"><span style="width:${Math.max(0, Math.min(100, v))}%;background:${N.color}"></span></span>
       <span class="pet-need-val">${Math.round(v)}</span></div>`;
+  }
+
+  // ---------- Journal des trouvailles ----------
+  let logSig = null; // évite de reconstruire le journal (et ses dessins) quand rien n'a changé
+  function findText(e) {
+    if (e.kind === 'gold') return `<b class="pet-log-gain gold">+${e.gold.toLocaleString('fr-FR')} 🪙</b>`;
+    if (e.kind === 'xp') return `<b class="pet-log-gain xp">+${e.xp.toLocaleString('fr-FR')} XP</b>`;
+    if (e.kind === 'chest') return `<b class="pet-log-gain">+${e.chests} <i class="ico-chest"></i> coffre${e.chests > 1 ? 's' : ''}</b>`;
+    if (e.kind === 'potion') {
+      const C = Rules.CONSUMABLES[e.potion];
+      return `<b class="pet-log-gain">${C ? `${C.icon} ${C.label}` : 'Une potion'}</b>${e.key ? ' <b class="pet-log-gain key">+ 🗝️ Clé de boss !</b>' : ''}`;
+    }
+    if (e.kind === 'item' && e.item) {
+      const S = Rules.SLOT_INFO[e.item.slot];
+      return `<b class="c-${e.item.rarity}">${S ? S.icon + ' ' : ''}${esc(e.item.name)}</b> <span class="muted">${Rules.RARITY_INFO[e.item.rarity].label}</span>`;
+    }
+    return '';
+  }
+  function whenText(at) {
+    const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
+    if (s < 60) return 'à l\'instant';
+    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+    const d = new Date(at);
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  function renderLog() {
+    const pets = P();
+    const log = pets.log || [];
+    const T = pets.totals || {};
+    const sig = `${log.length}:${log[0] ? log[0].at : 0}:${T.finds}:${Math.floor(Date.now() / 60000)}`;
+    if (sig === logSig) return;
+    logSig = sig;
+    const chip = (v, label, cls = '') => (v ? `<span class="pet-log-total ${cls}">${label}</span>` : '');
+    const totals = T.finds
+      ? `<div class="pet-log-totals"><span class="muted">Depuis le début :</span>
+        ${chip(T.finds, `🎁 <b>${T.finds}</b> trouvaille${T.finds > 1 ? 's' : ''}`)}
+        ${chip(T.gold, `<b>${(T.gold || 0).toLocaleString('fr-FR')}</b> 🪙`, 'gold')}
+        ${chip(T.xp, `<b>${(T.xp || 0).toLocaleString('fr-FR')}</b> XP`, 'xp')}
+        ${chip(T.chests, `<b>${T.chests}</b> <i class="ico-chest"></i>`)}
+        ${chip(T.potions, `🧪 <b>${T.potions}</b> potion${T.potions > 1 ? 's' : ''}`)}
+        ${chip(T.keys, `🗝️ <b>${T.keys}</b> clé${T.keys > 1 ? 's' : ''}`, 'key')}
+        ${chip(T.items, `⚔️ <b>${T.items}</b> objet${T.items > 1 ? 's' : ''}`)}</div>`
+      : '';
+    $('pet-log').innerHTML = `<h3>📜 Ce que tes familiers ont rapporté</h3>${totals}
+      <div class="pet-log-list">${log.length ? log.map((e) => `<div class="pet-log-row">
+          <canvas width="40" height="36" data-plog="${e.species || ''}"></canvas>
+          <div class="pet-log-main"><div><b style="color:${(Rules.PETS[e.species] || {}).color || 'inherit'}">${esc(e.name)}</b> a rapporté ${findText(e)}</div></div>
+          <span class="pet-log-when muted" title="${new Date(e.at).toLocaleString('fr-FR')}">${whenText(e.at)}</span>
+        </div>`).join('')
+    : `<p class="muted pet-log-empty">Rien pour l'instant. Quand tu récupères les trouvailles de tes familiers (bouton 🎁), elles s'affichent ici.</p>`}</div>`;
+    $('pet-log').querySelectorAll('canvas[data-plog]').forEach((cv) => {
+      if (!cv.dataset.plog || !Rules.PETS[cv.dataset.plog]) return;
+      const ctx = cv.getContext('2d');
+      drawPet(ctx, 20, 31, cv.dataset.plog, { t: 900, size: 0.42 });
+    });
   }
 
   function renderSide() {

@@ -60,6 +60,10 @@ function upgrade(character) {
   if (!Array.isArray(character.pets.enclos)) character.pets.enclos = [];
   if (character.pets.active === undefined) character.pets.active = null;
   if (character.pets.follow === undefined) character.pets.follow = null;
+  // 1.9 : journal des trouvailles des familiers (vide pour les anciens personnages)
+  if (!Array.isArray(character.pets.log)) character.pets.log = [];
+  if (!character.pets.totals) character.pets.totals = newPetTotals();
+  for (const [k, v] of Object.entries(newPetTotals())) if (!Number.isFinite(character.pets.totals[k])) character.pets.totals[k] = v;
   // 1.6 : historique des parties et statistiques détaillées (elles démarrent à zéro pour les anciens personnages)
   if (!Array.isArray(character.history)) character.history = [];
   if (!character.lifetime) character.lifetime = newLifetime();
@@ -895,7 +899,12 @@ function spendEnergy(character, now = Date.now()) {
 // ---------- Familiers (onglet Familier) ----------
 
 function newPets() {
-  return { list: [], active: null, follow: null, food: {}, enclos: [] };
+  return { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: newPetTotals() };
+}
+
+// Total de tout ce que les familiers ont rapporté (le journal, lui, ne garde que les dernières trouvailles).
+function newPetTotals() {
+  return { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 };
 }
 
 function findPet(character, id) {
@@ -1084,7 +1093,26 @@ function collectFinds(character, now = Date.now()) {
   }
   if (!gifts.length) throw new Error('Aucune trouvaille à récupérer pour l\'instant');
   bump(character, 'petFinds', gifts.length);
+  logFinds(character, gifts, now);
   return { gifts };
+}
+
+// Journal de l'enclos : une ligne par trouvaille (la plus récente en premier) et les totaux.
+function logFinds(character, gifts, now) {
+  const P = character.pets;
+  const T = P.totals;
+  for (const g of gifts) {
+    const pet = P.list.find((p) => p.id === g.pet);
+    const entry = { at: now, pet: g.pet, name: pet ? pet.name : '?', species: pet ? pet.species : null, kind: g.kind };
+    T.finds += 1;
+    if (g.kind === 'gold') { entry.gold = g.gold; T.gold += g.gold; }
+    if (g.kind === 'xp') { entry.xp = g.xp; T.xp += g.xp; }
+    if (g.kind === 'chest') { entry.chests = g.chests; T.chests += g.chests; }
+    if (g.kind === 'potion') { entry.potion = g.potion; T.potions += 1; if (g.key) { entry.key = g.key; T.keys += g.key; } }
+    if (g.kind === 'item') { entry.item = { name: g.item.name, rarity: g.item.rarity, slot: g.item.slot }; T.items += 1; }
+    P.log.unshift(entry);
+  }
+  P.log.length = Math.min(P.log.length, Rules.PET.logMax);
 }
 
 function renamePet(character, id, name) {
@@ -1116,6 +1144,8 @@ function mergePets(c, g) {
   }
   for (const [id, n] of Object.entries(g.pets.food || {})) c.pets.food[id] = Math.min(Rules.PET_FOOD_MAX, (c.pets.food[id] || 0) + n);
   for (const id of g.pets.enclos || []) if (!c.pets.enclos.includes(id)) c.pets.enclos.push(id);
+  c.pets.log = c.pets.log.concat(g.pets.log || []).sort((a, b) => b.at - a.at).slice(0, Rules.PET.logMax);
+  for (const k of Object.keys(c.pets.totals)) c.pets.totals[k] += (g.pets.totals && g.pets.totals[k]) || 0;
   if (!c.pets.active && c.pets.list.length) c.pets.active = c.pets.list[0].id;
 }
 
