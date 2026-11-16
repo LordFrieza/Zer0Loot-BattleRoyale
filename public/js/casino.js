@@ -53,7 +53,7 @@
   // Répliques au hasard au-dessus des promeneurs ; devant une table, ils parlent plutôt de ce jeu.
   const CHATTER = {
     any: [
-      'Allez, une dernière…', 'Allez… faut que j\'aille payer le crédit…', 'Encore une défaite et Don Paolo va m\'allumer',
+      'Allez, une dernière…', 'Allez… faut que j\'aille payer le crédit…', 'Encore une défaite et Don Paolo va m\'allumer…',
       'C\'était la partie de trop.', 'Je sens que c\'est mon jour !', 'Qui m\'a piqué mon jeton ?!', 'Ma femme croit que je suis au donjon…',
       'J\'ai misé le loot de la guilde…', 'Un petit légendaire et j\'arrête.', 'J\'ai vendu mon épée pour jouer…',
       'Plus que 3 golds… tout ou rien !', 'Promis, après je farm.', 'J\'ai une martingale infaillible.', 'Quelqu\'un me prête 100 golds ?',
