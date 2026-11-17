@@ -13,6 +13,8 @@ const twitch = require('./twitch');
 const { Battle } = require('./battle');
 const market = require('./market');
 const casino = require('./casino');
+const survivor = require('./survivor');
+const housing = require('./housing');
 const { Bets } = require('./bets');
 const Rules = require('../shared/rules');
 
@@ -119,6 +121,11 @@ function refundSoloRuns() {
   return n;
 }
 refundSoloRuns();
+// Survivor : une partie interrompue par un redémarrage rend ses golds.
+{
+  const n = survivor.refundActive();
+  if (n) console.log(`[survivor] ${n} partie(s) interrompue(s) : golds rendus`);
+}
 
 function queueView() {
   return { ...battle.publicQueue(), bets: bets.summary() };
@@ -290,6 +297,73 @@ app.post('/api/casino/blackjack/double', requirePlayer, casinoAction((req) => ca
 app.post('/api/casino/glace/start', requirePlayer, casinoAction((req) => casino.glaceStart(req.user, req.body.bet, req.body.mines)));
 app.post('/api/casino/glace/pick', requirePlayer, casinoAction((req) => casino.glacePick(req.user, req.body.index)));
 app.post('/api/casino/glace/cash', requirePlayer, casinoAction((req) => casino.glaceCash(req.user)));
+
+// ---------- Survivor ----------
+// La partie tourne côté serveur (survivor.tickAll, branché dans start()) ; la position arrive par socket (`sv:pos`).
+app.get('/api/survivor', requirePlayer, (req, res) => {
+  res.json({ ...survivor.stateOf(req.user), board: survivor.leaderboard(req.user.id) });
+});
+app.post('/api/survivor/start', requirePlayer, action((req) => {
+  const run = survivor.start(req.user, req.body.starter);
+  return { frame: run.frame() };
+}));
+app.post('/api/survivor/choose', requirePlayer, (req, res) => {
+  try {
+    const r = survivor.current(req.user.id);
+    const o = r.run.choose(req.body.index, req.body.id);
+    r.seen = Date.now();
+    res.json({ ok: true, chosen: o, frame: r.run.frame() });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/survivor/reroll', requirePlayer, (req, res) => {
+  try {
+    const r = survivor.current(req.user.id);
+    r.run.reroll();
+    res.json({ ok: true, frame: r.run.frame() });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/survivor/pause', requirePlayer, (req, res) => {
+  try {
+    survivor.setPause(req.user.id, !!req.body.on);
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/survivor/abandon', requirePlayer, action((req) => ({ result: survivor.abandon(req.user.id) })));
+app.post('/api/survivor/meta', requirePlayer, action((req) => survivor.buyMeta(req.user.character, String(req.body.id || ''))));
+app.post('/api/survivor/unlock', requirePlayer, action((req) => survivor.buyUnlock(req.user.character, String(req.body.kind || ''), String(req.body.id || ''))));
+app.post('/api/survivor/starter', requirePlayer, action((req) => survivor.setStarter(req.user.character, String(req.body.id || ''))));
+// ---------- Maison ----------
+app.get('/api/house', requirePlayer, (req, res) => {
+  const H = req.user.character.house;
+  res.json({ house: housing.publicHouse(req.user, req.user, appOf, lookOf), owned: H.owned, opts: H.opts, mailDue: Rules.houseMailDue(H.mailAt), mailAt: H.mailAt, emeralds: req.user.character.emeralds });
+});
+app.get('/api/houses', requirePlayer, (req, res) => res.json({ houses: housing.listHouses(req.query.q) }));
+app.get('/api/house/:id', requirePlayer, (req, res) => {
+  const owner = db.state.users[req.params.id];
+  if (!owner || !owner.character || owner.banned || owner.role !== 'player') return res.status(404).json({ error: 'Maison introuvable' });
+  housing.visit(owner, req.user);
+  db.save();
+  res.json({ house: housing.publicHouse(owner, req.user, appOf, lookOf) });
+});
+app.post('/api/house/buy', requirePlayer, action((req) => housing.buyFurniture(req.user.character, String(req.body.id || ''), req.body.count)));
+app.post('/api/house/layout', requirePlayer, action((req) => housing.saveLayout(req.user.character, req.body.placed)));
+app.post('/api/house/style', requirePlayer, action((req) => housing.setStyle(req.user.character, String(req.body.part || ''), String(req.body.id || ''))));
+app.post('/api/house/upgrade', requirePlayer, action((req) => housing.upgradeSize(req.user.character)));
+app.post('/api/house/mail', requirePlayer, action((req) => housing.collectMail(req.user.character)));
+app.post('/api/house/:id/like', requirePlayer, action((req) => housing.toggleLike(req.user, req.params.id)));
+
+// Images et fin de partie, envoyées à la room du joueur.
+function survivorTick() {
+  survivor.tickAll(
+    (userId, frame) => io.to('user:' + userId).emit('svFrame', frame),
+    (userId, result) => {
+      const user = db.state.users[userId];
+      io.to('user:' + userId).emit('svEnd', result);
+      if (user) pushMe(user);
+      io.emit('svBoard');
+    },
+  );
+}
 
 app.post('/api/forge/reroll', requirePlayer, action((req) => game.reroll(req.user.character, req.body.itemId, req.body.line)));
 app.post('/api/forge/alchemy', requirePlayer, action((req) => game.alchemy(req.user.character, req.body.itemId, req.body.line, req.body.sacrificeId)));
@@ -1467,6 +1541,8 @@ app.get('/api/solo/state', requirePlayer, (req, res) => {
 io.on('connection', (socket) => {
   const user = userFromCookie(socket.request.headers.cookie);
   if (user) socket.join('user:' + user.id);
+  // Survivor : position du joueur (ZQSD), jusqu'à 30 fois par seconde
+  if (user) socket.on('sv:pos', (msg) => survivor.input(user.id, msg));
   socket.emit('queue', queueView());
   socket.emit('frame', battle.frame());
 });
@@ -1480,6 +1556,8 @@ function start(port = PORT) {
   setInterval(() => io.emit('twitch', twitch.status()), 5000);
   // Marché : les ventes expirées rendent leurs objets (et préviennent les vendeurs), même si personne n'ouvre le marché.
   setInterval(() => { if (sweepMarket()) io.emit('market'); }, 5 * 60 * 1000);
+  // Survivor : 20 pas de simulation par seconde pour toutes les parties en cours.
+  setInterval(survivorTick, 50);
 
   // Nettoyage des sessions expirées.
   setInterval(() => {
@@ -1498,4 +1576,5 @@ function start(port = PORT) {
 
 if (require.main === module) start();
 
-module.exports = { app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };
+module.exports = {
+  survivorTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };

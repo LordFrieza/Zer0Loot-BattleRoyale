@@ -60,6 +60,15 @@ function upgrade(character) {
   if (!Array.isArray(character.pets.enclos)) character.pets.enclos = [];
   if (character.pets.active === undefined) character.pets.active = null;
   if (character.pets.follow === undefined) character.pets.follow = null;
+  // 2.0 : émeraudes, Survivor et Maison (tout neufs pour les anciens personnages)
+  if (!Number.isFinite(character.emeralds)) character.emeralds = 0;
+  if (!character.survivor) character.survivor = newSurvivor();
+  for (const [k, v] of Object.entries(newSurvivor())) if (character.survivor[k] === undefined) character.survivor[k] = v;
+  if (character.survivorActive === undefined) character.survivorActive = null;
+  if (!character.house) character.house = newHouse();
+  const freshHouse = newHouse();
+  for (const [k, v] of Object.entries(freshHouse)) if (character.house[k] === undefined) character.house[k] = v;
+  for (const [part, id] of Object.entries(freshHouse.style)) if (!character.house.style[part]) character.house.style[part] = id;
   // 1.9 : journal des trouvailles des familiers (vide pour les anciens personnages)
   if (!Array.isArray(character.pets.log)) character.pets.log = [];
   if (!character.pets.totals) character.pets.totals = newPetTotals();
@@ -119,6 +128,10 @@ function newCharacter() {
     soloActive: null, // partie solo en cours : { kind, startedAt } (remboursée si le serveur redémarre)
     bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
     pets: newPets(), // familiers (onglet Familier)
+    emeralds: 0, // émeraudes (Survivor → méta-progression et Maison)
+    survivor: newSurvivor(), // Survivor : méta-progression, déblocages, record, récompense du jour
+    survivorActive: null, // partie de Survivor en cours (golds rendus si le serveur redémarre)
+    house: newHouse(), // Maison : meubles, disposition, façade, boîte aux lettres
     history: [], // historique des parties (stream et solo), la plus récente en premier
     lifetime: newLifetime(), // statistiques cumulées (onglet Statistiques)
     lifetimeSince: Date.now(), // date de début des statistiques détaillées
@@ -898,6 +911,16 @@ function spendEnergy(character, now = Date.now()) {
 
 // ---------- Familiers (onglet Familier) ----------
 
+function newSurvivor() {
+  return { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0 };
+}
+
+function newHouse(now = Date.now()) {
+  const style = {};
+  for (const [part, P] of Object.entries(Rules.HOUSE_PARTS)) style[part] = Object.keys(P.options)[0];
+  return { size: 'studio', owned: {}, placed: [], style, opts: [], mailAt: now, likes: [], visits: 0 };
+}
+
 function newPets() {
   return { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: newPetTotals() };
 }
@@ -1221,6 +1244,10 @@ function absorbGhost(user, ghost) {
   for (const [id, n] of Object.entries(g.consumables || {})) c.consumables[id] = (c.consumables[id] || 0) + n;
   if (g.consumableSlot) c.consumables[g.consumableSlot] = (c.consumables[g.consumableSlot] || 0) + 1;
   mergePets(c, g);
+  // Émeraudes, Survivor et Maison du fantôme (il ne peut pas y jouer sans compte, mais au cas où)
+  c.emeralds += g.emeralds || 0;
+  if (g.survivor && g.survivor.best && (!c.survivor.best || g.survivor.best.score > c.survivor.best.score)) c.survivor.best = g.survivor.best;
+  for (const [id, n] of Object.entries((g.house && g.house.owned) || {})) c.house.owned[id] = (c.house.owned[id] || 0) + n;
   // Historique et statistiques du fantôme : réunis (records au maximum)
   c.history = c.history.concat(g.history || []).sort((x, y) => y.at - x.at).slice(0, Rules.HISTORY.max);
   for (const k of Rules.PLAYER_STAT_KEYS) c.lifetime[k] = Rules.PLAYER_STAT_MAX.includes(k) ? Math.max(c.lifetime[k], g.lifetime[k] || 0) : c.lifetime[k] + (g.lifetime[k] || 0);
@@ -1274,7 +1301,7 @@ module.exports = {
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, fuseBatch, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
   newLifetime, addStat, snapshot, recordActivity, respecStats,
-  newPets, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
+  newPets, newSurvivor, newHouse, petsTick, addPet, rollPetDrop, setActivePet, petAction, feedPet, buyPetFood, buyEnclos, collectFinds, renamePet, setPetFollow, petGainXp,
   getOrCreateTwitchUser, linkTwitch, publicCharacter,
   protectedIds, toggleLock, markSeen, savePreset, applyPreset, deletePreset,
   buyConsumable, equipConsumable, useConsumable,

@@ -64,9 +64,13 @@
       <button data-tab="boutique">🛍️ Boutique</button>
       <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
       <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
-      <button data-tab="familier">🐾 Familier <span class="tab-badge" data-badge="familier"></span></button>
-      <button data-tab="casino">🎰 Casino</button>
-      <button data-tab="entrainement">🏋️ Entraînement</button>
+      <span class="act-group" title="Activités">
+        <button data-tab="familier" class="act-tab" title="Familier"><span class="act-ico">🐾</span><span class="act-label">Familier</span><span class="tab-badge" data-badge="familier"></span></button>
+        <button data-tab="casino" class="act-tab" title="Casino"><span class="act-ico">🎰</span><span class="act-label">Casino</span></button>
+        <button data-tab="survivor" class="act-tab" title="Survivor"><span class="act-ico">🧟</span><span class="act-label">Survivor</span></button>
+        <button data-tab="maison" class="act-tab" title="Maison"><span class="act-ico">🏠</span><span class="act-label">Maison</span></button>
+        <button data-tab="entrainement" class="act-tab" title="Entraînement"><span class="act-ico">🏋️</span><span class="act-label">Entraînement</span></button>
+      </span>
     </nav>
 
     <section class="tab" data-tab="perso">
@@ -471,6 +475,48 @@
     </div>
     </section>
 
+    <section class="tab" data-tab="survivor">
+    <div class="panel sv-panel">
+      <h2>🧟 Survivor <span class="sub">Survis aux vagues de monstres sur la grande carte</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Déplace-toi avec <b>ZQSD</b> (ou les flèches) : tes armes attaquent toutes seules. Ramasse les gemmes d'expérience
+        pour monter de niveau et choisir une nouvelle arme, un objet ou une amélioration (la partie se met en pause pendant le choix).
+        Une vague dure 30 s et un boss arrive toutes les 5 vagues. Ici, <b>tes stats habituelles ne comptent pas</b> : tout le monde
+        part avec la même base, que seule la méta-progression (en émeraudes) améliore. Une partie coûte <b>300 golds</b> ; tu gagnes
+        des <b>émeraudes</b> selon la vague atteinte, et une fois par jour, atteindre la <b>vague 30</b> rapporte 3 coffres et 1 Clé de boss.</p>
+      <div id="sv-lobby"></div>
+      <div class="sv-game" id="sv-game" style="display:none">
+        <canvas id="sv-canvas" width="1280" height="720"></canvas>
+        <div class="sv-overlay" id="sv-choice"></div>
+        <div class="sv-overlay" id="sv-pause"></div>
+        <div class="sv-overlay" id="sv-over"></div>
+        <div class="sv-toast" id="sv-toast"></div>
+        <div class="sv-buttons"><button class="secondary small" id="sv-full" title="Plein écran">⛶</button><button class="secondary small" id="sv-pause-btn" title="Pause (Échap)">⏸</button></div>
+      </div>
+    </div>
+    <div class="panel" id="sv-meta"></div>
+    <div class="panel" id="sv-board"></div>
+    </section>
+
+    <section class="tab" data-tab="maison">
+    <div class="panel house-panel">
+      <h2>🏠 Maison <span class="sub">Décore ta maison et visite celles des autres</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Achète des meubles avec tes <b>émeraudes</b> (gagnées au Survivor) et place-les où tu veux dans ta pièce (bouton
+        <b>✏️ Décorer</b>, puis glisse-les sur le sol ou au mur). Peins les murs, change le toit, les fenêtres, la porte ou le jardin,
+        et agrandis ta maison. Chaque meuble posé et chaque option donnent des <b>points de déco</b> : plus ton niveau de décoration
+        est haut, plus ta <b>boîte aux lettres</b> se remplit de golds, de coffres et de petites surprises (un courrier toutes les 6 h).
+        Tu peux aussi visiter les maisons des autres joueurs et leur laisser un ❤️.</p>
+      <div id="house-head"></div>
+      <div class="house-main">
+        <div class="house-views">
+          <div class="house-ext"><canvas id="house-ext" width="560" height="300"></canvas></div>
+          <div class="house-int"><canvas id="house-int" width="900" height="600"></canvas></div>
+        </div>
+        <div class="house-side" id="house-side"></div>
+      </div>
+    </div>
+    <div class="panel" id="house-visit"></div>
+    </section>
+
     <section class="tab" data-tab="historique">
     <div class="panel">
       <h2>📜 Historique <span class="sub">Tes dernières parties, sur le stream et en solo</span></h2>
@@ -674,6 +720,9 @@
   <script src="/js/history.js"></script>
   <script src="/js/casino.js"></script>
   <script src="/js/casino-games.js"></script>
+  <script src="/js/survivor.js"></script>
+  <script src="/js/housing-draw.js"></script>
+  <script src="/js/housing.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

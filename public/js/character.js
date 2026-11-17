@@ -32,6 +32,8 @@ function render() {
   window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
   // Casino : ouvert au chargement de la page (onglet mémorisé) dès que le personnage est connu
   if (document.querySelector('.tab.active[data-tab="casino"]')) { if (!Casino.active) Casino.enter(); else Casino.renderStats(); }
+  if (document.querySelector('.tab.active[data-tab="survivor"]')) { if (!Survivor.active) Survivor.enter(); else Survivor.refreshLobby(); }
+  if (document.querySelector('.tab.active[data-tab="maison"]')) { if (!Housing.active) Housing.enter(); else Housing.refresh(); }
   const ci = c.cls && Rules.CLASS_INFO[c.cls];
   $('class-badge').innerHTML = c.spec
     ? `<span style="color:${c.spec.color}">${c.spec.icon} ${esc(c.spec.spec)}</span> <span class="muted" style="font-size:12px">(${ci.label})</span>`
@@ -1713,7 +1715,7 @@ $('fuse-go').onclick = async () => {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'survivor', 'maison', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1725,6 +1727,8 @@ function showTab(name) {
   if (name === 'marche' && me) loadMarket();
   if (name === 'familier' && me) renderPets();
   if (name === 'casino') Casino.enter(); else Casino.leave();
+  if (name === 'survivor') Survivor.enter(); else Survivor.leave();
+  if (name === 'maison') Housing.enter(); else Housing.leave();
 }
 
 document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => {
@@ -2462,6 +2466,9 @@ socket.on('bet', (r) => {
 
 socket.on('pet', (e) => { if (window.onPetEvent) onPetEvent(e); });
 socket.on('casino', (d) => Casino.onFeed(d.feed));
+socket.on('svFrame', (f) => Survivor.onFrame(f));
+socket.on('svEnd', (r) => Survivor.onEnd(r));
+socket.on('svBoard', () => Survivor.onBoard());
 socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
   const gains = [`+${r.reward.xp} XP`];

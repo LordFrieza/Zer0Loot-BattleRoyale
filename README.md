@@ -188,8 +188,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
   avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
   jusqu'au survol, forge et alchimie), Arbre de
-  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, Familier, Casino, Entraînement (une seule
-  ligne d'onglets, qui défile horizontalement sur petit écran). Les onglets d'infos — Historique, Statistiques, Succès
+  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, puis les activités en icônes (Familier,
+  Casino, Survivor, Maison, Entraînement ; l'onglet ouvert montre son nom) — une seule ligne d'onglets, qui défile
+  horizontalement sur petit écran. Les onglets d'infos — Historique, Statistiques, Succès
   (avec sa pastille), Classements, Règles — sont dans le bandeau du haut, avec leur nom sur grand écran et en icônes
   sinon ; le lien vers l'arène et la déconnexion passent aussi en icônes pour garder le bandeau sur une ligne.
 - **Historique** (onglet Historique) : les 50 dernières parties (stream et solo, pas l'entraînement) avec le résultat,
@@ -396,6 +397,31 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
   Les gros gains (10× la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde ; statistiques de
   casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
+- **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (4 800 × 4 800 px,
+  9 lieux-dits : village, forêt sombre, lac gelé, cimetière, champs de blé, volcan, ruines, marais, prairie fleurie, avec
+  leurs ennemis favoris). On se déplace avec **ZQSD** / les flèches (ou au doigt) ; les armes attaquent seules. Tout est
+  simulé par le serveur (la position envoyée est bornée à la vitesse permise). **Les stats habituelles ne comptent pas** :
+  base commune (120 PV, vitesse 150…), améliorée seulement par la méta-progression du Survivor.
+  - Vagues de 30 s (monstres du donjon, de plus en plus nombreux et costauds), un ennemi d'élite toutes les 50 s (coffre
+    d'une amélioration), un **boss toutes les 5 vagues** (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
+    cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
+  - Gemmes d'XP → montée de niveau (partie en pause) : choisir entre 3 (ou 4) améliorations. **8 armes** (Épée, Dagues,
+    Baguette magique, Aura de feu, Hache, Foudre, Orbes gardiens, Fiole d'acide ; 8 niveaux chacune, 6 au plus) et
+    **11 objets** cumulables (Cœur, Armure, Bottes, Gantelet, Grimoire, Cristal, Aimant, Trèfle, Couronne, Pomme dorée,
+    Duplicateur ; 6 au plus).
+  - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres), une fois par
+    jour **3 coffres + 1 Clé de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
+    (classement des meilleurs scores).
+  - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,
+    Carapace, Hâte, Célérité, Envergure, Attraction, Croissance, Récupération, Fortune, Avidité, Relance, Seconde vie),
+    déblocage des armes et objets dans les tirages, armes de départ (l'Épée est la seule au début).
+- **Maison** (onglet Maison) : sa propre maison, achetée et décorée en émeraudes. **47 meubles** (assises, tables, lits,
+  rangements, lumières, plantes, tapis, décoration murale, loisirs, prestige ; de 250 à 75 000 émeraudes) à placer soi-même
+  dans la pièce (glisser-déposer, clic droit pour retourner, double-clic pour ranger), façade (murs, toit, fenêtres, porte,
+  jardin) et intérieur (papier peint, sol) à personnaliser, agrandissement (studio 9 × 6 → maison 13 × 8 à 12 000 →
+  manoir 17 × 10 à 90 000). Son personnage s'y promène. Les meubles et options donnent des **points de déco** → niveau de
+  décoration (20 au plus) → la **boîte aux lettres** reçoit un courrier toutes les 6 h (golds, émeraudes dès le niveau 5,
+  parfois un coffre, une Clé de boss ou une potion). On peut **visiter** les maisons des autres et leur laisser un ❤️.
 - **Familiers** (onglet Familier) : un boss vaincu (Combat de Boss, Boss Rush, Défi des boss) a **5 % de chance** de
   laisser sa version miniature à chaque héros (une espèce par boss ; un doublon donne 150 XP au familier et un festin).
   Dans un **enclos animé** (ciel selon l'heure, objets achetés, familier qui se promène et réagit), le familier
@@ -408,7 +434,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   dans l'arène (cosmétique). Les autres familiers se reposent (leurs besoins ne baissent pas).
   Sous l'enclos, le **journal des trouvailles** liste les 40 dernières (quel familier, quoi, quand) avec le total de
   tout ce que les familiers ont rapporté depuis le début (trouvailles, golds, XP, coffres, potions, clés, objets).
-- **Succès** : 77 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, casino, chaque boss,
+- **Succès** : 82 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, casino, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.

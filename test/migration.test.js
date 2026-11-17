@@ -55,6 +55,12 @@ test('[DB-8] migration V1 → V2 : toute la progression est conservée, les nouv
     assert.strictEqual(c.bossKeys, Rules.SOLO.startKeys, 'une Clé de boss offerte');
     assert.deepStrictEqual(c.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 } }, 'enclos vide');
     assert.deepStrictEqual(c.history, [], 'historique vide');
+    // 2.0 : émeraudes, Survivor et Maison tout neufs
+    assert.strictEqual(c.emeralds, 0);
+    assert.deepStrictEqual(c.survivor, { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0 });
+    assert.strictEqual(c.survivorActive, null);
+    assert.deepStrictEqual([c.house.size, c.house.placed, c.house.owned, c.house.likes], ['studio', [], {}, []]);
+    assert.deepStrictEqual(c.house.style, { murs: 'blanc', toit: 'tuiles', fenetres: 'simples', porte: 'bois', jardin: 'aucun', papier: 'beige', sol: 'parquet' });
     assert.strictEqual(c.lifetime.damageDealt, 0, 'statistiques détaillées à zéro');
     for (const k of ['alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest']) assert.strictEqual(c.counters[k], 0);
     for (const k of ['chest', 'pants', 'gloves', 'belt', 'weapon', 'offhand', 'body', 'drawing']) assert.strictEqual(c.look[k], null);

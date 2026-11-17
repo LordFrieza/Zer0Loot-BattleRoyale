@@ -1150,3 +1150,66 @@ test('[CAS-1, CAS-4, CAS-6, CAS-8] casino via l\'API : salle, parties en cours s
   assert.ok(me.lifetime.casinoBets >= 3);
   assert.strictEqual(me.counters.casinoPlays, me.lifetime.casinoBets);
 });
+
+test('[SV-1, SV-6, SV-8, HOUSE-1, HOUSE-2, HOUSE-6] survivor et maison via l\'API', async () => {
+  const survivor = require('../server/survivor');
+  const s = client();
+  const id = (await register(s, 'pl_surv')).id;
+  await s.post('/api/class', { cls: 'guerrier' });
+  assert.strictEqual((await client().get('/api/survivor')).status, 401);
+  let st = (await s.get('/api/survivor')).data;
+  assert.deepStrictEqual([st.emeralds, st.starter, st.playing, st.dailyDone, st.best], [0, 'epee', false, false, null]);
+  assert.deepStrictEqual(st.starters, ['epee']);
+  assert.ok(st.board && Array.isArray(st.board.top));
+  assert.match((await s.post('/api/survivor/start', {})).data.error, /300 golds/);
+  const gave = await give(id, { gold: 1000 });
+  assert.strictEqual(gave.status, 200, JSON.stringify(gave.data));
+  const start = await s.post('/api/survivor/start', {});
+  assert.strictEqual(start.status, 200, JSON.stringify(start.data));
+  assert.ok(start.data.frame && start.data.frame.hp === 120 && Array.isArray(start.data.frame.e));
+  st = (await s.get('/api/survivor')).data;
+  assert.strictEqual(st.playing, true);
+  // Une montée de niveau : choix (un numéro périmé est refusé)
+  const run = survivor.runs.get(id).run;
+  run.gems.push({ x: run.p.x, y: run.p.y, v: 10, pull: true });
+  run.tick(0.05);
+  assert.ok(run.pending);
+  assert.match((await s.post('/api/survivor/choose', { index: 0, id: run.pending.id + 5 })).data.error, /déjà été fait/);
+  const ch = await s.post('/api/survivor/choose', { index: 0, id: run.pending.id });
+  assert.strictEqual(ch.status, 200);
+  assert.ok(ch.data.chosen && ch.data.frame);
+  // Abandon : émeraudes et record
+  Object.assign(run, { t: 300, wave: 11, kills: 400, bosses: 2 });
+  const ab = await s.post('/api/survivor/abandon', {});
+  assert.strictEqual(ab.status, 200);
+  assert.ok(ab.data.result.emeralds > 0 && ab.data.result.record);
+  st = (await s.get('/api/survivor')).data;
+  assert.deepStrictEqual([st.playing, st.best.wave], [false, 11]);
+  assert.ok(st.board.top.some((r) => r.id === id));
+  assert.ok(st.emeralds === ab.data.result.emeralds);
+  // Méta-progression
+  db.state.users[id].character.emeralds = 200;
+  assert.strictEqual((await s.post('/api/survivor/meta', { id: 'vitalite' })).status, 200);
+  assert.match((await s.post('/api/survivor/unlock', { kind: 'weapon', id: 'orbes' })).data.error, /émeraudes/);
+  // Maison
+  db.state.users[id].character.emeralds = 50000;
+  let h = (await s.get('/api/house')).data;
+  assert.deepStrictEqual([h.house.size, h.house.placed, h.house.mine, h.mailDue], ['studio', [], true, 0]);
+  assert.strictEqual((await s.post('/api/house/buy', { id: 'canape' })).status, 200);
+  assert.match((await s.post('/api/house/layout', { placed: [{ id: 'canape', x: 8, y: 0 }] })).data.error, /dépasse/);
+  const lay = await s.post('/api/house/layout', { placed: [{ id: 'canape', x: 1, y: 1 }] });
+  assert.strictEqual(lay.status, 200);
+  assert.strictEqual((await s.post('/api/house/style', { part: 'murs', id: 'rose' })).status, 200);
+  h = (await s.get('/api/house')).data;
+  assert.deepStrictEqual([h.house.placed.length, h.house.style.murs, h.house.level.points], [1, 'rose', 13 + Math.round(2500 / 350)]);
+  // Visite et « J'aime » par un autre joueur
+  const v = client();
+  await register(v, 'pl_visit');
+  const list = (await v.get('/api/houses')).data.houses;
+  assert.ok(list.some((x) => x.id === id));
+  const seen = (await v.get(`/api/house/${id}`)).data.house;
+  assert.deepStrictEqual([seen.name, seen.mine, seen.placed.length], ['pl_surv', false, 1]);
+  assert.strictEqual((await v.post(`/api/house/${id}/like`, {})).data.likes, 1);
+  assert.strictEqual((await v.get('/api/house/inconnu')).status, 404);
+  assert.match((await s.post('/api/house/mail', {})).data.error, /vide/);
+});

@@ -38,6 +38,7 @@
       case 'dungeon': return `🏰 Salle ${d.room || 0} atteinte`;
       case 'rush': return `💀 ${d.killed || 0} boss vaincu${d.killed > 1 ? 's' : ''} ${(d.defeated || []).map((id) => (Rules.BOSSES[id] || {}).icon || '').join('')}`;
       case 'expedition': return `🕳️ Profondeur ${d.depth || 0}${d.relics ? ` · 🔮 ${d.relics} relique${d.relics > 1 ? 's' : ''}` : ''}${d.abandoned ? ' · remonté' : ''}`;
+      case 'survivor': return `🌊 Vague ${d.wave || 1} · ${(d.score || 0).toLocaleString('fr-FR')} points${d.bosses ? ` · 👹 ${d.bosses} boss` : ''}${d.emeralds ? ` · 💎 +${d.emeralds}` : ''}`;
       case 'challenge': {
         const D = Rules.BOSS_CHALLENGE[d.difficulty];
         return boss ? `${boss.icon} ${boss.short} ${D ? `(${D.label})` : ''}${e.outcome === 'win' ? ' vaincu' : ` : il lui restait ${d.bossHp} % de vie`}` : '';
@@ -180,6 +181,15 @@
         ['Défis des boss tentés', fmt(L.challenges)],
         ['Défis réussis', fmt(C.challengeWins)],
         ['… en Héroïque ou Légendaire / en Légendaire', `${fmt(C.heroWins)} / ${fmt(C.legendWins)}`],
+      ]),
+      card('🧟 Survivor et Maison', [
+        ['Parties de Survivor', fmt(L.survivorRuns)],
+        ['Meilleure vague', fmt(C.svBestWave)],
+        ['Meilleur score', fmt((c.survivor && c.survivor.best && c.survivor.best.score) || 0)],
+        ['Monstres tués au Survivor', fmt(L.survivorKills)],
+        ['Boss vaincus au Survivor', fmt(C.svBosses)],
+        ['Émeraudes gagnées · actuelles', `${fmt(L.emeraldsEarned)} · ${fmt(c.emeralds || 0)}`],
+        ['Niveau de décoration (record)', fmt(C.decoLevel)],
       ]),
       card('💰 Économie et loot', [
         ['Golds actuels', fmt(c.gold)],

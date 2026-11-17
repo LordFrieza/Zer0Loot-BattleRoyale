@@ -422,15 +422,20 @@
     { id: 'petFinds20', metric: 'petFinds', goal: 20, name: 'Bon chien-chien', desc: 'Récupérer 20 trouvailles de ton familier', gold: 200 },
     { id: 'casino25', metric: 'casinoPlays', goal: 25, name: 'Faites vos jeux', desc: 'Jouer 25 parties au casino', gold: 100 },
     { id: 'jackpot1', metric: 'jackpots', goal: 1, name: 'JACKPOT !', desc: 'Aligner trois 7 à la machine à sous de Pyrax', gold: 1000 },
+    { id: 'sv10', metric: 'svBestWave', goal: 10, name: 'Survivant', desc: 'Atteindre la vague 10 au Survivor', gold: 200 },
+    { id: 'sv30', metric: 'svBestWave', goal: 30, name: 'Increvable', desc: 'Atteindre la vague 30 au Survivor', gold: 1500 },
+    { id: 'svBoss10', metric: 'svBosses', goal: 10, name: 'Chasseur de boss', desc: 'Vaincre 10 boss au Survivor', gold: 500 },
+    { id: 'deco5', metric: 'decoLevel', goal: 5, name: 'Petit nid douillet', desc: 'Atteindre le niveau de décoration 5', gold: 300 },
+    { id: 'deco15', metric: 'decoLevel', goal: 15, name: 'Palais des merveilles', desc: 'Atteindre le niveau de décoration 15', gold: 2000 },
     { id: 'casinoLegend1', metric: 'casinoLegend', goal: 1, name: 'Coup de chance incroyable', desc: 'Gagner un lot incroyable dans la caisse de Grignotor', gold: 500 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
     'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
     'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds',
-    'casinoPlays', 'jackpots', 'casinoLegend'];
+    'casinoPlays', 'jackpots', 'casinoLegend', 'svBestWave', 'svBosses', 'decoLevel'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
@@ -1791,17 +1796,424 @@
     return Math.floor((CASINO.glace.edge / p) * 100) / 100;
   }
 
+  // ---------- Survivor ----------
+  // Mode à part : on se déplace (ZQSD) sur une grande carte et on survit à des vagues d'ennemis. Les stats
+  // habituelles du personnage ne comptent pas : tout le monde part du même pied, seule la méta-progression
+  // (payée en émeraudes) améliore les stats de départ. Simulation côté serveur (server/survivor.js).
+  const SURVIVOR = {
+    price: 300, // golds la partie
+    map: { w: 4800, h: 4800 },
+    waveSeconds: 30,
+    bossEvery: 5,
+    dailyWave: 30, // atteindre la vague 30 : 3 coffres et 1 Clé de boss, une fois par jour (heure de Paris)
+    daily: { chests: 3, keys: 1 },
+    maxEnemies: 240,
+    spawnDist: [720, 860],
+    view: { w: 1280, h: 720 },
+    player: { radius: 14, maxHp: 120, speed: 150, magnet: 70, regen: 0, armor: 0, damage: 1, area: 1, cooldown: 1, amount: 0, luck: 0, xp: 1, crit: 0, revivals: 0, rerolls: 0, greed: 0 },
+    hitCooldown: 1, // un même ennemi ne frappe qu'une fois par seconde
+    moveSlack: 1.35, // tolérance sur la position envoyée par le navigateur (vitesse × temps × 1,35)
+    idlePause: 20, // s sans nouvelles du joueur : pause automatique
+    abandonAfter: 600, // s en pause sans joueur : la partie se termine
+    maxWeapons: 6,
+    maxPassives: 6,
+    gems: [{ v: 1, color: '#4fa8ff' }, { v: 5, color: '#3ddc5a' }, { v: 25, color: '#ff4d6d' }], // petite, moyenne, grosse
+    maxGems: 320,
+    drops: { chicken: 0.004, magnet: 0.0015 },
+    eliteEvery: 50, // s : un ennemi d'élite (coffre d'une amélioration)
+    elite: { hp: 9, damage: 1.5, scale: 1.7, xp: 25 },
+  };
+  // Lieux-dits : la carte est partagée entre les zones les plus proches de ces points (et leurs ennemis favoris).
+  const SURVIVOR_ZONES = {
+    village: { label: 'Village', x: 2400, y: 2400, ground: '#78b35e', enemies: ['gobelin', 'rat'] },
+    foret: { label: 'Forêt sombre', x: 1050, y: 1050, ground: '#2f6a39', enemies: ['araignee', 'gobelin'] },
+    lac: { label: 'Lac gelé', x: 2400, y: 650, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'] },
+    cimetiere: { label: 'Cimetière', x: 3750, y: 1050, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'] },
+    champs: { label: 'Champs de blé', x: 4100, y: 2400, ground: '#c8b356', enemies: ['rat', 'gobelin'] },
+    volcan: { label: 'Volcan', x: 3750, y: 3750, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'] },
+    ruines: { label: 'Ruines', x: 2400, y: 4150, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'] },
+    marais: { label: 'Marais', x: 1050, y: 3750, ground: '#4c5d38', enemies: ['slime', 'rat'] },
+    prairie: { label: 'Prairie fleurie', x: 650, y: 2400, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'] },
+  };
+  function survivorZone(x, y) {
+    let best = null;
+    let bd = Infinity;
+    for (const [id, z] of Object.entries(SURVIVOR_ZONES)) {
+      const d = (x - z.x) * (x - z.x) + (y - z.y) * (y - z.y);
+      if (d < bd) { bd = d; best = id; }
+    }
+    return best;
+  }
+  // Ennemis (dessins des monstres du donjon) : vie, vitesse, dégâts au contact, XP laissée, vague d'apparition.
+  const SURVIVOR_ENEMIES = {
+    rat: { hp: 7, speed: 88, damage: 4, xp: 1, radius: 10, from: 1 },
+    gobelin: { hp: 11, speed: 66, damage: 5, xp: 1, radius: 12, from: 1 },
+    chauve_souris: { hp: 6, speed: 108, damage: 3, xp: 1, radius: 10, from: 1, erratic: true },
+    slime: { hp: 30, speed: 44, damage: 7, xp: 2, radius: 15, from: 3 },
+    araignee: { hp: 13, speed: 96, damage: 5, xp: 1, radius: 12, from: 3 },
+    gobelin_violet: { hp: 24, speed: 72, damage: 7, xp: 2, radius: 13, from: 6 },
+    squelette: { hp: 26, speed: 52, damage: 6, xp: 2, radius: 13, from: 6, shoot: { every: 3.4, speed: 230, damage: 7 } },
+    dragonnet: { hp: 36, speed: 82, damage: 9, xp: 3, radius: 14, from: 9 },
+    flammeche: { hp: 11, speed: 124, damage: 6, xp: 1, radius: 10, from: 9 },
+  };
+  const SURVIVOR_ENEMY_KINDS = Object.keys(SURVIVOR_ENEMIES);
+  // Boss toutes les 5 vagues, dans cet ordre (puis le cycle reprend, plus fort).
+  const SURVIVOR_BOSSES = {
+    troll: { hp: 380, speed: 58, damage: 15, radius: 34, every: 4.5, label: 'Grokk' },
+    maexxna: { hp: 480, speed: 66, damage: 15, radius: 32, every: 5, label: 'Maexxna' },
+    mimic: { hp: 560, speed: 62, damage: 17, radius: 30, every: 4.5, label: 'Grignotor' },
+    dragon: { hp: 640, speed: 64, damage: 17, radius: 34, every: 3.8, label: 'Pyrax' },
+    liche: { hp: 720, speed: 58, damage: 17, radius: 28, every: 4.2, label: 'Givrenoire' },
+    sorcier: { hp: 800, speed: 62, damage: 18, radius: 26, every: 5, label: 'Malvorath' },
+  };
+  const SURVIVOR_BOSS_ORDER = ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier'];
+  // Difficulté de la vague n (1, 2, …) : vie et dégâts des ennemis, nombre d'ennemis à l'écran.
+  function survivorWave(n) {
+    const k = Math.max(0, n - 1);
+    return {
+      hp: 1 + 0.2 * k + 0.014 * k * k,
+      damage: 0.8 + 0.08 * k,
+      target: Math.min(SURVIVOR.maxEnemies, Math.round(12 + 7 * k + 0.32 * k * k)),
+      spawnPerSec: 2.5 + 1 * k,
+    };
+  }
+  function survivorBoss(n) {
+    if (n % SURVIVOR.bossEvery) return null;
+    const i = n / SURVIVOR.bossEvery - 1;
+    const kind = SURVIVOR_BOSS_ORDER[i % SURVIVOR_BOSS_ORDER.length];
+    const cycle = Math.floor(i / SURVIVOR_BOSS_ORDER.length);
+    const w = survivorWave(n);
+    return { kind, hp: Math.round(SURVIVOR_BOSSES[kind].hp * w.hp * (1 + cycle)), damage: SURVIVOR_BOSSES[kind].damage * w.damage };
+  }
+  // XP pour passer du niveau L au suivant.
+  function survivorXpToNext(level) {
+    return Math.round(4 + (level - 1) * 3.5 + Math.pow(Math.max(0, level - 12), 1.6) * 3);
+  }
+  // Armes : stats de base puis ce que chaque niveau ajoute (niveau 1 à 8).
+  // damage, cooldown (s), area (×), amount (projectiles), pierce, speed (px/s), duration (s), range (px).
+  const SURVIVOR_WEAPONS = {
+    epee: {
+      label: 'Épée', icon: '⚔️', color: '#e8e8f0', desc: 'Taillade devant toi à courte portée.',
+      base: { damage: 15, cooldown: 1.15, area: 1, amount: 1, range: 125, width: 72 },
+      levels: [{ amount: 1 }, { damage: 6 }, { area: 0.15 }, { damage: 6 }, { area: 0.15 }, { damage: 8 }, { damage: 10, cooldown: -0.2 }],
+    },
+    dagues: {
+      label: 'Dagues', icon: '🗡️', color: '#cfd8e8', desc: 'Lance des dagues droit devant toi.',
+      base: { damage: 8, cooldown: 1, amount: 1, pierce: 1, speed: 620, duration: 1.1 },
+      levels: [{ amount: 1 }, { damage: 4 }, { amount: 1 }, { pierce: 1 }, { amount: 1 }, { damage: 5 }, { amount: 1, pierce: 1 }],
+    },
+    baguette: {
+      label: 'Baguette magique', icon: '🪄', color: '#b98cff', desc: 'Un trait magique vers l\'ennemi le plus proche.',
+      base: { damage: 11, cooldown: 1.2, amount: 1, pierce: 1, speed: 400, duration: 2.2 },
+      levels: [{ amount: 1 }, { cooldown: -0.2 }, { amount: 1 }, { damage: 6 }, { amount: 1 }, { pierce: 1 }, { damage: 8 }],
+    },
+    aura: {
+      label: 'Aura de feu', icon: '🔥', color: '#ff7a1f', desc: 'Brûle les ennemis tout autour de toi.',
+      base: { damage: 5, cooldown: 0.55, area: 1, range: 72 },
+      levels: [{ area: 0.2 }, { damage: 2 }, { cooldown: -0.08 }, { area: 0.2 }, { damage: 3 }, { area: 0.2 }, { damage: 4 }],
+    },
+    hache: {
+      label: 'Hache', icon: '🪓', color: '#c8a070', desc: 'Lancée en l\'air, elle retombe en traversant tout.',
+      base: { damage: 24, cooldown: 1.7, amount: 1, area: 1, speed: 520, duration: 1.6 },
+      levels: [{ amount: 1 }, { damage: 10 }, { area: 0.2 }, { amount: 1 }, { damage: 10 }, { cooldown: -0.3 }, { amount: 1, damage: 12 }],
+    },
+    foudre: {
+      label: 'Foudre', icon: '⚡', color: '#ffe63c', desc: 'Frappe des ennemis au hasard autour de toi.',
+      base: { damage: 26, cooldown: 2.4, amount: 2, area: 1, range: 52 },
+      levels: [{ amount: 1 }, { damage: 10 }, { area: 0.25 }, { amount: 1 }, { cooldown: -0.4 }, { damage: 14 }, { amount: 2 }],
+    },
+    orbes: {
+      label: 'Orbes gardiens', icon: '🔮', color: '#5fd3ff', desc: 'Des orbes tournent autour de toi un moment.',
+      base: { damage: 10, cooldown: 3.2, amount: 2, area: 1, speed: 3.2, duration: 3, range: 92 },
+      levels: [{ amount: 1 }, { speed: 0.6, damage: 4 }, { duration: 0.8 }, { amount: 1 }, { damage: 6 }, { area: 0.25, duration: 0.8 }, { amount: 1, damage: 6 }],
+    },
+    fiole: {
+      label: 'Fiole d\'acide', icon: '🧪', color: '#7cff4f', desc: 'Une flaque d\'acide qui ronge ceux qui marchent dedans.',
+      base: { damage: 7, cooldown: 3, amount: 1, area: 1, duration: 2.6, range: 64 },
+      levels: [{ amount: 1 }, { damage: 3 }, { area: 0.2 }, { duration: 0.8 }, { amount: 1 }, { damage: 4 }, { area: 0.25, amount: 1 }],
+    },
+  };
+  const SURVIVOR_WEAPON_MAX = 8;
+  // Stats d'une arme à un niveau donné.
+  function survivorWeaponStats(id, level) {
+    const W = SURVIVOR_WEAPONS[id];
+    const s = { ...W.base };
+    for (let i = 0; i < Math.min(level, SURVIVOR_WEAPON_MAX) - 1; i++) {
+      for (const [k, v] of Object.entries(W.levels[i])) s[k] = Math.round(((s[k] || 0) + v) * 1000) / 1000;
+    }
+    return s;
+  }
+  // Ce que gagne une arme en passant au niveau `level` (2 à 8), en texte.
+  const SV_STAT_TEXT = {
+    damage: (v) => `+${v} dégâts`, cooldown: (v) => `${String(v).replace('.', ',')} s de recharge`, area: (v) => `+${Math.round(v * 100)} % de zone`,
+    amount: (v) => `+${v} projectile${v > 1 ? 's' : ''}`, pierce: (v) => `+${v} perforation`, speed: (v) => `+${v} de vitesse`,
+    duration: (v) => `+${String(v).replace('.', ',')} s de durée`,
+  };
+  function survivorLevelText(id, level) {
+    const W = SURVIVOR_WEAPONS[id];
+    if (level <= 1) return W.desc;
+    return Object.entries(W.levels[level - 2]).map(([k, v]) => (SV_STAT_TEXT[k] ? SV_STAT_TEXT[k](v) : '')).join(', ');
+  }
+  // Objets passifs : chaque exemplaire ajoute son effet (5 au plus, 2 pour le Duplicateur).
+  const SURVIVOR_PASSIVES = {
+    coeur: { label: 'Cœur robuste', icon: '❤️', max: 5, add: { maxHp: 20 }, desc: '+20 PV max' },
+    armure: { label: 'Armure', icon: '🛡️', max: 5, add: { armor: 1 }, desc: '−1 dégât subi par coup' },
+    bottes: { label: 'Bottes ailées', icon: '👢', max: 5, add: { speed: 0.08 }, desc: '+8 % de vitesse', mult: ['speed'] },
+    gant: { label: 'Gantelet de force', icon: '🥊', max: 5, add: { damage: 0.1 }, desc: '+10 % de dégâts' },
+    grimoire: { label: 'Grimoire', icon: '📕', max: 5, add: { cooldown: -0.07 }, desc: '−7 % de recharge' },
+    cristal: { label: 'Cristal d\'envergure', icon: '💠', max: 5, add: { area: 0.1 }, desc: '+10 % de zone' },
+    aimant: { label: 'Aimant', icon: '🧲', max: 5, add: { magnet: 0.3 }, desc: '+30 % de rayon de ramassage', mult: ['magnet'] },
+    trefle: { label: 'Trèfle', icon: '🍀', max: 5, add: { crit: 0.05, luck: 10 }, desc: '+5 % de coups critiques (×2), plus de choix' },
+    couronne: { label: 'Couronne', icon: '👑', max: 5, add: { xp: 0.08 }, desc: '+8 % d\'expérience' },
+    pomme: { label: 'Pomme dorée', icon: '🍎', max: 5, add: { regen: 0.4 }, desc: '+0,4 PV par seconde' },
+    duplicateur: { label: 'Duplicateur', icon: '➕', max: 2, add: { amount: 1 }, desc: '+1 projectile pour toutes les armes' },
+  };
+  // Méta-progression (émeraudes) : améliorations permanentes des stats de départ du Survivor uniquement.
+  // Prix du niveau L+1 : arrondi(base × hausse^L), arrondi à la dizaine.
+  const SURVIVOR_META = {
+    vitalite: { label: 'Vitalité', icon: '❤️', max: 10, add: { maxHp: 10 }, desc: '+10 PV max', base: 120, growth: 1.75 },
+    puissance: { label: 'Puissance', icon: '💪', max: 10, add: { damage: 0.05 }, desc: '+5 % de dégâts', base: 150, growth: 1.75 },
+    carapace: { label: 'Carapace', icon: '🛡️', max: 5, add: { armor: 1 }, desc: '−1 dégât subi par coup', base: 400, growth: 2.2 },
+    hate: { label: 'Hâte', icon: '⏱️', max: 5, add: { cooldown: -0.03 }, desc: '−3 % de recharge', base: 350, growth: 2.1 },
+    celerite: { label: 'Célérité', icon: '👟', max: 5, add: { speed: 0.04 }, desc: '+4 % de vitesse', base: 250, growth: 2 },
+    envergure: { label: 'Envergure', icon: '💠', max: 5, add: { area: 0.05 }, desc: '+5 % de zone', base: 300, growth: 2 },
+    attraction: { label: 'Attraction', icon: '🧲', max: 5, add: { magnet: 0.15 }, desc: '+15 % de rayon de ramassage', base: 150, growth: 1.9 },
+    croissance: { label: 'Croissance', icon: '📈', max: 5, add: { xp: 0.05 }, desc: '+5 % d\'expérience', base: 300, growth: 2.1 },
+    recuperation: { label: 'Récupération', icon: '🍎', max: 5, add: { regen: 0.15 }, desc: '+0,15 PV par seconde', base: 300, growth: 2.1 },
+    fortune: { label: 'Fortune', icon: '🍀', max: 5, add: { crit: 0.02, luck: 5 }, desc: '+2 % de critiques, plus de choix', base: 300, growth: 2.1 },
+    avidite: { label: 'Avidité', icon: '💎', max: 5, add: { greed: 0.1 }, desc: '+10 % d\'émeraudes gagnées', base: 600, growth: 2.3 },
+    relance: { label: 'Relance', icon: '🎲', max: 3, add: { rerolls: 1 }, desc: '+1 relance des choix par partie', base: 2500, growth: 3 },
+    resurrection: { label: 'Seconde vie', icon: '👼', max: 1, add: { revivals: 1 }, desc: 'Une résurrection par partie (50 % de vie)', base: 40000, growth: 1 },
+  };
+  function survivorMetaCost(id, level) {
+    const M = SURVIVOR_META[id];
+    if (!M || level >= M.max) return null;
+    return Math.round((M.base * Math.pow(M.growth, level)) / 10) * 10;
+  }
+  // Armes et objets à débloquer (émeraudes). Sans déblocage, ils ne sortent pas dans les choix de montée de niveau.
+  // `starter` : prix pour pouvoir commencer la partie avec cette arme (une fois débloquée).
+  const SURVIVOR_UNLOCKS = {
+    weapons: {
+      epee: { price: 0, starter: 0 },
+      dagues: { price: 0, starter: 2500 },
+      baguette: { price: 0, starter: 4000 },
+      aura: { price: 3000, starter: 8000 },
+      hache: { price: 6000, starter: 12000 },
+      foudre: { price: 10000, starter: 18000 },
+      orbes: { price: 15000, starter: 25000 },
+      fiole: { price: 22000, starter: 35000 },
+    },
+    passives: {
+      coeur: 0, bottes: 0, gant: 0, aimant: 0, pomme: 0,
+      armure: 1500, trefle: 2500, cristal: 3000, grimoire: 4000, couronne: 5000, duplicateur: 30000,
+    },
+  };
+  // Stats d'une partie : base + méta-progression + objets ramassés.
+  function survivorStats(meta = {}, passives = {}) {
+    const s = { ...SURVIVOR.player };
+    const add = (fx, n) => { for (const [k, v] of Object.entries(fx)) s[k] = (s[k] || 0) + v * n; };
+    const pct = { speed: 0, magnet: 0 }; // en % de la base
+    for (const [id, n] of Object.entries(meta)) {
+      const M = SURVIVOR_META[id];
+      if (!M || !n) continue;
+      for (const [k, v] of Object.entries(M.add)) { if (k in pct) pct[k] += v * n; else s[k] += v * n; }
+    }
+    for (const [id, n] of Object.entries(passives)) {
+      const P = SURVIVOR_PASSIVES[id];
+      if (!P || !n) continue;
+      for (const [k, v] of Object.entries(P.add)) { if (k in pct) pct[k] += v * n; else add({ [k]: v }, n); }
+    }
+    s.speed = SURVIVOR.player.speed * (1 + pct.speed);
+    s.magnet = SURVIVOR.player.magnet * (1 + pct.magnet);
+    s.cooldown = Math.max(0.4, s.cooldown);
+    return s;
+  }
+  // Score : temps de survie, monstres et boss tués.
+  function survivorScore(r) {
+    return Math.floor(r.time) * 10 + (r.kills || 0) + (r.bosses || 0) * 1000;
+  }
+  // Émeraudes gagnées à la fin d'une partie (avant le bonus d'Avidité).
+  function survivorEmeralds(r) {
+    const w = Math.max(0, (r.wave || 1) - 1);
+    return Math.floor((w * (w + 9)) / 4) + (r.bosses || 0) * 10 + Math.floor((r.kills || 0) / 100);
+  }
+  // Jour (heure de Paris, « AAAA-MM-JJ ») : la récompense de la vague 30 revient chaque jour.
+  function parisDay(ts = Date.now()) {
+    try { return new Date(ts).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }); } catch (e) { return new Date(ts).toISOString().slice(0, 10); }
+  }
+
+  // ---------- Maison (Housing) ----------
+  // Chaque joueur a sa maison : une façade à personnaliser et une pièce où il place ses meubles (payés en émeraudes).
+  // Le niveau de décoration (points de déco des meubles posés et des options) remplit la boîte aux lettres.
+  const HOUSING = {
+    sizes: {
+      studio: { label: 'Studio', cols: 9, rows: 6, price: 0 },
+      maison: { label: 'Maison', cols: 13, rows: 8, price: 12000 },
+      manoir: { label: 'Manoir', cols: 17, rows: 10, price: 90000 },
+    },
+    sizeOrder: ['studio', 'maison', 'manoir'],
+    maxLevel: 20,
+    mailbox: { everyH: 6, max: 4 },
+    listMax: 40,
+  };
+  // Meubles : cat, prix (émeraudes), taille en cases (w × h), points de déco ; wall : accroché au mur ; rug : tapis (sous les meubles).
+  const FURNITURE_CATS = {
+    assises: 'Assises', tables: 'Tables', lits: 'Lits', rangements: 'Rangements', lumieres: 'Lumières', plantes: 'Plantes',
+    tapis: 'Tapis', mural: 'Décoration murale', loisirs: 'Loisirs', prestige: 'Prestige',
+  };
+  const FURNITURE = {
+    tabouret: { label: 'Tabouret', cat: 'assises', price: 250, w: 1, h: 1, deco: 1 },
+    chaise: { label: 'Chaise en bois', cat: 'assises', price: 450, w: 1, h: 1, deco: 2 },
+    pouf: { label: 'Pouf moelleux', cat: 'assises', price: 800, w: 1, h: 1, deco: 3 },
+    fauteuil: { label: 'Fauteuil club', cat: 'assises', price: 1800, w: 1, h: 1, deco: 6 },
+    canape: { label: 'Canapé', cat: 'assises', price: 4200, w: 2, h: 1, deco: 13 },
+    trone: { label: 'Trône royal', cat: 'assises', price: 45000, w: 1, h: 1, deco: 85 },
+    table_basse: { label: 'Table basse', cat: 'tables', price: 1000, w: 2, h: 1, deco: 4 },
+    table_ronde: { label: 'Guéridon', cat: 'tables', price: 1400, w: 1, h: 1, deco: 5 },
+    table: { label: 'Grande table', cat: 'tables', price: 2200, w: 2, h: 1, deco: 8 },
+    bureau: { label: 'Bureau d\'aventurier', cat: 'tables', price: 3400, w: 2, h: 1, deco: 11 },
+    lit: { label: 'Lit simple', cat: 'lits', price: 3000, w: 1, h: 2, deco: 10 },
+    lit_double: { label: 'Lit double', cat: 'lits', price: 7500, w: 2, h: 2, deco: 20 },
+    lit_baldaquin: { label: 'Lit à baldaquin', cat: 'lits', price: 24000, w: 2, h: 2, deco: 50 },
+    coffre: { label: 'Coffre en bois', cat: 'rangements', price: 1100, w: 1, h: 1, deco: 4 },
+    commode: { label: 'Commode', cat: 'rangements', price: 2600, w: 1, h: 1, deco: 9 },
+    armoire: { label: 'Armoire', cat: 'rangements', price: 4200, w: 1, h: 1, deco: 13 },
+    bibliotheque: { label: 'Bibliothèque', cat: 'rangements', price: 6000, w: 2, h: 1, deco: 17 },
+    coffre_or: { label: 'Coffre au trésor', cat: 'rangements', price: 30000, w: 1, h: 1, deco: 60 },
+    bougeoir: { label: 'Bougeoir', cat: 'lumieres', price: 400, w: 1, h: 1, deco: 2 },
+    lampe: { label: 'Lampe de chevet', cat: 'lumieres', price: 1500, w: 1, h: 1, deco: 5 },
+    lampadaire: { label: 'Lampadaire', cat: 'lumieres', price: 2800, w: 1, h: 1, deco: 9 },
+    brasero: { label: 'Brasero', cat: 'lumieres', price: 7000, w: 1, h: 1, deco: 18 },
+    plante: { label: 'Plante en pot', cat: 'plantes', price: 600, w: 1, h: 1, deco: 2 },
+    cactus: { label: 'Cactus', cat: 'plantes', price: 850, w: 1, h: 1, deco: 3 },
+    bonsai: { label: 'Bonsaï', cat: 'plantes', price: 3800, w: 1, h: 1, deco: 11 },
+    palmier: { label: 'Palmier', cat: 'plantes', price: 8000, w: 1, h: 1, deco: 19 },
+    cerisier: { label: 'Cerisier en fleurs', cat: 'plantes', price: 22000, w: 2, h: 2, deco: 45 },
+    tapis: { label: 'Tapis', cat: 'tapis', price: 1400, w: 2, h: 1, deco: 4, rug: true },
+    tapis_rond: { label: 'Tapis rond', cat: 'tapis', price: 3000, w: 2, h: 2, deco: 9, rug: true },
+    tapis_royal: { label: 'Tapis royal', cat: 'tapis', price: 14000, w: 3, h: 2, deco: 30, rug: true },
+    tableau: { label: 'Tableau', cat: 'mural', price: 1800, w: 1, h: 1, deco: 6, wall: true },
+    etagere: { label: 'Étagère', cat: 'mural', price: 1900, w: 1, h: 1, deco: 6, wall: true },
+    horloge: { label: 'Horloge', cat: 'mural', price: 3000, w: 1, h: 1, deco: 9, wall: true },
+    banniere: { label: 'Bannière Zer0Loot', cat: 'mural', price: 2800, w: 1, h: 1, deco: 8, wall: true },
+    miroir: { label: 'Miroir doré', cat: 'mural', price: 3800, w: 1, h: 1, deco: 11, wall: true },
+    cheminee: { label: 'Cheminée', cat: 'mural', price: 11000, w: 2, h: 1, deco: 25, wall: true },
+    vitrail: { label: 'Vitrail', cat: 'mural', price: 10000, w: 2, h: 1, deco: 24, wall: true },
+    trophee: { label: 'Trophée de dragon', cat: 'mural', price: 18000, w: 1, h: 1, deco: 36, wall: true },
+    aquarium: { label: 'Aquarium', cat: 'loisirs', price: 9500, w: 2, h: 1, deco: 22 },
+    jukebox: { label: 'Juke-box', cat: 'loisirs', price: 12000, w: 1, h: 1, deco: 26 },
+    arcade: { label: 'Borne d\'arcade', cat: 'loisirs', price: 14000, w: 1, h: 1, deco: 28 },
+    machine_sous: { label: 'Machine à sous de Pyrax', cat: 'loisirs', price: 19000, w: 1, h: 1, deco: 36 },
+    billard: { label: 'Billard', cat: 'loisirs', price: 26000, w: 3, h: 2, deco: 48 },
+    piano: { label: 'Piano à queue', cat: 'prestige', price: 40000, w: 2, h: 2, deco: 75 },
+    statue_troll: { label: 'Statue de Grokk', cat: 'prestige', price: 35000, w: 1, h: 1, deco: 65 },
+    fontaine: { label: 'Fontaine', cat: 'prestige', price: 60000, w: 2, h: 2, deco: 100 },
+    statue_dragon: { label: 'Statue dorée de Pyrax', cat: 'prestige', price: 75000, w: 2, h: 2, deco: 120 },
+  };
+  // Façade et intérieur : options par partie (la première est gratuite) ; deco = points de déco.
+  const HOUSE_PARTS = {
+    murs: { label: 'Murs', zone: 'ext', options: {
+      blanc: { label: 'Crépi blanc', price: 0, color: '#efe9dc' }, creme: { label: 'Crème', price: 900, color: '#f3dfb4' },
+      rose: { label: 'Rose bonbon', price: 2500, color: '#f2b6c6' }, bleu: { label: 'Bleu lagon', price: 2500, color: '#a9d4ec' },
+      bois: { label: 'Rondins', price: 4500, color: '#a46a3b' }, brique: { label: 'Briques', price: 3500, color: '#b4553c' },
+      pierre: { label: 'Pierre', price: 7000, color: '#9a9690' }, marbre: { label: 'Marbre', price: 30000, color: '#f4f2ef' } } },
+    toit: { label: 'Toit', zone: 'ext', options: {
+      tuiles: { label: 'Tuiles', price: 0, color: '#b8452e' }, ardoise: { label: 'Ardoise', price: 3500, color: '#4a5263' },
+      chaume: { label: 'Chaume', price: 3000, color: '#c9a24e' }, vert: { label: 'Tuiles vertes', price: 4000, color: '#3e8a55' },
+      cuivre: { label: 'Cuivre', price: 12000, color: '#3fa58f' }, pagode: { label: 'Pagode', price: 22000, color: '#b11e2e' },
+      or: { label: 'Toit doré', price: 60000, color: '#e8b923' } } },
+    fenetres: { label: 'Fenêtres', zone: 'ext', options: {
+      simples: { label: 'Simples', price: 0 }, volets: { label: 'À volets', price: 1800 }, rondes: { label: 'Rondes', price: 4500 },
+      fleuries: { label: 'Jardinières', price: 6000 }, vitraux: { label: 'Vitraux', price: 15000 } } },
+    porte: { label: 'Porte', zone: 'ext', options: {
+      bois: { label: 'Bois', price: 0, color: '#7a4a24' }, rouge: { label: 'Rouge', price: 1500, color: '#b3262e' },
+      bleue: { label: 'Bleue', price: 1500, color: '#2f5fa8' }, arche: { label: 'En arche', price: 9000, color: '#5a3416' },
+      doree: { label: 'Dorée', price: 35000, color: '#e8b923' } } },
+    jardin: { label: 'Jardin', zone: 'ext', options: {
+      aucun: { label: 'Pelouse', price: 0 }, fleurs: { label: 'Parterre de fleurs', price: 1800 }, haie: { label: 'Haie taillée', price: 3500 },
+      lanternes: { label: 'Lanternes', price: 7000 }, cerisier: { label: 'Cerisier', price: 18000 }, fontaine: { label: 'Fontaine', price: 25000 } } },
+    papier: { label: 'Papier peint', zone: 'int', options: {
+      beige: { label: 'Beige', price: 0, color: '#e9dcc2' }, rayures: { label: 'Rayures', price: 1400, color: '#d8c3e8' },
+      fleurs: { label: 'Fleuri', price: 2800, color: '#f2d7d7' }, bois: { label: 'Lambris', price: 4000, color: '#a67547' },
+      pierre: { label: 'Pierre', price: 5500, color: '#9c9890' }, etoiles: { label: 'Nuit étoilée', price: 10000, color: '#26214a' },
+      royal: { label: 'Royal', price: 18000, color: '#7a1f3d' } } },
+    sol: { label: 'Sol', zone: 'int', options: {
+      parquet: { label: 'Parquet', price: 0, color: '#b98a5a' }, carrelage: { label: 'Carrelage', price: 1800, color: '#e6e2da' },
+      moquette: { label: 'Moquette', price: 3000, color: '#6a5a9a' }, damier: { label: 'Damier', price: 3500, color: '#f0f0f0' },
+      herbe: { label: 'Gazon', price: 5000, color: '#6bb35a' }, marbre: { label: 'Marbre', price: 15000, color: '#efeae4' } } },
+  };
+  const partDeco = (price) => Math.round(price / 350);
+  // Points de déco : meubles posés + options choisies.
+  function houseDeco(house) {
+    let pts = 0;
+    for (const p of (house && house.placed) || []) pts += (FURNITURE[p.id] && FURNITURE[p.id].deco) || 0;
+    for (const [part, id] of Object.entries((house && house.style) || {})) {
+      const o = HOUSE_PARTS[part] && HOUSE_PARTS[part].options[id];
+      if (o) pts += partDeco(o.price);
+    }
+    pts += { studio: 0, maison: 40, manoir: 160 }[(house && house.size) || 'studio'] || 0;
+    return pts;
+  }
+  // Points nécessaires pour le niveau n : 20 × n^1,7 (arrondi à 5).
+  const houseLevelPoints = (n) => (n <= 0 ? 0 : Math.round((20 * Math.pow(n, 1.7)) / 5) * 5);
+  function houseLevel(points) {
+    let level = 0;
+    while (level < HOUSING.maxLevel && points >= houseLevelPoints(level + 1)) level += 1;
+    return { level, points, cur: houseLevelPoints(level), next: level < HOUSING.maxLevel ? houseLevelPoints(level + 1) : null };
+  }
+  // Boîte aux lettres : un courrier toutes les 6 h (4 en attente au plus), contenu selon le niveau de déco.
+  function houseMailDue(mailAt, now = Date.now()) {
+    return Math.max(0, Math.min(HOUSING.mailbox.max, Math.floor((now - mailAt) / (HOUSING.mailbox.everyH * 3600 * 1000))));
+  }
+  function houseMailContent(level) {
+    return {
+      gold: 60 + 40 * level,
+      chestChance: Math.min(0.5, 0.04 * level),
+      keyChance: level >= 8 ? Math.min(0.25, 0.02 * (level - 7)) : 0,
+      emeralds: level >= 5 ? level * 2 : 0,
+      potionChance: 0.2,
+    };
+  }
+  // Disposition valide ? Meubles dans la pièce, sur le mur pour la décoration murale, sans chevauchement
+  // (les tapis ont leur propre couche), et pas plus d'exemplaires que possédés. Retourne un message ou null.
+  function houseLayoutError(house, placed) {
+    const size = HOUSING.sizes[house.size] || HOUSING.sizes.studio;
+    const used = {};
+    const cells = { floor: new Set(), rug: new Set(), wall: new Set() };
+    for (const p of placed) {
+      const F = FURNITURE[p && p.id];
+      if (!F) return 'Meuble inconnu';
+      used[p.id] = (used[p.id] || 0) + 1;
+      if (used[p.id] > ((house.owned || {})[p.id] || 0)) return `Tu n'as pas assez de « ${F.label} »`;
+      const x = Number(p.x);
+      const y = Number(p.y);
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x + F.w > size.cols) return `« ${F.label} » dépasse de la pièce`;
+      if (F.wall ? y !== -1 : (y < 0 || y + F.h > size.rows)) return F.wall ? `« ${F.label} » s'accroche au mur` : `« ${F.label} » dépasse de la pièce`;
+      const layer = F.wall ? cells.wall : F.rug ? cells.rug : cells.floor;
+      for (let i = 0; i < F.w; i++) {
+        for (let j = 0; j < (F.wall ? 1 : F.h); j++) {
+          const k = `${x + i},${y + j}`;
+          if (layer.has(k)) return `« ${F.label} » chevauche un autre meuble`;
+          layer.add(k);
+        }
+      }
+    }
+    return null;
+  }
+
   // ---------- Historique et statistiques ----------
   const HISTORY = { max: 50 }; // parties gardées par personnage (les plus récentes)
   // Types de partie de l'historique : les modes du stream, plus le contenu solo.
   const HISTORY_KINDS = {
     expedition: { label: 'Expédition', icon: '🕳️', color: '#b98cff' },
     challenge: { label: 'Défi des boss', icon: '👹', color: '#ff8fa3' },
+    survivor: { label: 'Survivor', icon: '🧟', color: '#7cff4f' },
   };
   // Statistiques cumulées (character.lifetime ; character.stats, ce sont les points de caractéristiques) ; les records (PLAYER_STAT_MAX) gardent le maximum.
   const PLAYER_STAT_KEYS = ['losses', 'deaths', 'damageDealt', 'damageTaken', 'bossDamage', 'hillTime', 'playTime', 'maxKills', 'maxDamage',
     'expeditions', 'expeditionFloors', 'challenges', 'rushBosses', 'dungeonRooms', 'goldShower',
-    'goldEarned', 'itemsObtained', 'potionsUsed', 'betGold', 'casinoBets', 'casinoWagered', 'casinoWon', 'casinoBest'];
+    'goldEarned', 'itemsObtained', 'potionsUsed', 'betGold', 'casinoBets', 'casinoWagered', 'casinoWon', 'casinoBest',
+    'survivorRuns', 'survivorKills', 'emeraldsEarned'];
   const PLAYER_STAT_MAX = ['maxKills', 'maxDamage', 'casinoBest'];
 
   const TRAINING = { maxLevel: 50, maxConcurrent: 20, maxDuration: 150, soloMaxDuration: 600 }; // soloMaxDuration : répétition du mode Solo (s)
@@ -2089,6 +2501,10 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
+    SURVIVOR, SURVIVOR_ZONES, survivorZone, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
+    survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
+    SURVIVOR_UNLOCKS, survivorStats, survivorScore, survivorEmeralds, parisDay,
+    HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
     talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
