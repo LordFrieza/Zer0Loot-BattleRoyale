@@ -91,7 +91,7 @@ function collectMail(c, now = Date.now()) {
   for (let i = 0; i < due; i++) {
     got.gold += M.gold;
     got.emeralds += M.emeralds;
-    if (random() < M.chestChance) got.chests += 1;
+    got.chests += Math.floor(M.chests) + (random() < M.chests % 1 ? 1 : 0);
     if (random() < M.keyChance) got.keys += 1;
     if (random() < M.potionChance) {
       const ids = Object.keys(Rules.CONSUMABLES);

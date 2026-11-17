@@ -72,6 +72,7 @@
       <div class="hh-meta">${EM} <b>${fmt(mine.emeralds)}</b> émeraudes<br>❤️ ${h.likes} · 👁️ ${fmt(h.visits)} visites</div>
       <div class="hh-mail ${due ? 'full' : ''}">📬 ${due ? `<b>${due}</b> courrier${due > 1 ? 's' : ''} !` : 'Boîte vide'}
         <div class="hh-sub">${due ? '' : `Prochain dans ${mailIn()}`}</div>
+        <div class="hh-sub" title="Contenu moyen d'un courrier à ton niveau de décoration">${mailText(L.level)}</div>
         ${due ? '<button class="gold small" id="hh-mail">Ouvrir</button>' : ''}</div>
       <span class="spacer"></span>
       <button class="${editing ? 'gold' : 'secondary'}" id="hh-edit">${editing ? '✅ Terminer' : '✏️ Décorer'}</button></div>`;
@@ -270,6 +271,12 @@
     const next = Rules.HOUSING.sizes[order[order.indexOf(mine.house.size) + 1]];
     if (!confirm(`Agrandir ta maison en ${next.label} pour ${fmt(next.price)} émeraudes ?`)) return;
     try { await after(await api('/api/house/upgrade', {}), 'levelUp'); toast(`🏗️ Ta maison devient un ${next.label.toLowerCase()} !`); } catch (e) { toast('⚠️ ' + e.message); }
+  }
+  // Ce que rapporte un courrier au niveau donné (en moyenne)
+  function mailText(level) {
+    const M = Rules.houseMailContent(level);
+    const pct = (v) => `${Math.round(v * 100)} %`;
+    return `Par courrier : ${fmt(M.gold)} 🪙${M.emeralds ? ` · ${M.emeralds} ${EM}` : ''}${M.chests ? ` · ${String(M.chests).replace('.', ',')} 🎁` : ''}${M.keyChance ? ` · clé ${pct(M.keyChance)}` : ''} · potion ${pct(M.potionChance)}`;
   }
   async function collect() {
     try {

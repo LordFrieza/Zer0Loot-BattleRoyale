@@ -94,9 +94,10 @@ test('[HOUSE-5] maison : boîte aux lettres (toutes les 6 h, 4 au plus, contenu 
   assert.strictEqual(Rules.houseMailDue(0, 5 * H), 0);
   assert.strictEqual(Rules.houseMailDue(0, 13 * H), 2);
   assert.strictEqual(Rules.houseMailDue(0, 100 * H), 4);
-  assert.deepStrictEqual(Rules.houseMailContent(0), { gold: 60, chestChance: 0, keyChance: 0, emeralds: 0, potionChance: 0.2 });
-  assert.strictEqual(Rules.houseMailContent(5).emeralds, 10);
-  assert.ok(Rules.houseMailContent(10).keyChance > 0);
+  assert.deepStrictEqual(Rules.houseMailContent(0), { gold: 180, chests: 0, keyChance: 0, emeralds: 0, potionChance: 0.5 });
+  assert.deepStrictEqual(Rules.houseMailContent(5), { gold: 780, chests: 0.6, keyChance: 0.09, emeralds: 30, potionChance: 0.5 });
+  assert.deepStrictEqual(Rules.houseMailContent(20), { gold: 2580, chests: 2.4, keyChance: 0.54, emeralds: 120, potionChance: 0.5 });
+  assert.strictEqual(Rules.houseMailContent(2).keyChance, 0, 'clés dès le niveau 3');
   const u = player();
   const c = u.character;
   c.house.mailAt = 1000;
@@ -104,13 +105,25 @@ test('[HOUSE-5] maison : boîte aux lettres (toutes les 6 h, 4 au plus, contenu 
   const gold = c.gold;
   const r = housing.collectMail(c, 1000 + 13 * H);
   assert.strictEqual(r.letters, 2);
-  assert.strictEqual(c.gold, gold + 2 * 60);
+  assert.strictEqual(c.gold, gold + 2 * 180);
   assert.strictEqual(c.house.mailAt, 1000 + 12 * H, 'l\'heure entamée vers le courrier suivant est gardée');
   // Après une longue absence : 4 courriers, et pas de nouveau tout de suite
   c.house.mailAt = 0;
   const now = 200 * H;
   assert.strictEqual(housing.collectMail(c, now).letters, 4);
   assert.strictEqual(Rules.houseMailDue(c.house.mailAt, now), 0);
+  // Maison très décorée : la partie entière des coffres est garantie à chaque courrier
+  const rich = player(1e8).character;
+  rich.house.size = 'manoir';
+  const ids = Object.keys(Rules.FURNITURE).filter((id) => !Rules.FURNITURE[id].wall);
+  for (const id of ids) housing.buyFurniture(rich, id);
+  const L = housing.levelOf(rich).level;
+  rich.house.mailAt = 0;
+  const M = Rules.houseMailContent(L);
+  const before = rich.chests;
+  const got = housing.collectMail(rich, 200 * H);
+  assert.ok(rich.chests - before >= Math.floor(M.chests) * got.letters, `niveau ${L} : ${rich.chests - before} coffres`);
+  assert.strictEqual(got.emeralds, M.emeralds * got.letters);
 });
 
 test('[HOUSE-6] maison : liste des maisons, visites, « J\'aime »', () => {

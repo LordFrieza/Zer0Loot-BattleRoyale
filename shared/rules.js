@@ -2365,13 +2365,15 @@
   function houseMailDue(mailAt, now = Date.now()) {
     return Math.max(0, Math.min(HOUSING.mailbox.max, Math.floor((now - mailAt) / (HOUSING.mailbox.everyH * 3600 * 1000))));
   }
+  // Contenu d'un courrier selon le niveau de décoration. chests : coffres en moyenne (partie entière garantie,
+  // le reste est une chance) ; keyChance / potionChance : chances d'une Clé de boss / d'une potion.
   function houseMailContent(level) {
     return {
-      gold: 60 + 40 * level,
-      chestChance: Math.min(0.5, 0.04 * level),
-      keyChance: level >= 8 ? Math.min(0.25, 0.02 * (level - 7)) : 0,
-      emeralds: level >= 5 ? level * 2 : 0,
-      potionChance: 0.2,
+      gold: 180 + 120 * level,
+      chests: Math.round(0.12 * level * 100) / 100,
+      keyChance: level >= 3 ? Math.min(0.6, Math.round(0.03 * (level - 2) * 100) / 100) : 0,
+      emeralds: 6 * level,
+      potionChance: 0.5,
     };
   }
   // Disposition valide ? Meubles dans la pièce, sur le mur pour la décoration murale, sans chevauchement

@@ -27,7 +27,7 @@
   // ---------- Partie ----------
   const G = {
     on: false, frame: null, frameAt: 0, srvT: 0, me: { x: SV.map.w / 2, y: SV.map.h / 2, fx: 1, fy: 0, moving: false },
-    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), proj: new Map(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
+    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), proj: new Map(), gems: new Map(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
     hurtAt: 0, raf: 0, last: 0, lastHp: null, puffs: [], over: null, paused: false,
   };
   let ctx = null;
@@ -523,6 +523,21 @@
     for (let i = 0; i < f.bo.length; i += 5) track(f.bo[i], f.bo[i + 1], f.bo[i + 2], f.bo[i + 3], f.bo[i + 4], { bolt: true });
     for (let i = 0; i < f.es.length; i += 6) track(f.es[i], f.es[i + 1], f.es[i + 2], f.es[i + 4], f.es[i + 5], { kind: f.es[i + 3] });
     for (const id of G.proj.keys()) if (!live.has(id)) G.proj.delete(id);
+    // Gemmes (5 valeurs) : au repos, à leur place ; attirées, elles volent vers moi côté navigateur
+    const gl = new Set();
+    for (let i = 0; i < f.g.length; i += 5) {
+      const id = f.g[i];
+      gl.add(id);
+      const x = f.g[i + 1];
+      const y = f.g[i + 2];
+      const sp = f.g[i + 4];
+      const m = G.gems.get(id);
+      if (!m) { G.gems.set(id, { id, rx: x, ry: y, size: f.g[i + 3], sp }); continue; }
+      m.size = f.g[i + 3];
+      if (!sp) { m.rx = x; m.ry = y; m.sp = 0; continue; }
+      if (!m.sp) m.sp = sp; // dès qu'elle est attirée, le navigateur la fait voler seul (même trajectoire que le serveur)
+    }
+    for (const id of G.gems.keys()) if (!gl.has(id)) G.gems.delete(id);
     for (const e of f.ev) onEvent(e, now);
     // Correction douce de ma position si le serveur me voit ailleurs (vitesse bornée, ralentissement…)
     const dx = f.x - G.me.x;
@@ -769,15 +784,30 @@
       ctx.beginPath(); ctx.moveTo(x - 8, y - 10); ctx.lineTo(x + 8, y - 10); ctx.lineTo(x + 14, y - 2); ctx.lineTo(x, y + 14); ctx.lineTo(x - 14, y - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(200, 255, 220, .8)'; ctx.beginPath(); ctx.moveTo(x - 8, y - 10); ctx.lineTo(x, y - 2); ctx.lineTo(x - 14, y - 2); ctx.closePath(); ctx.fill();
     }
-    // Gemmes et objets au sol
-    for (let i = 0; i < f.g.length; i += 3) {
-      const x = f.g[i];
-      const y = f.g[i + 1];
-      const gem = SV.gems[f.g[i + 2]];
-      const s = 4 + f.g[i + 2] * 2;
+    // Gemmes : celles qui sont attirées volent vers moi à chaque image (même accélération que sur le serveur)
+    const dtG = Math.min(0.05, (now - (G.gemDrawAt || now)) / 1000);
+    G.gemDrawAt = now;
+    for (const m of G.gems.values()) {
+      if (m.sp > 0) {
+        const dx = G.me.x - m.rx;
+        const dy = G.me.y - m.ry;
+        const d = Math.hypot(dx, dy) || 1;
+        m.sp += 900 * dtG;
+        const step = Math.min(d, m.sp * dtG);
+        m.rx += (dx / d) * step;
+        m.ry += (dy / d) * step;
+        if (d < SV.player.radius + 8) m.got = true; // ramassée : on ne la dessine plus en attendant le serveur
+      }
+      if (m.got) continue;
+      const x = m.rx;
+      const y = m.ry;
+      const gem = SV.gems[m.size];
+      const s = 6.5 + m.size * 2.5;
       ctx.fillStyle = gem.color;
-      ctx.beginPath(); ctx.moveTo(x, y - s * 1.4); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s * 1.2); ctx.lineTo(x - s, y); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.strokeStyle = 'rgba(10, 10, 30, .75)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x, y - s * 1.4); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s * 1.2); ctx.lineTo(x - s, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.65)';
       ctx.beginPath(); ctx.moveTo(x, y - s * 1.4); ctx.lineTo(x + s * 0.4, y - s * 0.2); ctx.lineTo(x - s * 0.3, y); ctx.closePath(); ctx.fill();
     }
     const PK = ['🍗', '🧲', '🎁'];
@@ -1312,6 +1342,7 @@
     G.enemies.clear();
     G.shots.clear();
     G.proj.clear();
+    G.gems.clear();
     G.fx = [];
     G.texts = [];
     G.puffs = [];

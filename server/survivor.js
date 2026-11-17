@@ -343,7 +343,7 @@ class SurvivorRun {
       g.v += v;
       return;
     }
-    this.gems.push({ x, y, v, pull: false });
+    this.gems.push({ id: this.nextId++, x, y, v, pull: false });
   }
 
   // ---------- Pas de simulation ----------
@@ -844,7 +844,8 @@ class SurvivorRun {
       e.push(m.id, KIND_INDEX[m.kind], Math.round(m.x), Math.round(m.y), Math.round((m.hp / m.maxHp) * 100), m.elite ? 1 : 0);
     }
     const g = [];
-    for (const gem of this.gems) if (inView(gem.x, gem.y)) g.push(Math.round(gem.x), Math.round(gem.y), gem.v >= 25 ? 2 : gem.v >= 5 ? 1 : 0);
+    // Gemmes : identifiant et vitesse d'attraction (0 au repos), pour que le navigateur les fasse voler en douceur
+    for (const gem of this.gems) if (inView(gem.x, gem.y)) g.push(gem.id, Math.round(gem.x), Math.round(gem.y), gem.v >= 25 ? 2 : gem.v >= 5 ? 1 : 0, gem.pull ? Math.round(gem.sp || 260) : 0);
     const pk = [];
     for (const k of this.pickups) if (inView(k.x, k.y)) pk.push(Math.round(k.x), Math.round(k.y), PICKUPS.indexOf(k.type));
     const es = [];

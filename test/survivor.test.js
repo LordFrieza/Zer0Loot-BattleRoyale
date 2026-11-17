@@ -370,6 +370,16 @@ test('[SV-8] survivor : projectiles envoyés avec identifiant, position et vites
   assert.deepStrictEqual([x, kind, vx, vy], [Math.round(run.p.x + 100), 0, -120, 30]);
   assert.strictEqual(run.frame().es[0], id, 'même identifiant d\'une image à l\'autre');
   assert.deepStrictEqual(f.bo, [999, Math.round(run.p.x - 50), Math.round(run.p.y), 200, 0]);
+  // Gemmes : [id, x, y, taille, vitesse d'attraction]
+  run.gems = [];
+  run.dropGem(run.p.x + 300, run.p.y, 5);
+  run.dropGem(run.p.x + 30, run.p.y, 25);
+  run.gems[1].pull = true;
+  run.gems[1].sp = 400;
+  const g = run.frame().g;
+  assert.strictEqual(g.length, 10);
+  assert.deepStrictEqual([g[3], g[4], g[8], g[9]], [1, 0, 2, 400]);
+  assert.ok(g[0] > 0 && g[5] > g[0]);
 });
 
 test('[SV-11] survivor : carte agrandie, eau qui ralentit joueur et ennemis, ponts', () => {
