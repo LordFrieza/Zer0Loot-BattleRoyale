@@ -813,7 +813,14 @@
     };
     fence(6, 44, YARD_W - 6, 44); // clôture du fond
     const own = new Set(data.enclos || []);
-    drawItems(ctx, t, false, null, { own, spots: YARD_SPOTS, w: YARD_W, ground: 40, lanternY: -14, petName: data.pet ? data.pet.name : '' });
+    if (own.has('lanternes')) {
+      // Deux mâts aux coins pour tendre la guirlande (elle ne flotte plus dans le vide)
+      for (const px of [6, YARD_W - 6]) {
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(px - 4, -22, 8, 70);
+        ctx.fillStyle = '#5e3b1c'; ctx.beginPath(); ctx.arc(px, -22, 6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    drawItems(ctx, t, false, null, { own, spots: YARD_SPOTS, w: YARD_W, ground: 40, lanternY: -20, petName: data.pet ? data.pet.name : '' });
     // Familier principal qui se promène dans l'enclos
     if (data.pet && window.drawPet) {
       const key = data.pet.species + '|' + data.pet.name;

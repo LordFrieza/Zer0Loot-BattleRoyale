@@ -12,6 +12,7 @@
 
   let active = false;
   let mine = null; // GET /api/house
+  let yardBox = null; // zone de l'enclos sur la façade (clic → onglet Familier)
   let view = null; // maison affichée (la mienne ou celle d'un autre)
   let editing = false;
   let sideTab = 'meubles';
@@ -429,6 +430,16 @@
       if (!active || !editing) return;
       if (e.key === 'Escape') { ghost = null; selected = null; renderSide(); }
     });
+    // Curseur « main » sur la boîte aux lettres et sur l'enclos
+    $('house-ext').addEventListener('mousemove', (e) => {
+      const cv = $('house-ext');
+      const r = cv.getBoundingClientRect();
+      const mx = ((e.clientX - r.left) / r.width) * cv.width;
+      const my = ((e.clientY - r.top) / r.height) * cv.height;
+      const y = yardBox;
+      const overYard = view && view.mine && y && mx >= y.x && mx <= y.x + y.w && my >= y.y && my <= y.y + y.h;
+      cv.title = overYard ? 'Aller voir mon familier' : '';
+    });
     $('house-ext').addEventListener('click', (e) => {
       if (!view || !view.mine || !ext) return;
       const cv = $('house-ext');
@@ -438,7 +449,11 @@
       const m = ext.mailbox;
       if (mx >= m.x && mx <= m.x + m.w && my >= m.y && my <= m.y + m.h) {
         if (Rules.houseMailDue(mine.mailAt)) collect(); else toast(`📭 Boîte vide : prochain courrier dans ${mailIn()}`);
+        return;
       }
+      // Clic sur mon enclos : direction l'onglet Familier
+      const y = yardBox;
+      if (y && mx >= y.x && mx <= y.x + y.w && my >= y.y && my <= y.y + y.h) location.hash = 'familier';
     });
   }
 
@@ -529,10 +544,12 @@
     if (yard && window.drawPetYard) {
       const bw = { studio: 220, maison: 290, manoir: 380 }[view.size] || 220;
       const yw = Math.max(150, Math.min(230, ec.width - bw - 110)); // plus grand quand la maison est petite
-      const x0 = ec.width - yw - 8;
-      cx = Math.min(x0 - 6 - bw / 2, Math.max(bw / 2 + 80, x0 / 2));
-      yardFn = (g, right, gy) => drawPetYard(g, Math.min(right + 26, x0), gy + 40 - yw * window.PET_YARD_RATIO, yw, yard, now);
-    }
+      const x0 = ec.width - yw; // collé au bord droit
+      cx = x0 - 2 - bw / 2; // la maison collée à l'enclos
+      const y0 = ec.height * 0.82 + 40 - yw * window.PET_YARD_RATIO;
+      yardFn = (g) => drawPetYard(g, x0, y0, yw, yard, now);
+      yardBox = { x: x0, y: y0 - 30, w: yw, h: yw * window.PET_YARD_RATIO + 30 };
+    } else yardBox = null;
     ext = drawHouseFront(ec.getContext('2d'), house, ec.width, ec.height, { t: now, mail: view.mine && Rules.houseMailDue(mine.mailAt) > 0, name: view.mine ? null : view.name, sky: life && life.sky, front: life && life.front, cx, yard: yardFn });
   }
   // Mon enclos d'après mes données à jour (achat d'un objet, changement de familier principal…)

@@ -438,7 +438,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   décoration (20 au plus) → la **boîte aux lettres** reçoit un courrier toutes les 6 h (4 en attente au plus : 180 + 120 × niveau golds,
   6 émeraudes par niveau, 0,12 coffre par niveau, une Clé de boss dès le niveau 3, une potion une fois sur deux). On peut **visiter** les maisons des autres et leur laisser un ❤️.
   **Enclos sur la façade** : à droite de la maison, son enclos à familier en miniature (la déco achetée dans l'onglet
-  Familier et le familier principal qui s'y promène), aussi chez les autres joueurs qu'on visite.
+  Familier et le familier principal qui s'y promène), aussi chez les autres joueurs qu'on visite ; un clic sur le sien
+  ouvre l'onglet Familier.
   **Façade animée** : avion publicitaire (« Casino Zer0Loot ! Le casino de la déchéance ! »…), Pyrax, montgolfière,
   chauves-souris dans le ciel, et d'autres joueurs qui passent devant la maison en lâchant des petites phrases.
   **Aperçu avant achat** : un clic sur une option de style pas encore achetée l'affiche sur sa maison (barre « Aperçu »
