@@ -14,7 +14,9 @@
     joie: { label: 'Joie', icon: '🎾', color: '#ff7ac8' },
   };
   // Emplacements des objets de l'enclos sur la scène
-  const SPOTS = {
+  const SCENE_W = W;
+  const SCENE_GROUND = GROUND;
+  const SPOT_DEFAULT = {
     statue: { x: 70, y: 262 }, jouets: { x: 160, y: 268 }, gamelle: { x: 250, y: 352 }, mare: { x: 500, y: 356 },
     fontaine: { x: 770, y: 262 }, niche: { x: 880, y: 300 }, fleurs: { x: 0, y: 0 }, lanternes: { x: 0, y: 0 },
   };
@@ -243,7 +245,7 @@
     $('pet-enclos-shop').querySelectorAll('[data-penclos]').forEach((b) => {
       b.onclick = async () => {
         const r = await act('/api/pet/enclos/buy', { item: b.dataset.penclos }, 'buy');
-        if (r) { const sp = SPOTS[b.dataset.penclos]; burst(sp.x || W / 2, sp.y || 120, ['✨', '⭐'], 14); }
+        if (r) { const sp = SPOT_DEFAULT[b.dataset.penclos]; burst(sp.x || W / 2, sp.y || 120, ['✨', '⭐'], 14); }
       };
     });
   }
@@ -470,10 +472,16 @@
     ctx.fillRect(0, GROUND - 10, W, 6);
   }
 
-  function drawItems(ctx, t, night, cur) {
-    const own = new Set(enclos());
+  // o (facultatif, pour l'enclos miniature de la Maison) : own (objets possédés), spots, w (largeur), ground,
+  // lanternY, petName — par défaut ceux de l'onglet Familier.
+  function drawItems(ctx, t, night, cur, o = {}) {
+    const own = o.own || new Set(enclos());
+    const SPOTS = o.spots || SPOT_DEFAULT;
+    const W = o.w || SCENE_W;
+    const GROUND = o.ground != null ? o.ground : SCENE_GROUND;
+    const LY = o.lanternY != null ? o.lanternY : 26;
     if (own.has('fleurs')) {
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < Math.round(22 * W / SCENE_W) + 1; i++) {
         const x = 30 + i * 43 + Math.sin(i) * 8;
         const y = GROUND + 6 + (i % 2) * 8;
         ctx.strokeStyle = '#2f7a2a'; ctx.lineWidth = 2;
@@ -485,10 +493,10 @@
     }
     if (own.has('lanternes')) {
       ctx.strokeStyle = 'rgba(60,40,20,.7)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(0, 26); ctx.quadraticCurveTo(W / 2, 80, W, 26); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, LY); ctx.quadraticCurveTo(W / 2, LY + 54, W, LY); ctx.stroke();
       for (let i = 1; i < 10; i++) {
         const x = (i / 10) * W;
-        const y = 26 + Math.sin((i / 10) * Math.PI) * 27 + 10;
+        const y = LY + Math.sin((i / 10) * Math.PI) * 27 + 10;
         const glow = night ? 0.8 + Math.sin(t / 300 + i) * 0.15 : 0.35;
         const g = ctx.createRadialGradient(x, y, 2, x, y, night ? 30 : 14);
         g.addColorStop(0, `rgba(255,190,90,${glow})`); g.addColorStop(1, 'rgba(255,150,60,0)');
@@ -551,7 +559,7 @@
       ctx.fillStyle = '#2a1608';
       ctx.beginPath(); ctx.arc(x, y + 2, 20, Math.PI, 0); ctx.lineTo(x + 20, y + 16); ctx.lineTo(x - 20, y + 16); ctx.fill();
       // plaque au nom du familier principal, centrée entre le toit et la porte (police réduite si le nom est long)
-      const pet = activePet();
+      const pet = o.petName !== undefined ? (o.petName ? { name: o.petName } : null) : activePet();
       if (pet) {
         let size = 11;
         ctx.font = `700 ${size}px sans-serif`;
@@ -773,6 +781,74 @@
     const cv = document.getElementById('pet-canvas');
     if (cv) cv.addEventListener('click', onCanvasClick);
   });
+
+  // ---------- Enclos miniature (vu depuis la façade de la Maison) ----------
+  // data : { enclos: [ids], pet: { species, name, level } | null } ; dessiné à (x, y), largeur w (hauteur w × 0,52).
+  const YARD_W = 420;
+  const YARD_H = 218;
+  const YARD_SPOTS = {
+    statue: { x: 48, y: 96 }, niche: { x: 362, y: 118 }, fontaine: { x: 212, y: 84 }, jouets: { x: 70, y: 182 },
+    gamelle: { x: 332, y: 186 }, mare: { x: 205, y: 180 }, fleurs: { x: 0, y: 0 }, lanternes: { x: 0, y: 0 },
+  };
+  const yardPets = new Map(); // un état de promenade par familier affiché
+  function drawPetYard(ctx, x, y, w, data, t) {
+    if (!data) return null;
+    const s = w / YARD_W;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    // Herbe, clôture et pancarte
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.roundRect(4, 46, YARD_W, YARD_H - 40, 14); ctx.fill();
+    const g = ctx.createLinearGradient(0, 40, 0, YARD_H);
+    g.addColorStop(0, '#79c85c'); g.addColorStop(1, '#58a844');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(0, 40, YARD_W, YARD_H - 40, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,110,30,.55)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) { const gx = 20 + ((i * 97) % (YARD_W - 40)); const gy = 70 + ((i * 41) % (YARD_H - 90)); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx - 2, gy - 8); ctx.moveTo(gx + 4, gy); ctx.lineTo(gx + 5, gy - 9); ctx.stroke(); }
+    const fence = (x0, y0, x1, y1) => {
+      ctx.fillStyle = '#a5774a'; ctx.strokeStyle = 'rgba(60,35,15,.6)'; ctx.lineWidth = 1.5;
+      const n = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / 44));
+      for (let i = 0; i <= n; i++) { const px = x0 + ((x1 - x0) * i) / n; const py = y0 + ((y1 - y0) * i) / n; ctx.fillRect(px - 4, py - 30, 8, 34); ctx.strokeRect(px - 4, py - 30, 8, 34); }
+      ctx.lineWidth = 6; ctx.strokeStyle = '#a5774a';
+      ctx.beginPath(); ctx.moveTo(x0, y0 - 22); ctx.lineTo(x1, y1 - 22); ctx.moveTo(x0, y0 - 8); ctx.lineTo(x1, y1 - 8); ctx.stroke();
+    };
+    fence(6, 44, YARD_W - 6, 44); // clôture du fond
+    const own = new Set(data.enclos || []);
+    drawItems(ctx, t, false, null, { own, spots: YARD_SPOTS, w: YARD_W, ground: 40, lanternY: -14, petName: data.pet ? data.pet.name : '' });
+    // Familier principal qui se promène dans l'enclos
+    if (data.pet && window.drawPet) {
+      const key = data.pet.species + '|' + data.pet.name;
+      let st = yardPets.get(key);
+      if (!st) { st = { x: 200, y: 140, tx: 200, ty: 140, wait: 1, facing: 1, last: t }; yardPets.set(key, st); }
+      const dt = Math.min(0.1, Math.max(0, (t - st.last) / 1000));
+      st.last = t;
+      const d = Math.hypot(st.tx - st.x, st.ty - st.y);
+      if (d < 4) { st.wait -= dt; if (st.wait <= 0) { st.tx = 90 + Math.random() * 230; st.ty = 105 + Math.random() * 60; st.wait = 1.5 + Math.random() * 3; } } else {
+        const sp = 46 * dt;
+        st.x += ((st.tx - st.x) / d) * Math.min(sp, d);
+        st.y += ((st.ty - st.y) / d) * Math.min(sp, d);
+        st.facing = st.tx > st.x ? 1 : -1;
+      }
+      const hop = d >= 4 ? Math.abs(Math.sin(t / 140)) * 5 : 0;
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(st.x, st.y + 2, 30, 9, 0, 0, Math.PI * 2); ctx.fill();
+      drawPet(ctx, st.x, st.y - hop, data.pet.species, { facing: st.facing, t, seed: 1, size: 1.35 });
+    }
+    // Clôture de devant (basse) et pancarte
+    ctx.fillStyle = '#a5774a'; ctx.strokeStyle = 'rgba(60,35,15,.6)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i <= 9; i++) { const px = 6 + ((YARD_W - 12) * i) / 9; ctx.fillRect(px - 4, YARD_H - 22, 8, 24); ctx.strokeRect(px - 4, YARD_H - 22, 8, 24); }
+    ctx.fillRect(0, YARD_H - 16, YARD_W, 6);
+    const label = data.pet ? `${data.pet.name} · niv. ${data.pet.level}` : 'Enclos';
+    ctx.font = '800 20px sans-serif';
+    const lw = ctx.measureText(label).width + 22;
+    ctx.fillStyle = '#6b4322'; ctx.fillRect(YARD_W / 2 - lw / 2, YARD_H - 30, lw, 30);
+    ctx.strokeStyle = '#d9a441'; ctx.lineWidth = 2; ctx.strokeRect(YARD_W / 2 - lw / 2 + 1, YARD_H - 29, lw - 2, 28);
+    ctx.fillStyle = '#ffe27a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, YARD_W / 2, YARD_H - 15);
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+    return { h: YARD_H * s };
+  }
+  window.drawPetYard = drawPetYard;
+  window.PET_YARD_RATIO = YARD_H / YARD_W;
 
   window.renderPets = renderPets;
   window.onPetEvent = onPetEvent;

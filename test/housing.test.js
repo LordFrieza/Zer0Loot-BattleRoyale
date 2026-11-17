@@ -144,6 +144,12 @@ test('[HOUSE-6] maison : liste des maisons, visites, « J\'aime »', () => {
   assert.strictEqual(a.character.house.visits, 1, 'sa propre visite ne compte pas');
   const view = housing.publicHouse(a, b, () => ({}), () => ({}));
   assert.deepStrictEqual([view.name, view.placed.length, view.mine, view.liked], [a.username, 1, false, false]);
+  assert.strictEqual(view.yard, null, 'sans familier ni objet d\'enclos : pas d\'enclos devant la maison');
+  game.addPet(a.character, 'dragon');
+  a.character.pets.enclos.push('niche', 'fontaine');
+  const yard = housing.publicHouse(a, b, () => ({}), () => ({})).yard;
+  assert.deepStrictEqual(yard.enclos, ['niche', 'fontaine']);
+  assert.deepStrictEqual([yard.pet.species, yard.pet.level], ['dragon', a.character.pets.list[0].level]);
   assert.deepStrictEqual(housing.toggleLike(b, a.id), { liked: true, likes: 1 });
   assert.deepStrictEqual(housing.toggleLike(b, a.id), { liked: false, likes: 0 });
   assert.throws(() => housing.toggleLike(a, a.id), /propre maison/);

@@ -695,12 +695,13 @@
     g.fillStyle = '#8cc56a'; g.beginPath(); g.ellipse(cw * 0.2, ch * 0.8, cw * 0.4, 70, 0, 0, Math.PI * 2); g.ellipse(cw * 0.85, ch * 0.82, cw * 0.35, 60, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#6fb35a'; g.fillRect(0, ch * 0.8, cw, ch * 0.2);
     const size = house.size || 'studio';
+    const cx = o.cx != null ? o.cx : cw / 2; // centre de la maison (décalée à gauche quand l'enclos est à droite)
     const bw = { studio: 220, maison: 290, manoir: 380 }[size];
     const bh = { studio: 110, maison: 120, manoir: 150 }[size];
-    const bx = cw / 2 - bw / 2;
+    const bx = cx - bw / 2;
     const by = ch * 0.82 - bh;
     // Allée
-    g.fillStyle = '#d8c09a'; g.beginPath(); g.moveTo(cw / 2 - 16, ch * 0.82); g.lineTo(cw / 2 + 16, ch * 0.82); g.lineTo(cw / 2 + 34, ch); g.lineTo(cw / 2 - 34, ch); g.closePath(); g.fill();
+    g.fillStyle = '#d8c09a'; g.beginPath(); g.moveTo(cx - 16, ch * 0.82); g.lineTo(cx + 16, ch * 0.82); g.lineTo(cx + 34, ch); g.lineTo(cx - 34, ch); g.closePath(); g.fill();
     // Murs
     const wall = P.murs.options[st.murs] || P.murs.options.blanc;
     g.fillStyle = wall.color; g.fillRect(bx, by, bw, bh);
@@ -724,15 +725,15 @@
         const y = by - k * 34;
         g.beginPath(); g.moveTo(bx - 26 + k * 30, y); g.quadraticCurveTo(bx + 10 + k * 30, y - 10, bx + 20 + k * 30, y - 30); g.lineTo(bx + bw - 20 - k * 30, y - 30); g.quadraticCurveTo(bx + bw - 10 - k * 30, y - 10, bx + bw + 26 - k * 30, y); g.closePath(); g.fill();
       }
-      g.fillStyle = GOLD; g.fillRect(cw / 2 - 3, by - 82, 6, 18);
+      g.fillStyle = GOLD; g.fillRect(cx - 3, by - 82, 6, 18);
     } else if (st.toit === 'chaume') {
-      g.beginPath(); g.moveTo(bx - 18, by + 4); g.quadraticCurveTo(cw / 2, by - 110, bx + bw + 18, by + 4); g.closePath(); g.fill();
-      g.strokeStyle = 'rgba(120, 90, 30, .5)'; for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo(bx - 10 + i * (bw + 20) / 14, by + 2); g.lineTo(cw / 2 + (i - 7) * 4, by - 40); g.stroke(); }
+      g.beginPath(); g.moveTo(bx - 18, by + 4); g.quadraticCurveTo(cx, by - 110, bx + bw + 18, by + 4); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(120, 90, 30, .5)'; for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo(bx - 10 + i * (bw + 20) / 14, by + 2); g.lineTo(cx + (i - 7) * 4, by - 40); g.stroke(); }
     } else {
-      g.beginPath(); g.moveTo(bx - 20, by + 2); g.lineTo(cw / 2, by - 78); g.lineTo(bx + bw + 20, by + 2); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(bx - 20, by + 2); g.lineTo(cx, by - 78); g.lineTo(bx + bw + 20, by + 2); g.closePath(); g.fill();
       g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1;
-      for (let i = 1; i < 6; i++) { const y = by + 2 - i * 13; const half = (bw / 2 + 20) * (1 - i / 6); g.beginPath(); g.moveTo(cw / 2 - half, y); g.lineTo(cw / 2 + half, y); g.stroke(); }
-      if (st.toit === 'or') { g.fillStyle = 'rgba(255,255,255,.6)'; g.globalAlpha = Math.max(0, Math.sin(t / 400)); g.fillRect(cw / 2 - 30, by - 40, 4, 4); g.fillRect(cw / 2 + 40, by - 20, 3, 3); g.globalAlpha = 1; }
+      for (let i = 1; i < 6; i++) { const y = by + 2 - i * 13; const half = (bw / 2 + 20) * (1 - i / 6); g.beginPath(); g.moveTo(cx - half, y); g.lineTo(cx + half, y); g.stroke(); }
+      if (st.toit === 'or') { g.fillStyle = 'rgba(255,255,255,.6)'; g.globalAlpha = Math.max(0, Math.sin(t / 400)); g.fillRect(cx - 30, by - 40, 4, 4); g.fillRect(cx + 40, by - 20, 3, 3); g.globalAlpha = 1; }
     }
     // Fenêtres
     const winY = by + bh * 0.25;
@@ -743,20 +744,21 @@
     const door = P.porte.options[st.porte] || P.porte.options.bois;
     const dw = 34;
     const dh = 54;
-    const dx = cw / 2 - dw / 2;
+    const dx = cx - dw / 2;
     const dy = by + bh - dh;
     g.fillStyle = door.color;
-    if (st.porte === 'arche' || st.porte === 'doree') { g.beginPath(); g.moveTo(dx, by + bh); g.lineTo(dx, dy + 14); g.arc(cw / 2, dy + 14, dw / 2, Math.PI, 0); g.lineTo(dx + dw, by + bh); g.closePath(); g.fill(); } else g.fillRect(dx, dy, dw, dh);
+    if (st.porte === 'arche' || st.porte === 'doree') { g.beginPath(); g.moveTo(dx, by + bh); g.lineTo(dx, dy + 14); g.arc(cx, dy + 14, dw / 2, Math.PI, 0); g.lineTo(dx + dw, by + bh); g.closePath(); g.fill(); } else g.fillRect(dx, dy, dw, dh);
     g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.5; g.strokeRect(dx + 5, dy + 8, dw - 10, dh - 14);
     g.fillStyle = GOLD; g.beginPath(); g.arc(dx + dw - 8, dy + dh / 2 + 4, 2.5, 0, Math.PI * 2); g.fill();
     if (st.porte === 'doree') { g.fillStyle = '#fff'; g.globalAlpha = Math.max(0, Math.sin(t / 300)); g.fillRect(dx + 8, dy + 16, 3, 3); g.globalAlpha = 1; }
     // Jardin
     const gy = ch * 0.82;
-    if (st.jardin === 'fleurs') for (let i = 0; i < 14; i++) { const x = bx + 8 + i * ((bw - 16) / 13); if (Math.abs(x - cw / 2) < 26) continue; g.fillStyle = '#3d7a34'; g.fillRect(x - 1, gy - 6, 2, 8); g.fillStyle = ['#ff6b9a', '#ffd34a', '#b98cff', '#fff'][i % 4]; g.beginPath(); g.arc(x, gy - 8, 4, 0, Math.PI * 2); g.fill(); }
-    if (st.jardin === 'haie') { g.fillStyle = '#2f7a3a'; rr(g, bx - 30, gy - 18, cw / 2 - bx + 4, 22, 9, '#2f7a3a'); rr(g, cw / 2 + 26, gy - 18, bx + bw - cw / 2 + 4, 22, 9, '#2f7a3a'); }
-    if (st.jardin === 'lanternes') for (const x of [cw / 2 - 50, cw / 2 + 50]) { g.fillStyle = '#3a3a42'; g.fillRect(x - 2, gy - 40, 4, 44); glow(g, x, gy - 44, 24, 'rgba(255, 210, 120, .6)'); rr(g, x - 6, gy - 52, 12, 14, 3, '#ffe9a8', '#3a3a42'); }
-    if (st.jardin === 'cerisier') { const x = bx + bw + 46; g.fillStyle = '#5a3a2a'; g.fillRect(x - 5, gy - 70, 10, 74); for (const [ox, oy, r] of [[-20, -80, 24], [18, -84, 26], [0, -102, 24]]) { g.fillStyle = '#ffb6d0'; g.beginPath(); g.arc(x + ox, gy + oy, r, 0, Math.PI * 2); g.fill(); } }
+    if (st.jardin === 'fleurs') for (let i = 0; i < 14; i++) { const x = bx + 8 + i * ((bw - 16) / 13); if (Math.abs(x - cx) < 26) continue; g.fillStyle = '#3d7a34'; g.fillRect(x - 1, gy - 6, 2, 8); g.fillStyle = ['#ff6b9a', '#ffd34a', '#b98cff', '#fff'][i % 4]; g.beginPath(); g.arc(x, gy - 8, 4, 0, Math.PI * 2); g.fill(); }
+    if (st.jardin === 'haie') { g.fillStyle = '#2f7a3a'; rr(g, bx - 30, gy - 18, cx - bx + 4, 22, 9, '#2f7a3a'); rr(g, cx + 26, gy - 18, bx + bw - cx + 4, 22, 9, '#2f7a3a'); }
+    if (st.jardin === 'lanternes') for (const x of [cx - 50, cx + 50]) { g.fillStyle = '#3a3a42'; g.fillRect(x - 2, gy - 40, 4, 44); glow(g, x, gy - 44, 24, 'rgba(255, 210, 120, .6)'); rr(g, x - 6, gy - 52, 12, 14, 3, '#ffe9a8', '#3a3a42'); }
+    if (st.jardin === 'cerisier') { const x = o.cx != null ? bx - 52 : bx + bw + 46; g.fillStyle = '#5a3a2a'; g.fillRect(x - 5, gy - 70, 10, 74); for (const [ox, oy, r] of [[-20, -80, 24], [18, -84, 26], [0, -102, 24]]) { g.fillStyle = '#ffb6d0'; g.beginPath(); g.arc(x + ox, gy + oy, r, 0, Math.PI * 2); g.fill(); } }
     if (st.jardin === 'fontaine') { const x = bx - 56; g.fillStyle = '#a8a39a'; g.beginPath(); g.ellipse(x, gy, 34, 10, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#5ab8e8'; g.beginPath(); g.ellipse(x, gy - 2, 28, 7, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c0bab0'; g.fillRect(x - 4, gy - 30, 8, 28); g.strokeStyle = 'rgba(180,230,255,.9)'; g.lineWidth = 2; for (let i = -1; i <= 1; i += 2) { g.beginPath(); g.moveTo(x, gy - 30); g.quadraticCurveTo(x + i * 20, gy - 44, x + i * 26, gy - 4); g.stroke(); } }
+    if (o.yard) o.yard(g, bx + bw, gy); // enclos à familier à droite de la maison (pets.js)
     // Boîte aux lettres (drapeau levé = courrier)
     const mx = bx - 30;
     const my = gy;

@@ -127,10 +127,19 @@ function ownerName(u) {
 }
 
 // Vue publique d'une maison (visite) : disposition, style, niveau, apparence du propriétaire.
+// Enclos à familier vu depuis la façade : objets achetés et familier principal (null sans familier ni objet).
+function yardOf(c) {
+  const P = c.pets;
+  if (!P || (!(P.list || []).length && !(P.enclos || []).length)) return null;
+  const pet = (P.list || []).find((p) => p.id === P.active) || null;
+  return { enclos: (P.enclos || []).slice(), pet: pet ? { species: pet.species, name: pet.name, level: pet.level } : null };
+}
+
 function publicHouse(owner, viewer, appOf, lookOf) {
   const c = owner.character;
   const H = houseOf(c);
   return {
+    yard: yardOf(c),
     id: owner.id,
     name: ownerName(owner),
     cls: c.cls || null,

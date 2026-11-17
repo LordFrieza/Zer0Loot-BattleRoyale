@@ -522,7 +522,25 @@
     // Façade redessinée à chaque image : ciel et passants animés (housing-life.js)
     const ec = $('house-ext');
     const life = window.HouseLife;
-    ext = drawHouseFront(ec.getContext('2d'), house, ec.width, ec.height, { t: now, mail: view.mine && Rules.houseMailDue(mine.mailAt) > 0, name: view.mine ? null : view.name, sky: life && life.sky, front: life && life.front });
+    // Enclos à familier à droite de la maison (objets achetés et familier principal, comme dans l'onglet Familier)
+    const yard = view.mine && me.character.pets ? liveYard() : view.yard;
+    let cx = null;
+    let yardFn = null;
+    if (yard && window.drawPetYard) {
+      const bw = { studio: 220, maison: 290, manoir: 380 }[view.size] || 220;
+      const yw = Math.max(150, Math.min(230, ec.width - bw - 110)); // plus grand quand la maison est petite
+      const x0 = ec.width - yw - 8;
+      cx = Math.min(x0 - 6 - bw / 2, Math.max(bw / 2 + 80, x0 / 2));
+      yardFn = (g, right, gy) => drawPetYard(g, Math.min(right + 26, x0), gy + 40 - yw * window.PET_YARD_RATIO, yw, yard, now);
+    }
+    ext = drawHouseFront(ec.getContext('2d'), house, ec.width, ec.height, { t: now, mail: view.mine && Rules.houseMailDue(mine.mailAt) > 0, name: view.mine ? null : view.name, sky: life && life.sky, front: life && life.front, cx, yard: yardFn });
+  }
+  // Mon enclos d'après mes données à jour (achat d'un objet, changement de familier principal…)
+  function liveYard() {
+    const P = me.character.pets;
+    if (!P || (!P.list.length && !P.enclos.length)) return null;
+    const pet = P.list.find((p) => p.id === P.active);
+    return { enclos: P.enclos, pet: pet ? { species: pet.species, name: pet.name, level: pet.level } : null };
   }
   function myLook() {
     const look = {};
