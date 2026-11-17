@@ -28,6 +28,7 @@ function render() {
   const c = me.character;
   $('who').textContent = me.username;
   $('gold-chip').textContent = `🪙 ${c.gold.toLocaleString('fr-FR')}`;
+  $('emerald-chip').innerHTML = `<i class="ico-emerald"></i> ${(c.emeralds || 0).toLocaleString('fr-FR')}`;
   $('char-name').textContent = me.twitchDisplayName || me.username;
   window.ZL_CLASS = c.cls; // pour l'affichage des objets réservés dans les animations
   // Casino : ouvert au chargement de la page (onglet mémorisé) dès que le personnage est connu

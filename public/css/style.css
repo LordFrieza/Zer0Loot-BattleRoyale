@@ -894,6 +894,7 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .stat-filters .filter-label { font-size: 12px; align-self: center; margin-right: 2px; }
 .stat-filters [data-set]:not([data-set="all"]):not([data-set="none"]) { border-color: color-mix(in srgb, var(--set) 55%, transparent); }
 .stat-filters [data-set].active:not([data-set="all"]):not([data-set="none"]) { background: color-mix(in srgb, var(--set) 25%, transparent); color: #fff; }
+.gold-chip.emerald-chip { color: #5dff9a; border-color: rgba(93,255,154,.45); background: rgba(93,255,154,.08); text-decoration: none; }
 .gold-chip { font-weight: 900; color: #ffc93a; padding: 3px 10px; border: 1px solid rgba(255,201,58,.45); border-radius: 999px; background: rgba(255,201,58,.08); font-size: 14px; white-space: nowrap; }
 
 /* ---------- Marché ---------- */

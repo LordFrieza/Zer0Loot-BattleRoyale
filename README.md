@@ -397,7 +397,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
   Les gros gains (10× la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde ; statistiques de
   casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
-- **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (4 800 × 4 800 px,
+- **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (7 200 × 7 200 px,
   9 lieux-dits : village, forêt sombre, lac gelé, cimetière, champs de blé, volcan, ruines, marais, prairie fleurie, avec
   leurs ennemis favoris, aux frontières naturelles). Carte dessinée au naturel : sol lissé et fondu, routes de terre
   sinueuses vers la clairière de chaque autel, rivière du lac gelé jusqu'à la mare du marais (avec des ponts), cratère de
@@ -419,10 +419,13 @@ de la file, confirme les `!join` et annonce le vainqueur.
     cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
   - Gemmes d'XP → montée de niveau (partie en pause) : choisir entre 3 (ou 4) améliorations. **8 armes** (Épée, Dagues,
     Baguette magique, Aura de feu, Hache, Foudre, Orbes gardiens, Fiole d'acide ; 8 niveaux chacune, 6 au plus) et
-    **11 objets** cumulables (Cœur, Armure, Bottes, Gantelet, Grimoire, Cristal, Aimant, Trèfle, Couronne, Pomme dorée,
-    Duplicateur ; 6 au plus).
+    **25 objets** cumulables (Cœur, Armure, Bottes, Gantelet, Grimoire, Cristal, Aimant, Trèfle, Couronne, Pomme dorée,
+    Duplicateur, Cape d'ombre, Armure d'épines, Croc de vampire, Sablier, Plume du vent, Œil de faucon, Bouclier runique,
+    Bourse de gemmes, Boussole, Cor de guerre, Gourde de soin, Talisman du vent, Rune de givre, Tome des possibles ;
+    6 au plus).
+  - **Eau** : la rivière, le lac gelé et la mare divisent la vitesse par deux (joueur et monstres) ; les ponts restent au sec.
   - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres), une fois par
-    jour **3 coffres + 1 Clé de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
+    jour **10 coffres + 3 Clés de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
     (classement des meilleurs scores).
   - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,
     Carapace, Hâte, Célérité, Envergure, Attraction, Croissance, Récupération, Fortune, Avidité, Relance, Seconde vie),

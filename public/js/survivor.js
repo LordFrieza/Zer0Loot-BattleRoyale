@@ -103,37 +103,13 @@
     out.push(pts[pts.length - 1]);
     return out;
   }
-  // Route sinueuse de A à B : courbe qui ondule de part et d'autre de la ligne droite
-  function windingPath(a, b, seed) {
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const len = Math.hypot(dx, dy);
-    const nx = -dy / len;
-    const ny = dx / len;
-    const amp = (110 + hash(seed, 1, 7) * 120) * (hash(seed, 2, 7) < 0.5 ? -1 : 1);
-    const ph = hash(seed, 3, 7) * Math.PI * 2;
-    const pts = [];
-    const n = Math.max(4, Math.round(len / 260));
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      // Une grande courbe, plus de petites ondulations
-      const w = Math.sin(t * Math.PI) * (amp + Math.sin(t * Math.PI * 3 + ph) * 35 + (hash(seed, i, 8) - 0.5) * 30);
-      pts.push([a[0] + dx * t + nx * w, a[1] + dy * t + ny * w]);
-    }
-    return catmull(pts, 8);
-  }
-  const ZP = (id) => [ZONES[id].x, ZONES[id].y];
-  const ROAD_LINKS = [['village', 'foret'], ['village', 'lac'], ['village', 'cimetiere'], ['village', 'champs'], ['village', 'volcan'], ['village', 'ruines'], ['village', 'marais'], ['village', 'prairie'],
-  ];
-  const ROADS = ROAD_LINKS.map(([a, b], i) => windingPath(ZP(a), ZP(b), i + 1));
-  // La rivière descend du lac gelé jusqu'au marais
-  const RIVER = catmull([[2180, 760], [2050, 1050], [1820, 1380], [1640, 1720], [1580, 2080], [1440, 2420], [1470, 2800], [1340, 3150], [1150, 3360]], 12);
-  // Lac gelé et cratère du volcan : formes irrégulières
-  const blob = (cx, cy, r, seed, n = 28) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; const k = 1 + (vnoise(i * 0.7, 0, seed) - 0.5) * 0.45; return [cx + Math.cos(a) * r * k, cy + Math.sin(a) * r * 0.72 * k]; });
-  const LAKE = blob(2260, 560, 360, 21);
-  const CRATER = { x: 4330, y: 4330, r: 260 };
-  const LAVA = blob(CRATER.x, CRATER.y, 150, 33, 22);
-  const POND = blob(1060, 3440, 150, 44, 22); // la rivière finit dans une mare du marais
+  // Géographie partagée avec le serveur (l'eau y ralentit) : routes, rivière, lac gelé, mare, cratère, ponts
+  const K = SV.mapScale;
+  const MAP = Rules.survivorMap();
+  const { roads: ROADS, river: RIVER, lake: LAKE, pond: POND, crater: CRATER, lava: LAVA, bridges: BRIDGES } = MAP;
+  const bbox = (pts) => { const xs = pts.map((p) => p[0]); const ys = pts.map((p) => p[1]); return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 }; };
+  const LB = bbox(LAKE);
+  const PB = bbox(POND);
   function polyDist(x, y, lines) {
     let best = Infinity;
     for (const pts of lines) {
@@ -160,21 +136,6 @@
       if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
     }
     return inside;
-  }
-  // Ponts : là où une route croise la rivière
-  const BRIDGES = [];
-  for (const road of ROADS) {
-    for (let i = 0; i < road.length - 1; i++) {
-      for (let j = 0; j < RIVER.length - 1; j++) {
-        const [p, q] = [road[i], road[i + 1]];
-        const [r, s] = [RIVER[j], RIVER[j + 1]];
-        const d = (q[0] - p[0]) * (s[1] - r[1]) - (q[1] - p[1]) * (s[0] - r[0]);
-        if (!d) continue;
-        const t = ((r[0] - p[0]) * (s[1] - r[1]) - (r[1] - p[1]) * (s[0] - r[0])) / d;
-        const u = ((r[0] - p[0]) * (q[1] - p[1]) - (r[1] - p[1]) * (q[0] - p[0])) / d;
-        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) BRIDGES.push({ x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t, a: Math.atan2(q[1] - p[1], q[0] - p[0]) });
-      }
-    }
   }
   const strokePath = (g, pts) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); };
   const fillPoly = (g, pts) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
@@ -359,14 +320,14 @@
     g.translate(-x0, -y0);
     const inChunk = (x, y, m) => x > x0 - m && x < x0 + CHUNK + m && y > y0 - m && y < y0 + CHUNK + m;
     // 2) Lac gelé et cratère du volcan
-    if (inChunk(2260, 560, 520)) {
-      g.fillStyle = 'rgba(150, 200, 225, .55)'; smoothClosed(g, LAKE.map(([x, y]) => [x + (x - 2260) * 0.06, y + (y - 560) * 0.06])); g.fill();
+    if (inChunk(LB.cx, LB.cy, (LB.x1 - LB.x0) / 2 + 100)) {
+      g.fillStyle = 'rgba(150, 200, 225, .55)'; smoothClosed(g, LAKE.map(([x, y]) => [x + (x - LB.cx) * 0.06, y + (y - LB.cy) * 0.06])); g.fill();
       g.fillStyle = '#bfe3f2'; smoothClosed(g, LAKE); g.fill();
       g.save(); smoothClosed(g, LAKE); g.clip();
       g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2;
-      for (let i = 0; i < 26; i++) { const x = 1920 + hash(i, 1, 40) * 680; const y = 320 + hash(i, 2, 40) * 480; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30 + hash(i, 3, 40) * 50, y + (hash(i, 4, 40) - 0.5) * 30); g.lineTo(x + 50 + hash(i, 5, 40) * 60, y + (hash(i, 6, 40) - 0.5) * 50); g.stroke(); }
+      for (let i = 0; i < 40; i++) { const x = LB.x0 + hash(i, 1, 40) * (LB.x1 - LB.x0); const y = LB.y0 + hash(i, 2, 40) * (LB.y1 - LB.y0); g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30 + hash(i, 3, 40) * 50, y + (hash(i, 4, 40) - 0.5) * 30); g.lineTo(x + 50 + hash(i, 5, 40) * 60, y + (hash(i, 6, 40) - 0.5) * 50); g.stroke(); }
       g.fillStyle = 'rgba(255,255,255,.35)';
-      for (let i = 0; i < 12; i++) { g.beginPath(); g.ellipse(1950 + hash(i, 7, 40) * 620, 340 + hash(i, 8, 40) * 420, 40 + hash(i, 9, 40) * 60, 8, -0.2, 0, Math.PI * 2); g.fill(); }
+      for (let i = 0; i < 18; i++) { g.beginPath(); g.ellipse(LB.x0 + hash(i, 7, 40) * (LB.x1 - LB.x0), LB.y0 + hash(i, 8, 40) * (LB.y1 - LB.y0), 40 + hash(i, 9, 40) * 60, 8, -0.2, 0, Math.PI * 2); g.fill(); }
       g.restore();
       g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 4; smoothClosed(g, LAKE); g.stroke();
     }
@@ -377,17 +338,17 @@
       g.fillStyle = cg; g.beginPath(); g.ellipse(CRATER.x, CRATER.y, R * 1.25, R * 0.95, 0, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#24130f'; smoothClosed(g, LAVA.map(([x, y]) => [CRATER.x + (x - CRATER.x) * 1.25, CRATER.y + (y - CRATER.y) * 1.25])); g.fill();
       g.save(); g.shadowColor = '#ff6a1f'; g.shadowBlur = 30;
-      const lg = g.createRadialGradient(CRATER.x, CRATER.y, 10, CRATER.x, CRATER.y, 170);
+      const lg = g.createRadialGradient(CRATER.x, CRATER.y, 10, CRATER.x, CRATER.y, 170 * K);
       lg.addColorStop(0, '#ffe27a'); lg.addColorStop(0.45, '#ff8a2a'); lg.addColorStop(1, '#c2301a');
       g.fillStyle = lg; smoothClosed(g, LAVA); g.fill(); g.restore();
       g.strokeStyle = 'rgba(255, 230, 140, .5)'; g.lineWidth = 2;
-      for (let i = 0; i < 8; i++) { const a = hash(i, 1, 50) * Math.PI * 2; const r = 40 + hash(i, 2, 50) * 70; g.beginPath(); g.arc(CRATER.x + Math.cos(a) * r, CRATER.y + Math.sin(a) * r * 0.7, 10 + hash(i, 3, 50) * 18, 0, Math.PI); g.stroke(); }
+      for (let i = 0; i < 8; i++) { const a = hash(i, 1, 50) * Math.PI * 2; const r = (40 + hash(i, 2, 50) * 70) * K; g.beginPath(); g.arc(CRATER.x + Math.cos(a) * r, CRATER.y + Math.sin(a) * r * 0.7, (10 + hash(i, 3, 50) * 18) * K, 0, Math.PI); g.stroke(); }
       // Coulées de lave vers l'extérieur
       g.save(); g.shadowColor = '#ff6a1f'; g.shadowBlur = 12; g.strokeStyle = '#ff7a26'; g.lineCap = 'round';
       for (let i = 0; i < 3; i++) {
         const a = Math.PI * (1.02 + i * 0.2);
-        const pts = catmull([0, 1, 2, 3].map((s) => [CRATER.x + Math.cos(a + (hash(i, s, 51) - 0.5) * 0.5) * (150 + s * 55), CRATER.y + Math.sin(a + (hash(i, s, 51) - 0.5) * 0.5) * (110 + s * 45)]), 8);
-        g.lineWidth = 6 - i * 1.5; strokePath(g, pts); g.stroke();
+        const pts = catmull([0, 1, 2, 3].map((s) => [CRATER.x + Math.cos(a + (hash(i, s, 51) - 0.5) * 0.5) * (150 + s * 55) * K, CRATER.y + Math.sin(a + (hash(i, s, 51) - 0.5) * 0.5) * (110 + s * 45) * K]), 8);
+        g.lineWidth = (6 - i * 1.5) * K; strokePath(g, pts); g.stroke();
       }
       g.restore();
     }
@@ -405,22 +366,23 @@
       }
     }
     // 4) Rivière (berges, eau, reflets)
-    if (RIVER.some(([x, y]) => inChunk(x, y, 120))) {
+    const RW = MAP.width.river;
+    if (RIVER.some(([x, y]) => inChunk(x, y, 160))) {
       g.lineCap = 'round'; g.lineJoin = 'round';
-      g.strokeStyle = 'rgba(70, 60, 40, .45)'; g.lineWidth = 62; strokePath(g, RIVER); g.stroke();
-      g.strokeStyle = '#3f86b8'; g.lineWidth = 44; strokePath(g, RIVER); g.stroke();
-      g.strokeStyle = '#5aa6d6'; g.lineWidth = 28; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = 'rgba(70, 60, 40, .45)'; g.lineWidth = RW + 18 * K; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = '#3f86b8'; g.lineWidth = RW; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = '#5aa6d6'; g.lineWidth = RW * 0.62; strokePath(g, RIVER); g.stroke();
       g.strokeStyle = 'rgba(220, 245, 255, .55)'; g.lineWidth = 2; g.setLineDash([18, 26]);
       strokePath(g, RIVER.map(([x, y], i) => [x + Math.sin(i * 0.9) * 6, y])); g.stroke(); g.setLineDash([]);
-      for (let i = 0; i < RIVER.length; i += 3) { const [x, y] = RIVER[i]; if (!inChunk(x, y, 60)) continue; const s = hash(i, 1, 60) > 0.5 ? 1 : -1; DECOR.rock(g, x + s * 34, y + 6, 0.7); }
+      for (let i = 0; i < RIVER.length; i += 3) { const [x, y] = RIVER[i]; if (!inChunk(x, y, 60)) continue; const s = hash(i, 1, 60) > 0.5 ? 1 : -1; DECOR.rock(g, x + s * (RW / 2 + 12), y + 6, 0.8); }
     }
-    if (inChunk(1060, 3440, 260)) {
-      g.fillStyle = 'rgba(60, 50, 30, .45)'; smoothClosed(g, POND.map(([x, y]) => [x + (x - 1060) * 0.12, y + (y - 3440) * 0.12])); g.fill();
+    if (inChunk(PB.cx, PB.cy, (PB.x1 - PB.x0) / 2 + 100)) {
+      g.fillStyle = 'rgba(60, 50, 30, .45)'; smoothClosed(g, POND.map(([x, y]) => [x + (x - PB.cx) * 0.12, y + (y - PB.cy) * 0.12])); g.fill();
       g.fillStyle = '#3f7d8a'; smoothClosed(g, POND); g.fill();
       g.fillStyle = 'rgba(170, 220, 210, .3)';
-      for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(980 + hash(i, 1, 45) * 160, 3390 + hash(i, 2, 45) * 90, 22, 5, 0, 0, Math.PI * 2); g.fill(); }
+      for (let i = 0; i < 8; i++) { g.beginPath(); g.ellipse(PB.x0 + 30 + hash(i, 1, 45) * (PB.x1 - PB.x0 - 60), PB.y0 + 20 + hash(i, 2, 45) * (PB.y1 - PB.y0 - 40), 22, 5, 0, 0, Math.PI * 2); g.fill(); }
       g.fillStyle = '#4f8a3a';
-      for (let i = 0; i < 7; i++) { const x = 940 + hash(i, 3, 45) * 240; const y = 3380 + hash(i, 4, 45) * 120; if (inPoly(x, y, POND)) { g.beginPath(); g.ellipse(x, y, 9, 6, 0, 0.3, Math.PI * 2 - 0.3); g.lineTo(x, y); g.fill(); } }
+      for (let i = 0; i < 10; i++) { const x = PB.x0 + hash(i, 3, 45) * (PB.x1 - PB.x0); const y = PB.y0 + hash(i, 4, 45) * (PB.y1 - PB.y0); if (inPoly(x, y, POND)) { g.beginPath(); g.ellipse(x, y, 9, 6, 0, 0.3, Math.PI * 2 - 0.3); g.lineTo(x, y); g.fill(); } }
     }
     // 5) Routes de terre sinueuses, jusqu'à une clairière autour de chaque autel
     g.lineCap = 'round'; g.lineJoin = 'round';
@@ -429,15 +391,16 @@
       g.fillStyle = 'rgba(80, 60, 35, .3)'; g.beginPath(); g.ellipse(A.x, A.y + 4, 96, 70, 0, 0, Math.PI * 2); g.fill();
       g.fillStyle = A.zone === 'lac' ? '#cfe4ee' : A.zone === 'volcan' ? '#6a3b2c' : '#b39064'; g.beginPath(); g.ellipse(A.x, A.y + 4, 88, 63, 0, 0, Math.PI * 2); g.fill();
     }
-    const roads = ROADS.filter((r) => r.some(([x, y]) => inChunk(x, y, 140)));
-    for (const r of roads) { g.strokeStyle = 'rgba(80, 60, 35, .35)'; g.lineWidth = 58; strokePath(g, r); g.stroke(); }
-    for (const r of roads) { g.strokeStyle = '#b08a5a'; g.lineWidth = 46; strokePath(g, r); g.stroke(); }
-    for (const r of roads) { g.strokeStyle = 'rgba(214, 180, 128, .55)'; g.lineWidth = 18; strokePath(g, r); g.stroke(); }
+    const roads = ROADS.filter((r) => r.some(([x, y]) => inChunk(x, y, 180)));
+    const RD = MAP.width.road;
+    for (const r of roads) { g.strokeStyle = 'rgba(80, 60, 35, .35)'; g.lineWidth = RD + 12 * K; strokePath(g, r); g.stroke(); }
+    for (const r of roads) { g.strokeStyle = '#b08a5a'; g.lineWidth = RD; strokePath(g, r); g.stroke(); }
+    for (const r of roads) { g.strokeStyle = 'rgba(214, 180, 128, .55)'; g.lineWidth = RD * 0.4; strokePath(g, r); g.stroke(); }
     for (const r of roads) {
       for (let i = 0; i < r.length; i++) {
         const [x, y] = r[i];
         if (!inChunk(x, y, 30)) continue;
-        for (let s = 0; s < 2; s++) { const h = hash(Math.round(x), Math.round(y), s); g.fillStyle = h > 0.5 ? 'rgba(120, 90, 55, .5)' : 'rgba(235, 210, 170, .5)'; g.beginPath(); g.arc(x + (h - 0.5) * 36, y + (hash(Math.round(y), Math.round(x), s) - 0.5) * 30, 1.5 + h * 2, 0, Math.PI * 2); g.fill(); }
+        for (let s = 0; s < 2; s++) { const h = hash(Math.round(x), Math.round(y), s); g.fillStyle = h > 0.5 ? 'rgba(120, 90, 55, .5)' : 'rgba(235, 210, 170, .5)'; g.beginPath(); g.arc(x + (h - 0.5) * RD * 0.75, y + (hash(Math.round(y), Math.round(x), s) - 0.5) * RD * 0.65, 1.5 + h * 2, 0, Math.PI * 2); g.fill(); }
       }
     }
     // Place du village pavée
@@ -448,13 +411,15 @@
     }
     // Ponts de bois
     for (const b of BRIDGES) {
-      if (!inChunk(b.x, b.y, 80)) continue;
+      if (!inChunk(b.x, b.y, 120)) continue;
+      const [L, Wd] = MAP.width.bridge;
       g.save(); g.translate(b.x, b.y); g.rotate(b.a);
-      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(-40, -26, 80, 56);
-      g.fillStyle = '#8a5a30'; g.fillRect(-42, -27, 84, 52);
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(-L / 2 + 2, -Wd / 2 + 4, L, Wd);
+      g.fillStyle = '#8a5a30'; g.fillRect(-L / 2, -Wd / 2, L, Wd);
       g.strokeStyle = '#5e3b1c'; g.lineWidth = 2;
-      for (let i = -36; i <= 36; i += 9) { g.beginPath(); g.moveTo(i, -27); g.lineTo(i, 25); g.stroke(); }
-      g.fillStyle = '#6b4322'; g.fillRect(-44, -31, 88, 6); g.fillRect(-44, 23, 88, 6);
+      for (let i = -L / 2 + 6; i <= L / 2 - 4; i += 10) { g.beginPath(); g.moveTo(i, -Wd / 2); g.lineTo(i, Wd / 2); g.stroke(); }
+      g.fillStyle = '#6b4322'; g.fillRect(-L / 2 - 3, -Wd / 2 - 5, L + 6, 7); g.fillRect(-L / 2 - 3, Wd / 2 - 2, L + 6, 7);
+      for (const sx of [-L / 2, L / 2]) for (const sy of [-Wd / 2 - 3, Wd / 2 + 3]) { g.fillStyle = '#4e3018'; g.beginPath(); g.arc(sx, sy, 5, 0, Math.PI * 2); g.fill(); }
       g.restore();
     }
     // 6) Décor (une graine par case de 64 px, y compris celles qui débordent sur ce morceau), triés par profondeur
@@ -465,7 +430,7 @@
         const y = gy * TILE + hash(gx, gy, 3) * TILE;
         if (x < 0 || y < 0 || x > SV.map.w || y > SV.map.h) { if (hash(gx, gy, 9) < 0.6) items.push(['pine', x, y, 1.2]); continue; }
         if (Math.hypot(x - SV.map.w / 2, y - SV.map.h / 2) < 190) continue; // place du village dégagée
-        if (roadDist(x, y) < 52 || riverDist(x, y) < 50 || inPoly(x, y, LAKE) || inPoly(x, y, POND) || Math.hypot(x - CRATER.x, (y - CRATER.y) * 1.3) < CRATER.r + 20) continue;
+        if (roadDist(x, y) < 52 * K || riverDist(x, y) < RW / 2 + 28 || inPoly(x, y, LAKE) || inPoly(x, y, POND) || Math.hypot(x - CRATER.x, (y - CRATER.y) * 1.3) < CRATER.r + 20) continue;
         if (ALTARS.some((A) => Math.hypot(x - A.x, y - A.y) < 110)) continue; // autels bien visibles
         const zone = Rules.survivorZone(x, y);
         let r = hash(gx, gy, 5);
@@ -601,6 +566,13 @@
         Sound.play('chestBurst', 'epique');
         svToast(`🎁 Coffre ! ${e.items.map(optLabel).join(' · ')}`, 3600);
         break;
+      case 'dodge':
+        G.texts.push({ x: G.me.x, y: G.me.y - 20, v: 'Esquive !', t0: now, c: 2 });
+        break;
+      case 'block':
+        G.texts.push({ x: G.me.x, y: G.me.y - 20, v: '🔰 Bloqué', t0: now, c: 1 });
+        G.fx.push({ k: 'ring', x: G.me.x, y: G.me.y, r: 60, t0: now, life: 400, color: '#7fd0ff' });
+        break;
       case 'heal':
         Sound.play('potion', 'vie');
         svToast('🍗 +30 % de vie !', 1600);
@@ -686,7 +658,8 @@
     const d = inputDir();
     G.me.moving = !stopped && (d.x || d.y);
     if (G.me.moving) {
-      const spd = (f && f.spd) || SV.player.speed;
+      // L'eau ralentit (le serveur fait de même) : il vaut mieux passer par les ponts
+      const spd = ((f && f.spd) || SV.player.speed) * (Rules.survivorWater(G.me.x, G.me.y) ? SV.waterSlow : 1);
       G.me.x = Math.max(20, Math.min(SV.map.w - 20, G.me.x + d.x * spd * dt));
       G.me.y = Math.max(20, Math.min(SV.map.h - 20, G.me.y + d.y * spd * dt));
       G.me.fx = d.x;
@@ -1024,8 +997,8 @@
     g.fillStyle = '#bfe3f2'; smoothClosed(g, LAKE); g.fill();
     g.fillStyle = '#ff7a26'; smoothClosed(g, LAVA); g.fill();
     g.fillStyle = '#3f7d8a'; smoothClosed(g, POND); g.fill();
-    g.strokeStyle = '#4a96c8'; g.lineWidth = 60; strokePath(g, RIVER); g.stroke();
-    g.strokeStyle = 'rgba(176, 138, 90, .95)'; g.lineWidth = 70;
+    g.strokeStyle = '#4a96c8'; g.lineWidth = MAP.width.river * 1.6; strokePath(g, RIVER); g.stroke();
+    g.strokeStyle = 'rgba(176, 138, 90, .95)'; g.lineWidth = 70 * K;
     for (const r of ROADS) { strokePath(g, r); g.stroke(); }
     g.restore();
     g.font = '700 9px system-ui';
@@ -1097,6 +1070,11 @@
       const Bz = ZONES[f.bless.zone];
       const bl = `✨ Bénédiction ${Bz.bonus} (${Math.ceil(Math.max(0, f.bless.left - (now - G.frameAt) / 1000))} s)`;
       ctx.strokeText(bl, 14, 174); ctx.fillStyle = '#b6ffa0'; ctx.fillText(bl, 14, 174);
+    }
+    if (Rules.survivorWater(G.me.x, G.me.y)) {
+      const wl = '💧 Dans l\'eau : vitesse −50 % (passe par les ponts !)';
+      const wy = f.bless ? 192 : 174;
+      ctx.strokeText(wl, 14, wy); ctx.fillStyle = '#9fdcff'; ctx.fillText(wl, 14, wy);
     }
     // Boss
     if (f.b) {
@@ -1288,7 +1266,7 @@
     Sound.music.stop();
     Sound.play(res.wave >= SV.dailyWave ? 'victory' : 'defeat');
     const el = $('sv-over');
-    const daily = res.daily ? `<div class="sv-daily">🎉 Récompense du jour : +${res.daily.chests} <i class="ico-chest"></i> coffres et +${res.daily.keys} 🗝️ Clé de boss !</div>` : '';
+    const daily = res.daily ? `<div class="sv-daily">🎉 Récompense du jour : +${res.daily.chests} <i class="ico-chest"></i> coffres et +${res.daily.keys} 🗝️ Clés de boss !</div>` : '';
     el.innerHTML = `<div class="sv-choice-box"><div class="sv-title">${res.wave >= SV.dailyWave ? '🏆 Quelle survie !' : '💀 Fin de partie'}</div>
       ${res.record ? '<div class="sv-record">★ Nouveau record ! ★</div>' : ''}
       <div class="sv-stats">
@@ -1429,13 +1407,13 @@
     return `<button class="sv-starter ${ok ? '' : 'locked'} ${starter === id ? 'active' : ''}" data-starter="${id}" ${ok ? '' : 'disabled'} title="${ok ? Wp.desc : 'À débloquer dans la méta-progression'}">${Wp.icon}<span>${Wp.label}</span>${ok ? '' : '<em>🔒</em>'}</button>`;
   }).join('')}</div>
           <button class="gold big-btn sv-play" id="sv-play" ${c.gold < SV.price ? 'disabled' : ''}>▶ Jouer — ${SV.price} 🪙</button>
-          <div class="sv-daily-status ${state.dailyDone ? 'done' : ''}">${state.dailyDone ? '✅ Récompense de la vague 30 déjà obtenue aujourd\'hui (revient demain)' : `🎁 Récompense du jour : atteins la vague ${SV.dailyWave} → +${SV.daily.chests} coffres et +${SV.daily.keys} Clé de boss`}</div>
+          <div class="sv-daily-status ${state.dailyDone ? 'done' : ''}">${state.dailyDone ? '✅ Récompense de la vague 30 déjà obtenue aujourd\'hui (revient demain)' : `🎁 Récompense du jour : atteins la vague ${SV.dailyWave} → +${SV.daily.chests} coffres et +${SV.daily.keys} Clés de boss`}</div>
           <div class="muted" style="font-size:13px">${b ? `Ton record : <b>${fmt(b.score)}</b> points (vague ${b.wave}, ${mmss(b.time)}, ${fmt(b.kills)} monstres, ${b.bosses} boss) · ${state.runs} partie(s)` : 'Pas encore de record : à toi de jouer !'}</div>
           <div class="muted" style="font-size:12px">⌨️ ZQSD ou flèches pour bouger · tes armes tirent seules · Échap : pause · 1-4 : choisir</div>
         </div>
       </div>
       <div class="sv-zones"><div class="sv-zones-title">🗺️ Lieux-dits : chacun a son effet tant que tu y es. Explore pour trouver les <b>autels</b> (bénédiction de ${X.altar.duration} s),
-        les <b>éclats d'émeraude</b> (+${X.shard.emeralds} 💎 chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} 💎).</div>
+        les <b>éclats d'émeraude</b> (+${X.shard.emeralds} 💎 chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} 💎). 💧 La rivière, le lac et la mare ralentissent de moitié (toi comme les monstres) : passe par les ponts.</div>
         <div class="sv-zones-grid">${Object.values(ZONES).map((z) => `<div class="sv-zone" style="--zc:${z.ground}"><b>${z.icon} ${z.label}</b><span>${z.bonus} : ${z.desc}</span></div>`).join('')}</div>
       </div>`;
     $('sv-lobby').querySelectorAll('[data-starter]').forEach((el) => {

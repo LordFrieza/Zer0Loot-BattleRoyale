@@ -43,14 +43,15 @@ test('[SV-1] survivor : 300 golds la partie, stats du personnage ignorées, gold
 
 test('[SV-2] survivor : lieux-dits, position bornée à la vitesse et à la carte', () => {
   assert.strictEqual(Object.keys(Rules.SURVIVOR_ZONES).length, 9);
-  assert.strictEqual(Rules.survivorZone(2400, 2400), 'village');
-  assert.strictEqual(Rules.survivorZone(300, 300), 'foret');
-  assert.strictEqual(Rules.survivorZone(4500, 4500), 'volcan');
+  assert.deepStrictEqual([SV.map.w, SV.map.h], [7200, 7200]);
+  assert.strictEqual(Rules.survivorZone(3600, 3600), 'village');
+  assert.strictEqual(Rules.survivorZone(450, 450), 'foret');
+  assert.strictEqual(Rules.survivorZone(6750, 6750), 'volcan');
   const run = new sv.SurvivorRun({});
-  run.setPos(2400 + 1000, 2400, 1, 0, 0.1); // téléportation : bornée
-  assert.ok(Math.abs(run.p.x - (2400 + 150 * 0.1 * SV.moveSlack + 4)) < 1e-6);
+  run.setPos(3600 + 1000, 3600, 1, 0, 0.1); // téléportation : bornée
+  assert.ok(Math.abs(run.p.x - (3600 + 150 * 0.1 * SV.moveSlack + 4)) < 1e-6);
   run.setPos(run.p.x + 10, run.p.y + 10, 0, 1, 0.1);
-  assert.ok(run.p.y > 2400 && run.p.fy === 1);
+  assert.ok(run.p.y > 3600 && run.p.fy === 1);
   run.setPos(-500, -500, 0, 0, 10); // temps limité à 0,25 s et bords de la carte
   assert.ok(run.p.x >= 20 && run.p.y >= 20);
   const x = run.p.x;
@@ -72,7 +73,7 @@ test('[SV-2] survivor : effets des lieux-dits (village, forêt, cimetière, volc
   assert.ok(near.a !== near.b && near.da <= near.db);
   assert.deepStrictEqual(Rules.survivorZoneNear(1700, 1700), near);
   const counts = {};
-  for (let y = 0; y < 4800; y += 60) for (let x = 0; x < 4800; x += 60) { const k = Rules.survivorZone(x, y); counts[k] = (counts[k] || 0) + 1; }
+  for (let y = 0; y < 7200; y += 90) for (let x = 0; x < 7200; x += 90) { const k = Rules.survivorZone(x, y); counts[k] = (counts[k] || 0) + 1; }
   assert.strictEqual(Object.keys(counts).length, 9);
   assert.ok(Object.values(counts).every((c) => c > 0.06 * 6400), 'chaque lieu-dit garde une bonne place');
   // Bénédiction : les effets positifs du lieu-dit béni × 1,5, sans ses contreparties
@@ -132,7 +133,7 @@ test('[SV-3] survivor : vagues de 30 s, ennemis selon la vague et le lieu-dit, �
   assert.ok(run.enemies.every((e) => Rules.SURVIVOR_ENEMIES[e.kind].from <= 1), 'seulement les ennemis de la vague 1');
   // Lieu-dit : ses ennemis favoris sortent bien plus souvent
   const counts = {};
-  for (let i = 0; i < 2000; i++) { const k = run.pickKind(1050, 3750); counts[k] = (counts[k] || 0) + 1; }
+  for (let i = 0; i < 2000; i++) { const k = run.pickKind(Rules.SURVIVOR_ZONES.marais.x, Rules.SURVIVOR_ZONES.marais.y); counts[k] = (counts[k] || 0) + 1; }
   assert.ok((counts.rat || 0) > (counts.gobelin || 0) * 2, 'marais : les rats d\'abord');
   // Élite toutes les 50 s
   run.eliteT = 0.01;
@@ -232,12 +233,14 @@ test('[SV-6] survivor : émeraudes, récompense du jour à la vague 30, record, 
   sv.start(u);
   const run = sv.runs.get(u.id).run;
   Object.assign(run, { t: 30 * 29 + 5, wave: 30, kills: 1234, bosses: 5, bonusEmeralds: 4 });
+  run.passives.bourse = 1; // Bourse de gemmes : +6 % en plus de l'Avidité
+  run.recompute();
   const now = Date.UTC(2026, 10, 17, 12);
   const r = sv.finish(u.id, now);
-  const expected = Math.round(Rules.survivorEmeralds(r) * 1.2) + 4;
+  const expected = Math.round(Rules.survivorEmeralds(r) * 1.26) + 4;
   assert.strictEqual(r.emeralds, expected);
   assert.strictEqual(u.character.emeralds, expected);
-  assert.deepStrictEqual(r.daily, { chests: 3, keys: 1 });
+  assert.deepStrictEqual(r.daily, { chests: 10, keys: 3 });
   assert.strictEqual(u.character.survivor.dailyDate, Rules.parisDay(now));
   assert.ok(r.record && u.character.survivor.best.score === r.score);
   assert.deepStrictEqual([u.character.counters.svBestWave, u.character.counters.svBosses], [30, 5]);
@@ -319,7 +322,7 @@ test('[SV-10] survivor : autels et bénédictions, éclats d\'émeraude, trésor
   for (const s of run.shards) {
     assert.notStrictEqual(Rules.survivorZone(s.x, s.y), 'village');
     const d = Math.hypot(s.x - run.p.x, s.y - run.p.y);
-    assert.ok(d >= 899 && d <= 1701, `distance ${d}`);
+    assert.ok(d >= 1349 && d <= 2551, `distance ${d}`);
   }
   run.shardT = 1e9;
   Object.assign(run.p, { x: run.shards[0].x, y: run.shards[0].y });
@@ -367,4 +370,109 @@ test('[SV-8] survivor : projectiles envoyés avec identifiant, position et vites
   assert.deepStrictEqual([x, kind, vx, vy], [Math.round(run.p.x + 100), 0, -120, 30]);
   assert.strictEqual(run.frame().es[0], id, 'même identifiant d\'une image à l\'autre');
   assert.deepStrictEqual(f.bo, [999, Math.round(run.p.x - 50), Math.round(run.p.y), 200, 0]);
+});
+
+test('[SV-11] survivor : carte agrandie, eau qui ralentit joueur et ennemis, ponts', () => {
+  const M = Rules.survivorMap();
+  assert.strictEqual(SV.mapScale, 1.5);
+  assert.ok(M.bridges.length >= 2, 'des ponts là où les routes croisent la rivière');
+  const mid = M.river[Math.floor(M.river.length / 2)];
+  assert.strictEqual(Rules.survivorWater(mid[0], mid[1]), true, 'rivière');
+  const L = M.lake.reduce((a, p) => [a[0] + p[0] / M.lake.length, a[1] + p[1] / M.lake.length], [0, 0]);
+  assert.strictEqual(Rules.survivorWater(L[0], L[1]), true, 'lac gelé');
+  for (const b of M.bridges) assert.strictEqual(Rules.survivorWater(b.x, b.y), false, 'sur un pont, on passe normalement');
+  for (const r of M.roads) assert.ok(r.every(([x, y]) => !Rules.survivorWater(x, y)), 'les routes restent au sec');
+  for (const z of Object.values(Rules.SURVIVOR_ZONES)) assert.strictEqual(Rules.survivorWater(z.x, z.y), false, `autel ${z.label} au sec`);
+  // Joueur : vitesse ×0,5 dans l'eau, et la position envoyée est bornée en conséquence
+  const run = new sv.SurvivorRun({});
+  const dry = run.speedNow();
+  Object.assign(run.p, { x: mid[0], y: mid[1] });
+  assert.ok(Math.abs(run.speedNow() - dry * SV.waterSlow) < 1e-9);
+  assert.strictEqual(run.frame().spd, Math.round(dry), 'le navigateur reçoit la vitesse hors eau et applique lui-même l\'eau');
+  const dir = [M.river[Math.floor(M.river.length / 2) + 1][0] - mid[0], M.river[Math.floor(M.river.length / 2) + 1][1] - mid[1]];
+  const len = Math.hypot(dir[0], dir[1]);
+  run.setPos(mid[0] + (dir[0] / len) * 500, mid[1] + (dir[1] / len) * 500, 1, 0, 0.1);
+  const moved = Math.hypot(run.p.x - mid[0], run.p.y - mid[1]);
+  assert.ok(moved <= dry * SV.waterSlow * 0.1 * SV.moveSlack + 4 + 1e-6, `ralenti dans l'eau (${moved})`);
+  // Ennemis : ralentis aussi
+  run.enemies = [];
+  Object.assign(run.p, { x: mid[0], y: mid[1] + 300 });
+  const e = run.spawnEnemy('rat', { x: mid[0], y: mid[1] });
+  const side = [300, -300, 0].find((dx) => !Rules.survivorWater(run.p.x + dx, run.p.y + (dx ? 0 : 300)));
+  const f = run.spawnEnemy('rat', { x: run.p.x + side, y: run.p.y + (side ? 0 : 300) });
+  assert.deepStrictEqual([Rules.survivorWater(e.x, e.y), Rules.survivorWater(f.x, f.y)], [true, false]);
+  const [ex, ey, fx, fy] = [e.x, e.y, f.x, f.y];
+  run.buildGrid();
+  run.updateEnemies(0.1);
+  const de = Math.hypot(e.x - ex, e.y - ey);
+  const df = Math.hypot(f.x - fx, f.y - fy);
+  assert.ok(Math.abs(de - df * SV.waterSlow) < 0.5, `rat dans l'eau ${de} / au sec ${df}`);
+});
+
+test('[SV-12] survivor : 25 objets, nouveaux effets (esquive, bouclier, épines, vampire, sablier, plume, faucon, cor, gourde, talisman, givre, boussole, tome)', () => {
+  const P = Rules.SURVIVOR_PASSIVES;
+  assert.strictEqual(Object.keys(P).length, 25);
+  assert.ok(Object.keys(P).every((id) => id in Rules.SURVIVOR_UNLOCKS.passives), 'chaque objet a un prix de déblocage');
+  assert.ok(['cape', 'epines', 'croc', 'sablier', 'plume', 'oeil', 'bouclier', 'bourse', 'boussole', 'cor', 'gourde', 'talisman', 'givre', 'tome'].every((id) => Rules.SURVIVOR_UNLOCKS.passives[id] >= 6000));
+  assert.strictEqual(Rules.survivorStats({}, { cape: 20 }).dodge, 0.4, 'esquive plafonnée à 40 %');
+  const mk = (passives) => { const r = new sv.SurvivorRun({ random: () => 0.5 }); r.passives = passives; r.recompute(); r.enemies = []; return r; };
+  // Esquive
+  let r = mk({ cape: 5 });
+  r.rand = () => 0.1;
+  assert.strictEqual(r.hurt(50), false);
+  assert.strictEqual(r.hp, r.stats.maxHp);
+  // Bouclier runique : bloque un coup, puis 15 s de recharge au niveau 1
+  r = mk({ bouclier: 1 });
+  assert.strictEqual(r.hurt(30), false);
+  assert.strictEqual(r.hurt(30), true);
+  assert.strictEqual(r.shieldAt, 15);
+  // Épines : l'ennemi au contact prend des dégâts
+  r = mk({ epines: 2 });
+  const e = r.spawnEnemy('slime', { x: r.p.x + 5, y: r.p.y });
+  const hp = e.hp;
+  r.buildGrid();
+  r.updateEnemies(0.05);
+  assert.ok(Math.abs(hp - e.hp - 24) < 1e-6, `épines ${hp - e.hp}`);
+  // Croc de vampire + Gourde de soin
+  r = mk({ croc: 5, gourde: 5 });
+  r.hp = 50;
+  r.kill(r.spawnEnemy('rat', { x: r.p.x + 400, y: r.p.y }));
+  assert.ok(Math.abs(r.hp - (50 + 1.5 * 2)) < 1e-9);
+  // Œil de faucon et Cor de guerre
+  r = mk({ oeil: 2, cor: 1, trefle: 0 });
+  r.rand = () => 0;
+  r.stats.crit = 1;
+  const boss = r.spawnEnemy('rat', { x: r.p.x + 600, y: r.p.y, elite: true });
+  const before = boss.hp;
+  r.damage(boss, 10, null, 0);
+  assert.ok(Math.abs(before - boss.hp - 10 * 2.5 * 1.12) < 1e-6);
+  // Rune de givre : ralenti 1 s ; Talisman : recul plus fort
+  r = mk({ givre: 5, talisman: 3 });
+  const g = r.spawnEnemy('rat', { x: r.p.x + 300, y: r.p.y });
+  r.damage(g, 1, null, 100);
+  assert.deepStrictEqual([g.chill, g.chillUntil], [0.4, 1]);
+  assert.ok(Math.abs(g.kx - 100 * 2.05) < 1e-6);
+  // Sablier et Plume du vent : durée et vitesse des dagues
+  r = mk({ sablier: 5, plume: 5 });
+  r.weapons = [];
+  r.addWeapon('dagues');
+  r.weapons[0].cd = 0;
+  r.fireWeapons(0.05);
+  const shot = r.shots[0];
+  const W = r.weapons[0].s;
+  assert.ok(Math.abs(shot.life - W.duration * 1.6) < 1e-9 && Math.abs(Math.hypot(shot.vx, shot.vy) - W.speed * 1.6) < 1e-6);
+  // Boussole : bénédiction plus longue, autel rechargé plus vite
+  r = mk({ boussole: 2 });
+  const A = r.altars[0];
+  Object.assign(r.p, { x: A.x, y: A.y });
+  r.treasureT = 1e9;
+  r.shardT = 1e9;
+  tickFor(r, 2.2);
+  assert.ok(Math.abs(r.blessing.until - r.t - 40 * 1.5) < 0.35);
+  assert.ok(Math.abs(A.readyAt - r.t - 150 * 0.7) < 0.35);
+  // Tome des possibles : une relance de plus à la prise
+  r = mk({});
+  const rr = r.rerolls;
+  r.apply({ type: 'passive', id: 'tome' });
+  assert.strictEqual(r.rerolls, rr + 1);
 });

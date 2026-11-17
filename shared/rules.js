@@ -1802,15 +1802,18 @@
   // (payée en émeraudes) améliore les stats de départ. Simulation côté serveur (server/survivor.js).
   const SURVIVOR = {
     price: 300, // golds la partie
-    map: { w: 4800, h: 4800 },
+    map: { w: 7200, h: 7200 },
+    mapScale: 1.5, // la carte dessinée sur une base de 4 800 px, agrandie ×1,5 (lieux-dits, rivière, lac…)
+    waterSlow: 0.5, // dans l'eau (rivière, lac, mare) hors des ponts : vitesse ×0,5, joueur comme ennemis
     waveSeconds: 30,
     bossEvery: 5,
-    dailyWave: 30, // atteindre la vague 30 : 3 coffres et 1 Clé de boss, une fois par jour (heure de Paris)
-    daily: { chests: 3, keys: 1 },
+    dailyWave: 30, // atteindre la vague 30 : 10 coffres et 3 Clés de boss, une fois par jour (heure de Paris)
+    daily: { chests: 10, keys: 3 },
     maxEnemies: 240,
     spawnDist: [720, 860],
     view: { w: 1280, h: 720 },
-    player: { radius: 14, maxHp: 120, speed: 150, magnet: 70, regen: 0, armor: 0, damage: 1, area: 1, cooldown: 1, amount: 0, luck: 0, xp: 1, crit: 0, revivals: 0, rerolls: 0, greed: 0 },
+    player: { radius: 14, maxHp: 120, speed: 150, magnet: 70, regen: 0, armor: 0, damage: 1, area: 1, cooldown: 1, amount: 0, luck: 0, xp: 1, crit: 0, revivals: 0, rerolls: 0, greed: 0,
+      dodge: 0, thorns: 0, lifeKill: 0, duration: 1, shotSpeed: 1, critMult: 2, shield: 0, explore: 0, bossDmg: 0, healMult: 1, knockback: 1, chill: 0 },
     hitCooldown: 1, // un même ennemi ne frappe qu'une fois par seconde
     moveSlack: 1.35, // tolérance sur la position envoyée par le navigateur (vitesse × temps × 1,35)
     idlePause: 20, // s sans nouvelles du joueur : pause automatique
@@ -1828,20 +1831,20 @@
   // et un effet tant que le joueur s'y trouve (fx) : xp, regen (PV/s), gems (gemmes ×(1+gems)), slow (ralentit les
   // ennemis), speed, magnet, damage, burn (PV perdus par seconde), crit, area, enemyHp (vie des ennemis qui y apparaissent).
   const SURVIVOR_ZONES = {
-    village: { label: 'Village', x: 2400, y: 2400, size: 0.8, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
-    foret: { label: 'Forêt sombre', x: 950, y: 1100, size: 1.2, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
-    lac: { label: 'Lac gelé', x: 2300, y: 700, size: 1.0, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
-    cimetiere: { label: 'Cimetière', x: 3800, y: 1150, size: 0.95, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
-    champs: { label: 'Champs de blé', x: 3950, y: 2350, size: 1.05, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
-    volcan: { label: 'Volcan', x: 3900, y: 3850, size: 1.05, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
-    ruines: { label: 'Ruines', x: 2750, y: 4050, size: 0.9, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
-    marais: { label: 'Marais', x: 1150, y: 3650, size: 1.05, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
-    prairie: { label: 'Prairie fleurie', x: 800, y: 2350, size: 1.0, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
+    village: { label: 'Village', x: 3600, y: 3600, size: 0.8, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
+    foret: { label: 'Forêt sombre', x: 1425, y: 1650, size: 1.2, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
+    lac: { label: 'Lac gelé', x: 3450, y: 1170, size: 1.0, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
+    cimetiere: { label: 'Cimetière', x: 5700, y: 1725, size: 0.95, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
+    champs: { label: 'Champs de blé', x: 5925, y: 3525, size: 1.05, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
+    volcan: { label: 'Volcan', x: 5850, y: 5775, size: 1.05, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
+    ruines: { label: 'Ruines', x: 4125, y: 6075, size: 0.9, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
+    marais: { label: 'Marais', x: 1725, y: 5475, size: 1.05, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
+    prairie: { label: 'Prairie fleurie', x: 1200, y: 3525, size: 1.0, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
   };
   // Raisons d'explorer : autels (bénédiction d'un lieu-dit), éclats d'émeraude, trésors gardés.
   const SURVIVOR_EXPLORE = {
     altar: { radius: 70, charge: 2, duration: 40, cooldown: 150, mult: 1.5, heal: 0.25 }, // un autel par lieu-dit (sauf le village)
-    shard: { every: 35, max: 3, dist: [900, 1700], radius: 34, emeralds: 1 }, // éclats d'émeraude, jamais au village
+    shard: { every: 35, max: 3, dist: [1350, 2550], radius: 34, emeralds: 1 }, // éclats d'émeraude, jamais au village
     treasure: { first: 90, every: 150, upgrades: 2, emeralds: 3, guards: 6, radius: 42, aggro: 450 }, // les gardiens restent au trésor tant que le joueur est à plus de 450 px
   };
   // Effet de zone (fx) en jeu : celui du lieu-dit où l'on est, plus la bénédiction d'autel en cours (parties positives × 1,5).
@@ -1853,12 +1856,159 @@
   }
   // Lieux-dits aux frontières naturelles : diagramme de Voronoï pondéré (`size`) sur une position déformée par
   // des ondulations régulières (même résultat côté serveur et navigateur, sans hasard).
-  function survivorWarp(x, y) {
-    return [
+  function survivorWarp(X, Y) {
+    const k = SURVIVOR.mapScale;
+    const x = X / k;
+    const y = Y / k;
+    const w = [
       x + Math.sin(y * 0.0021 + 1.3) * 160 + Math.sin((x + y) * 0.0047 + 0.7) * 70 + Math.sin(x * 0.011 - y * 0.008 + 2.1) * 22,
       y + Math.sin(x * 0.0019 + 4.1) * 160 + Math.sin((x - y) * 0.0043 + 2.3) * 70 + Math.sin(y * 0.012 + x * 0.007 + 0.4) * 22,
     ];
+    return [w[0] * k, w[1] * k];
   }
+  // ---- Géographie de la carte (routes, rivière, lac, mare, cratère), la même pour le serveur et le navigateur ----
+  // Tracée sur la base de 4 800 px puis agrandie ×mapScale. L'eau ralentit (SURVIVOR.waterSlow), sauf sur les ponts.
+  function survivorHash(x, y, s = 0) {
+    let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function svNoise(x, y, s) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const u = x - xi;
+    const v = y - yi;
+    const su = u * u * (3 - 2 * u);
+    const sv = v * v * (3 - 2 * v);
+    const a = survivorHash(xi, yi, s);
+    const b = survivorHash(xi + 1, yi, s);
+    const c = survivorHash(xi, yi + 1, s);
+    const d = survivorHash(xi + 1, yi + 1, s);
+    return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv;
+  }
+  function svCatmull(pts, steps = 10) {
+    const out = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        out.push([0, 1].map((k) => 0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)));
+      }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+  function svInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i];
+      const [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  function svSegDist(x, y, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
+  }
+  let svMapCache = null;
+  function survivorMap() {
+    if (svMapCache) return svMapCache;
+    const K = SURVIVOR.mapScale;
+    const S = (pts) => pts.map(([x, y]) => [x * K, y * K]);
+    const Z = (id) => [SURVIVOR_ZONES[id].x, SURVIVOR_ZONES[id].y];
+    // Route sinueuse : une grande courbe et de petites ondulations
+    const winding = (a, b, seed) => {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = Math.hypot(dx, dy);
+      const nx = -dy / len;
+      const ny = dx / len;
+      const amp = (110 + survivorHash(seed, 1, 7) * 120) * K * (survivorHash(seed, 2, 7) < 0.5 ? -1 : 1);
+      const ph = survivorHash(seed, 3, 7) * Math.PI * 2;
+      const pts = [];
+      const n = Math.max(4, Math.round(len / (260 * K)));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const w = Math.sin(t * Math.PI) * (amp + (Math.sin(t * Math.PI * 3 + ph) * 35 + (survivorHash(seed, i, 8) - 0.5) * 30) * K);
+        pts.push([a[0] + dx * t + nx * w, a[1] + dy * t + ny * w]);
+      }
+      return svCatmull(pts, 8);
+    };
+    const blob = (cx, cy, r, seed, n = 28) => Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2;
+      const k = 1 + (svNoise(i * 0.7, 0, seed) - 0.5) * 0.45;
+      return [(cx + Math.cos(a) * r * k) * K, (cy + Math.sin(a) * r * 0.72 * k) * K];
+    });
+    const roads = Object.keys(SURVIVOR_ZONES).filter((id) => id !== 'village').map((id, i) => winding(Z('village'), Z(id), i + 1));
+    const river = svCatmull(S([[2130, 640], [2030, 1000], [1820, 1380], [1640, 1720], [1580, 2080], [1440, 2420], [1470, 2800], [1340, 3150], [1150, 3360]]), 12);
+    const lake = blob(2250, 400, 320, 21);
+    const pond = blob(1060, 3440, 150, 44, 22);
+    const crater = { x: 4330 * K, y: 4330 * K, r: 260 * K };
+    const lava = blob(4330, 4330, 150, 33, 22);
+    const width = { river: 44 * K, road: 46 * K, bridge: [84 * K, 54 * K] };
+    // Ponts : là où une route croise la rivière
+    const bridges = [];
+    for (const road of roads) {
+      for (let i = 0; i < road.length - 1; i++) {
+        for (let j = 0; j < river.length - 1; j++) {
+          const [p, q] = [road[i], road[i + 1]];
+          const [r, t] = [river[j], river[j + 1]];
+          const d = (q[0] - p[0]) * (t[1] - r[1]) - (q[1] - p[1]) * (t[0] - r[0]);
+          if (!d) continue;
+          const a = ((r[0] - p[0]) * (t[1] - r[1]) - (r[1] - p[1]) * (t[0] - r[0])) / d;
+          const b = ((r[0] - p[0]) * (q[1] - p[1]) - (r[1] - p[1]) * (q[0] - p[0])) / d;
+          if (a >= 0 && a <= 1 && b >= 0 && b <= 1) bridges.push({ x: p[0] + (q[0] - p[0]) * a, y: p[1] + (q[1] - p[1]) * a, a: Math.atan2(q[1] - p[1], q[0] - p[0]) });
+        }
+      }
+    }
+    // Grille de l'eau (cases de 16 px) : 1 = eau, 0 = terre ferme ou pont
+    const C = 16;
+    const cols = Math.ceil(SURVIVOR.map.w / C);
+    const rows = Math.ceil(SURVIVOR.map.h / C);
+    const grid = new Uint8Array(cols * rows);
+    const mark = (x0, y0, x1, y1, test, v) => {
+      for (let gy = Math.max(0, Math.floor(y0 / C)); gy <= Math.min(rows - 1, Math.floor(y1 / C)); gy++) {
+        for (let gx = Math.max(0, Math.floor(x0 / C)); gx <= Math.min(cols - 1, Math.floor(x1 / C)); gx++) if (test(gx * C + C / 2, gy * C + C / 2)) grid[gy * cols + gx] = v;
+      }
+    };
+    const half = width.river / 2;
+    for (let i = 0; i < river.length - 1; i++) {
+      const [ax, ay] = river[i];
+      const [bx, by] = river[i + 1];
+      mark(Math.min(ax, bx) - half, Math.min(ay, by) - half, Math.max(ax, bx) + half, Math.max(ay, by) + half, (x, y) => svSegDist(x, y, ax, ay, bx, by) <= half, 1);
+    }
+    for (const poly of [lake, pond]) {
+      const xs = poly.map((p) => p[0]);
+      const ys = poly.map((p) => p[1]);
+      mark(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), (x, y) => svInPoly(x, y, poly), 1);
+    }
+    for (const b of bridges) {
+      const [L, Wd] = width.bridge;
+      const c = Math.cos(b.a);
+      const s = Math.sin(b.a);
+      const R = Math.hypot(L, Wd) / 2;
+      mark(b.x - R, b.y - R, b.x + R, b.y + R, (x, y) => { const dx = x - b.x; const dy = y - b.y; return Math.abs(dx * c + dy * s) <= L / 2 && Math.abs(-dx * s + dy * c) <= Wd / 2; }, 0);
+    }
+    svMapCache = { roads, river, lake, pond, crater, lava, bridges, width, grid, cell: C, cols, rows };
+    return svMapCache;
+  }
+  // Ce point est-il dans l'eau (hors des ponts) ?
+  function survivorWater(x, y) {
+    const M = survivorMap();
+    const gx = Math.floor(x / M.cell);
+    const gy = Math.floor(y / M.cell);
+    if (gx < 0 || gy < 0 || gx >= M.cols || gy >= M.rows) return false;
+    return M.grid[gy * M.cols + gx] === 1;
+  }
+
   // Les deux lieux-dits les plus proches et leurs distances pondérées (pour fondre les sols à la frontière).
   function survivorZoneNear(x, y) {
     const [qx, qy] = survivorWarp(x, y);
@@ -2000,6 +2150,20 @@
     couronne: { label: 'Couronne', icon: '👑', max: 5, add: { xp: 0.08 }, desc: '+8 % d\'expérience' },
     pomme: { label: 'Pomme dorée', icon: '🍎', max: 5, add: { regen: 0.4 }, desc: '+0,4 PV par seconde' },
     duplicateur: { label: 'Duplicateur', icon: '➕', max: 2, add: { amount: 1 }, desc: '+1 projectile pour toutes les armes' },
+    cape: { label: 'Cape d\'ombre', icon: '🧥', max: 5, add: { dodge: 0.05 }, desc: '+5 % de chances d\'esquiver un coup' },
+    epines: { label: 'Armure d\'épines', icon: '🌵', max: 5, add: { thorns: 12 }, desc: 'renvoie 12 dégâts à l\'ennemi qui te touche' },
+    croc: { label: 'Croc de vampire', icon: '🦷', max: 5, add: { lifeKill: 0.3 }, desc: '+0,3 PV par monstre tué' },
+    sablier: { label: 'Sablier', icon: '⏳', max: 5, add: { duration: 0.12 }, desc: '+12 % de durée des projectiles, orbes et flaques' },
+    plume: { label: 'Plume du vent', icon: '🪶', max: 5, add: { shotSpeed: 0.12 }, desc: '+12 % de vitesse des projectiles' },
+    oeil: { label: 'Œil de faucon', icon: '👁️', max: 5, add: { critMult: 0.25 }, desc: 'coups critiques +25 % plus forts' },
+    bouclier: { label: 'Bouclier runique', icon: '🔰', max: 5, add: { shield: 1 }, desc: 'bloque un coup, puis se recharge (15 s, −2 s par niveau)' },
+    bourse: { label: 'Bourse de gemmes', icon: '💰', max: 5, add: { greed: 0.06 }, desc: '+6 % d\'émeraudes en fin de partie' },
+    boussole: { label: 'Boussole', icon: '🧭', max: 3, add: { explore: 1 }, desc: 'bénédictions d\'autel +25 % plus longues, autels rechargés 15 % plus vite' },
+    cor: { label: 'Cor de guerre', icon: '📯', max: 5, add: { bossDmg: 0.12 }, desc: '+12 % de dégâts contre les élites et les boss' },
+    gourde: { label: 'Gourde de soin', icon: '🧪', max: 5, add: { healMult: 0.2 }, desc: '+20 % de soins (régénération, poulet, autels, croc)' },
+    talisman: { label: 'Talisman du vent', icon: '🌀', max: 3, add: { knockback: 0.35 }, desc: '+35 % de recul des ennemis touchés' },
+    givre: { label: 'Rune de givre', icon: '🧊', max: 5, add: { chill: 0.08 }, desc: 'les ennemis touchés sont ralentis de 8 % pendant 1 s' },
+    tome: { label: 'Tome des possibles', icon: '📘', max: 3, add: { rerolls: 1 }, desc: '+1 relance des choix de niveau' },
   };
   // Méta-progression (émeraudes) : améliorations permanentes des stats de départ du Survivor uniquement.
   // Prix du niveau L+1 : arrondi(base × hausse^L), arrondi à la dizaine.
@@ -2039,6 +2203,8 @@
     passives: {
       coeur: 0, bottes: 0, gant: 0, aimant: 0, pomme: 0,
       armure: 1500, trefle: 2500, cristal: 3000, grimoire: 4000, couronne: 5000, duplicateur: 30000,
+      talisman: 6000, cape: 7000, gourde: 7500, croc: 8500, epines: 9000, plume: 9500, sablier: 10000, boussole: 11000,
+      cor: 13000, oeil: 15000, bouclier: 17000, givre: 19000, bourse: 22000, tome: 26000,
     },
   };
   // Stats d'une partie : base + méta-progression + objets ramassés.
@@ -2059,6 +2225,7 @@
     s.speed = SURVIVOR.player.speed * (1 + pct.speed);
     s.magnet = SURVIVOR.player.magnet * (1 + pct.magnet);
     s.cooldown = Math.max(0.4, s.cooldown);
+    s.dodge = Math.min(0.4, s.dodge);
     return s;
   }
   // Score : temps de survie, monstres et boss tués.
@@ -2534,7 +2701,7 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
-    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, survivorZoneNear, survivorWarp, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
+    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,

@@ -83,6 +83,11 @@ class SurvivorRun {
   }
 
   speedNow() {
+    return this.baseSpeed() * (Rules.survivorWater(this.p.x, this.p.y) ? SV.waterSlow : 1);
+  }
+
+  // Vitesse sans l'effet de l'eau (le navigateur applique lui-même le ralentissement de l'eau selon sa position)
+  baseSpeed() {
     const inWeb = this.areas.some((a) => a.k === 'web' && dist2(a.x, a.y, this.p.x, this.p.y) < a.r * a.r);
     return this.stats.speed * (1 + (this.fx.speed || 0)) * (inWeb ? 0.55 : 1) * (this.p.slowUntil > this.t ? 0.6 : 1);
   }
@@ -91,7 +96,7 @@ class SurvivorRun {
   setPos(x, y, fx, fy, elapsed) {
     if (this.over || this.pending || this.paused) return;
     if (![x, y].every(Number.isFinite)) return;
-    const max = this.speedNow() * clamp(elapsed, 0, 0.25) * SV.moveSlack + 4;
+    const max = this.speedNow() * clamp(elapsed, 0, 0.25) * SV.moveSlack + 4; // dans l'eau : ralenti
     let dx = x - this.p.x;
     let dy = y - this.p.y;
     const d = Math.hypot(dx, dy);
@@ -102,10 +107,21 @@ class SurvivorRun {
     if (Number.isFinite(fl) && fl > 0.1) { this.p.fx = fx / fl; this.p.fy = fy / fl; }
   }
 
+  // Coup reçu : esquive (Cape d'ombre), bouclier runique, puis armure. Renvoie vrai si le coup a porté.
   hurt(amount) {
+    if (this.stats.dodge && this.rand() < this.stats.dodge) { this.events.push({ k: 'dodge' }); return false; }
+    if (this.stats.shield && this.t >= (this.shieldAt || 0)) {
+      this.shieldAt = this.t + Math.max(5, 17 - 2 * this.stats.shield);
+      this.events.push({ k: 'block' });
+      return false;
+    }
     const dmg = Math.max(1, Math.round(amount - this.stats.armor));
     this.hp -= dmg;
     this.events.push({ k: 'hurt', v: dmg });
+    return true;
+  }
+  heal(v) {
+    this.hp = Math.min(this.stats.maxHp, this.hp + v * this.stats.healMult);
   }
 
   // ---------- Armes et objets ----------
@@ -153,8 +169,9 @@ class SurvivorRun {
     } else if (o.type === 'passive') {
       this.passives[o.id] = (this.passives[o.id] || 0) + 1;
       this.recompute();
+      this.rerolls += Rules.SURVIVOR_PASSIVES[o.id].add.rerolls || 0; // Tome des possibles
     } else if (o.type === 'heal') {
-      this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.maxHp * 0.3);
+      this.heal(this.stats.maxHp * 0.3);
     } else if (o.type === 'emerald') {
       this.bonusEmeralds += 2;
     }
@@ -284,8 +301,11 @@ class SurvivorRun {
   // Dégâts infligés par une arme.
   damage(e, base, weapon, kb = 0) {
     if (e.dead) return;
-    const crit = this.rand() < this.stats.crit + (this.fx.crit || 0);
-    const dmg = base * this.stats.damage * (1 + (this.fx.damage || 0)) * (crit ? 2 : 1);
+    const S = this.stats;
+    const crit = this.rand() < S.crit + (this.fx.crit || 0);
+    const dmg = base * S.damage * (1 + (this.fx.damage || 0)) * (crit ? S.critMult : 1) * (e.boss || e.elite ? 1 + S.bossDmg : 1);
+    if (S.chill) { e.chill = S.chill; e.chillUntil = this.t + 1; }
+    kb *= S.knockback;
     e.hp -= dmg;
     if (this.dmgEvents < 28) { this.events.push({ k: 'd', x: Math.round(e.x), y: Math.round(e.y - e.r), v: Math.round(dmg), c: crit ? 1 : 0 }); this.dmgEvents += 1; }
     if (kb && !e.boss) {
@@ -308,6 +328,7 @@ class SurvivorRun {
       return;
     }
     this.kills += 1;
+    if (this.stats.lifeKill && this.hp > 0) this.heal(this.stats.lifeKill);
     if (this.deathEvents < 40) { this.events.push({ k: 'x', x: Math.round(e.x), y: Math.round(e.y), i: KIND_INDEX[e.kind] }); this.deathEvents += 1; }
     this.dropGem(e.x, e.y, e.xp * (1 + (this.fx.gems || 0)));
     if (e.elite) this.pickups.push({ type: 'chest', x: e.x, y: e.y, count: 1 });
@@ -347,7 +368,7 @@ class SurvivorRun {
     if (this.blessing && this.t >= this.blessing.until) { this.blessing = null; this.events.push({ k: 'blessEnd' }); }
     this.fx = Rules.survivorZoneFx(zone, this.blessing && this.blessing.zone);
     const regen = S.regen + (this.fx.regen || 0);
-    if (regen > 0 && this.hp > 0) this.hp = Math.min(S.maxHp, this.hp + regen * dt);
+    if (regen > 0 && this.hp > 0) this.heal(regen * dt);
     if (this.fx.burn && this.hp > 1) this.hp = Math.max(1, this.hp - this.fx.burn * dt); // la Fournaise brûle, sans jamais achever
     this.updateExplore(dt);
     // Apparitions
@@ -408,7 +429,7 @@ class SurvivorRun {
         d = Math.hypot(dx, dy) || 1;
         if (d < 8) continue;
       }
-      const sp = e.speed * (1 - (this.fx.slow || 0));
+      const sp = e.speed * (1 - (this.fx.slow || 0)) * (e.chillUntil > this.t ? 1 - e.chill : 1) * (!e.boss && Rules.survivorWater(e.x, e.y) ? SV.waterSlow : 1);
       let vx = (dx / d) * sp;
       let vy = (dy / d) * sp;
       if (Rules.SURVIVOR_ENEMIES[e.kind] && Rules.SURVIVOR_ENEMIES[e.kind].erratic) {
@@ -448,6 +469,7 @@ class SurvivorRun {
       if (e.hitCd <= 0 && dist2(e.x, e.y, P.x, P.y) < (e.r + SV.player.radius) * (e.r + SV.player.radius)) {
         e.hitCd = SV.hitCooldown;
         this.hurt(e.damage);
+        if (this.stats.thorns) this.damage(e, this.stats.thorns, null, 0); // Armure d'épines
       }
       // Trop loin derrière (le joueur a filé) : il réapparaît devant
       if (!e.boss && !e.guard && d > 1400) {
@@ -512,6 +534,8 @@ class SurvivorRun {
       const s = w.s;
       const area = (s.area || 1) * S.area * (1 + (this.fx.area || 0));
       const amount = (s.amount || 1) + S.amount;
+      const life = s.duration * S.duration; // Sablier
+      const spd = s.speed * S.shotSpeed; // Plume du vent
       // Orbes : actives un moment, puis en recharge
       if (w.id === 'orbes') {
         if (w.on) {
@@ -552,7 +576,7 @@ class SurvivorRun {
           const base = Math.atan2(P.fy, P.fx);
           for (let i = 0; i < amount; i++) {
             const a = base + (i - (amount - 1) / 2) * 0.09;
-            this.addShot(w, { x: P.x, y: P.y, vx: Math.cos(a) * s.speed, vy: Math.sin(a) * s.speed, life: s.duration, r: 9, pierce: s.pierce, damage: s.damage, kb: 60 });
+            this.addShot(w, { x: P.x, y: P.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life, r: 9, pierce: s.pierce, damage: s.damage, kb: 60 });
           }
           break;
         }
@@ -563,7 +587,7 @@ class SurvivorRun {
             if (!target) break;
             used.add(target.id);
             const a = Math.atan2(target.y - P.y, target.x - P.x) + (i - (amount - 1) / 2) * 0.15;
-            this.addShot(w, { x: P.x, y: P.y, vx: Math.cos(a) * s.speed, vy: Math.sin(a) * s.speed, life: s.duration, r: 10, pierce: s.pierce, damage: s.damage, target: target.id, homing: true, kb: 50 });
+            this.addShot(w, { x: P.x, y: P.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life, r: 10, pierce: s.pierce, damage: s.damage, target: target.id, homing: true, kb: 50 });
           }
           break;
         }
@@ -573,7 +597,7 @@ class SurvivorRun {
         case 'hache':
           for (let i = 0; i < amount; i++) {
             const vx = (this.rand() - 0.5) * 300 + P.fx * 90;
-            this.addShot(w, { x: P.x, y: P.y, vx, vy: -s.speed * (0.85 + this.rand() * 0.3), g: 900, life: s.duration, r: 18 * area, pierce: 99, damage: s.damage, kb: 90 });
+            this.addShot(w, { x: P.x, y: P.y, vx: vx * S.shotSpeed, vy: -spd * (0.85 + this.rand() * 0.3), g: 900 * S.shotSpeed * S.shotSpeed, life, r: 18 * area, pierce: 99, damage: s.damage, kb: 90 });
           }
           break;
         case 'foudre': {
@@ -589,7 +613,7 @@ class SurvivorRun {
         case 'orbes':
           w.on = true;
           w.t0 = this.t;
-          w.until = this.t + s.duration;
+          w.until = this.t + life;
           break;
         case 'fiole': {
           const pool = this.enemies.filter((e) => !e.dead && dist2(e.x, e.y, P.x, P.y) < 480 * 480);
@@ -598,7 +622,7 @@ class SurvivorRun {
             const a = this.rand() * Math.PI * 2;
             const x = e ? e.x : P.x + Math.cos(a) * 160;
             const y = e ? e.y : P.y + Math.sin(a) * 160;
-            this.areas.push({ id: this.nextId++, k: 'acid', x, y, r: s.range * area, until: this.t + s.duration, damage: s.damage, tickAt: 0 });
+            this.areas.push({ id: this.nextId++, k: 'acid', x, y, r: s.range * area, until: this.t + life, damage: s.damage, tickAt: 0 });
           }
           break;
         }
@@ -684,8 +708,7 @@ class SurvivorRun {
       s.y += s.vy * dt;
       s.life -= dt;
       if (dist2(s.x, s.y, P.x, P.y) < (s.r + SV.player.radius) * (s.r + SV.player.radius)) {
-        this.hurt(s.damage);
-        if (s.slow) P.slowUntil = this.t + s.slow;
+        if (this.hurt(s.damage) && s.slow) P.slowUntil = this.t + s.slow;
         s.life = 0;
       }
     }
@@ -711,7 +734,7 @@ class SurvivorRun {
     for (const k of this.pickups) {
       if (dist2(k.x, k.y, P.x, P.y) > 30 * 30) continue;
       k.got = true;
-      if (k.type === 'chicken') { this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.maxHp * 0.3); this.events.push({ k: 'heal' }); }
+      if (k.type === 'chicken') { this.heal(this.stats.maxHp * 0.3); this.events.push({ k: 'heal' }); }
       if (k.type === 'magnet') { for (const g of this.gems) g.pull = true; this.events.push({ k: 'magnet' }); }
       if (k.type === 'chest') this.openChest(k.count);
     }
@@ -728,9 +751,9 @@ class SurvivorRun {
       a.charge = on ? a.charge + dt / X.altar.charge : 0;
       if (a.charge >= 1) {
         a.charge = 0;
-        a.readyAt = this.t + X.altar.cooldown;
-        this.blessing = { zone: a.zone, until: this.t + X.altar.duration };
-        this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.maxHp * X.altar.heal);
+        a.readyAt = this.t + X.altar.cooldown * (1 - 0.15 * this.stats.explore);
+        this.blessing = { zone: a.zone, until: this.t + X.altar.duration * (1 + 0.25 * this.stats.explore) };
+        this.heal(this.stats.maxHp * X.altar.heal);
         this.found.altars += 1;
         this.events.push({ k: 'bless', zone: a.zone });
       }
@@ -745,7 +768,7 @@ class SurvivorRun {
           const d = X.shard.dist[0] + this.rand() * (X.shard.dist[1] - X.shard.dist[0]);
           const x = clamp(P.x + Math.cos(a) * d, 80, SV.map.w - 80);
           const y = clamp(P.y + Math.sin(a) * d, 80, SV.map.h - 80);
-          if (Rules.survivorZone(x, y) === 'village') continue;
+          if (Rules.survivorZone(x, y) === 'village' || Rules.survivorWater(x, y)) continue;
           this.shards.push({ id: this.nextId++, x, y });
           this.events.push({ k: 'shardSpawn' });
           break;
@@ -768,9 +791,14 @@ class SurvivorRun {
       const zones = Object.keys(Rules.SURVIVOR_ZONES).filter((z) => z !== 'village' && z !== Rules.survivorZone(P.x, P.y));
       const zone = zones[Math.floor(this.rand() * zones.length)];
       const Z = Rules.SURVIVOR_ZONES[zone];
-      const a = this.rand() * Math.PI * 2;
-      const x = clamp(Z.x + Math.cos(a) * 260, 80, SV.map.w - 80);
-      const y = clamp(Z.y + Math.sin(a) * 260, 80, SV.map.h - 80);
+      let x;
+      let y;
+      for (let tries = 0; tries < 12; tries++) {
+        const a = this.rand() * Math.PI * 2;
+        x = clamp(Z.x + Math.cos(a) * 260 * SV.mapScale, 80, SV.map.w - 80);
+        y = clamp(Z.y + Math.sin(a) * 260 * SV.mapScale, 80, SV.map.h - 80);
+        if (!Rules.survivorWater(x, y)) break;
+      }
       this.treasure = { x, y, zone };
       // Ses gardiens : une élite et une petite troupe du lieu-dit
       const guard = (e) => { e.guard = { x: e.x, y: e.y }; };
@@ -845,7 +873,7 @@ class SurvivorRun {
       xpNext: this.xpNext,
       hp: Math.ceil(this.hp),
       maxHp: Math.round(this.stats.maxHp),
-      spd: Math.round(this.speedNow()),
+      spd: Math.round(this.baseSpeed()),
       magnet: Math.round(this.stats.magnet),
       x: Math.round(P.x),
       y: Math.round(P.y),
@@ -940,8 +968,8 @@ function finish(userId, now = Date.now()) {
   const res = r.run.finish();
   const c = r.user.character;
   const S = svOf(c);
-  const stats = Rules.survivorStats(S.meta, {});
-  const emeralds = Math.round(Rules.survivorEmeralds(res) * (1 + stats.greed)) + (res.bonusEmeralds || 0);
+  const greed = r.run.stats.greed; // Avidité (méta) + Bourse de gemmes (objet)
+  const emeralds = Math.round(Rules.survivorEmeralds(res) * (1 + greed)) + (res.bonusEmeralds || 0);
   c.emeralds += emeralds;
   game.addStat(c, 'emeraldsEarned', emeralds);
   game.addStat(c, 'survivorRuns');
