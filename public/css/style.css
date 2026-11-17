@@ -1409,9 +1409,18 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .sv-lvl { font-size: 12px; color: #ffd34a; min-height: 16px; }
 .sv-new { color: #7cff4f; font-weight: 900; letter-spacing: .5px; }
 .sv-desc { font-size: 13px; color: #d8d0f0; }
-.sv-toast { position: absolute; left: 50%; top: 120px; transform: translateX(-50%) translateY(-10px); opacity: 0; pointer-events: none; z-index: 2; padding: 8px 16px; border-radius: 20px; background: rgba(10, 6, 24, .8); border: 1px solid rgba(255, 255, 255, .3); font-weight: 800; transition: opacity .2s, transform .2s; white-space: nowrap; }
-.sv-toast.show { opacity: 1; transform: translateX(-50%); }
-.sv-toast.boss { border-color: #ff4d6d; color: #ffb3c0; font-size: 18px; }
+.sv-game { container-type: inline-size; }
+/* Annonces : sous le chrono et la vague, taille qui suit la largeur du jeu (plein écran compris) */
+.sv-toast { position: absolute; left: 50%; top: 17%; transform: translateX(-50%); pointer-events: none; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: .45em; width: 92%; font-size: clamp(14px, 1.45cqw, 30px); }
+.sv-note { width: max-content; max-width: 100%; box-sizing: border-box; padding: .55em 1.1em; border-radius: .9em; background: rgba(10, 6, 24, .88); border: 2px solid rgba(255, 255, 255, .35); box-shadow: 0 .3em 1.2em rgba(0, 0, 0, .45); font-weight: 800; text-align: center; opacity: 0; transform: translateY(-.6em) scale(.96); transition: opacity .25s, transform .25s; }
+.sv-note.show { opacity: 1; transform: none; }
+.sv-note.hide { opacity: 0; transform: translateY(-.4em); }
+.sv-note-title { font-size: 1.05em; }
+.sv-note-items { display: flex; flex-wrap: nowrap; justify-content: center; gap: .35em; margin-top: .4em; }
+.sv-note-items span { white-space: nowrap; padding: .2em .6em; border-radius: .6em; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .25); font-size: .92em; }
+.sv-note.k-boss { border-color: #ff4d6d; color: #ffb3c0; font-size: 1.15em; }
+.sv-note.k-chest { border-color: #ffd34a; color: #fff2a8; }
+.sv-note.k-treasure { border-color: #ffb84a; color: #ffe0a0; }
 .sv-record { color: #ffd34a; font-weight: 900; font-size: 18px; margin: 4px 0; animation: payFlash .4s infinite alternate; }
 .sv-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px auto; max-width: 520px; }
 .sv-stats div { display: flex; flex-direction: column; padding: 8px; border-radius: 10px; background: rgba(255, 255, 255, .05); }
@@ -1500,7 +1509,7 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .hv-card.me { border-color: rgba(124, 255, 79, .5); }
 .hv-rank { position: absolute; left: 10px; top: 10px; font-weight: 900; color: var(--muted); }
 .hv-meta { font-size: 12px; color: var(--muted); }
-.sv-toast.bless { border-color: #ffd34a; color: #fff2a8; }
+.sv-note.k-bless { border-color: #7cff4f; color: #d8ffc4; }
 .sv-zones { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--border); }
 .sv-zones-title { font-size: 13px; margin-bottom: 8px; }
 .sv-zones-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }

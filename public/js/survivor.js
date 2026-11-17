@@ -579,7 +579,7 @@
         break;
       case 'chest':
         Sound.play('chestBurst', 'epique');
-        svToast(`🎁 Coffre ! ${e.items.map(optLabel).join(' · ')}`, 3600);
+        svToast('🎁 Coffre !', 3600, 'chest', e.items.map(optLabel));
         break;
       case 'dodge':
         G.texts.push({ x: G.me.x, y: G.me.y - 20, v: 'Esquive !', t0: now, c: 2 });
@@ -633,11 +633,11 @@
         Sound.play('petFind');
         break;
       case 'treasure':
-        svToast(`💰 Un trésor gardé est apparu : ${ZONES[e.zone].label} !`, 3600, 'bless');
+        svToast(`💰 Un trésor gardé est apparu : ${ZONES[e.zone].label} !`, 3600, 'treasure');
         Sound.play('queueOpen');
         break;
       case 'treasureOpen':
-        svToast(`💰 Trésor ouvert ! +${e.emeralds} 💎 et des améliorations`, 3000, 'bless');
+        svToast(`💰 Trésor ouvert ! +${e.emeralds} 💎 et des améliorations`, 3000, 'treasure');
         Sound.play('chestBurst', 'legendaire');
         break;
       case 'revive':
@@ -1280,12 +1280,18 @@
     } catch (e) { toast('⚠️ ' + e.message); }
   }
 
-  function svToast(text, ms = 2000, kind = '') {
-    const el = $('sv-toast');
-    el.textContent = text;
-    el.className = `sv-toast show ${kind}`;
-    clearTimeout(svToast.timer);
-    svToast.timer = setTimeout(() => { el.className = 'sv-toast'; }, ms);
+  // Annonces : cartes empilées sous le chrono et la vague (3 au plus, la plus récente en haut), assez longtemps pour les lire.
+  // items : liste de lignes affichées en pastilles (ex. contenu d'un coffre).
+  function svToast(text, ms = 2000, kind = '', items = null) {
+    const box = $('sv-toast');
+    const el = document.createElement('div');
+    el.className = `sv-note ${kind ? `k-${kind}` : ''}`; // classes préfixées (pas de conflit avec .chest, .boss… du reste du site)
+    el.innerHTML = `<div class="sv-note-title">${esc(text)}</div>${items && items.length ? `<div class="sv-note-items">${items.map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : ''}`;
+    box.prepend(el);
+    while (box.children.length > 3) box.lastElementChild.remove();
+    requestAnimationFrame(() => el.classList.add('show'));
+    const life = Math.max(2800, ms * 1.6);
+    setTimeout(() => { el.classList.remove('show'); el.classList.add('hide'); setTimeout(() => el.remove(), 350); }, life);
   }
 
   function showOver(res) {
