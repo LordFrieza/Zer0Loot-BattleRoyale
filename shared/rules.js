@@ -1215,11 +1215,10 @@
     },
     chatiment: {
       label: 'Châtiment', icon: '⚡', color: '#ffe27a',
-      desc: 'Des rayons sacrés frappent les 3 ennemis les plus proches : 190 % des dégâts chacun.',
-      descPlus: '4 ennemis, 250 % des dégâts et étourdissement de 0,8 s.',
-      // Rééquilibré (Inquisiteur trop fort) : avant 3 × 220 %, amélioré 5 × 280 % et 1 s d'étourdissement
-      base: { targets: 3, ratio: 1.9, stun: 0 },
-      plus: { targets: 4, ratio: 2.5, stun: 0.8 },
+      desc: 'Des rayons sacrés frappent les 3 ennemis les plus proches : 220 % des dégâts chacun.',
+      descPlus: '5 ennemis, 280 % des dégâts et étourdissement de 1 s.',
+      base: { targets: 3, ratio: 2.2, stun: 0 },
+      plus: { targets: 5, ratio: 2.8, stun: 1 },
     },
   };
 
