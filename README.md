@@ -415,7 +415,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     les 35 s, 3 au plus) et un **trésor gardé** à 90 s puis toutes les 150 s (une élite et 6 gardiens qui restent à leur
     poste ; 2 améliorations + 3 émeraudes). Mini-carte et flèches au bord de l'écran pour les trouver.
   - Vagues de 30 s (monstres du donjon, de plus en plus nombreux et costauds), un ennemi d'élite toutes les 50 s (coffre
-    d'une amélioration), un **boss toutes les 5 vagues** (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
+    d'une amélioration), un **boss toutes les 5 vagues** (la vague suivante attend qu'il soit vaincu ; ignoré 3 min, il s'enrage : vitesse et dégâts ×1,5) (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
     cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
   - Gemmes d'XP → montée de niveau (partie en pause) : choisir entre 3 (ou 4) améliorations. **8 armes** (Épée, Dagues,
     Baguette magique, Aura de feu, Hache, Foudre, Orbes gardiens, Fiole d'acide ; 8 niveaux chacune, 6 au plus) et

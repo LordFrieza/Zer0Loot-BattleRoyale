@@ -143,7 +143,7 @@ test('[SV-3] survivor : vagues de 30 s, ennemis selon la vague et le lieu-dit, �
   run.kill(elite);
   assert.ok(run.pickups.some((k) => k.type === 'chest' && k.count === 1));
   // Vague 5 : le boss arrive
-  run.t = SV.waveSeconds * 4 - 0.01;
+  run.waveT = SV.waveSeconds * 4 - 0.01;
   run.tick(0.05);
   assert.strictEqual(run.wave, 5);
   assert.ok(run.boss && run.boss.kind === 'troll');
@@ -485,4 +485,42 @@ test('[SV-12] survivor : 25 objets, nouveaux effets (esquive, bouclier, épines,
   const rr = r.rerolls;
   r.apply({ type: 'passive', id: 'tome' });
   assert.strictEqual(r.rerolls, rr + 1);
+});
+
+test('[SV-13] survivor : vague de boss bloquée tant que le boss vit, rage au bout de 3 min', () => {
+  const run = new sv.SurvivorRun({ meta: { vitalite: 10, carapace: 5 } });
+  run.hurt = () => false; // invulnérable pour le test
+  run.waveT = SV.waveSeconds * 4 - 0.01;
+  run.tick(0.05);
+  const boss = run.boss;
+  assert.ok(boss && run.wave === 5);
+  boss.hp = boss.maxHp = 1e12; // increvable pour le test
+  // Fin de la vague 5 : on reste bloqué en vague 5 tant que le boss vit, les monstres continuent d'arriver
+  tickFor(run, SV.waveSeconds + 5);
+  assert.strictEqual(run.wave, 5);
+  assert.ok(run.held);
+  assert.strictEqual(run.frame().hold, true);
+  assert.strictEqual(run.boss, boss, 'le boss reste (il n\'est pas remplacé)');
+  const count = run.enemies.filter((e) => !e.boss).length;
+  run.enemies = run.enemies.filter((e) => e.boss);
+  tickFor(run, 3);
+  assert.ok(count > 0 && run.enemies.some((e) => !e.boss), 'les monstres continuent d\'apparaître');
+  // Rage : 3 min après son apparition, vitesse et dégâts ×1,5, attaques plus fréquentes
+  assert.strictEqual(boss.rage, false);
+  const [speed, damage] = [boss.speed, boss.damage];
+  run.events = [];
+  boss.spawnT = run.t - SV.bossRage.after;
+  run.tick(0.05);
+  assert.strictEqual(boss.rage, true);
+  assert.ok(run.events.some((e) => e.k === 'bossRage'));
+  assert.deepStrictEqual([boss.speed, boss.damage], [speed * 1.5, damage * 1.5]);
+  assert.strictEqual(run.frame().b.rage, true);
+  boss.special = 0;
+  run.tick(0.05);
+  assert.ok(Math.abs(boss.special - Rules.SURVIVOR_BOSSES[boss.kind].every * SV.bossRage.special) < 0.06);
+  // Boss vaincu : la vague 6 arrive
+  run.kill(boss);
+  tickFor(run, 0.2);
+  assert.strictEqual(run.wave, 6);
+  assert.ok(!run.held);
 });

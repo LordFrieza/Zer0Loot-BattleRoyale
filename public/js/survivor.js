@@ -602,7 +602,11 @@
         Sound.play('roomEnter');
         break;
       case 'boss':
-        svToast(`⚠️ ${Rules.SURVIVOR_BOSSES[e.kind].label} arrive !`, 3000, 'boss');
+        svToast(`⚠️ ${Rules.SURVIVOR_BOSSES[e.kind].label} arrive ! La vague suivante attendra qu'il soit vaincu.`, 3000, 'boss');
+        Sound.play('roar', true);
+        break;
+      case 'bossRage':
+        svToast(`😡 ${Rules.SURVIVOR_BOSSES[e.kind].label} est enragé ! Plus rapide, plus fort, plus d'attaques.`, 3200, 'boss');
         Sound.play('roar', true);
         break;
       case 'bossDown':
@@ -893,7 +897,13 @@
       if (!meDrawn && b.y > G.me.y) drawMe();
       ctx.fillStyle = 'rgba(0,0,0,.3)';
       ctx.beginPath(); ctx.ellipse(b.x, b.y + 6, 46, 14, 0, 0, Math.PI * 2); ctx.fill();
-      drawMonster(ctx, b.x, b.y - BD[1], { kind: b.kind }, { scale: BD[0], t: now, facing: b.x > G.me.x ? -1 : 1 });
+      if (b.rage) {
+        // Enragé : halo rouge qui pulse
+        const rg = ctx.createRadialGradient(b.x, b.y - 30, 10, b.x, b.y - 30, 110);
+        rg.addColorStop(0, `rgba(255, 40, 20, ${0.35 + Math.sin(now / 150) * 0.15})`); rg.addColorStop(1, 'rgba(255, 40, 20, 0)');
+        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(b.x, b.y - 30, 110, 0, Math.PI * 2); ctx.fill();
+      }
+      drawMonster(ctx, b.x, b.y - BD[1], { kind: b.kind, enraged: b.rage }, { scale: BD[0], t: now, facing: b.x > G.me.x ? -1 : 1, enraged: b.rage });
     }
     if (!meDrawn) drawMe();
     // Orbes gardiens
@@ -1090,9 +1100,9 @@
     ctx.fillText(mmss(G.srvT), W / 2, 60);
     ctx.font = '800 15px system-ui, sans-serif';
     const wl = Math.max(0, f.waveLeft - (now - G.frameAt) / 1000);
-    const wtxt = `Vague ${f.wave}${f.wave % SV.bossEvery === SV.bossEvery - 1 ? ` · boss dans ${Math.ceil(wl)} s` : ''}`;
+    const wtxt = f.hold ? `Vague ${f.wave} · ⚔️ Tue le boss pour continuer !` : `Vague ${f.wave}${f.wave % SV.bossEvery === SV.bossEvery - 1 ? ` · boss dans ${Math.ceil(wl)} s` : ''}`;
     ctx.strokeText(wtxt, W / 2, 82);
-    ctx.fillStyle = f.wave % SV.bossEvery === SV.bossEvery - 1 ? '#ff8a6b' : '#cfe';
+    ctx.fillStyle = f.hold ? `rgba(255, 120, 90, ${0.75 + Math.sin(now / 180) * 0.25})` : f.wave % SV.bossEvery === SV.bossEvery - 1 ? '#ff8a6b' : '#cfe';
     ctx.fillText(wtxt, W / 2, 82);
     ctx.textAlign = 'right';
     ctx.font = '800 18px system-ui, sans-serif';
@@ -1139,9 +1149,11 @@
       const bw = 520;
       const bx = W / 2 - bw / 2;
       ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, 96, bw, 18);
-      ctx.fillStyle = '#c4122f'; ctx.fillRect(bx + 2, 98, (bw - 4) * (f.b.hp / f.b.maxHp), 14);
+      ctx.fillStyle = f.b.rage ? `rgb(${200 + Math.sin(now / 120) * 55}, 20, 20)` : '#c4122f'; ctx.fillRect(bx + 2, 98, (bw - 4) * (f.b.hp / f.b.maxHp), 14);
+      if (f.b.rage) { ctx.strokeStyle = '#ff3030'; ctx.lineWidth = 2; ctx.strokeRect(bx - 1, 95, bw + 2, 20); }
       ctx.textAlign = 'center'; ctx.font = '900 12px system-ui'; ctx.fillStyle = '#fff';
-      ctx.fillText(`${Rules.SURVIVOR_BOSSES[f.b.kind].label} — ${fmt(f.b.hp)} / ${fmt(f.b.maxHp)}`, W / 2, 110);
+      const rageTxt = f.b.rage ? ' · 😡 ENRAGÉ' : f.b.rageIn <= 60 ? ` · rage dans ${f.b.rageIn} s` : '';
+      ctx.fillText(`${Rules.SURVIVOR_BOSSES[f.b.kind].label} — ${fmt(f.b.hp)} / ${fmt(f.b.maxHp)}${rageTxt}`, W / 2, 110);
       // flèche vers le boss hors de l'écran
       const dx = f.b.x - G.me.x;
       const dy = f.b.y - G.me.y;

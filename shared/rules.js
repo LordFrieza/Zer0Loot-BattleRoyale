@@ -1807,6 +1807,8 @@
     waterSlow: 0.5, // dans l'eau (rivière, lac, mare) hors des ponts : vitesse ×0,5, joueur comme ennemis
     waveSeconds: 30,
     bossEvery: 5,
+    // Vague de boss : la suivante n'arrive pas tant que le boss vit ; ignoré 3 min, il s'enrage (vitesse et dégâts ×1,5, attaques plus fréquentes)
+    bossRage: { after: 180, speed: 1.5, damage: 1.5, special: 0.6 },
     dailyWave: 30, // atteindre la vague 30 : 10 coffres et 3 Clés de boss, une fois par jour (heure de Paris)
     daily: { chests: 10, keys: 3 },
     maxEnemies: 240,

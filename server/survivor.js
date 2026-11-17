@@ -32,6 +32,7 @@ class SurvivorRun {
     this.pool = { weapons: o.weapons || ['epee'], passives: o.passives || [] };
     this.t = 0;
     this.wave = 1;
+    this.waveT = 0; // horloge des vagues : arrêtée à la fin d'une vague de boss tant que le boss vit
     this.kills = 0;
     this.bosses = 0;
     this.level = 1;
@@ -252,6 +253,7 @@ class SurvivorRun {
     const boss = {
       id: this.nextId++, kind: spec.kind, boss: true, x: clamp(this.p.x + Math.cos(a) * 520, 60, SV.map.w - 60), y: clamp(this.p.y + Math.sin(a) * 520, 60, SV.map.h - 60),
       hp: spec.hp, maxHp: spec.hp, r: B.radius, speed: B.speed, damage: spec.damage, xp: 0, hitCd: 0, kx: 0, ky: 0, special: B.every * 0.7, hits: {}, phase: 0,
+      spawnT: this.t, rage: false,
     };
     this.enemies.push(boss);
     this.boss = boss;
@@ -354,8 +356,10 @@ class SurvivorRun {
     this.deathEvents = 0;
     const S = this.stats;
     const P = this.p;
-    // Vagues et boss
-    const wave = 1 + Math.floor(this.t / SV.waveSeconds);
+    // Vagues et boss : on ne passe pas à la vague suivante tant que le boss de la vague est en vie
+    this.held = !!this.boss && this.waveT + dt >= this.wave * SV.waveSeconds;
+    if (!this.held) this.waveT += dt;
+    const wave = 1 + Math.floor(this.waveT / SV.waveSeconds);
     if (wave > this.wave) {
       this.wave = wave;
       this.events.push({ k: 'wave', n: wave });
@@ -484,10 +488,18 @@ class SurvivorRun {
   updateBoss(dt) {
     const b = this.boss;
     const P = this.p;
+    // Ignoré trop longtemps : il s'enrage
+    const R = SV.bossRage;
+    if (!b.rage && this.t - b.spawnT >= R.after) {
+      b.rage = true;
+      b.speed *= R.speed;
+      b.damage *= R.damage;
+      this.events.push({ k: 'bossRage', kind: b.kind });
+    }
     b.special -= dt;
     if (b.special > 0) return;
     const B = Rules.SURVIVOR_BOSSES[b.kind];
-    b.special = B.every;
+    b.special = B.every * (b.rage ? R.special : 1);
     const toward = (spd, spread = 0) => {
       const a = Math.atan2(P.y - b.y, P.x - b.x) + spread;
       return { vx: Math.cos(a) * spd, vy: Math.sin(a) * spd };
@@ -866,7 +878,8 @@ class SurvivorRun {
     return {
       t: Math.round(this.t * 100) / 100,
       wave: this.wave,
-      waveLeft: Math.round((SV.waveSeconds - (this.t % SV.waveSeconds)) * 10) / 10,
+      waveLeft: Math.round(Math.max(0, this.wave * SV.waveSeconds - this.waveT) * 10) / 10,
+      hold: this.held || undefined, // vague bloquée : il faut tuer le boss
       kills: this.kills,
       bosses: this.bosses,
       level: this.level,
@@ -879,7 +892,7 @@ class SurvivorRun {
       x: Math.round(P.x),
       y: Math.round(P.y),
       e, g, pk, es, bo, ar,
-      b: b ? { kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), hp: Math.max(0, Math.round(b.hp)), maxHp: Math.round(b.maxHp) } : null,
+      b: b ? { kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), hp: Math.max(0, Math.round(b.hp)), maxHp: Math.round(b.maxHp), rage: b.rage || undefined, rageIn: b.rage ? 0 : Math.ceil(SV.bossRage.after - (this.t - b.spawnT)) } : null,
       orb: orb ? { n: (orb.s.amount || 1) + this.stats.amount, r: Math.round(orb.s.range * (orb.s.area || 1) * this.stats.area), spd: orb.s.speed, t0: orb.t0, size: Math.round(14 * (orb.s.area || 1) * this.stats.area) } : null,
       aura: aura ? Math.round(aura.s.range * (aura.s.area || 1) * this.stats.area) : 0,
       weapons: this.weapons.map((w) => [w.id, w.level]),
