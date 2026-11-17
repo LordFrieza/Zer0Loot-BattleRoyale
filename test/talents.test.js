@@ -266,12 +266,13 @@ test('[ULT-11, ULT-12] Prière et Châtiment', () => {
   assert.strictEqual(a.hp, 100 + a.maxHp * 0.4);
   assert.deepStrictEqual(Rules.ULTS.priere.plus, { self: 0.4, ally: 0.4, radius: 9999, taken: 0.7, duration: 4 });
 
+  assert.deepStrictEqual([Rules.ULTS.chatiment.base, Rules.ULTS.chatiment.plus], [{ targets: 3, ratio: 1.9, stun: 0 }, { targets: 4, ratio: 2.5, stun: 0.8 }]);
   const c = cast('chatiment', true, { foes: 6 });
   const [p, ...foes] = c.fighters;
   Object.assign(p, { x: 0, y: 300 });
   foes.forEach((f, i) => Object.assign(f, { x: 100 + i * 100, y: 300 }));
   c.castUlt(p, foes[0]);
   const ev = c.events.find((e) => e.t === 'ult');
-  assert.deepStrictEqual(ev.targets, foes.slice(0, 5).map((f) => f.key), '5 ennemis les plus proches');
-  assert.ok(foes[0].stunUntil > c.time && foes[5].stunUntil === 0);
+  assert.deepStrictEqual(ev.targets, foes.slice(0, 4).map((f) => f.key), '4 ennemis les plus proches');
+  assert.ok(foes[0].stunUntil > c.time && foes[4].stunUntil === 0);
 });

@@ -387,7 +387,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **ULT-9** Exécution : téléportation derrière l'ennemi au plus faible pourcentage de vie et coup à 350 % ; améliorée : enchaîne sur 3 ennemis.
 - **ULT-10** Nuage toxique : zone de 120 px pendant 5 s infligeant 120 % des dégâts par seconde (par tranche de 0,5 s) aux ennemis dedans ; amélioré : 8 s, 170 px, et le nuage suit l'assassin.
 - **ULT-11** Prière : soigne 40 % de sa vie max et 30 % aux alliés à moins de 220 px ; améliorée : 40 % à tous les alliés et dégâts subis ×0,7 pendant 4 s.
-- **ULT-12** Châtiment : 220 % des dégâts aux 3 ennemis les plus proches ; amélioré : 5 ennemis, 280 % et étourdissement de 1 s.
+- **ULT-12** Châtiment : 190 % des dégâts aux 3 ennemis les plus proches ; amélioré : 4 ennemis, 250 % et étourdissement de 0,8 s.
 
 ## 12 quinquies. Entraînement
 
