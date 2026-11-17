@@ -471,6 +471,17 @@
       tone(midi(83), 0.06, { type: 'square', vol: 0.035 });
       tone(midi(88), 0.18, { type: 'square', vol: 0.035, delay: 0.06 });
     },
+    // Survivor : dégât reçu (choc sourd et court)
+    svHurt() {
+      noise(0.09, { filter: 'lowpass', freq: 900, vol: 0.22 });
+      tone(240, 0.12, { type: 'square', vol: 0.06, to: 90 });
+    },
+    // Survivor : gemme d'XP ramassée (petit « pling », plus aigu à chaque gemme d'une même série)
+    svGem(step = 0, big = false) {
+      const n = Math.min(24, step);
+      tone(midi(84 + n), big ? 0.16 : 0.07, { type: 'triangle', vol: big ? 0.07 : 0.045 });
+      if (big) tone(midi(91 + n), 0.14, { type: 'triangle', vol: 0.05, delay: 0.05 });
+    },
     chestPick() {
       [72, 76, 79, 84, 88].forEach((n, i) => tone(midi(n), 0.14, { type: 'square', vol: 0.05, delay: i * 0.06 }));
     },

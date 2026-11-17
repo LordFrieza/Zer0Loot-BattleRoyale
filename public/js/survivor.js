@@ -27,7 +27,7 @@
   // ---------- Partie ----------
   const G = {
     on: false, frame: null, frameAt: 0, srvT: 0, me: { x: SV.map.w / 2, y: SV.map.h / 2, fx: 1, fy: 0, moving: false },
-    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), proj: new Map(), gems: new Map(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
+    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), proj: new Map(), gems: new Map(), gemGot: new Set(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
     hurtAt: 0, raf: 0, last: 0, lastHp: null, puffs: [], over: null, paused: false,
   };
   let ctx = null;
@@ -532,7 +532,7 @@
       const y = f.g[i + 2];
       const sp = f.g[i + 4];
       const m = G.gems.get(id);
-      if (!m) { G.gems.set(id, { id, rx: x, ry: y, size: f.g[i + 3], sp }); continue; }
+      if (!m) { G.gems.set(id, { id, rx: x, ry: y, size: f.g[i + 3], sp, got: G.gemGot.has(id) }); continue; }
       m.size = f.g[i + 3];
       if (!sp) { m.rx = x; m.ry = y; m.sp = 0; continue; }
       if (!m.sp) m.sp = sp; // dès qu'elle est attirée, le navigateur la fait voler seul (même trajectoire que le serveur)
@@ -573,6 +573,7 @@
         break;
       case 'hurt':
         G.hurtAt = now;
+        if (now - (G.hurtSnd || 0) > 160) { G.hurtSnd = now; Sound.play('svHurt'); }
         break;
       case 'lvl':
         Sound.play('levelUp');
@@ -788,6 +789,7 @@
     const dtG = Math.min(0.05, (now - (G.gemDrawAt || now)) / 1000);
     G.gemDrawAt = now;
     for (const m of G.gems.values()) {
+      if (m.got) continue;
       if (m.sp > 0) {
         const dx = G.me.x - m.rx;
         const dy = G.me.y - m.ry;
@@ -796,7 +798,15 @@
         const step = Math.min(d, m.sp * dtG);
         m.rx += (dx / d) * step;
         m.ry += (dy / d) * step;
-        if (d < SV.player.radius + 8) m.got = true; // ramassée : on ne la dessine plus en attendant le serveur
+        if (d < SV.player.radius + 8) {
+          m.got = true; // ramassée : on ne la dessine plus en attendant le serveur
+          G.gemGot.add(m.id); // ni ne la rejoue si elle revient dans une image
+          if (G.gemGot.size > 600) G.gemGot.delete(G.gemGot.values().next().value);
+          // Son : les gemmes d'une même série montent d'un demi-ton (série remise à zéro après 0,7 s de pause)
+          G.gemStep = now - (G.gemAt || 0) < 700 ? (G.gemStep || 0) + 1 : 0;
+          G.gemAt = now;
+          if (now - (G.gemSnd || 0) > 45 || m.size > 0) { G.gemSnd = now; Sound.play('svGem', G.gemStep, m.size > 1); }
+        }
       }
       if (m.got) continue;
       const x = m.rx;
@@ -810,15 +820,33 @@
       ctx.fillStyle = 'rgba(255,255,255,.65)';
       ctx.beginPath(); ctx.moveTo(x, y - s * 1.4); ctx.lineTo(x + s * 0.4, y - s * 0.2); ctx.lineTo(x - s * 0.3, y); ctx.closePath(); ctx.fill();
     }
+    // Bonus au sol (poulet, aimant, coffre) : pastille contourée qui pulse, halo coloré et petite flèche qui rebondit
     const PK = ['🍗', '🧲', '🎁'];
-    ctx.font = '26px system-ui';
+    const PKC = ['#ff9f43', '#5dc8ff', '#ffd34a'];
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i < f.pk.length; i += 3) {
+      const x = f.pk[i];
+      const kind = f.pk[i + 2];
       const bob = Math.sin(t * 4 + i) * 3;
-      if (f.pk[i + 2] === 2) { ctx.shadowColor = '#ffd34a'; ctx.shadowBlur = 18; }
-      ctx.fillText(PK[f.pk[i + 2]], f.pk[i], f.pk[i + 1] + bob);
-      ctx.shadowBlur = 0;
+      const y = f.pk[i + 1] + bob;
+      const pulse = 1 + Math.sin(t * 5 + i) * 0.08;
+      const c = PKC[kind];
+      const glow = ctx.createRadialGradient(x, y, 6, x, y, 40 * pulse);
+      glow.addColorStop(0, c + 'aa'); glow.addColorStop(1, c + '00');
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, 40 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(15, 10, 30, .78)'; ctx.strokeStyle = c; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, 21 * pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 25 * pulse, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '24px system-ui';
+      ctx.fillText(PK[kind], x, y + 1);
+      // Flèche au-dessus
+      const ay = y - 36 - Math.abs(Math.sin(t * 4 + i)) * 5;
+      ctx.fillStyle = c; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 7, ay - 6); ctx.lineTo(x + 7, ay - 6); ctx.lineTo(x, ay + 3); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+    ctx.textBaseline = 'alphabetic';
     // Personnages, ennemis et boss, triés par profondeur
     const k = Math.min(1, (now - G.frameAt) / 100);
     const list = [];
@@ -1349,6 +1377,7 @@
     G.shots.clear();
     G.proj.clear();
     G.gems.clear();
+    G.gemGot.clear();
     G.fx = [];
     G.texts = [];
     G.puffs = [];
