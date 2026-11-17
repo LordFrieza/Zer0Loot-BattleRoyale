@@ -1824,17 +1824,33 @@
     elite: { hp: 9, damage: 1.5, scale: 1.7, xp: 25 },
   };
   // Lieux-dits : la carte est partagée entre les zones les plus proches de ces points (et leurs ennemis favoris).
+  // Lieux-dits : la carte est partagée entre les zones les plus proches de ces points. Chacune a ses ennemis favoris
+  // et un effet tant que le joueur s'y trouve (fx) : xp, regen (PV/s), gems (gemmes ×(1+gems)), slow (ralentit les
+  // ennemis), speed, magnet, damage, burn (PV perdus par seconde), crit, area, enemyHp (vie des ennemis qui y apparaissent).
   const SURVIVOR_ZONES = {
-    village: { label: 'Village', x: 2400, y: 2400, ground: '#78b35e', enemies: ['gobelin', 'rat'] },
-    foret: { label: 'Forêt sombre', x: 1050, y: 1050, ground: '#2f6a39', enemies: ['araignee', 'gobelin'] },
-    lac: { label: 'Lac gelé', x: 2400, y: 650, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'] },
-    cimetiere: { label: 'Cimetière', x: 3750, y: 1050, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'] },
-    champs: { label: 'Champs de blé', x: 4100, y: 2400, ground: '#c8b356', enemies: ['rat', 'gobelin'] },
-    volcan: { label: 'Volcan', x: 3750, y: 3750, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'] },
-    ruines: { label: 'Ruines', x: 2400, y: 4150, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'] },
-    marais: { label: 'Marais', x: 1050, y: 3750, ground: '#4c5d38', enemies: ['slime', 'rat'] },
-    prairie: { label: 'Prairie fleurie', x: 650, y: 2400, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'] },
+    village: { label: 'Village', x: 2400, y: 2400, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
+    foret: { label: 'Forêt sombre', x: 1050, y: 1050, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
+    lac: { label: 'Lac gelé', x: 2400, y: 650, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
+    cimetiere: { label: 'Cimetière', x: 3750, y: 1050, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
+    champs: { label: 'Champs de blé', x: 4100, y: 2400, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
+    volcan: { label: 'Volcan', x: 3750, y: 3750, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
+    ruines: { label: 'Ruines', x: 2400, y: 4150, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
+    marais: { label: 'Marais', x: 1050, y: 3750, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
+    prairie: { label: 'Prairie fleurie', x: 650, y: 2400, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
   };
+  // Raisons d'explorer : autels (bénédiction d'un lieu-dit), éclats d'émeraude, trésors gardés.
+  const SURVIVOR_EXPLORE = {
+    altar: { radius: 70, charge: 2, duration: 40, cooldown: 150, mult: 1.5, heal: 0.25 }, // un autel par lieu-dit (sauf le village)
+    shard: { every: 35, max: 3, dist: [900, 1700], radius: 34, emeralds: 1 }, // éclats d'émeraude, jamais au village
+    treasure: { first: 90, every: 150, upgrades: 2, emeralds: 3, guards: 6, radius: 42, aggro: 450 }, // les gardiens restent au trésor tant que le joueur est à plus de 450 px
+  };
+  // Effet de zone (fx) en jeu : celui du lieu-dit où l'on est, plus la bénédiction d'autel en cours (parties positives × 1,5).
+  function survivorZoneFx(zone, blessing) {
+    const fx = { ...((SURVIVOR_ZONES[zone] || {}).fx || {}) };
+    const B = blessing && SURVIVOR_ZONES[blessing];
+    if (B) for (const [k, v] of Object.entries(B.fx)) if (v > 0 && k !== 'enemyHp' && k !== 'burn') fx[k] = (fx[k] || 0) + v * SURVIVOR_EXPLORE.altar.mult;
+    return fx;
+  }
   function survivorZone(x, y) {
     let best = null;
     let bd = Infinity;
@@ -2501,7 +2517,7 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
-    SURVIVOR, SURVIVOR_ZONES, survivorZone, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
+    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,

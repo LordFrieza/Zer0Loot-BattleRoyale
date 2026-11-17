@@ -401,7 +401,17 @@ de la file, confirme les `!join` et annonce le vainqueur.
   9 lieux-dits : village, forêt sombre, lac gelé, cimetière, champs de blé, volcan, ruines, marais, prairie fleurie, avec
   leurs ennemis favoris). On se déplace avec **ZQSD** / les flèches (ou au doigt) ; les armes attaquent seules. Tout est
   simulé par le serveur (la position envoyée est bornée à la vitesse permise). **Les stats habituelles ne comptent pas** :
-  base commune (120 PV, vitesse 150…), améliorée seulement par la méta-progression du Survivor.
+  base commune (120 PV, vitesse 150…), améliorée seulement par la méta-progression du Survivor. Musique : *Last Battle*
+  (`public/audio/survivor.mp3`).
+  - **Lieux-dits** : chacun a un effet tant qu'on y est (guide dans le camp, rappel dans le HUD). Village : +1 PV/s mais
+    −25 % d'XP (camper au centre ne paie plus) ; forêt +30 % d'XP (ennemis +20 % de vie) ; lac : ennemis ralentis de
+    25 % ; cimetière : gemmes ×2 (ennemis +15 % de vie) ; champs +15 % de vitesse et +30 % d'aimant ; volcan +30 % de
+    dégâts mais −1,5 PV/s (jamais mortel) ; ruines +15 % de critiques ; marais +25 % de zone (−10 % de vitesse) ; prairie
+    +50 % d'aimant et +0,5 PV/s.
+  - **Exploration** : un **autel** par lieu-dit (2 s dessus → bénédiction de 40 s : ses bonus × 1,5, partout et sans
+    contrepartie, + 25 % des PV ; recharge 150 s), des **éclats d'émeraude** loin du joueur (+1 émeraude chacun, toutes
+    les 35 s, 3 au plus) et un **trésor gardé** à 90 s puis toutes les 150 s (une élite et 6 gardiens qui restent à leur
+    poste ; 2 améliorations + 3 émeraudes). Mini-carte et flèches au bord de l'écran pour les trouver.
   - Vagues de 30 s (monstres du donjon, de plus en plus nombreux et costauds), un ennemi d'élite toutes les 50 s (coffre
     d'une amélioration), un **boss toutes les 5 vagues** (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
     cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
@@ -422,6 +432,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   manoir 17 × 10 à 90 000). Son personnage s'y promène. Les meubles et options donnent des **points de déco** → niveau de
   décoration (20 au plus) → la **boîte aux lettres** reçoit un courrier toutes les 6 h (golds, émeraudes dès le niveau 5,
   parfois un coffre, une Clé de boss ou une potion). On peut **visiter** les maisons des autres et leur laisser un ❤️.
+  **Aperçu avant achat** : un clic sur une option de style pas encore achetée l'affiche sur sa maison (barre « Aperçu »
+  avec Acheter / Annuler) ; « 👁️ Essayer » sur un meuble de la boutique le pose dans la pièce pour voir, à acheter et
+  garder à cette place ou à annuler.
 - **Familiers** (onglet Familier) : un boss vaincu (Combat de Boss, Boss Rush, Défi des boss) a **5 % de chance** de
   laisser sa version miniature à chaque héros (une espèce par boss ; un doublon donne 150 XP au familier et un festin).
   Dans un **enclos animé** (ciel selon l'heure, objets achetés, familier qui se promène et réagit), le familier

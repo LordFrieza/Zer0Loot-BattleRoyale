@@ -16,6 +16,8 @@
   const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const EM = '<i class="ico-emerald"></i>';
 
+  const X = Rules.SURVIVOR_EXPLORE;
+  const ALTARS = Object.entries(ZONES).filter(([id]) => id !== 'village').map(([id, z]) => ({ zone: id, x: z.x, y: z.y }));
   let state = null; // GET /api/survivor
   let active = false;
   let starter = null;
@@ -332,6 +334,29 @@
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 70, t0: now, life: 350, color: '#b98cff' });
         Sound.play('blink');
         break;
+      case 'bless':
+        svToast(`✨ Bénédiction ${ZONES[e.zone].bonus} : ses bonus ×${String(X.altar.mult).replace('.', ',')}, partout et sans contrepartie, pendant ${X.altar.duration} s !`, 3600, 'bless');
+        G.fx.push({ k: 'ring', x: G.me.x, y: G.me.y, r: 160, t0: now, life: 700, color: '#fff2a8' });
+        Sound.play('chestTier', 'epique');
+        break;
+      case 'blessEnd':
+        svToast('La bénédiction s\'estompe…', 1600);
+        break;
+      case 'shardSpawn':
+        svToast('💎 Un éclat d\'émeraude est apparu sur la carte !', 1800);
+        break;
+      case 'shard':
+        G.texts.push({ x: e.x, y: e.y - 10, v: '+1 💎', c: 2, t0: now });
+        Sound.play('petFind');
+        break;
+      case 'treasure':
+        svToast(`💰 Un trésor gardé est apparu : ${ZONES[e.zone].label} !`, 3600, 'bless');
+        Sound.play('queueOpen');
+        break;
+      case 'treasureOpen':
+        svToast(`💰 Trésor ouvert ! +${e.emeralds} 💎 et des améliorations`, 3000, 'bless');
+        Sound.play('chestBurst', 'legendaire');
+        break;
       case 'revive':
         svToast('👼 Seconde vie !', 2400);
         G.fx.push({ k: 'ring', x: G.me.x, y: G.me.y, r: 280, t0: now, life: 700, color: '#fff2a8' });
@@ -429,6 +454,50 @@
       g.addColorStop(1, 'rgba(255, 70, 20, .45)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(G.me.x, G.me.y, f.aura * pulse, 0, Math.PI * 2); ctx.fill();
+    }
+    // Autels des lieux-dits
+    ALTARS.forEach((A, i) => {
+      if (Math.abs(A.x - G.me.x) > W / 2 + 80 || Math.abs(A.y - G.me.y) > H / 2 + 120) return;
+      const [cd, charge] = (f.alt && f.alt[i]) || [0, 0];
+      const ready = cd <= 0;
+      const Z = ZONES[A.zone];
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(A.x, A.y + 6, 62, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = ready ? '#d8d2c2' : '#8a8680'; ctx.beginPath(); ctx.ellipse(A.x, A.y, 56, 20, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = ready ? `rgba(255, 226, 122, ${0.6 + Math.sin(t * 3) * 0.3})` : 'rgba(80,80,80,.6)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(A.x, A.y, 48, 16, 0, 0, Math.PI * 2); ctx.stroke();
+      if (charge > 0) { ctx.strokeStyle = '#7cff4f'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(A.x, A.y, 52, 18, 0, -Math.PI / 2, -Math.PI / 2 + (charge / 100) * Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = ready ? '#bdb5a3' : '#6a6660'; ctx.fillRect(A.x - 12, A.y - 46, 24, 46);
+      ctx.fillStyle = ready ? '#d6cfbf' : '#7a7670'; ctx.fillRect(A.x - 16, A.y - 52, 32, 8);
+      if (ready) { const g = ctx.createRadialGradient(A.x, A.y - 70, 2, A.x, A.y - 70, 40); g.addColorStop(0, 'rgba(255, 240, 160, .7)'); g.addColorStop(1, 'rgba(255, 240, 160, 0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(A.x, A.y - 70, 40, 0, Math.PI * 2); ctx.fill(); }
+      ctx.font = '26px system-ui'; ctx.textAlign = 'center'; ctx.globalAlpha = ready ? 1 : 0.45;
+      ctx.fillText(Z.icon, A.x, A.y - 62 + (ready ? Math.sin(t * 2) * 3 : 0));
+      ctx.globalAlpha = 1;
+      ctx.font = '800 11px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+      const label = ready ? `Autel : ${Z.bonus}` : `Autel : ${cd} s`;
+      ctx.strokeText(label, A.x, A.y + 34); ctx.fillStyle = ready ? '#fff2a8' : '#ccc'; ctx.fillText(label, A.x, A.y + 34);
+    });
+    // Trésor gardé : un coffre doré sous un rayon de lumière
+    if (f.tr) {
+      const x = f.tr.x;
+      const y = f.tr.y;
+      const beam = ctx.createLinearGradient(x, y - 260, x, y);
+      beam.addColorStop(0, 'rgba(255, 220, 90, 0)'); beam.addColorStop(1, 'rgba(255, 220, 90, .35)');
+      ctx.fillStyle = beam; ctx.fillRect(x - 22, y - 260, 44, 260);
+      ctx.font = '40px system-ui'; ctx.textAlign = 'center';
+      ctx.shadowColor = '#ffd34a'; ctx.shadowBlur = 24;
+      ctx.fillText('🧰', x, y + 10 + Math.sin(t * 3) * 3);
+      ctx.shadowBlur = 0;
+    }
+    // Éclats d'émeraude
+    for (let i = 0; i < (f.sh || []).length; i += 2) {
+      const x = f.sh[i];
+      const y = f.sh[i + 1] + Math.sin(t * 3 + i) * 4;
+      const g = ctx.createRadialGradient(x, y, 2, x, y, 30);
+      g.addColorStop(0, 'rgba(93, 255, 154, .6)'); g.addColorStop(1, 'rgba(93, 255, 154, 0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#20c26a'; ctx.strokeStyle = '#0a5a2e'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 8, y - 10); ctx.lineTo(x + 8, y - 10); ctx.lineTo(x + 14, y - 2); ctx.lineTo(x, y + 14); ctx.lineTo(x - 14, y - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(200, 255, 220, .8)'; ctx.beginPath(); ctx.moveTo(x - 8, y - 10); ctx.lineTo(x, y - 2); ctx.lineTo(x - 14, y - 2); ctx.closePath(); ctx.fill();
     }
     // Gemmes et objets au sol
     for (let i = 0; i < f.g.length; i += 3) {
@@ -600,7 +669,7 @@
       ctx.font = `900 ${e.c ? 20 : 14}px system-ui, sans-serif`;
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
       ctx.strokeText(e.v, e.x, e.y - 18 - p * 26);
-      ctx.fillStyle = e.c ? '#ffd34a' : '#fff';
+      ctx.fillStyle = e.c === 2 ? '#5dff9a' : e.c ? '#ffd34a' : '#fff';
       ctx.fillText(e.v, e.x, e.y - 18 - p * 26);
     }
     ctx.globalAlpha = 1;
@@ -686,7 +755,17 @@
     ctx.textAlign = 'left';
     ctx.font = '800 13px system-ui';
     ctx.fillStyle = '#fff';
-    ctx.fillText(`❤️ ${f.hp} / ${f.maxHp}${f.revivals ? '   👼' : ''}${f.rerolls ? `   🎲 ${f.rerolls}` : ''}`, 14, 136);
+    ctx.fillText(`❤️ ${f.hp} / ${f.maxHp}${f.revivals ? '   👼' : ''}${f.rerolls ? `   🎲 ${f.rerolls}` : ''}${f.em ? `   💎 +${f.em}` : ''}`, 14, 136);
+    const Zc = ZONES[f.zone || 'village'];
+    ctx.font = '700 12px system-ui';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.65)';
+    const zl = `${Zc.icon} ${Zc.label} · ${Zc.bonus} : ${Zc.desc}`;
+    ctx.strokeText(zl, 14, 156); ctx.fillStyle = '#fff2a8'; ctx.fillText(zl, 14, 156);
+    if (f.bless) {
+      const Bz = ZONES[f.bless.zone];
+      const bl = `✨ Bénédiction ${Bz.bonus} (${Math.ceil(Math.max(0, f.bless.left - (now - G.frameAt) / 1000))} s)`;
+      ctx.strokeText(bl, 14, 174); ctx.fillStyle = '#b6ffa0'; ctx.fillText(bl, 14, 174);
+    }
     // Boss
     if (f.b) {
       const bw = 520;
@@ -731,7 +810,33 @@
     const s = MINI / SV.map.w;
     ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1;
     ctx.strokeRect(mx + (G.me.x - W / 2) * s, my + (G.me.y - H / 2) * s, W * s, H * s);
+    ALTARS.forEach((A, i) => {
+      const ready = !f.alt || !f.alt[i] || f.alt[i][0] <= 0;
+      ctx.fillStyle = ready ? '#fff2a8' : 'rgba(120,120,120,.8)';
+      ctx.fillRect(mx + A.x * s - 2.5, my + A.y * s - 2.5, 5, 5);
+    });
+    for (let i = 0; i < (f.sh || []).length; i += 2) { ctx.fillStyle = '#5dff9a'; ctx.beginPath(); ctx.arc(mx + f.sh[i] * s, my + f.sh[i + 1] * s, 3, 0, Math.PI * 2); ctx.fill(); }
+    if (f.tr) { ctx.fillStyle = '#ffd34a'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('★', mx + f.tr.x * s, my + f.tr.y * s + 4); }
     if (f.b) { ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.arc(mx + f.b.x * s, my + f.b.y * s, 4, 0, Math.PI * 2); ctx.fill(); }
+    // Flèches vers le trésor et l'éclat le plus proche, hors de l'écran
+    const edge = (tx, ty, color, icon) => {
+      const dx = tx - G.me.x;
+      const dy = ty - G.me.y;
+      if (Math.abs(dx) < W / 2 - 30 && Math.abs(dy) < H / 2 - 30) return;
+      const a = Math.atan2(dy, dx);
+      const k = Math.min((W / 2 - 46) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 46) / Math.abs(Math.sin(a) || 1e-6));
+      const px = W / 2 + Math.cos(a) * k;
+      const py = H / 2 + Math.sin(a) * k;
+      ctx.save(); ctx.translate(px, py);
+      ctx.fillStyle = 'rgba(10, 6, 24, .7)'; ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '16px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 0, 1);
+      ctx.rotate(a); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(17, -7); ctx.lineTo(17, 7); ctx.closePath(); ctx.fill();
+      ctx.restore(); ctx.textBaseline = 'alphabetic';
+    };
+    if (f.tr) edge(f.tr.x, f.tr.y, '#ffd34a', '🧰');
+    let near = null;
+    for (let i = 0; i < (f.sh || []).length; i += 2) { const d = Math.hypot(f.sh[i] - G.me.x, f.sh[i + 1] - G.me.y); if (!near || d < near.d) near = { x: f.sh[i], y: f.sh[i + 1], d }; }
+    if (near) edge(near.x, near.y, '#5dff9a', '💎');
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + G.me.x * s, my + G.me.y * s, 3.5, 0, Math.PI * 2); ctx.fill();
     // Vie basse : bords rouges
     const low = f.hp / f.maxHp;
@@ -793,7 +898,6 @@
     if (rr) rr.onclick = async () => { try { const r = await api('/api/survivor/reroll', {}); choiceKey = ''; onFrame(r.frame); } catch (e) { toast('⚠️ ' + e.message); } };
   }
   function hideChoice() {
-    if (!choiceKey) return;
     choiceKey = '';
     $('sv-choice').classList.remove('open');
   }
@@ -916,7 +1020,7 @@
     G.raf = requestAnimationFrame(loop);
     $('sv-game').scrollIntoView({ behavior: 'smooth', block: 'center' });
     Sound.music.stop(0.2);
-    setTimeout(() => { if (G.on && !G.over) Sound.music.start(0, 'dungeon'); }, 300);
+    setTimeout(() => { if (G.on && !G.over) Sound.music.start(0, 'survivor'); }, 300);
   }
 
   function stopGame() {
@@ -996,6 +1100,10 @@
           <div class="muted" style="font-size:13px">${b ? `Ton record : <b>${fmt(b.score)}</b> points (vague ${b.wave}, ${mmss(b.time)}, ${fmt(b.kills)} monstres, ${b.bosses} boss) · ${state.runs} partie(s)` : 'Pas encore de record : à toi de jouer !'}</div>
           <div class="muted" style="font-size:12px">⌨️ ZQSD ou flèches pour bouger · tes armes tirent seules · Échap : pause · 1-4 : choisir</div>
         </div>
+      </div>
+      <div class="sv-zones"><div class="sv-zones-title">🗺️ Lieux-dits : chacun a son effet tant que tu y es. Explore pour trouver les <b>autels</b> (bénédiction de ${X.altar.duration} s),
+        les <b>éclats d'émeraude</b> (+${X.shard.emeralds} 💎 chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} 💎).</div>
+        <div class="sv-zones-grid">${Object.values(ZONES).map((z) => `<div class="sv-zone" style="--zc:${z.ground}"><b>${z.icon} ${z.label}</b><span>${z.bonus} : ${z.desc}</span></div>`).join('')}</div>
       </div>`;
     $('sv-lobby').querySelectorAll('[data-starter]').forEach((el) => {
       el.onclick = async () => {

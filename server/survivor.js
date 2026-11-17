@@ -44,6 +44,17 @@ class SurvivorRun {
     this.rerolls = this.stats.rerolls;
     this.revivals = this.stats.revivals;
     this.bonusEmeralds = 0;
+    // Exploration : effet du lieu-dit, autels, éclats d'émeraude, trésor gardé
+    const X = Rules.SURVIVOR_EXPLORE;
+    this.zone = 'village';
+    this.fx = Rules.survivorZoneFx('village');
+    this.blessing = null; // { zone, until }
+    this.altars = Object.entries(Rules.SURVIVOR_ZONES).filter(([id]) => id !== 'village').map(([id, z]) => ({ zone: id, x: z.x, y: z.y, readyAt: 0, charge: 0 }));
+    this.shards = [];
+    this.shardT = X.shard.every * 0.5;
+    this.treasure = null;
+    this.treasureT = X.treasure.first;
+    this.found = { shards: 0, altars: 0, treasures: 0 };
     this.p = { x: SV.map.w / 2, y: SV.map.h / 2, fx: 1, fy: 0, slowUntil: 0 };
     this.enemies = [];
     this.gems = [];
@@ -73,7 +84,7 @@ class SurvivorRun {
 
   speedNow() {
     const inWeb = this.areas.some((a) => a.k === 'web' && dist2(a.x, a.y, this.p.x, this.p.y) < a.r * a.r);
-    return this.stats.speed * (inWeb ? 0.55 : 1) * (this.p.slowUntil > this.t ? 0.6 : 1);
+    return this.stats.speed * (1 + (this.fx.speed || 0)) * (inWeb ? 0.55 : 1) * (this.p.slowUntil > this.t ? 0.6 : 1);
   }
 
   // Position envoyée par le navigateur : bornée à ce que la vitesse permet depuis le dernier message.
@@ -197,7 +208,8 @@ class SurvivorRun {
       y = clamp(y, 30, SV.map.h - 30);
     }
     const elite = !!opts.elite;
-    const hp = E.hp * W.hp * (elite ? SV.elite.hp : 1);
+    const spawnZone = Rules.SURVIVOR_ZONES[Rules.survivorZone(x, y)];
+    const hp = E.hp * W.hp * (elite ? SV.elite.hp : 1) * (1 + ((spawnZone.fx && spawnZone.fx.enemyHp) || 0));
     const e = {
       id: this.nextId++, kind, x, y, hp, maxHp: hp, r: E.radius * (elite ? SV.elite.scale * 0.8 : 1),
       speed: E.speed * Math.min(1.25, 1 + 0.008 * (this.wave - 1)), damage: E.damage * W.damage * (elite ? SV.elite.damage : 1),
@@ -272,8 +284,8 @@ class SurvivorRun {
   // Dégâts infligés par une arme.
   damage(e, base, weapon, kb = 0) {
     if (e.dead) return;
-    const crit = this.rand() < this.stats.crit;
-    const dmg = base * this.stats.damage * (crit ? 2 : 1);
+    const crit = this.rand() < this.stats.crit + (this.fx.crit || 0);
+    const dmg = base * this.stats.damage * (1 + (this.fx.damage || 0)) * (crit ? 2 : 1);
     e.hp -= dmg;
     if (this.dmgEvents < 28) { this.events.push({ k: 'd', x: Math.round(e.x), y: Math.round(e.y - e.r), v: Math.round(dmg), c: crit ? 1 : 0 }); this.dmgEvents += 1; }
     if (kb && !e.boss) {
@@ -297,7 +309,7 @@ class SurvivorRun {
     }
     this.kills += 1;
     if (this.deathEvents < 40) { this.events.push({ k: 'x', x: Math.round(e.x), y: Math.round(e.y), i: KIND_INDEX[e.kind] }); this.deathEvents += 1; }
-    this.dropGem(e.x, e.y, e.xp);
+    this.dropGem(e.x, e.y, e.xp * (1 + (this.fx.gems || 0)));
     if (e.elite) this.pickups.push({ type: 'chest', x: e.x, y: e.y, count: 1 });
     else if (this.rand() < SV.drops.chicken) this.pickups.push({ type: 'chicken', x: e.x, y: e.y });
     else if (this.rand() < SV.drops.magnet) this.pickups.push({ type: 'magnet', x: e.x, y: e.y });
@@ -329,7 +341,15 @@ class SurvivorRun {
       const b = Rules.survivorBoss(wave);
       if (b) this.spawnBoss(b);
     }
-    if (S.regen > 0) this.hp = Math.min(S.maxHp, this.hp + S.regen * dt);
+    // Lieu-dit et bénédiction d'autel
+    const zone = Rules.survivorZone(P.x, P.y);
+    if (zone !== this.zone) this.zone = zone;
+    if (this.blessing && this.t >= this.blessing.until) { this.blessing = null; this.events.push({ k: 'blessEnd' }); }
+    this.fx = Rules.survivorZoneFx(zone, this.blessing && this.blessing.zone);
+    const regen = S.regen + (this.fx.regen || 0);
+    if (regen > 0 && this.hp > 0) this.hp = Math.min(S.maxHp, this.hp + regen * dt);
+    if (this.fx.burn && this.hp > 1) this.hp = Math.max(1, this.hp - this.fx.burn * dt); // la Fournaise brûle, sans jamais achever
+    this.updateExplore(dt);
     // Apparitions
     const W = Rules.survivorWave(this.wave);
     this.spawnAcc += W.spawnPerSec * (this.boss ? 0.6 : 1) * dt;
@@ -378,11 +398,19 @@ class SurvivorRun {
     const P = this.p;
     for (const e of this.enemies) {
       if (e.dead) continue;
-      const dx = P.x - e.x;
-      const dy = P.y - e.y;
-      const d = Math.hypot(dx, dy) || 1;
-      let vx = (dx / d) * e.speed;
-      let vy = (dy / d) * e.speed;
+      let dx = P.x - e.x;
+      let dy = P.y - e.y;
+      let d = Math.hypot(dx, dy) || 1;
+      // Gardien de trésor : reste à son poste tant que le joueur est loin
+      if (e.guard && d > Rules.SURVIVOR_EXPLORE.treasure.aggro) {
+        dx = e.guard.x - e.x;
+        dy = e.guard.y - e.y;
+        d = Math.hypot(dx, dy) || 1;
+        if (d < 8) continue;
+      }
+      const sp = e.speed * (1 - (this.fx.slow || 0));
+      let vx = (dx / d) * sp;
+      let vy = (dy / d) * sp;
       if (Rules.SURVIVOR_ENEMIES[e.kind] && Rules.SURVIVOR_ENEMIES[e.kind].erratic) {
         e.phase += dt * 4;
         vx += Math.cos(e.phase) * 60;
@@ -422,7 +450,7 @@ class SurvivorRun {
         this.hurt(e.damage);
       }
       // Trop loin derrière (le joueur a filé) : il réapparaît devant
-      if (!e.boss && d > 1400) {
+      if (!e.boss && !e.guard && d > 1400) {
         const a = this.rand() * Math.PI * 2;
         e.x = clamp(P.x + Math.cos(a) * SV.spawnDist[0], 30, SV.map.w - 30);
         e.y = clamp(P.y + Math.sin(a) * SV.spawnDist[0], 30, SV.map.h - 30);
@@ -482,7 +510,7 @@ class SurvivorRun {
     const S = this.stats;
     for (const w of this.weapons) {
       const s = w.s;
-      const area = (s.area || 1) * S.area;
+      const area = (s.area || 1) * S.area * (1 + (this.fx.area || 0));
       const amount = (s.amount || 1) + S.amount;
       // Orbes : actives un moment, puis en recharge
       if (w.id === 'orbes') {
@@ -666,7 +694,7 @@ class SurvivorRun {
 
   updatePickups(dt) {
     const P = this.p;
-    const mag = this.stats.magnet;
+    const mag = this.stats.magnet * (1 + (this.fx.magnet || 0));
     for (const g of this.gems) {
       const d2 = dist2(g.x, g.y, P.x, P.y);
       if (!g.pull && d2 < mag * mag) g.pull = true;
@@ -676,7 +704,7 @@ class SurvivorRun {
         const step = Math.min(d, g.sp * dt);
         g.x += ((P.x - g.x) / d) * step;
         g.y += ((P.y - g.y) / d) * step;
-        if (d < SV.player.radius + 10) { this.xp += g.v * this.stats.xp; g.got = true; }
+        if (d < SV.player.radius + 10) { this.xp += g.v * this.stats.xp * Math.max(0.1, 1 + (this.fx.xp || 0)); g.got = true; }
       }
     }
     this.gems = this.gems.filter((g) => !g.got);
@@ -690,6 +718,81 @@ class SurvivorRun {
     this.pickups = this.pickups.filter((k) => !k.got);
   }
 
+  // ---------- Exploration ----------
+  updateExplore(dt) {
+    const X = Rules.SURVIVOR_EXPLORE;
+    const P = this.p;
+    // Autels : rester 2 s dessus donne la bénédiction de son lieu-dit (40 s), puis 150 s de recharge
+    for (const a of this.altars) {
+      const on = dist2(a.x, a.y, P.x, P.y) < X.altar.radius * X.altar.radius && this.t >= a.readyAt;
+      a.charge = on ? a.charge + dt / X.altar.charge : 0;
+      if (a.charge >= 1) {
+        a.charge = 0;
+        a.readyAt = this.t + X.altar.cooldown;
+        this.blessing = { zone: a.zone, until: this.t + X.altar.duration };
+        this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.maxHp * X.altar.heal);
+        this.found.altars += 1;
+        this.events.push({ k: 'bless', zone: a.zone });
+      }
+    }
+    // Éclats d'émeraude : loin du joueur, jamais au village
+    this.shardT -= dt;
+    if (this.shardT <= 0) {
+      this.shardT = X.shard.every;
+      if (this.shards.length < X.shard.max) {
+        for (let tries = 0; tries < 10; tries++) {
+          const a = this.rand() * Math.PI * 2;
+          const d = X.shard.dist[0] + this.rand() * (X.shard.dist[1] - X.shard.dist[0]);
+          const x = clamp(P.x + Math.cos(a) * d, 80, SV.map.w - 80);
+          const y = clamp(P.y + Math.sin(a) * d, 80, SV.map.h - 80);
+          if (Rules.survivorZone(x, y) === 'village') continue;
+          this.shards.push({ id: this.nextId++, x, y });
+          this.events.push({ k: 'shardSpawn' });
+          break;
+        }
+      }
+    }
+    for (const s of this.shards) {
+      if (dist2(s.x, s.y, P.x, P.y) < X.shard.radius * X.shard.radius) {
+        s.got = true;
+        this.bonusEmeralds += X.shard.emeralds;
+        this.found.shards += 1;
+        this.events.push({ k: 'shard', x: Math.round(s.x), y: Math.round(s.y) });
+      }
+    }
+    this.shards = this.shards.filter((s) => !s.got);
+    // Trésor gardé dans un lieu-dit au hasard (hors village)
+    this.treasureT -= dt;
+    if (!this.treasure && this.treasureT <= 0) {
+      this.treasureT = X.treasure.every;
+      const zones = Object.keys(Rules.SURVIVOR_ZONES).filter((z) => z !== 'village' && z !== Rules.survivorZone(P.x, P.y));
+      const zone = zones[Math.floor(this.rand() * zones.length)];
+      const Z = Rules.SURVIVOR_ZONES[zone];
+      const a = this.rand() * Math.PI * 2;
+      const x = clamp(Z.x + Math.cos(a) * 260, 80, SV.map.w - 80);
+      const y = clamp(Z.y + Math.sin(a) * 260, 80, SV.map.h - 80);
+      this.treasure = { x, y, zone };
+      // Ses gardiens : une élite et une petite troupe du lieu-dit
+      const guard = (e) => { e.guard = { x: e.x, y: e.y }; };
+      // Monstres du moment, de préférence ceux du lieu-dit
+      guard(this.spawnEnemy(this.pickKind(x, y), { x: x + 50, y, elite: true }));
+      for (let i = 0; i < X.treasure.guards; i++) {
+        const b = (i / X.treasure.guards) * Math.PI * 2;
+        guard(this.spawnEnemy(this.pickKind(x, y), { x: x + Math.cos(b) * 90, y: y + Math.sin(b) * 90 }));
+      }
+      this.events.push({ k: 'treasure', zone });
+    }
+    if (this.treasure && dist2(this.treasure.x, this.treasure.y, P.x, P.y) < X.treasure.radius * X.treasure.radius) {
+      const tz = this.treasure.zone;
+      this.treasure = null;
+      for (const e of this.enemies) e.guard = null; // les gardiens survivants se lancent à sa poursuite
+      this.bonusEmeralds += X.treasure.emeralds;
+      this.found.treasures += 1;
+      this.events.push({ k: 'treasureOpen', zone: tz, emeralds: X.treasure.emeralds });
+      this.openChest(X.treasure.upgrades);
+    }
+  }
+
   finish() {
     if (this.over) return this.over;
     const r = { time: Math.round(this.t * 10) / 10, wave: this.wave, kills: this.kills, bosses: this.bosses, level: this.level };
@@ -697,6 +800,7 @@ class SurvivorRun {
     r.weapons = this.weapons.map((w) => [w.id, w.level]);
     r.passives = Object.entries(this.passives);
     r.bonusEmeralds = this.bonusEmeralds;
+    r.found = { ...this.found };
     this.over = r;
     this.events.push({ k: 'over' });
     return r;
@@ -748,6 +852,12 @@ class SurvivorRun {
       passives: Object.entries(this.passives),
       rerolls: this.rerolls,
       revivals: this.revivals,
+      zone: this.zone,
+      bless: this.blessing ? { zone: this.blessing.zone, left: Math.round((this.blessing.until - this.t) * 10) / 10 } : null,
+      alt: this.altars.map((a) => [Math.max(0, Math.round(a.readyAt - this.t)), Math.round(a.charge * 100)]),
+      sh: this.shards.flatMap((s) => [Math.round(s.x), Math.round(s.y)]),
+      tr: this.treasure ? { x: Math.round(this.treasure.x), y: Math.round(this.treasure.y), zone: this.treasure.zone } : null,
+      em: this.bonusEmeralds,
       paused: this.paused,
       pend: this.pending,
       ev: events,

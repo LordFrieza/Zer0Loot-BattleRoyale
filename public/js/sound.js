@@ -669,6 +669,7 @@
     gold: '/audio/ruee.mp3', // YV Remix (Ruée vers l'or)
     rush: '/audio/boss.mp3', // Boss Rush : même musique que le Combat de Boss
     casino: '/audio/casino.mp3', // Luigi's Casino (onglet Casino)
+    survivor: '/audio/survivor.mp3', // Last Battle — Cave Story (Survivor)
   };
 
   const music = (function () {

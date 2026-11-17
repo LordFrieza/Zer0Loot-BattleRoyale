@@ -21,6 +21,8 @@
   let ext = null; // zones cliquables de la façade
   let ghost = null; // { id, x, y, ok, flip, from (index du meuble déplacé) }
   let selected = null; // meuble choisi dans « Mes meubles »
+  let stylePreview = null; // { part, id } : option essayée avant l'achat
+  let furnPreview = null; // { id, x, y } : meuble essayé dans la pièce avant l'achat
   let houses = [];
   const walker = { x: 1, y: 1, path: [], wait: 1, facing: 1 };
 
@@ -73,7 +75,7 @@
         ${due ? '<button class="gold small" id="hh-mail">Ouvrir</button>' : ''}</div>
       <span class="spacer"></span>
       <button class="${editing ? 'gold' : 'secondary'}" id="hh-edit">${editing ? '✅ Terminer' : '✏️ Décorer'}</button></div>`;
-    $('hh-edit').onclick = () => { editing = !editing; selected = null; ghost = null; renderAll(); };
+    $('hh-edit').onclick = () => { editing = !editing; selected = null; ghost = null; furnPreview = null; renderAll(); };
     if ($('hh-mail')) $('hh-mail').onclick = collect;
   }
   function mailIn() {
@@ -115,12 +117,14 @@
         <div class="hs-grid">${Object.entries(FUR).filter(([, F]) => F.cat === shopCat).map(([id, F]) => `<div class="hs-item shop" title="${esc(F.label)}">
           <span class="hs-thumb" data-thumb="${id}"></span><span class="hs-name">${F.label}</span>
           <span class="hs-info">+${F.deco} déco · ${F.w}×${F.wall ? 1 : F.h}${F.wall ? ' mural' : F.rug ? ' tapis' : ''}${owned(id) ? ` · ×${owned(id)}` : ''}</span>
-          <button class="small ${mine.emeralds >= F.price ? 'gold' : 'secondary'}" data-buy="${id}" ${mine.emeralds >= F.price ? '' : 'disabled'}>${fmt(F.price)} ${EM}</button></div>`).join('')}</div>`;
+          <button class="small ${mine.emeralds >= F.price ? 'gold' : 'secondary'}" data-buy="${id}" ${mine.emeralds >= F.price ? '' : 'disabled'}>${fmt(F.price)} ${EM}</button>
+          <button class="small secondary" data-htry="${id}" title="Le placer dans ta pièce pour voir, avant de l'acheter">👁️ Essayer</button></div>`).join('')}</div>`;
     } else if (sideTab === 'style') {
       body = Object.entries(Rules.HOUSE_PARTS).map(([part, P]) => `<div class="hs-part"><div class="hs-part-title">${P.zone === 'ext' ? '🏡' : '🛋️'} ${P.label}</div><div class="chips">${Object.entries(P.options).map(([id, o]) => {
     const have = o.price === 0 || mine.opts.includes(`${part}:${id}`);
     const cur = view.style[part] === id;
-    return `<button class="chip ${cur ? 'active' : ''} ${have ? '' : 'locked'}" data-style="${part}:${id}" title="${have ? 'Choisir' : `Acheter pour ${fmt(o.price)} émeraudes`}">${o.color ? `<i class="hs-swatch" style="background:${o.color}"></i>` : ''}${o.label}${have ? '' : ` · ${fmt(o.price)} 💎`}</button>`;
+    const prev = stylePreview && stylePreview.part === part && stylePreview.id === id;
+    return `<button class="chip ${cur ? 'active' : ''} ${have ? '' : 'locked'} ${prev ? 'previewing' : ''}" data-style="${part}:${id}" title="${have ? 'Choisir' : 'Voir l\'aperçu sur ta maison'}">${o.color ? `<i class="hs-swatch" style="background:${o.color}"></i>` : ''}${o.label}${have ? '' : ` · ${fmt(o.price)} 💎`}</button>`;
   }).join('')}</div></div>`).join('');
     } else {
       const order = Rules.HOUSING.sizeOrder;
@@ -133,7 +137,29 @@
           ${state === 'cur' ? '<em>Ta maison</em>' : state === 'done' ? '<em>✅</em>' : state === 'next' ? `<button class="small ${mine.emeralds >= S.price ? 'gold' : 'secondary'}" id="hs-grow" ${mine.emeralds >= S.price ? '' : 'disabled'}>Agrandir · ${fmt(S.price)} ${EM}</button>` : `<em>${fmt(S.price)} 💎</em>`}</div>`;
   }).join('')}</div><p class="muted hs-help">Une plus grande maison : plus de place pour les meubles et plus de points de déco. Les meubles déjà posés restent à leur place.</p>`;
     }
-    side.innerHTML = `<div class="chips hs-tabs">${tabs.map(([k, l]) => `<button class="chip ${sideTab === k ? 'active' : ''}" data-stab="${k}">${l}</button>`).join('')}</div><div class="hs-body">${body}</div>`;
+    let bar = '';
+    if (stylePreview) {
+      const o = Rules.HOUSE_PARTS[stylePreview.part].options[stylePreview.id];
+      bar = `<div class="hs-preview">👁️ Aperçu : <b>${o.label}</b> (${Rules.HOUSE_PARTS[stylePreview.part].label.toLowerCase()})
+        <div class="row"><button class="small ${mine.emeralds >= o.price ? 'gold' : 'secondary'}" id="hp-buy" ${mine.emeralds >= o.price ? '' : 'disabled'}>Acheter · ${fmt(o.price)} ${EM}</button><button class="small secondary" id="hp-cancel">Annuler</button></div></div>`;
+    } else if (furnPreview || (ghost && ghost.preview)) {
+      const F = FUR[(furnPreview || ghost).id];
+      bar = `<div class="hs-preview">👁️ Aperçu : <b>${F.label}</b> — ${furnPreview ? 'voilà ce que ça donne !' : 'glisse-le dans ta pièce'}
+        <div class="row">${furnPreview ? `<button class="small ${mine.emeralds >= F.price ? 'gold' : 'secondary'}" id="hp-buy" ${mine.emeralds >= F.price ? '' : 'disabled'}>Acheter et garder · ${fmt(F.price)} ${EM}</button>` : ''}<button class="small secondary" id="hp-cancel">Annuler</button></div></div>`;
+    }
+    side.innerHTML = `${bar}<div class="chips hs-tabs">${tabs.map(([k, l]) => `<button class="chip ${sideTab === k ? 'active' : ''}" data-stab="${k}">${l}</button>`).join('')}</div><div class="hs-body">${body}</div>`;
+    if ($('hp-cancel')) $('hp-cancel').onclick = () => { stylePreview = null; furnPreview = null; if (ghost && ghost.preview) ghost = null; renderSide(); };
+    if ($('hp-buy')) $('hp-buy').onclick = () => (stylePreview ? setStyle(stylePreview.part, stylePreview.id, true) : buyPreview());
+    side.querySelectorAll('[data-htry]').forEach((b) => {
+      b.onclick = () => {
+        if (!editing) { editing = true; renderAll(); }
+        stylePreview = null;
+        furnPreview = null;
+        ghost = { id: b.dataset.htry, x: -99, y: -99, ok: false, flip: false, from: null, dragging: false, preview: true };
+        renderSide();
+        toast('👁️ Clique sur une case de ta pièce pour essayer ce meuble', 3000);
+      };
+    });
     side.querySelectorAll('[data-stab]').forEach((b) => { b.onclick = () => { sideTab = b.dataset.stab; renderSide(); }; });
     side.querySelectorAll('[data-cat]').forEach((b) => { b.onclick = () => { shopCat = b.dataset.cat; renderSide(); }; });
     side.querySelectorAll('[data-thumb]').forEach((el) => el.appendChild(thumb(el.dataset.thumb)));
@@ -209,11 +235,35 @@
   async function buy(id) {
     try { await after(await api('/api/house/buy', { id }), 'buy'); toast(`🛋️ ${FUR[id].label} ajouté à tes meubles !`); } catch (e) { toast('⚠️ ' + e.message); }
   }
-  async function setStyle(part, id) {
+  async function setStyle(part, id, confirmBuy = false) {
     const o = Rules.HOUSE_PARTS[part].options[id];
     const have = o.price === 0 || mine.opts.includes(`${part}:${id}`);
-    if (!have && !confirm(`Acheter « ${o.label} » pour ${fmt(o.price)} émeraudes ?`)) return;
-    try { await after(await api('/api/house/style', { part, id }), have ? 'equip' : 'buy'); } catch (e) { toast('⚠️ ' + e.message); }
+    if (!have && !confirmBuy) {
+      // Pas encore achetée : on l'essaie sur la maison avant de décider
+      stylePreview = { part, id };
+      furnPreview = null;
+      renderSide();
+      Sound.play('chip');
+      return;
+    }
+    try {
+      await after(await api('/api/house/style', { part, id }), have ? 'equip' : 'buy');
+      stylePreview = null;
+      renderSide();
+    } catch (e) { toast('⚠️ ' + e.message); }
+  }
+  // Achète le meuble essayé et le laisse à sa place
+  async function buyPreview() {
+    const p = furnPreview;
+    if (!p) return;
+    try {
+      await api('/api/house/buy', { id: p.id });
+      furnPreview = null;
+      mine.owned[p.id] = (mine.owned[p.id] || 0) + 1;
+      await saveLayout(mine.house.placed.concat([{ id: p.id, x: p.x, y: p.y, flip: false }]));
+      await after(null, 'buy');
+      toast(`🛋️ ${FUR[p.id].label} acheté et installé !`);
+    } catch (e) { toast('⚠️ ' + e.message); }
   }
   async function grow() {
     const order = Rules.HOUSING.sizeOrder;
@@ -290,9 +340,10 @@
     });
     return best;
   }
-  function tryPlaced(p, exceptIndex) {
+  function tryPlaced(p, exceptIndex, preview = false) {
     const list = mine.house.placed.filter((_, i) => i !== exceptIndex).concat([p]);
-    return { list, error: Rules.houseLayoutError({ size: mine.house.size, owned: mine.owned }, list) };
+    const ownedNow = preview ? { ...mine.owned, [p.id]: (mine.owned[p.id] || 0) + 1 } : mine.owned;
+    return { list, error: Rules.houseLayoutError({ size: mine.house.size, owned: ownedNow }, list) };
   }
 
   function setupEditor() {
@@ -300,7 +351,7 @@
     cv.addEventListener('pointerdown', (e) => {
       if (!view || !view.mine || !editing) return;
       if (e.button === 2) return;
-      if (selected && ghost && !ghost.dragging) return; // placement au clic : géré au relâchement
+      if (ghost && !ghost.dragging) return; // placement au clic (meuble choisi ou essayé) : géré au relâchement
       const i = itemAt(e);
       if (i < 0) return;
       const p = mine.house.placed[i];
@@ -330,7 +381,7 @@
       ghost.x = c.x;
       ghost.y = c.y;
       ghost.over = c.inside;
-      ghost.ok = c.inside && !tryPlaced({ id: ghost.id, x: c.x, y: c.y, flip: ghost.flip }, ghost.from).error;
+      ghost.ok = c.inside && !tryPlaced({ id: ghost.id, x: c.x, y: c.y, flip: ghost.flip }, ghost.from, ghost.preview).error;
     });
     window.addEventListener('pointerup', (e) => {
       if (!ghost || !editing) return;
@@ -346,6 +397,11 @@
           saveLayout(list);
           Sound.play('equip');
         }
+        return;
+      }
+      if (g.preview) {
+        // Essai d'un meuble de la boutique : posé pour voir, pas enregistré
+        if (over && g.ok) { furnPreview = { id: g.id, x: c.x, y: c.y }; ghost = null; renderSide(); Sound.play('equip'); }
         return;
       }
       if (over && g.ok) {
@@ -445,10 +501,11 @@
     const g = ic.getContext('2d');
     const owner = view.mine ? { name: me.twitchDisplayName || me.username, cls: me.character.cls, look: myLook(), app: me.character.look } : { name: view.name, cls: view.cls, look: view.look || {}, app: view.app || {} };
     const moving = walker.path.length > 0 && walker.wait <= 0;
-    const house = { size: view.size, style: view.style, placed: view.placed };
+    const style = stylePreview && view.mine ? { ...view.style, [stylePreview.part]: stylePreview.id } : view.style;
+    const house = { size: view.size, style, placed: view.placed };
     room = drawRoom(g, house, ic.width, ic.height, {
       t: now, grid: editing, hidden: ghost && ghost.from != null ? ghost.from : undefined,
-      ghost: editing && ghost && ghost.over ? { id: ghost.id, x: ghost.x, y: ghost.y, ok: ghost.ok, flip: ghost.flip } : null,
+      ghost: editing && ghost && ghost.over ? { id: ghost.id, x: ghost.x, y: ghost.y, ok: ghost.ok, flip: ghost.flip } : furnPreview && view.mine ? { id: furnPreview.id, x: furnPreview.x, y: furnPreview.y, ok: true, preview: true } : null,
       walkers: [{ x: walker.x, y: walker.y, f: owner, facing: walker.facing, bob: moving ? -Math.abs(Math.sin(now / 100)) * 2 : 0, name: owner.name }],
     });
     if (Math.floor(now / 66) !== Math.floor((now - dt * 1000) / 66) || !ext) {

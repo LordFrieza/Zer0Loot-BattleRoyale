@@ -665,10 +665,16 @@
       const Fd = Rules.FURNITURE[o.ghost.id];
       const gx = R.x + o.ghost.x * T;
       const gy = Fd.wall ? wallY : R.y + o.ghost.y * T;
-      g.fillStyle = o.ghost.ok ? 'rgba(80, 255, 120, .25)' : 'rgba(255, 60, 60, .3)';
-      g.fillRect(gx, gy, Fd.w * T, (Fd.wall ? 1 : Fd.h) * T);
+      if (o.ghost.preview) {
+        // Meuble essayé : dessiné normalement, entouré de pointillés dorés
+        g.save(); g.setLineDash([6, 4]); g.strokeStyle = `rgba(255, 211, 74, ${0.6 + Math.sin((o.t || 0) / 200) * 0.3})`; g.lineWidth = 2;
+        g.strokeRect(gx + 1, gy + 1, Fd.w * T - 2, (Fd.wall ? 1 : Fd.h) * T - 2); g.restore();
+      } else {
+        g.fillStyle = o.ghost.ok ? 'rgba(80, 255, 120, .25)' : 'rgba(255, 60, 60, .3)';
+        g.fillRect(gx, gy, Fd.w * T, (Fd.wall ? 1 : Fd.h) * T);
+      }
       g.save(); g.translate(gx, Fd.id === 'cheminee' ? R.y - T * 1.4 : gy);
-      drawFurniture(g, o.ghost.id, Fd.w * T, o.ghost.id === 'cheminee' ? T * 1.4 : (Fd.wall ? 1 : Fd.h) * T, T, { t: o.t, ghost: true, flip: o.ghost.flip });
+      drawFurniture(g, o.ghost.id, Fd.w * T, o.ghost.id === 'cheminee' ? T * 1.4 : (Fd.wall ? 1 : Fd.h) * T, T, { t: o.t, ghost: !o.ghost.preview, flip: o.ghost.flip });
       g.restore();
     }
     return R;

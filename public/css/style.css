@@ -1499,3 +1499,13 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .hv-card.me { border-color: rgba(124, 255, 79, .5); }
 .hv-rank { position: absolute; left: 10px; top: 10px; font-weight: 900; color: var(--muted); }
 .hv-meta { font-size: 12px; color: var(--muted); }
+.sv-toast.bless { border-color: #ffd34a; color: #fff2a8; }
+.sv-zones { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--border); }
+.sv-zones-title { font-size: 13px; margin-bottom: 8px; }
+.sv-zones-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.sv-zone { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 8px; background: rgba(0, 0, 0, .2); border-left: 4px solid var(--zc); font-size: 12px; }
+.sv-zone span { color: var(--muted); }
+.hs-preview { margin-bottom: 10px; padding: 10px; border-radius: 10px; background: rgba(255, 211, 74, .1); border: 1px dashed rgba(255, 211, 74, .6); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+.hs-preview .row { gap: 6px; flex-wrap: wrap; }
+.hs-part .chip.previewing { border-color: #ffd34a; box-shadow: 0 0 10px rgba(255, 211, 74, .5); border-style: solid; }
+.hs-item.shop button[data-htry] { margin-top: 2px; }

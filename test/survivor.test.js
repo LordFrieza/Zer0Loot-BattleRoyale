@@ -59,6 +59,51 @@ test('[SV-2] survivor : lieux-dits, position bornée à la vitesse et à la cart
   assert.strictEqual(run.p.x, x, 'ignorée pendant un choix');
 });
 
+test('[SV-2] survivor : effets des lieux-dits (village, forêt, cimetière, volcan…), bénédiction combinée', () => {
+  const Z = Rules.SURVIVOR_ZONES;
+  assert.ok(Object.values(Z).every((z) => z.bonus && z.icon && z.desc && z.fx));
+  assert.deepStrictEqual(Rules.survivorZoneFx('village'), { regen: 1, xp: -0.25 });
+  // Bénédiction : les effets positifs du lieu-dit béni × 1,5, sans ses contreparties
+  const fx = Rules.survivorZoneFx('volcan', 'champs');
+  assert.deepStrictEqual([fx.damage, fx.burn], [0.3, 1.5]);
+  assert.ok(Math.abs(fx.speed - 0.225) < 1e-9 && Math.abs(fx.magnet - 0.45) < 1e-9);
+  const f2 = Rules.survivorZoneFx('village', 'foret');
+  assert.ok(Math.abs(f2.xp - 0.2) < 1e-9);
+  assert.strictEqual(f2.enemyHp, undefined, 'la vie des ennemis ne vient pas avec la bénédiction');
+  const f3 = Rules.survivorZoneFx('marais', 'marais');
+  assert.strictEqual(f3.speed, -0.1, 'les malus ne sont pas amplifiés');
+  assert.ok(Math.abs(f3.area - 0.625) < 1e-9);
+  assert.strictEqual(Rules.survivorZoneFx('volcan', 'volcan').burn, 1.5);
+
+  const run = new sv.SurvivorRun({});
+  // Village : régénération
+  run.hp = 50;
+  tickFor(run, 1);
+  assert.strictEqual(run.zone, 'village');
+  assert.ok(run.hp > 50.9 && run.hp < 51.1, `régénération : ${run.hp}`);
+  // Champs : vitesse
+  Object.assign(run.p, { x: Z.champs.x, y: Z.champs.y });
+  run.tick(0.05);
+  assert.strictEqual(run.zone, 'champs');
+  assert.ok(Math.abs(run.speedNow() - run.stats.speed * 1.15) < 1e-9);
+  // Volcan : brûle, mais jamais jusqu'à la mort
+  Object.assign(run.p, { x: Z.volcan.x + 250, y: Z.volcan.y + 250 }); // loin de l'autel (il soignerait)
+  run.hp = 2;
+  tickFor(run, 2);
+  assert.strictEqual(run.zone, 'volcan');
+  assert.strictEqual(run.hp, 1);
+  assert.ok(!run.over);
+  // Forêt et cimetière : ennemis plus solides selon le lieu d'apparition ; gemmes ×2 au cimetière
+  const e1 = run.spawnEnemy('slime', { x: Z.village.x, y: Z.village.y });
+  const e2 = run.spawnEnemy('slime', { x: Z.foret.x, y: Z.foret.y });
+  assert.ok(Math.abs(e2.maxHp - e1.maxHp * 1.2) < 1e-6);
+  Object.assign(run.p, { x: Z.cimetiere.x, y: Z.cimetiere.y });
+  run.tick(0.05);
+  run.gems = [];
+  run.kill(e1);
+  assert.strictEqual(run.gems[0].v, e1.xp * 2);
+});
+
 test('[SV-3] survivor : vagues de 30 s, ennemis selon la vague et le lieu-dit, élite, boss toutes les 5 vagues', () => {
   assert.deepStrictEqual(Rules.survivorWave(1).hp, 1);
   assert.ok(Rules.survivorWave(20).hp > Rules.survivorWave(10).hp && Rules.survivorWave(20).target <= SV.maxEnemies);
@@ -220,4 +265,81 @@ test('[SV-7] survivor : méta-progression, déblocages, arme de départ', () => 
   assert.ok(run.pool.weapons.includes('hache') && run.pool.passives.includes('armure'));
   assert.strictEqual(run.stats.maxHp, 130);
   sv.abandon(u.id);
+});
+
+test('[SV-10] survivor : autels et bénédictions, éclats d\'émeraude, trésors gardés', () => {
+  const X = Rules.SURVIVOR_EXPLORE;
+  const Z = Rules.SURVIVOR_ZONES;
+  assert.deepStrictEqual([X.altar.charge, X.altar.duration, X.altar.cooldown, X.altar.mult], [2, 40, 150, 1.5]);
+  const run = new sv.SurvivorRun({});
+  assert.strictEqual(run.altars.length, 8);
+  assert.ok(!run.altars.some((a) => a.zone === 'village'));
+  // Autel de la forêt : 2 s dessus
+  run.treasureT = 1e9;
+  run.shardT = 1e9;
+  Object.assign(run.p, { x: Z.foret.x + 20, y: Z.foret.y });
+  run.hp = 50;
+  tickFor(run, 1.9);
+  assert.strictEqual(run.blessing, null);
+  run.events = [];
+  tickFor(run, 0.2);
+  assert.strictEqual(run.blessing.zone, 'foret');
+  assert.ok(Math.abs(run.blessing.until - (run.t + 40)) < 0.2);
+  assert.ok(run.hp >= 50 + run.stats.maxHp * X.altar.heal - 1, 'rend 25 % des PV');
+  assert.strictEqual(run.found.altars, 1);
+  assert.ok(run.events.some((e) => e.k === 'bless' && e.zone === 'foret'));
+  const A = run.altars.find((a) => a.zone === 'foret');
+  assert.ok(Math.abs(A.readyAt - (run.t + 150)) < 0.2);
+  tickFor(run, 3);
+  assert.strictEqual(run.found.altars, 1, 'en recharge');
+  // La bénédiction suit le joueur partout
+  Object.assign(run.p, { x: Z.village.x, y: Z.village.y });
+  run.tick(0.05);
+  assert.ok(Math.abs(run.fx.xp - (-0.25 + 0.45)) < 1e-9);
+  run.t = run.blessing.until;
+  run.events = [];
+  run.tick(0.05);
+  assert.strictEqual(run.blessing, null);
+  assert.ok(run.events.some((e) => e.k === 'blessEnd'));
+  // Éclats d'émeraude : loin du joueur, jamais au village, 3 au plus
+  for (let i = 0; i < 5; i++) { run.shardT = 0; run.tick(0.05); }
+  assert.strictEqual(run.shards.length, 3);
+  for (const s of run.shards) {
+    assert.notStrictEqual(Rules.survivorZone(s.x, s.y), 'village');
+    const d = Math.hypot(s.x - run.p.x, s.y - run.p.y);
+    assert.ok(d >= 899 && d <= 1701, `distance ${d}`);
+  }
+  run.shardT = 1e9;
+  Object.assign(run.p, { x: run.shards[0].x, y: run.shards[0].y });
+  run.tick(0.05);
+  assert.deepStrictEqual([run.shards.length, run.bonusEmeralds, run.found.shards], [2, 1, 1]);
+  // Trésor gardé : ni au village ni dans le lieu-dit du joueur, avec une élite pour le garder
+  Object.assign(run.p, { x: Z.village.x, y: Z.village.y });
+  run.enemies = [];
+  run.treasureT = 0;
+  run.tick(0.05);
+  const T = run.treasure;
+  assert.ok(T && T.zone !== 'village');
+  assert.ok(run.enemies.some((e) => e.elite && Math.hypot(e.x - T.x, e.y - T.y) < 120));
+  assert.strictEqual(run.enemies.filter((e) => e.guard).length, 1 + X.treasure.guards);
+  assert.ok(run.enemies.every((e) => Rules.SURVIVOR_ENEMIES[e.kind].from <= run.wave), 'monstres de la vague en cours');
+  tickFor(run, 5); // le joueur est loin : les gardiens restent au trésor
+  assert.ok(run.enemies.filter((e) => e.guard).every((e) => Math.hypot(e.x - T.x, e.y - T.y) < 160));
+  run.treasureT = 0;
+  run.tick(0.05);
+  assert.strictEqual(run.treasure, T, 'un seul à la fois');
+  const before = run.weapons.reduce((a, w) => a + w.level, 0) + Object.values(run.passives).reduce((a, l) => a + l, 0);
+  run.enemies = [];
+  Object.assign(run.p, { x: T.x, y: T.y });
+  run.events = [];
+  run.tick(0.05);
+  assert.strictEqual(run.treasure, null);
+  assert.deepStrictEqual([run.bonusEmeralds, run.found.treasures], [4, 1]);
+  assert.strictEqual(run.events.find((e) => e.k === 'chest').items.length, 2);
+  const after = run.weapons.reduce((a, w) => a + w.level, 0) + Object.values(run.passives).reduce((a, l) => a + l, 0);
+  assert.ok(after >= before + 1, 'les améliorations sont appliquées');
+  assert.deepStrictEqual(run.finish().found, { shards: 1, altars: 1, treasures: 1 });
+  // L'image envoie l'état de l'exploration
+  const f = run.frame();
+  assert.ok(['zone', 'alt', 'sh', 'em'].every((k) => k in f), Object.keys(f).join());
 });
