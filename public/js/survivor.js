@@ -9,6 +9,8 @@
   const SV = Rules.SURVIVOR;
   const KINDS = Rules.SURVIVOR_ENEMY_KINDS;
   const ZONES = Rules.SURVIVOR_ZONES;
+  // Projectiles ennemis : [couleur, rayon] — os du squelette en rouge vif, boules de feu, glace, orbes
+  const ESHOT = [['#ff2a2a', 8], ['#ff7a1f', 13], ['#7fdcff', 10], ['#d05cff', 11]];
   const W = 1280;
   const H = 720;
   const $ = (id) => document.getElementById(id);
@@ -25,14 +27,15 @@
   // ---------- Partie ----------
   const G = {
     on: false, frame: null, frameAt: 0, srvT: 0, me: { x: SV.map.w / 2, y: SV.map.h / 2, fx: 1, fy: 0, moving: false },
-    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
+    keys: new Set(), touch: null, enemies: new Map(), shots: new Map(), proj: new Map(), fx: [], texts: [], lastSend: 0, zone: null, zoneAt: 0,
     hurtAt: 0, raf: 0, last: 0, lastHp: null, puffs: [], over: null, paused: false,
   };
   let ctx = null;
 
-  // ---------- Carte : morceaux de 512 px dessinés une fois (sol, chemins, décor), gardés en cache ----------
+  // ---------- Carte : morceaux de 512 px dessinés une fois (sol fondu, rivière, routes, décor), gardés en cache ----------
   const CHUNK = 512;
   const TILE = 64;
+  const CELL = 8; // résolution du sol (lissé ensuite : pas de gros carrés)
   const chunks = new Map();
   const hash = (x, y, s = 0) => {
     let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
@@ -44,19 +47,137 @@
     const f = (c) => Math.max(0, Math.min(255, Math.round(c + (k > 0 ? (255 - c) * k : c * k))));
     return `rgb(${f(n >> 16)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
   };
-  // Chemins de terre du village vers chaque lieu-dit
-  const ROADS = Object.entries(ZONES).filter(([id]) => id !== 'village').map(([, z]) => [ZONES.village.x, ZONES.village.y, z.x, z.y]);
-  function roadDist(x, y) {
+  const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  // Bruit lisse (valeurs aléatoires fixes interpolées) pour marbrer le sol
+  function vnoise(x, y, s) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const u = x - xi;
+    const v = y - yi;
+    const su = u * u * (3 - 2 * u);
+    const sv = v * v * (3 - 2 * v);
+    const a = hash(xi, yi, s);
+    const b = hash(xi + 1, yi, s);
+    const c = hash(xi, yi + 1, s);
+    const d = hash(xi + 1, yi + 1, s);
+    return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv;
+  }
+  const fbm = (x, y) => vnoise(x / 260, y / 260, 11) * 0.55 + vnoise(x / 90, y / 90, 12) * 0.3 + vnoise(x / 30, y / 30, 13) * 0.15;
+  // Deux teintes par lieu-dit, mélangées par le bruit
+  const GROUND = {
+    village: ['#7cb862', '#68a552'], foret: ['#2f6a39', '#224f2b'], lac: ['#e3f1f7', '#bcd9e6'], cimetiere: ['#5d6553', '#474d42'],
+    champs: ['#cdb75a', '#ae9b45'], volcan: ['#4e2a22', '#2f1c18'], ruines: ['#a9a08a', '#8b946b'], marais: ['#4d5e3a', '#38482f'], prairie: ['#93c86e', '#a8d97c'],
+  };
+  const GROUND_RGB = Object.fromEntries(Object.entries(GROUND).map(([k, [a, b]]) => [k, [rgb(a), rgb(b)]]));
+  const OUTSIDE = rgb('#1b301e');
+  function groundRGB(x, y) {
+    if (x < 0 || y < 0 || x > SV.map.w || y > SV.map.h) return OUTSIDE;
+    const n = fbm(x, y);
+    const near = Rules.survivorZoneNear(x, y);
+    const mix = (id) => { const [p, q] = GROUND_RGB[id]; return [p[0] + (q[0] - p[0]) * n, p[1] + (q[1] - p[1]) * n, p[2] + (q[2] - p[2]) * n]; };
+    const A = mix(near.a);
+    // Frontière fondue sur une centaine de pixels
+    // Frontière fondue et irrégulière (le bruit la fait onduler finement)
+    const k = Math.max(0, Math.min(1, (near.db - near.da + (vnoise(x / 70, y / 70, 14) - 0.5) * 70) / 45));
+    const t = 0.5 * (1 - k * k * (3 - 2 * k));
+    if (t <= 0.001) return A;
+    const B = mix(near.b);
+    return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t];
+  }
+
+  // Lignes courbes : routes, rivière (listes de points)
+  function catmull(pts, steps = 10) {
+    const out = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        out.push([0, 1].map((k) => 0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)));
+      }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+  // Route sinueuse de A à B : courbe qui ondule de part et d'autre de la ligne droite
+  function windingPath(a, b, seed) {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy);
+    const nx = -dy / len;
+    const ny = dx / len;
+    const amp = (110 + hash(seed, 1, 7) * 120) * (hash(seed, 2, 7) < 0.5 ? -1 : 1);
+    const ph = hash(seed, 3, 7) * Math.PI * 2;
+    const pts = [];
+    const n = Math.max(4, Math.round(len / 260));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      // Une grande courbe, plus de petites ondulations
+      const w = Math.sin(t * Math.PI) * (amp + Math.sin(t * Math.PI * 3 + ph) * 35 + (hash(seed, i, 8) - 0.5) * 30);
+      pts.push([a[0] + dx * t + nx * w, a[1] + dy * t + ny * w]);
+    }
+    return catmull(pts, 8);
+  }
+  const ZP = (id) => [ZONES[id].x, ZONES[id].y];
+  const ROAD_LINKS = [['village', 'foret'], ['village', 'lac'], ['village', 'cimetiere'], ['village', 'champs'], ['village', 'volcan'], ['village', 'ruines'], ['village', 'marais'], ['village', 'prairie'],
+  ];
+  const ROADS = ROAD_LINKS.map(([a, b], i) => windingPath(ZP(a), ZP(b), i + 1));
+  // La rivière descend du lac gelé jusqu'au marais
+  const RIVER = catmull([[2180, 760], [2050, 1050], [1820, 1380], [1640, 1720], [1580, 2080], [1440, 2420], [1470, 2800], [1340, 3150], [1150, 3360]], 12);
+  // Lac gelé et cratère du volcan : formes irrégulières
+  const blob = (cx, cy, r, seed, n = 28) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; const k = 1 + (vnoise(i * 0.7, 0, seed) - 0.5) * 0.45; return [cx + Math.cos(a) * r * k, cy + Math.sin(a) * r * 0.72 * k]; });
+  const LAKE = blob(2260, 560, 360, 21);
+  const CRATER = { x: 4330, y: 4330, r: 260 };
+  const LAVA = blob(CRATER.x, CRATER.y, 150, 33, 22);
+  const POND = blob(1060, 3440, 150, 44, 22); // la rivière finit dans une mare du marais
+  function polyDist(x, y, lines) {
     let best = Infinity;
-    for (const [ax, ay, bx, by] of ROADS) {
-      const dx = bx - ax;
-      const dy = by - ay;
-      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
-      const d = Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
-      if (d < best) best = d;
+    for (const pts of lines) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [ax, ay] = pts[i];
+        const [bx, by] = pts[i + 1];
+        if (Math.min(ax, bx) - best > x || Math.max(ax, bx) + best < x || Math.min(ay, by) - best > y || Math.max(ay, by) + best < y) continue;
+        const dx = bx - ax;
+        const dy = by - ay;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+        const d = Math.hypot(x - (ax + dx * t), y - (ay + dy * t));
+        if (d < best) best = d;
+      }
     }
     return best;
   }
+  const roadDist = (x, y) => polyDist(x, y, ROADS);
+  const riverDist = (x, y) => polyDist(x, y, [RIVER]);
+  function inPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i];
+      const [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // Ponts : là où une route croise la rivière
+  const BRIDGES = [];
+  for (const road of ROADS) {
+    for (let i = 0; i < road.length - 1; i++) {
+      for (let j = 0; j < RIVER.length - 1; j++) {
+        const [p, q] = [road[i], road[i + 1]];
+        const [r, s] = [RIVER[j], RIVER[j + 1]];
+        const d = (q[0] - p[0]) * (s[1] - r[1]) - (q[1] - p[1]) * (s[0] - r[0]);
+        if (!d) continue;
+        const t = ((r[0] - p[0]) * (s[1] - r[1]) - (r[1] - p[1]) * (s[0] - r[0])) / d;
+        const u = ((r[0] - p[0]) * (q[1] - p[1]) - (r[1] - p[1]) * (q[0] - p[0])) / d;
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) BRIDGES.push({ x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t, a: Math.atan2(q[1] - p[1], q[0] - p[0]) });
+      }
+    }
+  }
+  const strokePath = (g, pts) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); };
+  const fillPoly = (g, pts) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
 
   // Petits décors dessinés au pinceau (arbres, tombes, blé, lave…)
   const DECOR = {
@@ -157,6 +278,59 @@
     prairie: [['flower', 0.45], ['tree', 0.05], ['rock', 0.02]],
   };
 
+  // Forme fermée arrondie (milieux des côtés reliés par des courbes)
+  function smoothClosed(g, pts) {
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    g.beginPath();
+    const m0 = mid(pts[pts.length - 1], pts[0]);
+    g.moveTo(m0[0], m0[1]);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const m = mid(p, pts[(i + 1) % pts.length]);
+      g.quadraticCurveTo(p[0], p[1], m[0], m[1]);
+    }
+    g.closePath();
+  }
+  // Détails du sol posés sur une grille du monde (débordent d'un morceau à l'autre sans coupure)
+  const DETAIL = {
+    grass(g, x, y, k, base) {
+      g.strokeStyle = shade(base, -0.28); g.lineWidth = 1.4;
+      for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(x + i * 3, y); g.quadraticCurveTo(x + i * 4, y - 4, x + i * 5 + (k - 0.5) * 4, y - 7 - k * 3); g.stroke(); }
+      if (k > 0.6) { g.strokeStyle = shade(base, 0.25); g.beginPath(); g.moveTo(x + 6, y + 2); g.lineTo(x + 8, y - 5); g.stroke(); }
+    },
+    snow(g, x, y, k) {
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(x, y, 1.2 + k, 0, Math.PI * 2); g.fill();
+      if (k > 0.55) { g.strokeStyle = 'rgba(120, 165, 195, .35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - 14, y + 3); g.lineTo(x - 2, y - 1); g.lineTo(x + 12, y + 4); g.stroke(); }
+    },
+    ash(g, x, y, k) {
+      g.strokeStyle = 'rgba(15, 8, 6, .55)'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(x - 12, y); g.lineTo(x - 3, y - 3); g.lineTo(x + 4, y + 2); g.lineTo(x + 13, y - 1); g.stroke();
+      if (k > 0.7) { g.fillStyle = '#ff8a3d'; g.shadowColor = '#ff6a1f'; g.shadowBlur = 6; g.beginPath(); g.arc(x + 4, y + 2, 1.6, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0; }
+    },
+    flagstone(g, x, y, k, base) {
+      if (k > 0.22) return k > 0.6 ? DETAIL.grass(g, x, y, k, '#8b946b') : undefined;
+      for (let i = 0; i < 3; i++) {
+        const w = 14 + hash(x | 0, y | 0, i) * 12;
+        g.fillStyle = shade('#c9c0aa', (hash(y | 0, x | 0, i) - 0.5) * 0.2); g.strokeStyle = 'rgba(60, 55, 45, .35)'; g.lineWidth = 1;
+        g.beginPath(); g.roundRect(x - 18 + (i % 2) * 18, y - 10 + Math.floor(i / 2) * 12, w, 10, 3); g.fill(); g.stroke();
+      }
+    },
+    mud(g, x, y, k) {
+      if (k > 0.35) return DETAIL.grass(g, x, y, k, '#4d5e3a');
+      g.fillStyle = 'rgba(40, 48, 30, .55)'; g.beginPath(); g.ellipse(x, y, 16 + k * 20, 7 + k * 6, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(150, 190, 170, .25)'; g.beginPath(); g.ellipse(x - 4, y - 2, 6, 2, 0, 0, Math.PI * 2); g.fill();
+    },
+    dirt(g, x, y, k, base) {
+      if (k > 0.3) return DETAIL.grass(g, x, y, k, base);
+      g.fillStyle = 'rgba(70, 60, 45, .35)'; g.beginPath(); g.ellipse(x, y, 14 + k * 20, 6 + k * 8, k * 3, 0, Math.PI * 2); g.fill();
+    },
+    stubble(g, x, y, k) {
+      g.strokeStyle = 'rgba(120, 95, 35, .5)'; g.lineWidth = 1.2;
+      for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(x + i * 5 - 5, y); g.lineTo(x + i * 5 - 4, y - 5 - k * 3); g.stroke(); }
+    },
+  };
+  const ZONE_DETAIL = { village: 'grass', foret: 'grass', lac: 'snow', cimetiere: 'dirt', champs: 'stubble', volcan: 'ash', ruines: 'flagstone', marais: 'mud', prairie: 'grass' };
+
   function buildChunk(cx, cy) {
     const c = document.createElement('canvas');
     c.width = CHUNK;
@@ -164,41 +338,139 @@
     const g = c.getContext('2d');
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
-    // Sol : couleur du lieu-dit, légèrement variée, chemins de terre
-    for (let ty = 0; ty < CHUNK; ty += TILE / 2) {
-      for (let tx = 0; tx < CHUNK; tx += TILE / 2) {
-        const wx = x0 + tx + TILE / 4;
-        const wy = y0 + ty + TILE / 4;
-        const z = ZONES[Rules.survivorZone(wx, wy)];
-        const out = wx < 0 || wy < 0 || wx > SV.map.w || wy > SV.map.h;
-        const n = hash(Math.floor(wx / 32), Math.floor(wy / 32), 1);
-        g.fillStyle = out ? '#1a2a1a' : shade(z.ground, (n - 0.5) * 0.12);
-        g.fillRect(tx, ty, TILE / 2, TILE / 2);
-        if (!out && roadDist(wx, wy) < 26 + n * 10) { g.fillStyle = shade('#b08a5a', (n - 0.5) * 0.15); g.fillRect(tx, ty, TILE / 2, TILE / 2); }
+    // 1) Sol : couleurs calculées tous les 8 px puis agrandies en douceur (frontières fondues, pas de carrés)
+    const n = CHUNK / CELL + 3;
+    const small = document.createElement('canvas');
+    small.width = n;
+    small.height = n;
+    const sg = small.getContext('2d');
+    const img = sg.createImageData(n, n);
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const [r, gg, b] = groundRGB(x0 + (i - 1) * CELL + CELL / 2, y0 + (j - 1) * CELL + CELL / 2);
+        const o = (j * n + i) * 4;
+        img.data[o] = r; img.data[o + 1] = gg; img.data[o + 2] = b; img.data[o + 3] = 255;
       }
     }
-    // Brins d'herbe
-    g.strokeStyle = 'rgba(0,0,0,.08)';
-    for (let i = 0; i < 90; i++) {
-      const x = hash(cx, cy, i * 3) * CHUNK;
-      const y = hash(cx, cy, i * 3 + 1) * CHUNK;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x + 2, y - 5); g.stroke();
+    sg.putImageData(img, 0, 0);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(small, -CELL, -CELL, n * CELL, n * CELL);
+    g.translate(-x0, -y0);
+    const inChunk = (x, y, m) => x > x0 - m && x < x0 + CHUNK + m && y > y0 - m && y < y0 + CHUNK + m;
+    // 2) Lac gelé et cratère du volcan
+    if (inChunk(2260, 560, 520)) {
+      g.fillStyle = 'rgba(150, 200, 225, .55)'; smoothClosed(g, LAKE.map(([x, y]) => [x + (x - 2260) * 0.06, y + (y - 560) * 0.06])); g.fill();
+      g.fillStyle = '#bfe3f2'; smoothClosed(g, LAKE); g.fill();
+      g.save(); smoothClosed(g, LAKE); g.clip();
+      g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2;
+      for (let i = 0; i < 26; i++) { const x = 1920 + hash(i, 1, 40) * 680; const y = 320 + hash(i, 2, 40) * 480; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 30 + hash(i, 3, 40) * 50, y + (hash(i, 4, 40) - 0.5) * 30); g.lineTo(x + 50 + hash(i, 5, 40) * 60, y + (hash(i, 6, 40) - 0.5) * 50); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.35)';
+      for (let i = 0; i < 12; i++) { g.beginPath(); g.ellipse(1950 + hash(i, 7, 40) * 620, 340 + hash(i, 8, 40) * 420, 40 + hash(i, 9, 40) * 60, 8, -0.2, 0, Math.PI * 2); g.fill(); }
+      g.restore();
+      g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 4; smoothClosed(g, LAKE); g.stroke();
     }
-    // Décor (une graine par case), triés par profondeur
+    if (inChunk(CRATER.x, CRATER.y, CRATER.r + 80)) {
+      const R = CRATER.r;
+      const cg = g.createRadialGradient(CRATER.x, CRATER.y, R * 0.3, CRATER.x, CRATER.y, R * 1.25);
+      cg.addColorStop(0, '#3a1d18'); cg.addColorStop(0.75, '#5e3326'); cg.addColorStop(1, 'rgba(78, 42, 34, 0)');
+      g.fillStyle = cg; g.beginPath(); g.ellipse(CRATER.x, CRATER.y, R * 1.25, R * 0.95, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#24130f'; smoothClosed(g, LAVA.map(([x, y]) => [CRATER.x + (x - CRATER.x) * 1.25, CRATER.y + (y - CRATER.y) * 1.25])); g.fill();
+      g.save(); g.shadowColor = '#ff6a1f'; g.shadowBlur = 30;
+      const lg = g.createRadialGradient(CRATER.x, CRATER.y, 10, CRATER.x, CRATER.y, 170);
+      lg.addColorStop(0, '#ffe27a'); lg.addColorStop(0.45, '#ff8a2a'); lg.addColorStop(1, '#c2301a');
+      g.fillStyle = lg; smoothClosed(g, LAVA); g.fill(); g.restore();
+      g.strokeStyle = 'rgba(255, 230, 140, .5)'; g.lineWidth = 2;
+      for (let i = 0; i < 8; i++) { const a = hash(i, 1, 50) * Math.PI * 2; const r = 40 + hash(i, 2, 50) * 70; g.beginPath(); g.arc(CRATER.x + Math.cos(a) * r, CRATER.y + Math.sin(a) * r * 0.7, 10 + hash(i, 3, 50) * 18, 0, Math.PI); g.stroke(); }
+      // Coulées de lave vers l'extérieur
+      g.save(); g.shadowColor = '#ff6a1f'; g.shadowBlur = 12; g.strokeStyle = '#ff7a26'; g.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const a = Math.PI * (1.02 + i * 0.2);
+        const pts = catmull([0, 1, 2, 3].map((s) => [CRATER.x + Math.cos(a + (hash(i, s, 51) - 0.5) * 0.5) * (150 + s * 55), CRATER.y + Math.sin(a + (hash(i, s, 51) - 0.5) * 0.5) * (110 + s * 45)]), 8);
+        g.lineWidth = 6 - i * 1.5; strokePath(g, pts); g.stroke();
+      }
+      g.restore();
+    }
+    // 3) Détails du sol (touffes d'herbe, neige, cendres, dalles, boue…)
+    const DS = 40;
+    for (let gy = Math.floor((y0 - DS) / DS); gy <= Math.floor((y0 + CHUNK + DS) / DS); gy++) {
+      for (let gx = Math.floor((x0 - DS) / DS); gx <= Math.floor((x0 + CHUNK + DS) / DS); gx++) {
+        const k = hash(gx, gy, 31);
+        if (k < 0.35) continue;
+        const x = gx * DS + hash(gx, gy, 32) * DS;
+        const y = gy * DS + hash(gx, gy, 33) * DS;
+        if (x < 0 || y < 0 || x > SV.map.w || y > SV.map.h) continue;
+        const zone = Rules.survivorZone(x, y);
+        DETAIL[ZONE_DETAIL[zone]](g, x, y, hash(gx, gy, 34), GROUND[zone][0]);
+      }
+    }
+    // 4) Rivière (berges, eau, reflets)
+    if (RIVER.some(([x, y]) => inChunk(x, y, 120))) {
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      g.strokeStyle = 'rgba(70, 60, 40, .45)'; g.lineWidth = 62; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = '#3f86b8'; g.lineWidth = 44; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = '#5aa6d6'; g.lineWidth = 28; strokePath(g, RIVER); g.stroke();
+      g.strokeStyle = 'rgba(220, 245, 255, .55)'; g.lineWidth = 2; g.setLineDash([18, 26]);
+      strokePath(g, RIVER.map(([x, y], i) => [x + Math.sin(i * 0.9) * 6, y])); g.stroke(); g.setLineDash([]);
+      for (let i = 0; i < RIVER.length; i += 3) { const [x, y] = RIVER[i]; if (!inChunk(x, y, 60)) continue; const s = hash(i, 1, 60) > 0.5 ? 1 : -1; DECOR.rock(g, x + s * 34, y + 6, 0.7); }
+    }
+    if (inChunk(1060, 3440, 260)) {
+      g.fillStyle = 'rgba(60, 50, 30, .45)'; smoothClosed(g, POND.map(([x, y]) => [x + (x - 1060) * 0.12, y + (y - 3440) * 0.12])); g.fill();
+      g.fillStyle = '#3f7d8a'; smoothClosed(g, POND); g.fill();
+      g.fillStyle = 'rgba(170, 220, 210, .3)';
+      for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(980 + hash(i, 1, 45) * 160, 3390 + hash(i, 2, 45) * 90, 22, 5, 0, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = '#4f8a3a';
+      for (let i = 0; i < 7; i++) { const x = 940 + hash(i, 3, 45) * 240; const y = 3380 + hash(i, 4, 45) * 120; if (inPoly(x, y, POND)) { g.beginPath(); g.ellipse(x, y, 9, 6, 0, 0.3, Math.PI * 2 - 0.3); g.lineTo(x, y); g.fill(); } }
+    }
+    // 5) Routes de terre sinueuses, jusqu'à une clairière autour de chaque autel
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const A of ALTARS) {
+      if (!inChunk(A.x, A.y, 120)) continue;
+      g.fillStyle = 'rgba(80, 60, 35, .3)'; g.beginPath(); g.ellipse(A.x, A.y + 4, 96, 70, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = A.zone === 'lac' ? '#cfe4ee' : A.zone === 'volcan' ? '#6a3b2c' : '#b39064'; g.beginPath(); g.ellipse(A.x, A.y + 4, 88, 63, 0, 0, Math.PI * 2); g.fill();
+    }
+    const roads = ROADS.filter((r) => r.some(([x, y]) => inChunk(x, y, 140)));
+    for (const r of roads) { g.strokeStyle = 'rgba(80, 60, 35, .35)'; g.lineWidth = 58; strokePath(g, r); g.stroke(); }
+    for (const r of roads) { g.strokeStyle = '#b08a5a'; g.lineWidth = 46; strokePath(g, r); g.stroke(); }
+    for (const r of roads) { g.strokeStyle = 'rgba(214, 180, 128, .55)'; g.lineWidth = 18; strokePath(g, r); g.stroke(); }
+    for (const r of roads) {
+      for (let i = 0; i < r.length; i++) {
+        const [x, y] = r[i];
+        if (!inChunk(x, y, 30)) continue;
+        for (let s = 0; s < 2; s++) { const h = hash(Math.round(x), Math.round(y), s); g.fillStyle = h > 0.5 ? 'rgba(120, 90, 55, .5)' : 'rgba(235, 210, 170, .5)'; g.beginPath(); g.arc(x + (h - 0.5) * 36, y + (hash(Math.round(y), Math.round(x), s) - 0.5) * 30, 1.5 + h * 2, 0, Math.PI * 2); g.fill(); }
+      }
+    }
+    // Place du village pavée
+    if (inChunk(SV.map.w / 2, SV.map.h / 2, 200)) {
+      g.fillStyle = '#c2a679'; g.beginPath(); g.ellipse(SV.map.w / 2, SV.map.h / 2, 150, 120, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(90, 70, 45, .3)'; g.lineWidth = 1.5;
+      for (let r = 40; r <= 140; r += 26) { g.beginPath(); g.ellipse(SV.map.w / 2, SV.map.h / 2, r, r * 0.8, 0, 0, Math.PI * 2); g.stroke(); }
+    }
+    // Ponts de bois
+    for (const b of BRIDGES) {
+      if (!inChunk(b.x, b.y, 80)) continue;
+      g.save(); g.translate(b.x, b.y); g.rotate(b.a);
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(-40, -26, 80, 56);
+      g.fillStyle = '#8a5a30'; g.fillRect(-42, -27, 84, 52);
+      g.strokeStyle = '#5e3b1c'; g.lineWidth = 2;
+      for (let i = -36; i <= 36; i += 9) { g.beginPath(); g.moveTo(i, -27); g.lineTo(i, 25); g.stroke(); }
+      g.fillStyle = '#6b4322'; g.fillRect(-44, -31, 88, 6); g.fillRect(-44, 23, 88, 6);
+      g.restore();
+    }
+    // 6) Décor (une graine par case de 64 px, y compris celles qui débordent sur ce morceau), triés par profondeur
     const items = [];
-    for (let ty = 0; ty < CHUNK / TILE; ty++) {
-      for (let tx = 0; tx < CHUNK / TILE; tx++) {
-        const gx = cx * (CHUNK / TILE) + tx;
-        const gy = cy * (CHUNK / TILE) + ty;
-        const wx = gx * TILE + TILE / 2;
-        const wy = gy * TILE + TILE / 2;
-        if (wx < 0 || wy < 0 || wx > SV.map.w || wy > SV.map.h) { if (hash(gx, gy, 9) < 0.6) items.push(['pine', tx * TILE + hash(gx, gy, 2) * TILE, ty * TILE + hash(gx, gy, 3) * TILE, 1.2]); continue; }
-        if (Math.hypot(wx - SV.map.w / 2, wy - SV.map.h / 2) < 160) continue; // place du village dégagée
-        if (roadDist(wx, wy) < 50) continue;
-        const zone = Rules.survivorZone(wx, wy);
+    for (let gy = Math.floor(y0 / TILE) - 1; gy <= Math.floor((y0 + CHUNK) / TILE) + 1; gy++) {
+      for (let gx = Math.floor(x0 / TILE) - 1; gx <= Math.floor((x0 + CHUNK) / TILE) + 1; gx++) {
+        const x = gx * TILE + hash(gx, gy, 2) * TILE;
+        const y = gy * TILE + hash(gx, gy, 3) * TILE;
+        if (x < 0 || y < 0 || x > SV.map.w || y > SV.map.h) { if (hash(gx, gy, 9) < 0.6) items.push(['pine', x, y, 1.2]); continue; }
+        if (Math.hypot(x - SV.map.w / 2, y - SV.map.h / 2) < 190) continue; // place du village dégagée
+        if (roadDist(x, y) < 52 || riverDist(x, y) < 50 || inPoly(x, y, LAKE) || inPoly(x, y, POND) || Math.hypot(x - CRATER.x, (y - CRATER.y) * 1.3) < CRATER.r + 20) continue;
+        if (ALTARS.some((A) => Math.hypot(x - A.x, y - A.y) < 110)) continue; // autels bien visibles
+        const zone = Rules.survivorZone(x, y);
         let r = hash(gx, gy, 5);
         for (const [type, density, dark] of ZONE_DECOR[zone]) {
-          if (r < density) { items.push([type, tx * TILE + hash(gx, gy, 2) * TILE, ty * TILE + hash(gx, gy, 3) * TILE, 0.8 + hash(gx, gy, 4) * 0.5, dark, hash(gx, gy, 6)]); break; }
+          if (r < density) { items.push([type, x, y, 0.8 + hash(gx, gy, 4) * 0.5, dark, hash(gx, gy, 6)]); break; }
           r -= density;
         }
       }
@@ -208,7 +480,7 @@
     // Bord de la carte
     g.strokeStyle = 'rgba(0,0,0,.5)';
     g.lineWidth = 6;
-    g.strokeRect(-x0, -y0, SV.map.w, SV.map.h);
+    g.strokeRect(0, 0, SV.map.w, SV.map.h);
     return c;
   }
   function chunk(cx, cy) {
@@ -217,9 +489,23 @@
     if (!c) {
       c = buildChunk(cx, cy);
       chunks.set(k, c);
-      if (chunks.size > 40) chunks.delete(chunks.keys().next().value);
+      if (chunks.size > 48) chunks.delete(chunks.keys().next().value);
+    } else {
+      chunks.delete(k); // le plus récemment vu passe en fin de file
+      chunks.set(k, c);
     }
     return c;
+  }
+  // Prépare un morceau voisin de l'écran par image, pour ne pas saccader en changeant de morceau
+  function prefetch(camX, camY) {
+    for (let cx = Math.floor(camX / CHUNK) - 1; cx <= Math.floor((camX + W) / CHUNK) + 1; cx++) {
+      for (let cy = Math.floor(camY / CHUNK) - 1; cy <= Math.floor((camY + H) / CHUNK) + 1; cy++) {
+        if (cx < -1 || cy < -1 || cx * CHUNK > SV.map.w || cy * CHUNK > SV.map.h || chunks.has(cx * 100 + cy)) continue;
+        chunks.set(cx * 100 + cy, buildChunk(cx, cy));
+        if (chunks.size > 48) chunks.delete(chunks.keys().next().value);
+        return;
+      }
+    }
   }
 
   // ---------- Sprites des monstres (images en cache, 6 étapes d'animation) ----------
@@ -262,6 +548,16 @@
       if (Math.abs(m.tx - m.px) > 0.5) m.facing = m.tx > m.px ? 1 : -1;
     }
     for (const id of G.enemies.keys()) if (!seen.has(id)) G.enemies.delete(id);
+    // Traits magiques (5 valeurs) et projectiles ennemis (6 valeurs) : on garde leur vitesse pour les animer
+    const live = new Set();
+    const track = (id, x, y, vx, vy, extra) => {
+      live.add(id);
+      const p = G.proj.get(id);
+      if (p) Object.assign(p, { x, y, vx, vy }); else G.proj.set(id, { id, x, y, vx, vy, ...extra });
+    };
+    for (let i = 0; i < f.bo.length; i += 5) track(f.bo[i], f.bo[i + 1], f.bo[i + 2], f.bo[i + 3], f.bo[i + 4], { bolt: true });
+    for (let i = 0; i < f.es.length; i += 6) track(f.es[i], f.es[i + 1], f.es[i + 2], f.es[i + 4], f.es[i + 5], { kind: f.es[i + 3] });
+    for (const id of G.proj.keys()) if (!live.has(id)) G.proj.delete(id);
     for (const e of f.ev) onEvent(e, now);
     // Correction douce de ma position si le serveur me voit ailleurs (vitesse bornée, ralentissement…)
     const dx = f.x - G.me.x;
@@ -417,6 +713,7 @@
     for (let cx = cx0; cx <= Math.floor((camX + W) / CHUNK); cx++) {
       for (let cy = cy0; cy <= Math.floor((camY + H) / CHUNK); cy++) ctx.drawImage(chunk(cx, cy), Math.round(cx * CHUNK - camX), Math.round(cy * CHUNK - camY));
     }
+    prefetch(camX, camY);
     ctx.translate(-Math.round(camX), -Math.round(camY));
     if (!f) return;
     const t = now / 1000;
@@ -602,23 +899,42 @@
       }
       ctx.restore();
     }
-    // Traits magiques (à tête chercheuse : positions du serveur)
-    for (let i = 0; i < f.bo.length; i += 2) {
-      const x = f.bo[i];
-      const y = f.bo[i + 1];
-      const g = ctx.createRadialGradient(x, y, 1, x, y, 12);
-      g.addColorStop(0, '#fff'); g.addColorStop(0.4, '#c79bff'); g.addColorStop(1, 'rgba(150, 80, 255, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
-    }
-    // Projectiles ennemis
-    const SHOT = [['#f4f1ea', 7], ['#ff7a1f', 13], ['#9fe8ff', 9], ['#c070ff', 11]];
-    for (let i = 0; i < f.es.length; i += 3) {
-      const [c, r] = SHOT[f.es[i + 2]];
-      ctx.shadowColor = c; ctx.shadowBlur = 12;
+    // Traits magiques et projectiles ennemis : avancés à chaque image selon leur vitesse, recalés en douceur sur le serveur
+    const dtF = Math.min(0.2, (now - G.frameAt) / 1000);
+    for (const p of G.proj.values()) {
+      const tx = p.x + p.vx * dtF;
+      const ty = p.y + p.vy * dtF;
+      if (p.rx == null) { p.rx = tx; p.ry = ty; } else { const k = Math.min(1, (now - (p.lastDraw || now)) / 60); p.rx += (tx - p.rx) * Math.max(0.5, k); p.ry += (ty - p.ry) * Math.max(0.5, k); }
+      p.lastDraw = now;
+      const x = p.rx;
+      const y = p.ry;
+      const ang = Math.atan2(p.vy, p.vx);
+      if (p.bolt) {
+        // Trait magique violet avec traînée
+        const tail = ctx.createLinearGradient(x, y, x - Math.cos(ang) * 34, y - Math.sin(ang) * 34);
+        tail.addColorStop(0, 'rgba(199, 155, 255, .8)'); tail.addColorStop(1, 'rgba(150, 80, 255, 0)');
+        ctx.strokeStyle = tail; ctx.lineWidth = 8; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(ang) * 34, y - Math.sin(ang) * 34); ctx.stroke();
+        const g = ctx.createRadialGradient(x, y, 1, x, y, 12);
+        g.addColorStop(0, '#fff'); g.addColorStop(0.4, '#c79bff'); g.addColorStop(1, 'rgba(150, 80, 255, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
+      // Projectile ennemi : rouge vif (ou couleur de l'attaque du boss), contour sombre et halo pour bien le voir
+      const [c, r] = ESHOT[p.kind] || ESHOT[0];
+      ctx.fillStyle = 'rgba(255, 40, 40, .22)';
+      ctx.beginPath(); ctx.arc(x, y, r + 7, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = c; ctx.shadowBlur = 14;
       ctx.fillStyle = c;
-      ctx.beginPath(); ctx.arc(f.es[i], f.es[i + 1], r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#2a0505';
+      ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255, 235, 235, .9)';
+      ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
     }
     // Effets : tailles d'épée, éclairs, ondes de choc
     G.fx = G.fx.filter((e) => now - e.t0 < e.life);
@@ -693,9 +1009,25 @@
     miniCanvas.height = MINI;
     const g = miniCanvas.getContext('2d');
     const s = SV.map.w / MINI;
-    for (let y = 0; y < MINI; y += 2) for (let x = 0; x < MINI; x += 2) { g.fillStyle = ZONES[Rules.survivorZone(x * s, y * s)].ground; g.fillRect(x, y, 2, 2); }
-    g.fillStyle = 'rgba(176, 138, 90, .9)';
-    for (let y = 0; y < MINI; y += 2) for (let x = 0; x < MINI; x += 2) if (roadDist(x * s, y * s) < 40) g.fillRect(x, y, 2, 2);
+    const img = g.createImageData(MINI, MINI);
+    for (let y = 0; y < MINI; y++) {
+      for (let x = 0; x < MINI; x++) {
+        const c = groundRGB(x * s + s / 2, y * s + s / 2);
+        const o = (y * MINI + x) * 4;
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    g.save();
+    g.scale(1 / s, 1 / s);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.fillStyle = '#bfe3f2'; smoothClosed(g, LAKE); g.fill();
+    g.fillStyle = '#ff7a26'; smoothClosed(g, LAVA); g.fill();
+    g.fillStyle = '#3f7d8a'; smoothClosed(g, POND); g.fill();
+    g.strokeStyle = '#4a96c8'; g.lineWidth = 60; strokePath(g, RIVER); g.stroke();
+    g.strokeStyle = 'rgba(176, 138, 90, .95)'; g.lineWidth = 70;
+    for (const r of ROADS) { strokePath(g, r); g.stroke(); }
+    g.restore();
     g.font = '700 9px system-ui';
     g.textAlign = 'center';
     for (const z of Object.values(ZONES)) {
@@ -1001,6 +1333,7 @@
     G.paused = false;
     G.enemies.clear();
     G.shots.clear();
+    G.proj.clear();
     G.fx = [];
     G.texts = [];
     G.puffs = [];

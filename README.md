@@ -399,7 +399,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
 - **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (4 800 × 4 800 px,
   9 lieux-dits : village, forêt sombre, lac gelé, cimetière, champs de blé, volcan, ruines, marais, prairie fleurie, avec
-  leurs ennemis favoris). On se déplace avec **ZQSD** / les flèches (ou au doigt) ; les armes attaquent seules. Tout est
+  leurs ennemis favoris, aux frontières naturelles). Carte dessinée au naturel : sol lissé et fondu, routes de terre
+  sinueuses vers la clairière de chaque autel, rivière du lac gelé jusqu'à la mare du marais (avec des ponts), cratère de
+  lave. Projectiles animés en douceur ; ceux des ennemis sont rouges (ou colorés pour les boss) avec un contour. On se déplace avec **ZQSD** / les flèches (ou au doigt) ; les armes attaquent seules. Tout est
   simulé par le serveur (la position envoyée est bornée à la vitesse permise). **Les stats habituelles ne comptent pas** :
   base commune (120 PV, vitesse 150…), améliorée seulement par la méta-progression du Survivor. Musique : *Last Battle*
   (`public/audio/survivor.mp3`).

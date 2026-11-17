@@ -1828,15 +1828,15 @@
   // et un effet tant que le joueur s'y trouve (fx) : xp, regen (PV/s), gems (gemmes ×(1+gems)), slow (ralentit les
   // ennemis), speed, magnet, damage, burn (PV perdus par seconde), crit, area, enemyHp (vie des ennemis qui y apparaissent).
   const SURVIVOR_ZONES = {
-    village: { label: 'Village', x: 2400, y: 2400, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
-    foret: { label: 'Forêt sombre', x: 1050, y: 1050, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
-    lac: { label: 'Lac gelé', x: 2400, y: 650, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
-    cimetiere: { label: 'Cimetière', x: 3750, y: 1050, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
-    champs: { label: 'Champs de blé', x: 4100, y: 2400, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
-    volcan: { label: 'Volcan', x: 3750, y: 3750, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
-    ruines: { label: 'Ruines', x: 2400, y: 4150, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
-    marais: { label: 'Marais', x: 1050, y: 3750, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
-    prairie: { label: 'Prairie fleurie', x: 650, y: 2400, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
+    village: { label: 'Village', x: 2400, y: 2400, size: 0.8, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
+    foret: { label: 'Forêt sombre', x: 950, y: 1100, size: 1.2, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
+    lac: { label: 'Lac gelé', x: 2300, y: 700, size: 1.0, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
+    cimetiere: { label: 'Cimetière', x: 3800, y: 1150, size: 0.95, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
+    champs: { label: 'Champs de blé', x: 3950, y: 2350, size: 1.05, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
+    volcan: { label: 'Volcan', x: 3900, y: 3850, size: 1.05, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
+    ruines: { label: 'Ruines', x: 2750, y: 4050, size: 0.9, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
+    marais: { label: 'Marais', x: 1150, y: 3650, size: 1.05, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
+    prairie: { label: 'Prairie fleurie', x: 800, y: 2350, size: 1.0, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
   };
   // Raisons d'explorer : autels (bénédiction d'un lieu-dit), éclats d'émeraude, trésors gardés.
   const SURVIVOR_EXPLORE = {
@@ -1851,15 +1851,32 @@
     if (B) for (const [k, v] of Object.entries(B.fx)) if (v > 0 && k !== 'enemyHp' && k !== 'burn') fx[k] = (fx[k] || 0) + v * SURVIVOR_EXPLORE.altar.mult;
     return fx;
   }
-  function survivorZone(x, y) {
-    let best = null;
-    let bd = Infinity;
-    for (const [id, z] of Object.entries(SURVIVOR_ZONES)) {
-      const d = (x - z.x) * (x - z.x) + (y - z.y) * (y - z.y);
-      if (d < bd) { bd = d; best = id; }
-    }
-    return best;
+  // Lieux-dits aux frontières naturelles : diagramme de Voronoï pondéré (`size`) sur une position déformée par
+  // des ondulations régulières (même résultat côté serveur et navigateur, sans hasard).
+  function survivorWarp(x, y) {
+    return [
+      x + Math.sin(y * 0.0021 + 1.3) * 160 + Math.sin((x + y) * 0.0047 + 0.7) * 70 + Math.sin(x * 0.011 - y * 0.008 + 2.1) * 22,
+      y + Math.sin(x * 0.0019 + 4.1) * 160 + Math.sin((x - y) * 0.0043 + 2.3) * 70 + Math.sin(y * 0.012 + x * 0.007 + 0.4) * 22,
+    ];
   }
+  // Les deux lieux-dits les plus proches et leurs distances pondérées (pour fondre les sols à la frontière).
+  function survivorZoneNear(x, y) {
+    const [qx, qy] = survivorWarp(x, y);
+    let a = null;
+    let b = null;
+    let da = Infinity;
+    let db = Infinity;
+    for (const id in SURVIVOR_ZONES) {
+      const z = SURVIVOR_ZONES[id];
+      const d = Math.hypot(qx - z.x, qy - z.y) / (z.size || 1);
+      if (d < da) { b = a; db = da; a = id; da = d; } else if (d < db) { b = id; db = d; }
+    }
+    return { a, b, da, db };
+  }
+  function survivorZone(x, y) {
+    return survivorZoneNear(x, y).a;
+  }
+
   // Ennemis (dessins des monstres du donjon) : vie, vitesse, dégâts au contact, XP laissée, vague d'apparition.
   const SURVIVOR_ENEMIES = {
     rat: { hp: 7, speed: 88, damage: 4, xp: 1, radius: 10, from: 1 },
@@ -2517,7 +2534,7 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
-    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
+    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, survivorZoneNear, survivorWarp, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,

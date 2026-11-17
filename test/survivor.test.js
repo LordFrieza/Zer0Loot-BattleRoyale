@@ -63,6 +63,18 @@ test('[SV-2] survivor : effets des lieux-dits (village, forêt, cimetière, volc
   const Z = Rules.SURVIVOR_ZONES;
   assert.ok(Object.values(Z).every((z) => z.bonus && z.icon && z.desc && z.fx));
   assert.deepStrictEqual(Rules.survivorZoneFx('village'), { regen: 1, xp: -0.25 });
+  // Frontières naturelles : centre (et autel) dans son lieu-dit, voisin cohérent, résultat stable
+  for (const [id, z] of Object.entries(Z)) {
+    assert.strictEqual(Rules.survivorZone(z.x, z.y), id);
+    for (let a = 0; a < 8; a++) assert.strictEqual(Rules.survivorZone(z.x + Math.cos(a) * 100, z.y + Math.sin(a) * 100), id, `${id} autour de l'autel`);
+  }
+  const near = Rules.survivorZoneNear(1700, 1700);
+  assert.ok(near.a !== near.b && near.da <= near.db);
+  assert.deepStrictEqual(Rules.survivorZoneNear(1700, 1700), near);
+  const counts = {};
+  for (let y = 0; y < 4800; y += 60) for (let x = 0; x < 4800; x += 60) { const k = Rules.survivorZone(x, y); counts[k] = (counts[k] || 0) + 1; }
+  assert.strictEqual(Object.keys(counts).length, 9);
+  assert.ok(Object.values(counts).every((c) => c > 0.06 * 6400), 'chaque lieu-dit garde une bonne place');
   // Bénédiction : les effets positifs du lieu-dit béni × 1,5, sans ses contreparties
   const fx = Rules.survivorZoneFx('volcan', 'champs');
   assert.deepStrictEqual([fx.damage, fx.burn], [0.3, 1.5]);
@@ -342,4 +354,17 @@ test('[SV-10] survivor : autels et bénédictions, éclats d\'émeraude, trésor
   // L'image envoie l'état de l'exploration
   const f = run.frame();
   assert.ok(['zone', 'alt', 'sh', 'em'].every((k) => k in f), Object.keys(f).join());
+});
+
+test('[SV-8] survivor : projectiles envoyés avec identifiant, position et vitesse', () => {
+  const run = new sv.SurvivorRun({});
+  run.eshots.push({ x: run.p.x + 100, y: run.p.y, vx: -120, vy: 30, r: 8, damage: 1, life: 3, kind: 'bone' });
+  run.shots.push({ id: 999, x: run.p.x - 50, y: run.p.y, vx: 200, vy: 0, homing: true, life: 2, r: 10, pierce: 1, hit: new Set() });
+  const f = run.frame();
+  assert.strictEqual(f.es.length, 6);
+  const [id, x, , kind, vx, vy] = f.es;
+  assert.ok(id > 0);
+  assert.deepStrictEqual([x, kind, vx, vy], [Math.round(run.p.x + 100), 0, -120, 30]);
+  assert.strictEqual(run.frame().es[0], id, 'même identifiant d\'une image à l\'autre');
+  assert.deepStrictEqual(f.bo, [999, Math.round(run.p.x - 50), Math.round(run.p.y), 200, 0]);
 });

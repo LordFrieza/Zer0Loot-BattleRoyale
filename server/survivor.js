@@ -820,9 +820,14 @@ class SurvivorRun {
     const pk = [];
     for (const k of this.pickups) if (inView(k.x, k.y)) pk.push(Math.round(k.x), Math.round(k.y), PICKUPS.indexOf(k.type));
     const es = [];
-    for (const s of this.eshots) if (inView(s.x, s.y)) es.push(Math.round(s.x), Math.round(s.y), SHOT_KINDS.indexOf(s.kind));
+    // Projectiles suivis par le navigateur : identifiant et vitesse, pour qu'il les fasse avancer en douceur entre deux images
+    for (const s of this.eshots) {
+      if (!inView(s.x, s.y)) continue;
+      if (!s.id) s.id = this.nextId++;
+      es.push(s.id, Math.round(s.x), Math.round(s.y), SHOT_KINDS.indexOf(s.kind), Math.round(s.vx), Math.round(s.vy));
+    }
     const bo = [];
-    for (const s of this.shots) if (s.homing && inView(s.x, s.y)) bo.push(Math.round(s.x), Math.round(s.y));
+    for (const s of this.shots) if (s.homing && inView(s.x, s.y)) bo.push(s.id, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy));
     const ar = this.areas.filter((a) => inView(a.x, a.y)).map((a) => ({ k: a.k, x: Math.round(a.x), y: Math.round(a.y), r: Math.round(a.r), left: Math.round(((a.k === 'warn' ? a.at : a.until) - this.t) * 100) / 100 }));
     const orb = this.weapons.find((w) => w.id === 'orbes' && w.on);
     const aura = this.weapons.find((w) => w.id === 'aura');
