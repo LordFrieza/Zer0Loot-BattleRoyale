@@ -134,6 +134,8 @@ test('[HOUSE-6] maison : liste des maisons, visites, « J\'aime »', () => {
   const list = housing.listHouses();
   assert.ok(list.findIndex((h) => h.id === a.id) < list.findIndex((h) => h.id === b.id), 'les plus décorées d\'abord');
   assert.deepStrictEqual(housing.listHouses(a.username).map((h) => h.id), [a.id]);
+  const withLook = housing.listHouses(a.username, () => ({ color: 'rouge' }), () => ({ arme: 'rare' }))[0];
+  assert.deepStrictEqual([withLook.cls, withLook.app, withLook.look], [a.character.cls, { color: 'rouge' }, { arme: 'rare' }], 'apparence pour les passants');
   const ghost = player();
   ghost.ghost = true;
   assert.ok(!housing.listHouses().some((h) => h.id === ghost.id), 'sans les fantômes');

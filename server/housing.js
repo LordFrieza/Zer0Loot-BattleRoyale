@@ -153,14 +153,18 @@ function visit(owner, viewer) {
 }
 
 // Liste des maisons à visiter : les plus décorées (puis les plus aimées), ou par nom.
-function listHouses(query) {
+// appOf / lookOf (facultatifs) : apparence des propriétaires, pour les passants devant la maison.
+function listHouses(query, appOf, lookOf) {
   const q = String(query || '').trim().toLowerCase();
   return Object.values(db.state.users)
     .filter((u) => u.character && u.role === 'player' && !u.banned && !u.ghost && (!q || ownerName(u).toLowerCase().includes(q)))
     .map((u) => {
       const H = houseOf(u.character);
       const L = levelOf(u.character);
-      return { id: u.id, name: ownerName(u), level: L.level, points: L.points, likes: H.likes.length, size: H.size, furniture: H.placed.length };
+      const out = { id: u.id, name: ownerName(u), level: L.level, points: L.points, likes: H.likes.length, size: H.size, furniture: H.placed.length, cls: u.character.cls || null };
+      if (appOf) out.app = appOf(u);
+      if (lookOf) out.look = lookOf(u);
+      return out;
     })
     .sort((a, b) => b.points - a.points || b.likes - a.likes)
     .slice(0, Rules.HOUSING.listMax);

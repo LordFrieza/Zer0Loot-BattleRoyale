@@ -691,6 +691,7 @@
     g.fillStyle = sky; g.fillRect(0, 0, cw, ch);
     g.fillStyle = 'rgba(255,255,255,.85)';
     for (let i = 0; i < 3; i++) { const x = ((t / 60 + i * 230) % (cw + 160)) - 80; const y = 30 + i * 18; g.beginPath(); g.ellipse(x, y, 34, 11, 0, 0, Math.PI * 2); g.ellipse(x + 22, y - 6, 22, 10, 0, 0, Math.PI * 2); g.fill(); }
+    if (o.sky) o.sky(g, cw, ch, t); // ce qui passe dans le ciel (housing-life.js)
     g.fillStyle = '#8cc56a'; g.beginPath(); g.ellipse(cw * 0.2, ch * 0.8, cw * 0.4, 70, 0, 0, Math.PI * 2); g.ellipse(cw * 0.85, ch * 0.82, cw * 0.35, 60, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#6fb35a'; g.fillRect(0, ch * 0.8, cw, ch * 0.2);
     const size = house.size || 'studio';
@@ -773,6 +774,7 @@
       rr(g, cw / 2 - w / 2, 8, w, 22, 11, 'rgba(10, 6, 24, .7)');
       g.fillStyle = '#fff'; g.fillText(label, cw / 2, 23);
     }
+    if (o.front) o.front(g, cw, ch, t); // passants au premier plan
     return { mailbox: { x: mx - 16, y: my - 64, w: 40, h: 68 } };
   }
 

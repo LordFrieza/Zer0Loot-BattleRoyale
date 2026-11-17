@@ -437,6 +437,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   manoir 17 × 10 à 90 000). Son personnage s'y promène. Les meubles et options donnent des **points de déco** → niveau de
   décoration (20 au plus) → la **boîte aux lettres** reçoit un courrier toutes les 6 h (4 en attente au plus : 180 + 120 × niveau golds,
   6 émeraudes par niveau, 0,12 coffre par niveau, une Clé de boss dès le niveau 3, une potion une fois sur deux). On peut **visiter** les maisons des autres et leur laisser un ❤️.
+  **Façade animée** : avion publicitaire (« Casino Zer0Loot ! Le casino de la déchéance ! »…), Pyrax, montgolfière,
+  chauves-souris dans le ciel, et d'autres joueurs qui passent devant la maison en lâchant des petites phrases.
   **Aperçu avant achat** : un clic sur une option de style pas encore achetée l'affiche sur sa maison (barre « Aperçu »
   avec Acheter / Annuler) ; « 👁️ Essayer » sur un meuble de la boutique le pose dans la pièce pour voir, à acheter et
   garder à cette place ou à annuler.

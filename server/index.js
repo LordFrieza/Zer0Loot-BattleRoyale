@@ -337,7 +337,7 @@ app.get('/api/house', requirePlayer, (req, res) => {
   const H = req.user.character.house;
   res.json({ house: housing.publicHouse(req.user, req.user, appOf, lookOf), owned: H.owned, opts: H.opts, mailDue: Rules.houseMailDue(H.mailAt), mailAt: H.mailAt, emeralds: req.user.character.emeralds });
 });
-app.get('/api/houses', requirePlayer, (req, res) => res.json({ houses: housing.listHouses(req.query.q) }));
+app.get('/api/houses', requirePlayer, (req, res) => res.json({ houses: housing.listHouses(req.query.q, appOf, lookOf) }));
 app.get('/api/house/:id', requirePlayer, (req, res) => {
   const owner = db.state.users[req.params.id];
   if (!owner || !owner.character || owner.banned || owner.role !== 'player') return res.status(404).json({ error: 'Maison introuvable' });

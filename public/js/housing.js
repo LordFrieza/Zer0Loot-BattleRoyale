@@ -36,7 +36,11 @@
     } catch (e) { /* hors ligne */ }
   }
   async function loadList(q = '') {
-    try { houses = (await api('/api/houses' + (q ? `?q=${encodeURIComponent(q)}` : ''))).houses; renderVisit(); } catch (e) { /* ignore */ }
+    try {
+      houses = (await api('/api/houses' + (q ? `?q=${encodeURIComponent(q)}` : ''))).houses;
+      if (!q && window.HouseLife) HouseLife.setPeople(houses.filter((h) => !mine || h.id !== mine.house.id)); // les passants devant la maison
+      renderVisit();
+    } catch (e) { /* ignore */ }
   }
 
   function owned(id) {
@@ -515,10 +519,10 @@
       ghost: editing && ghost && ghost.over ? { id: ghost.id, x: ghost.x, y: ghost.y, ok: ghost.ok, flip: ghost.flip } : furnPreview && view.mine ? { id: furnPreview.id, x: furnPreview.x, y: furnPreview.y, ok: true, preview: true } : null,
       walkers: [{ x: walker.x, y: walker.y, f: owner, facing: walker.facing, bob: moving ? -Math.abs(Math.sin(now / 100)) * 2 : 0, name: owner.name }],
     });
-    if (Math.floor(now / 66) !== Math.floor((now - dt * 1000) / 66) || !ext) {
-      const ec = $('house-ext');
-      ext = drawHouseFront(ec.getContext('2d'), house, ec.width, ec.height, { t: now, mail: view.mine && Rules.houseMailDue(mine.mailAt) > 0, name: view.mine ? null : view.name });
-    }
+    // Façade redessinée à chaque image : ciel et passants animés (housing-life.js)
+    const ec = $('house-ext');
+    const life = window.HouseLife;
+    ext = drawHouseFront(ec.getContext('2d'), house, ec.width, ec.height, { t: now, mail: view.mine && Rules.houseMailDue(mine.mailAt) > 0, name: view.mine ? null : view.name, sky: life && life.sky, front: life && life.front });
   }
   function myLook() {
     const look = {};
