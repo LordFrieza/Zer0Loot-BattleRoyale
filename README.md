@@ -184,6 +184,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Dragon / le Magicien / le Mimic / la Liche de glace / Maexxna en **Défi des boss, en Héroïque ou Légendaire**), couronne d'os (salle 30 du
     donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
     (profondeur 25 en Expédition), aura du champion (100 victoires).
+  - **Légendes** (15 cosmétiques d'exploit très longs, mis en avant dans la boutique) : Casque du Seigneur Grokk, Ailes
+    de Pyrax, Runes de Malvorath, Pattes de Maexxna, Armure-coffre de Grignotor, Couronne de Givrenoire (chacun : vaincre
+    ce boss **100 fois en Défi des boss Légendaire**), Manteau des profondeurs (salle 100 en Expédition), Aura de
+    l'immortel (vague 100 au Survivor), Pluie d'or (posséder 1 000 000 de golds en même temps), Auréole céleste
+    (niveau 100), Cape du conquérant (1 000 victoires), Gantelets du carnage (10 000 éliminations), Ceinture du chasseur
+    de trésors (5 000 coffres ouverts), Lunettes du flambeur (25 jackpots), Chaussons du palais (décoration niveau 20).
 - **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
   Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
   avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
@@ -238,6 +244,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   menant à une spécialisation ; prendre le premier rond d'un chemin bloque l'autre, et à chaque carrefour on choisit un
   rond sur trois. Remise à zéro : 250 golds (gratuite en changeant de classe). Une branche complète demande 7 points
   (niveau 22) : ultime → stats → carrefour → stats (+3 Stamina) → carrefour → stats → spécialisation.
+  Une fois la spécialisation obtenue, les ronds non choisis aux carrefours de **sa** branche se prennent en bonus pour
+  **5 points de compétence** chacun (jamais ceux de l'autre branche ; rendus par la remise à zéro).
   | Classe | Chemin gauche (ultime) | Chemin droit (ultime) |
   |---|---|---|
   | Guerriloot | Paladin — Rempart sacré | Berserker — Tourbillon |

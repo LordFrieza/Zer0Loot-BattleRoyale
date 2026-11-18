@@ -122,7 +122,7 @@ function renderStats() {
   let after = null;
   if (draft) {
     const setPts = Rules.setBonus(c.equipment).points;
-    const talentPts = Rules.talentBonus(c.cls, c.talents);
+    const talentPts = Rules.talentBonus(c.cls, c.talents, c.talentExtra);
     const points = Object.fromEntries(Rules.STATS.map((st) => [st, (draft[st] || 0) + (setPts[st] || 0) + (talentPts[st] || 0)]));
     after = Rules.derive(points, c.gear, c.cls);
   }
@@ -453,11 +453,11 @@ function renderPresets() {
       if (r) toast(`✅ Preset « ${r.name} » équipé${r.missing ? ` (${r.missing} objet(s) introuvable(s))` : ''}${r.locked ? ` (${r.locked} objet(s) d'une autre classe)` : ''}`);
     };
     el.querySelector('[data-update]').onclick = async () => {
-      if (!confirm(`Remplacer « ${p.name} » par l'équipement actuel ?`)) return;
+      if (!await confirmBox(`Remplacer « ${p.name} » par l'équipement actuel ?`)) return;
       if (await act('/api/preset/save', { name: p.name, id: p.id }, 'equip')) toast(`💾 Preset « ${p.name} » mis à jour`);
     };
     el.querySelector('[data-del]').onclick = async () => {
-      if (!confirm(`Supprimer le preset « ${p.name} » ? Ses objets ne seront plus protégés.`)) return;
+      if (!await confirmBox(`Supprimer le preset « ${p.name} » ? Ses objets ne seront plus protégés.`)) return;
       if (await act('/api/preset/delete', { id: p.id }, 'unequip')) toast(`🗑 Preset « ${p.name} » supprimé`);
     };
   });
@@ -573,7 +573,8 @@ function talentInfo(cls, n) {
 }
 
 function talentState(c, n) {
-  if (c.talents.includes(n.id)) return 'owned';
+  if (c.talents.includes(n.id) || (c.talentExtra || []).includes(n.id)) return 'owned';
+  if (!Rules.talentExtraBlocker(c.cls, c.talents, c.talentExtra, n.id, null)) return 'extra'; // branche terminée : à prendre en bonus
   const reason = Rules.talentBlocker(c.cls, c.talents, n.id, c.talentState.available);
   if (!reason) return 'available';
   if (/autre chemin|Chemin bloqué/.test(reason)) return 'blocked';
@@ -626,7 +627,7 @@ function renderTalents() {
     }).join('')}</div>`;
   const resetBtn = $('talent-reset');
   if (resetBtn) resetBtn.onclick = async () => {
-    if (!confirm(`Remettre ton arbre à zéro pour ${Rules.TALENT_RESET_PRICE} golds ? Tous tes points te sont rendus.`)) return;
+    if (!await confirmBox(`Remettre ton arbre à zéro pour ${Rules.TALENT_RESET_PRICE} golds ? Tous tes points te sont rendus.`)) return;
     const r = await act('/api/talent/reset', {}, 'reroll');
     if (r) { talentSel = null; toast(`↺ Arbre remis à zéro : ${r.refunded} point(s) récupéré(s)`); }
   };
@@ -635,7 +636,7 @@ function renderTalents() {
   layoutTree();
   const nodes = Rules.talentNodes(cls);
   const byTier = (b, t) => nodes.filter((n) => n.branch === b && n.tier === t);
-  const owned = new Set(c.talents);
+  const owned = new Set(c.talents.concat(c.talentExtra || []));
   let lines = '';
   for (const b of ['left', 'right']) {
     const color = tree[b].color;
@@ -672,12 +673,20 @@ function renderTalents() {
     const info = talentInfo(cls, sel);
     const state = talentState(c, sel);
     const reason = Rules.talentBlocker(c.cls, c.talents, sel.id, st.available);
+    const extraCost = Rules.TALENT_EXTRA_COST;
     const action = locked ? '<span class="muted">🔒 Arbre pas encore débloqué.</span>'
-      : state === 'owned' ? '<b class="up">✅ Appris</b>'
+      : state === 'owned' ? `<b class="up">✅ ${(c.talentExtra || []).includes(sel.id) ? 'Pris en bonus' : 'Appris'}</b>`
         : state === 'available' ? `<button class="gold" id="talent-learn">Apprendre (1 point)</button>`
-          : `<span class="muted">🔒 ${esc(reason)}</span>`;
+          : state === 'extra' ? `<button class="gold" id="talent-extra" ${c.skillPoints < extraCost ? 'disabled' : ''}>⭐ Prendre en bonus (${extraCost} points de compétence)</button>
+            <span class="muted">Branche terminée : tu as ${c.skillPoints} point${c.skillPoints > 1 ? 's' : ''} de compétence.</span>`
+            : `<span class="muted">🔒 ${esc(reason)}</span>`;
     $('talent-detail').innerHTML = `<div class="talent-detail-box" style="--c:${tree[sel.branch].color}">
       <div class="talent-detail-title">${info.icon} <b>${esc(info.title)}</b></div>${info.html}<div class="row">${action}</div></div>`;
+    const extraBtn = $('talent-extra');
+    if (extraBtn) extraBtn.onclick = async () => {
+      if (!await confirmBox(`Prendre « ${info.title} » en bonus pour ${extraCost} points de compétence ?`, { title: '⭐ Nœud bonus' })) return;
+      if (await act('/api/talent/extra', { id: sel.id }, 'levelUp')) toast(`⭐ ${info.title} pris en bonus !`, 4000);
+    };
     const learn = $('talent-learn');
     if (learn) learn.onclick = async () => {
       const r = await act('/api/talent/learn', { id: sel.id }, 'levelUp');
@@ -877,22 +886,32 @@ function renderRelicChoice() {
   renderRelicChoiceIn(soloFrame, $('relic-choice'), '/api/solo/relic');
 }
 
+// Bouton « Masquer / Afficher » d'une fenêtre de choix posée sur l'arène : réduite en bandeau, on voit la vie du héros.
+function bindPeek(box) {
+  const btn = box.querySelector('.relic-peek');
+  if (!btn) return;
+  const sync = () => { btn.textContent = box.classList.contains('peek') ? '👁 Afficher' : '🙈 Masquer'; };
+  btn.onclick = (e) => { e.stopPropagation(); box.classList.toggle('peek'); sync(); };
+  sync();
+}
+
 // Choix d'une relique par-dessus une arène (mode Solo, ou sa répétition dans l'onglet Entraînement).
 function renderRelicChoiceIn(frame, box, endpoint) {
   const dg = frame && frame.phase === 'battle' && frame.dungeon;
   const choice = dg && dg.relicChoice;
-  if (!choice) { box.classList.remove('show'); box.dataset.key = ''; return; }
+  if (!choice) { box.classList.remove('show', 'peek'); box.dataset.key = ''; return; }
   const key = choice.options.join(',') + dg.room;
   const left = box.querySelector('.relic-left');
   if (left) left.textContent = Math.ceil(choice.left) + ' s';
   if (box.dataset.key === key) return;
   box.dataset.key = key;
-  box.innerHTML = `<div class="relic-title">🔮 Choisis une relique <span class="relic-left">${Math.ceil(choice.left)} s</span></div>
+  box.innerHTML = `<div class="relic-title">🔮 Choisis une relique <span class="relic-left">${Math.ceil(choice.left)} s</span><button class="small secondary relic-peek" type="button"></button></div>
     <div class="relic-cards">${choice.options.map((id) => {
       const R = Rules.RELICS[id];
       return `<button class="relic-card" data-relic="${id}"><span class="ic">${R.icon}</span><b>${esc(R.label)}</b><small>${esc(R.desc)}</small></button>`;
-    }).join('')}</div><div class="muted" style="font-size:12px">Sans choix, une relique est tirée au hasard.</div>`;
+    }).join('')}</div><div class="muted relic-note" style="font-size:12px">Sans choix, une relique est tirée au hasard.</div>`;
   box.classList.add('show');
+  bindPeek(box);
   Sound.play('chestAppear');
   box.querySelectorAll('[data-relic]').forEach((b) => {
     b.onclick = async () => {
@@ -908,16 +927,17 @@ function renderRelicChoiceIn(frame, box, endpoint) {
 // Boss Rush en solo (entraînement) : entre deux boss, le joueur choisit en cliquant (bonus, grand soin, quitte ou double).
 function renderRushChoiceIn(frame, box, endpoint) {
   const poll = frame && frame.phase === 'battle' && frame.rush && frame.rush.poll;
-  if (!poll) { box.classList.remove('show'); box.dataset.key = ''; return; }
+  if (!poll) { box.classList.remove('show', 'peek'); box.dataset.key = ''; return; }
   const key = 'rush' + frame.rush.round + poll.options.map((o) => o.id + o.label).join(',');
   const left = box.querySelector('.relic-left');
   if (left) left.textContent = Math.ceil(poll.left) + ' s';
   if (box.dataset.key === key) return;
   box.dataset.key = key;
-  box.innerHTML = `<div class="relic-title">💀 Boss vaincu ! Choisis la suite de ta run <span class="relic-left">${Math.ceil(poll.left)} s</span></div>
+  box.innerHTML = `<div class="relic-title">💀 Boss vaincu ! Choisis la suite de ta run <span class="relic-left">${Math.ceil(poll.left)} s</span><button class="small secondary relic-peek" type="button"></button></div>
     <div class="relic-cards">${poll.options.map((o) => `<button class="relic-card" data-rush="${o.id}" style="--c:${o.color}"><span class="ic">${o.icon}</span><b>${esc(o.label)}</b><small>${esc(o.desc || '')}</small></button>`).join('')}</div>
-    <div class="muted" style="font-size:12px">Sans choix, la suite est tirée au hasard.</div>`;
+    <div class="muted relic-note" style="font-size:12px">Sans choix, la suite est tirée au hasard.</div>`;
   box.classList.add('show');
+  bindPeek(box);
   Sound.play('chestAppear');
   box.querySelectorAll('[data-rush]').forEach((b) => {
     b.onclick = async () => {
@@ -952,7 +972,7 @@ document.querySelectorAll('#solo-run [data-speed]').forEach((b) => {
 });
 $('solo-abandon').onclick = async () => {
   const exp = soloQueue && soloQueue.solo && soloQueue.solo.kind === 'expedition';
-  if (!confirm(exp ? 'Remonter à la surface ? Tu gardes le butin des étages déjà nettoyés.' : 'Abandonner le défi ? Tu ne gagneras rien.')) return;
+  if (!await confirmBox(exp ? 'Remonter à la surface ? Tu gardes le butin des étages déjà nettoyés.' : 'Abandonner le défi ? Tu ne gagneras rien.')) return;
   try { await api('/api/solo/abandon', {}); } catch (err) { toast('⚠️ ' + err.message); }
 };
 
@@ -1028,7 +1048,7 @@ function renderMarket() {
     : '<p class="muted">Aucune vente en cours.</p>';
   $('market-mine').querySelectorAll('[data-mcancel]').forEach((b) => {
     b.onclick = async () => {
-      if (!confirm('Retirer cette vente ? L\'objet revient dans ton coffre, mais la taxe n\'est pas remboursée.')) return;
+      if (!await confirmBox('Retirer cette vente ? L\'objet revient dans ton coffre, mais la taxe n\'est pas remboursée.')) return;
       if (await act('/api/market/cancel', { orderId: b.dataset.mcancel }, 'equip')) { toast('↩️ Vente retirée : l\'objet est revenu dans ton coffre'); loadMarket(); }
     };
   });
@@ -1074,7 +1094,7 @@ function renderMarket() {
   $('market-list').querySelectorAll('[data-mbuy]').forEach((b) => {
     b.onclick = async () => {
       const o = orders.find((x) => x.id === b.dataset.mbuy);
-      if (!o || !confirm(`Acheter « ${o.item.name} » à ${o.seller} pour ${o.price} golds ?`)) return;
+      if (!o || !await confirmBox(`Acheter « ${o.item.name} » à ${o.seller} pour ${o.price} golds ?`)) return;
       const r = await act('/api/market/buy', { orderId: o.id }, 'buy');
       if (r) { toast(`🛒 « ${o.item.name} » acheté : il est dans ton coffre personnel !`, 5000); loadMarket(); }
     };
@@ -1094,7 +1114,7 @@ function setupMarket() {
     const price = Math.floor(Number($('market-price').value) || 0);
     if (!item) return;
     const tax = Rules.marketTax(price);
-    if (!confirm(`Mettre « ${item.name} » en vente pour ${price} golds ?\nTaxe : ${tax} golds, payée maintenant et non remboursée.\nLa vente dure 4 jours.`)) return;
+    if (!await confirmBox(`Mettre « ${item.name} » en vente pour ${price} golds ?\nTaxe : ${tax} golds, payée maintenant et non remboursée.\nLa vente dure 4 jours.`)) return;
     const r = await act('/api/market/sell', { itemId: item.id, price }, 'buy');
     if (r) { toast(`🏷️ « ${item.name} » est en vente pour ${price} golds (taxe ${r.tax} 🪙)`, 5000); loadMarket(); }
   };
@@ -1387,7 +1407,7 @@ $('alch-item').onchange = (e) => { alchItemId = e.target.value; alchLine = 0; al
 $('alch-go').onclick = async () => {
   const sacrifice = me.character.inventory.find((x) => x.id === alchSacId);
   if (sacrifice && (sacrifice.rarity === 'epique' || sacrifice.rarity === 'legendaire')
-    && !confirm(`« ${sacrifice.name} » va être détruit définitivement. Continuer ?`)) return;
+    && !await confirmBox(`« ${sacrifice.name} » va être détruit définitivement. Continuer ?`)) return;
   let r;
   opening = true;
   try {
@@ -1492,7 +1512,7 @@ $('batch-max').onclick = () => { $('batch-count').value = Math.max(1, batchMax(b
 $('batch-go').onclick = async () => {
   const n = Math.floor(Number($('batch-count').value)) || 1;
   const label = Rules.RARITY_INFO[batchRarity].label.toLowerCase();
-  if (!confirm(`${n * Rules.FUSE_COUNT} objets ${label}s tirés au hasard (jamais un objet verrouillé ou dans un preset) vont être détruits définitivement pour ${n} fusion${n > 1 ? 's' : ''}. Continuer ?`)) return;
+  if (!await confirmBox(`${n * Rules.FUSE_COUNT} objets ${label}s tirés au hasard (jamais un objet verrouillé ou dans un preset) vont être détruits définitivement pour ${n} fusion${n > 1 ? 's' : ''}. Continuer ?`)) return;
   let r;
   opening = true;
   try {
@@ -1512,7 +1532,7 @@ $('fuse-clear').onclick = () => { fuseSel.length = 0; renderForge(); };
 $('fuse-go').onclick = async () => {
   const inputs = fuseSel.map((id) => me.character.inventory.find((x) => x.id === id));
   if (inputs.some((i) => i.rarity === 'epique' || i.rarity === 'legendaire')
-    && !confirm('Ces objets vont être détruits définitivement. Continuer ?')) return;
+    && !await confirmBox('Ces objets vont être détruits définitivement. Continuer ?')) return;
   let r;
   opening = true; // évite d'afficher le résultat derrière l'animation
   try {
@@ -1849,7 +1869,7 @@ function renderShop() {
   $('shop-try').innerHTML = t ? `Essai : <b>${esc(t.label)}</b>` : 'Clique sur un article pour l\'essayer';
   $('shop-list').innerHTML = Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
     const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot)
-      .sort((a, b) => (!!a[1].unlock - !!b[1].unlock) || (a[1].cls || '').localeCompare(b[1].cls || '') || a[1].price - b[1].price);
+      .sort((a, b) => (!!a[1].unlock - !!b[1].unlock) || (!!a[1].legend - !!b[1].legend) || (a[1].cls || '').localeCompare(b[1].cls || '') || a[1].price - b[1].price);
     return `<div class="shop-cat"><h3>${def.icon} ${def.plural}${def.note ? ` <span class="sub">${def.note}</span>` : ''}</h3><div class="shop-grid">${items.map(([id, it]) => {
       const owned = c.owned.includes(id);
       const worn = c.look[slot] === id;
@@ -1862,12 +1882,14 @@ function renderShop() {
       else if (it.unlock) btn = `<button class="small gold" data-buy="${id}">🏆 Récupérer</button>`;
       else btn = `<button class="small gold" data-buy="${id}" ${c.gold < it.price ? 'disabled' : ''}>Acheter</button>`;
       const progress = it.unlock ? Math.min(Rules.achievementValue(c, it.unlock.metric), it.unlock.goal) : 0;
+      const fmtN = (n) => Number(n).toLocaleString('fr-FR');
       const ci = it.cls && Rules.CLASS_INFO[it.cls];
-      return `<div class="shop-item ${owned ? 'owned' : ''} ${locked ? 'locked' : ''} ${it.unlock ? 'exploit' : ''} ${trying === id ? 'trying' : ''}" data-try="${id}">
+      return `<div class="shop-item ${owned ? 'owned' : ''} ${locked ? 'locked' : ''} ${it.unlock ? 'exploit' : ''} ${it.legend ? 'legend' : ''} ${trying === id ? 'trying' : ''}" data-try="${id}">
+        ${it.legend ? '<div class="shop-legend">✦ Légende</div>' : ''}
         <canvas width="110" height="100" data-shopcv="${id}"></canvas>
         <div class="shop-name">${esc(it.label)}</div>
         ${ci ? `<div class="shop-cls" style="color:${ci.color}">${ci.icon} ${ci.label}</div>` : ''}
-        ${it.unlock ? `<div class="shop-unlock" title="Cosmétique d'exploit">🏆 ${esc(it.unlock.desc)}${owned ? '' : ` <b>${progress} / ${it.unlock.goal}</b>`}</div>` : ''}
+        ${it.unlock ? `<div class="shop-unlock" title="Cosmétique d'exploit">🏆 ${esc(it.unlock.desc)}${owned ? '' : ` <b>${fmtN(progress)} / ${fmtN(it.unlock.goal)}</b>`}</div>` : ''}
         <div class="shop-price">${owned ? '<span class="up">Possédé</span>' : it.unlock ? (locked ? '<span class="muted">Exploit</span>' : '<span class="up">Débloqué !</span>') : `${it.price} 🪙`}</div>
         ${btn}
       </div>`;
@@ -1888,7 +1910,7 @@ function renderShop() {
   $('shop-list').querySelectorAll('[data-buy]').forEach((b) => {
     b.onclick = async () => {
       const it = Rules.COSMETICS[b.dataset.buy];
-      if (!it.unlock && !confirm(`Acheter « ${it.label} » pour ${it.price} golds ?`)) return;
+      if (!it.unlock && !await confirmBox(`Acheter « ${it.label} » pour ${it.price} golds ?`)) return;
       const r = await act('/api/shop/buy', { id: b.dataset.buy }, 'buy');
       if (!r) return;
       trying = null;
@@ -2062,7 +2084,7 @@ function renderRecycleBar(visible) {
 async function recycleSelected() {
   const items = me.character.inventory.filter((i) => selected.has(i.id));
   const precious = items.filter((i) => i.rarity === 'epique' || i.rarity === 'legendaire').length;
-  if (precious && !confirm(`Attention : ta sélection contient ${precious} objet(s) Épique ou Légendaire. Les recycler quand même ?`)) return;
+  if (precious && !await confirmBox(`Attention : ta sélection contient ${precious} objet(s) Épique ou Légendaire. Les recycler quand même ?`)) return;
   document.querySelectorAll('#inventory .item.selected').forEach((el) => el.classList.add('recycled'));
   Sound.play('recycle', items.length);
   await new Promise((r) => setTimeout(r, 400));
@@ -2458,7 +2480,7 @@ socket.on('market', () => {
 });
 socket.on('mail', (m) => { toast('✉️ ' + m.text, 8000); Sound.play(m.kind === 'sold' ? 'victory' : 'reward'); });
 socket.on('soloFrame', (f) => { soloFrame = f; soloBus.emit('frame', f); });
-socket.on('banned', () => { alert('Ton compte a été banni.'); location.href = '/'; });
+socket.on('banned', async () => { await alertBox('Ton compte a été banni.', { title: 'Compte banni' }); location.href = '/'; });
 socket.on('bet', (r) => {
   lastBetResult = r;
   if (r.outcome === 'won') { Sound.play('reward'); toast(`💰 Pari gagné sur ${r.targetName} ! +${r.payout} 🪙`, 6000); }

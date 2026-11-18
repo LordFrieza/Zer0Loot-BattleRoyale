@@ -431,6 +431,7 @@ app.post('/api/consumable/equip', requirePlayer, action((req) => {
 // ---------- Arbre de compétences ----------
 
 app.post('/api/talent/learn', requirePlayer, action((req) => game.learnTalent(req.user.character, String(req.body.id || ''))));
+app.post('/api/talent/extra', requirePlayer, action((req) => game.learnTalentExtra(req.user.character, String(req.body.id || ''))));
 app.post('/api/tactics', requirePlayer, action((req) => game.setTactics(req.user.character, req.body || {})));
 app.post('/api/techs', requirePlayer, action((req) => game.setTechniques(req.user.character, req.body.techs)));
 app.post('/api/stats/reset', requirePlayer, action((req) => game.resetStats(req.user.character)));
@@ -1446,7 +1447,10 @@ function soloRewards(user, result, f = null) {
       game.bump(c, 'heroWins');
       if (Rules.HERO_BOSS_COUNTER[id]) game.bump(c, Rules.HERO_BOSS_COUNTER[id]);
     }
-    if (result.difficulty === 'legendaire') game.bump(c, 'legendWins');
+    if (result.difficulty === 'legendaire') {
+      game.bump(c, 'legendWins');
+      if (Rules.LEGEND_BOSS_COUNTER[id]) game.bump(c, Rules.LEGEND_BOSS_COUNTER[id]); // skins d'exploit (100 victoires)
+    }
   }
   // Historique : expédition (profondeur) ou défi (vie restante du boss)
   game.recordActivity(c, {

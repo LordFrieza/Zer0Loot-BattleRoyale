@@ -433,15 +433,18 @@
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
     'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
     'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds',
-    'casinoPlays', 'jackpots', 'casinoLegend', 'svBestWave', 'svBosses', 'decoLevel'];
+    'casinoPlays', 'jackpots', 'casinoLegend', 'svBestWave', 'svBosses', 'decoLevel',
+    'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
   const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins', mimic: 'mimicWins', liche: 'licheWins', maexxna: 'maexxnaWins' };
   // Défi des boss réussi en Héroïque ou Légendaire : débloque la peau légendaire du boss.
   const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier', mimic: 'heroMimic', liche: 'heroLiche', maexxna: 'heroMaexxna' };
+  // Défi des boss réussi en Légendaire, par boss (skins d'exploit à 100 victoires).
+  const LEGEND_BOSS_COUNTER = { troll: 'legendTroll', dragon: 'legendDragon', sorcier: 'legendSorcier', mimic: 'legendMimic', liche: 'legendLiche', maexxna: 'legendMaexxna' };
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -1287,13 +1290,29 @@
     return null;
   }
 
-  // Points de stats donnés par les nœuds appris.
-  function talentBonus(cls, owned) {
+  // Points de stats donnés par les nœuds appris (et les nœuds bonus pris après la spécialisation).
+  function talentBonus(cls, owned, extra) {
     const points = emptyStats();
     for (const n of talentNodes(cls)) {
-      if ((owned || []).includes(n.id)) for (const [st, v] of Object.entries(n.points)) points[st] += v;
+      if ((owned || []).includes(n.id) || (extra || []).includes(n.id)) for (const [st, v] of Object.entries(n.points)) points[st] += v;
     }
     return points;
+  }
+  // Branche terminée (spécialisation apprise) : les autres choix de la même branche s'achètent avec des points de
+  // compétence (TALENT_EXTRA_COST chacun). Raison du refus, ou null.
+  const TALENT_EXTRA_COST = 5;
+  function talentExtraBlocker(cls, owned, extra, id, skillPoints) {
+    const node = talentNodes(cls).find((n) => n.id === id);
+    if (!node) return 'Compétence inconnue';
+    owned = owned || [];
+    extra = extra || [];
+    if (owned.includes(id) || extra.includes(id)) return 'Déjà apprise';
+    const branch = talentBranch(owned);
+    if (!branch || !owned.includes(branch + '.spec')) return 'Termine d\'abord ta branche jusqu\'à la spécialisation';
+    if (node.branch !== branch) return 'Seulement dans la branche que tu as choisie';
+    if (node.type !== 'stat') return 'Compétence impossible à prendre en bonus';
+    if (skillPoints != null && skillPoints < TALENT_EXTRA_COST) return `Il faut ${TALENT_EXTRA_COST} points de compétence`;
+    return null;
   }
 
   // Branche choisie (left / right) ou null.
@@ -2587,6 +2606,22 @@
     aura_ombre: { slot: 'aura', label: 'Aura de l\'ombre', price: 1200, color: '#8a4dff' },
     aura_arcenciel: { slot: 'aura', label: 'Aura arc-en-ciel', price: 2000, color: '#ff5fd2' },
     aura_champion: { slot: 'aura', label: 'Aura du champion', price: 0, color: '#ffc93a', unlock: { metric: 'wins', goal: 100, desc: 'Gagner 100 parties' } },
+    // Légendes : exploits très longs à réussir (legend: true, mis en avant dans la boutique)
+    casque_grokk: { slot: 'hat', label: 'Casque du Seigneur Grokk', price: 0, legend: true, color: '#6f8f3a', trim: '#f2e6c4', unlock: { metric: 'legendTroll', goal: 100, desc: 'Vaincre Grokk (Troll) 100 fois en Défi des boss Légendaire' } },
+    ailes_pyrax: { slot: 'cape', label: 'Ailes de Pyrax', price: 0, legend: true, color: '#b8322a', trim: '#ffb347', unlock: { metric: 'legendDragon', goal: 100, desc: 'Vaincre Pyrax (Dragon) 100 fois en Défi des boss Légendaire' } },
+    aura_malvorath: { slot: 'aura', label: 'Runes de Malvorath', price: 0, legend: true, color: '#9a5cff', unlock: { metric: 'legendSorcier', goal: 100, desc: 'Vaincre Malvorath (Magicien) 100 fois en Défi des boss Légendaire' } },
+    pattes_maexxna: { slot: 'cape', label: 'Pattes de Maexxna', price: 0, legend: true, color: '#241e2c', trim: '#c4122f', unlock: { metric: 'legendMaexxna', goal: 100, desc: 'Vaincre Maexxna 100 fois en Défi des boss Légendaire' } },
+    armure_grignotor: { slot: 'chest', label: 'Armure-coffre de Grignotor', price: 0, legend: true, color: '#9a6a32', trim: '#ffd34a', unlock: { metric: 'legendMimic', goal: 100, desc: 'Vaincre Grignotor (Mimic) 100 fois en Défi des boss Légendaire' } },
+    couronne_givre: { slot: 'hat', label: 'Couronne de Givrenoire', price: 0, legend: true, color: '#bfe8ff', trim: '#5ad8ff', unlock: { metric: 'legendLiche', goal: 100, desc: 'Vaincre Givrenoire (Liche) 100 fois en Défi des boss Légendaire' } },
+    manteau_abysses: { slot: 'cape', label: 'Manteau des profondeurs', price: 0, legend: true, color: '#0e1a3a', trim: '#5ad8ff', unlock: { metric: 'expeditionBest', goal: 100, desc: 'Atteindre la salle 100 en Expédition (mode Solo)' } },
+    aura_immortel: { slot: 'aura', label: 'Aura de l\'immortel', price: 0, legend: true, color: '#5dff9a', unlock: { metric: 'svBestWave', goal: 100, desc: 'Atteindre la vague 100 au Survivor' } },
+    aura_or: { slot: 'aura', label: 'Pluie d\'or', price: 0, legend: true, color: '#ffd34a', unlock: { metric: 'goldPeak', goal: 1000000, desc: 'Posséder 1 000 000 de golds en même temps' } },
+    aureole_celeste: { slot: 'hat', label: 'Auréole céleste', price: 0, legend: true, color: '#ffe680', trim: '#ffffff', unlock: { metric: 'level', goal: 100, desc: 'Atteindre le niveau 100' } },
+    cape_conquerant: { slot: 'cape', label: 'Cape du conquérant', price: 0, legend: true, color: '#4a1a7a', trim: '#ffd34a', unlock: { metric: 'wins', goal: 1000, desc: 'Gagner 1 000 parties' } },
+    gants_massacre: { slot: 'gloves', label: 'Gantelets du carnage', price: 0, legend: true, color: '#3a0d10', trim: '#ff3b3b', unlock: { metric: 'kills', goal: 10000, desc: 'Éliminer 10 000 adversaires' } },
+    ceinture_tresor: { slot: 'belt', label: 'Ceinture du chasseur de trésors', price: 0, legend: true, color: '#8a5a1e', trim: '#ffd34a', unlock: { metric: 'chests', goal: 5000, desc: 'Ouvrir 5 000 coffres' } },
+    lunettes_flambeur: { slot: 'face', label: 'Lunettes du flambeur', price: 0, legend: true, color: '#ffd34a', unlock: { metric: 'jackpots', goal: 25, desc: 'Décrocher 25 jackpots au casino' } },
+    chaussons_palais: { slot: 'shoes', label: 'Chaussons du palais', price: 0, legend: true, color: '#7a1f6a', trim: '#ffd34a', unlock: { metric: 'decoLevel', goal: 20, desc: 'Atteindre le niveau de décoration 20 (le maximum) dans sa maison' } },
   };
   // Visage dessiné : grille de pixels (chaque caractère = une couleur de la palette, 0 = transparent).
   const DRAWING = {
@@ -2701,7 +2736,7 @@
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
-    ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, achievementValue, achievementState, achievementById,
+    ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
     BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
@@ -2714,6 +2749,6 @@
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
-    talentNodes, talentBlocker, talentBonus, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
+    talentNodes, talentBlocker, talentBonus, talentExtraBlocker, TALENT_EXTRA_COST, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

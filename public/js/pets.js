@@ -204,7 +204,7 @@
         </div>
       </div>`;
     $('pet-rename').onclick = async () => {
-      const name = prompt('Nouveau nom de ton familier :', pet.name);
+      const name = await promptBox('Nouveau nom de ton familier :', pet.name, { title: '✏️ Renommer' });
       if (name && name.trim()) act('/api/pet/rename', { id: pet.id, name }, 'equip');
     };
     $('pet-side').querySelectorAll('[data-pact]').forEach((b) => { b.onclick = () => petAct(b.dataset.pact); });

@@ -1313,7 +1313,7 @@
   }
 
   async function abandon() {
-    if (!confirm('Abandonner la partie ? Tes émeraudes seront comptées jusqu\'ici.')) return;
+    if (!await confirmBox('Abandonner la partie ? Tes émeraudes seront comptées jusqu\'ici.')) return;
     try {
       const r = await api('/api/survivor/abandon', {});
       showOver(r.result, r.result);

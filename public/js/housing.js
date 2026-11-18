@@ -274,7 +274,7 @@
   async function grow() {
     const order = Rules.HOUSING.sizeOrder;
     const next = Rules.HOUSING.sizes[order[order.indexOf(mine.house.size) + 1]];
-    if (!confirm(`Agrandir ta maison en ${next.label} pour ${fmt(next.price)} émeraudes ?`)) return;
+    if (!await confirmBox(`Agrandir ta maison en ${next.label} pour ${fmt(next.price)} émeraudes ?`)) return;
     try { await after(await api('/api/house/upgrade', {}), 'levelUp'); toast(`🏗️ Ta maison devient un ${next.label.toLowerCase()} !`); } catch (e) { toast('⚠️ ' + e.message); }
   }
   // Ce que rapporte un courrier au niveau donné (en moyenne)

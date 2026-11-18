@@ -42,6 +42,7 @@ function upgrade(character) {
   if (character.consumableSlot === undefined) character.consumableSlot = null; // potion prête pour la prochaine partie
   if (!character.presets) character.presets = []; // presets d'équipement
   if (!character.talents) character.talents = []; // nœuds appris dans l'arbre de compétences (dans l'ordre)
+  if (!Array.isArray(character.talentExtra)) character.talentExtra = []; // nœuds bonus (branche terminée), payés en points de compétence
   // V2 : style de combat (tactique + techniques)
   character.tactics = Object.assign({}, Rules.DEFAULT_TACTICS, character.tactics);
   if (!Array.isArray(character.techs)) character.techs = [];
@@ -120,6 +121,7 @@ function newCharacter() {
     consumableSlot: null, // potion équipée pour la prochaine partie
     presets: [], // presets d'équipement : [{ id, name, items: { slot: itemId | null } }]
     talents: [], // arbre de compétences : nœuds appris, dans l'ordre
+    talentExtra: [], // nœuds bonus de la branche terminée (5 points de compétence chacun)
     tactics: { ...Rules.DEFAULT_TACTICS }, // style de combat : posture, cible préférée, distance de recul
     techs: [], // techniques signature choisies (1 emplacement au niveau 5, 2 au niveau 15)
     drawing: '', // visage dessiné : une couleur de Rules.DRAWING.palette par case (0 = transparent)
@@ -162,7 +164,7 @@ function derived(character) {
   upgrade(character);
   // Les panoplies et l'arbre de compétences donnent des points bonus, qui s'ajoutent aux points de compétence.
   const setPoints = Rules.setBonus(character.equipment).points;
-  const talentPoints = Rules.talentBonus(character.cls, character.talents);
+  const talentPoints = Rules.talentBonus(character.cls, character.talents, character.talentExtra);
   const points = Object.fromEntries(Rules.STATS.map((st) => [st, (character.stats[st] || 0) + setPoints[st] + talentPoints[st]]));
   return Rules.derive(points, gearBonus(character), character.cls);
 }
@@ -441,6 +443,8 @@ function chooseClass(character, cls) {
   character.cls = cls;
   const talentsReset = character.talents.length;
   character.talents = []; // l'arbre dépend de la classe : remis à zéro gratuitement
+  character.skillPoints += character.talentExtra.length * Rules.TALENT_EXTRA_COST; // nœuds bonus : points de compétence rendus
+  character.talentExtra = [];
   character.techs = character.techs.filter((id) => !Rules.techBlocker(cls, character.level, id)); // techniques d'une autre classe retirées
   if (character.tactics.kite !== null) character.tactics.kite = Math.min(character.tactics.kite, Rules.tacticsKiteMax(cls)) || null;
   for (const slot of ['weapon', 'offhand']) { // skins d'arme d'une autre classe : retirés (mais gardés)
@@ -723,7 +727,20 @@ function resetTalents(character) {
   character.gold -= Rules.TALENT_RESET_PRICE;
   const refunded = character.talents.length;
   character.talents = [];
-  return { price: Rules.TALENT_RESET_PRICE, refunded };
+  const refundedSkill = character.talentExtra.length * Rules.TALENT_EXTRA_COST; // nœuds bonus : points de compétence rendus
+  character.skillPoints += refundedSkill;
+  character.talentExtra = [];
+  return { price: Rules.TALENT_RESET_PRICE, refunded, refundedSkill };
+}
+
+// Branche terminée : prendre un autre choix de la même branche pour TALENT_EXTRA_COST points de compétence.
+function learnTalentExtra(character, id) {
+  upgrade(character);
+  const blocker = Rules.talentExtraBlocker(character.cls, character.talents, character.talentExtra, id, character.skillPoints);
+  if (blocker) throw new Error(blocker);
+  character.skillPoints -= Rules.TALENT_EXTRA_COST;
+  character.talentExtra.push(id);
+  return { id, cost: Rules.TALENT_EXTRA_COST };
 }
 
 // ---------- Style de combat : tactique et techniques (V2) ----------
@@ -1273,9 +1290,16 @@ function linkTwitch(user, login, displayName, twitchId) {
   db.save();
 }
 
+// Record de golds possédés en même temps (skin d'exploit « Pluie d'or ») : mis à jour à chaque envoi du personnage.
+function trackPeaks(c) {
+  if (!c.counters) return;
+  if ((c.gold || 0) > (c.counters.goldPeak || 0)) c.counters.goldPeak = c.gold;
+}
+
 function publicCharacter(user) {
   const c = upgrade(user.character);
   petsTick(c);
+  trackPeaks(c);
   const d = derived(c);
   return {
     ...c,
@@ -1287,7 +1311,7 @@ function publicCharacter(user) {
     derived: d,
     lootTable: Rules.lootTable(d.luck),
     talentState: talentState(c),
-    talentPoints: Rules.talentBonus(c.cls, c.talents),
+    talentPoints: Rules.talentBonus(c.cls, c.talents, c.talentExtra),
     ult: Rules.ultOf(c.cls, c.talents),
     spec: Rules.specOf(c.cls, c.talents),
     protectedIds: [...protectedIds(c)],
@@ -1297,7 +1321,7 @@ function publicCharacter(user) {
 }
 
 module.exports = {
-  newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
+  trackPeaks, learnTalentExtra, newCharacter, upgrade, gearBonus, powerOf, derived, addXp, grant, allocate, resetStats, rollRarity, makeItem, setTactics, setTechniques,
   openChest, buyChests, recycle, equip, unequip, chooseClass, fuse, fuseBatch, reroll, alchemy,
   bump, claimAchievement, setTitle, titleOf, adminGive, setLook, buyCosmetic, setDrawing, clearDrawing, energyOf, spendEnergy, addEnergy, spendKey, addKeys,
   newLifetime, addStat, snapshot, recordActivity, respecStats,

@@ -137,9 +137,12 @@ test('[SOLO-4] reliques : 3 au choix toutes les 3 profondeurs, cumulables', () =
   b.applyRelic('tresor');
   assert.strictEqual(b.dungeon.rewardMult, 1.25);
   // Plume de phénix : une vie en plus
-  b.applyRelic('plume');
+  b.applyRelic('plume'); b.dungeon.relics.push('plume');
+  assert.ok(b.activeRelics().includes('plume'));
   b.kill(null, p);
   assert.deepStrictEqual([p.alive, p.hp, p.extraLives], [true, 500, 0]);
+  assert.ok(!b.activeRelics().includes('plume'), 'la plume utilisée disparaît des reliques affichées');
+  assert.ok(b.dungeon.relics.includes('plume'), 'mais compte toujours dans le bilan');
   // Délai écoulé : relique au hasard
   const c = soloBattle('expedition');
   runUntil(c, (x) => x.dungeon.stage === 'relic');

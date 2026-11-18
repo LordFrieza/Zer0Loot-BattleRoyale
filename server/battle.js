@@ -1374,6 +1374,18 @@ class Battle extends EventEmitter {
     return id;
   }
 
+  // Reliques encore actives (affichage) : les Plumes de phénix déjà utilisées n'y sont plus.
+  activeRelics() {
+    const d = this.dungeon;
+    const out = [...d.relics];
+    for (let k = 0; k < (d.spentLives || 0); k++) {
+      const i = out.lastIndexOf('plume');
+      if (i < 0) break;
+      out.splice(i, 1);
+    }
+    return out;
+  }
+
   applyRelic(id) {
     const d = this.dungeon;
     const e = Rules.RELICS[id].effect;
@@ -2603,6 +2615,7 @@ class Battle extends EventEmitter {
     // Relique « Plume de phénix » (Expédition) : une vie en plus.
     if (victim.extraLives > 0) {
       victim.extraLives -= 1;
+      if (this.dungeon) this.dungeon.spentLives = (this.dungeon.spentLives || 0) + 1; // la plume utilisée disparaît des reliques affichées
       victim.hp = Math.max(1, Math.round(victim.maxHp * (victim.reviveRatio || 0.5)));
       victim.stunUntil = 0;
       this.events.push({ t: 'revive', to: victim.key });
@@ -2797,7 +2810,7 @@ class Battle extends EventEmitter {
         poll: d.poll ? { options: this.pollCounts(), left: Math.max(0, Math.round((Rules.DUNGEON_POLL.duration - d.stageT) * 10) / 10) } : null,
         boons: d.boons, monsterMult: d.monsterMult, rewardMult: d.rewardMult,
         cleared: this.solo ? d.cleared : undefined,
-        relics: this.solo ? d.relics : undefined,
+        relics: this.solo ? this.activeRelics() : undefined,
         relicChoice: d.relicChoice ? { options: d.relicChoice, left: Math.max(0, Math.round((Rules.EXPEDITION.relicTimeout - d.stageT) * 10) / 10) } : undefined,
       } : null,
       solo: this.soloInfo(),

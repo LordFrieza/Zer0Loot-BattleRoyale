@@ -62,10 +62,10 @@ function renderModes() {
   $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : live === 'rush' ? '💀 LANCER LE BOSS RUSH' : '⚔️ LANCER LA BATAILLE';
 }
 
-$('open').onclick = () => (queue && queue.participants.length && queue.phase !== 'ended' && !confirm('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
+$('open').onclick = async () => (queue && queue.participants.length && queue.phase !== 'ended' && !await confirmBox('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
 $('close').onclick = () => run('/api/admin/queue/close');
-$('reset').onclick = () => {
-  if (queue && queue.phase === 'battle' && !confirm('Annuler la bataille en cours ? Aucune récompense de victoire ne sera donnée.')) return;
+$('reset').onclick = async () => {
+  if (queue && queue.phase === 'battle' && !await confirmBox('Annuler la bataille en cours ? Aucune récompense de victoire ne sera donnée.')) return;
   run('/api/admin/battle/reset');
 };
 $('add-bots').onclick = () => run('/api/admin/queue/bots', { count: Number($('bots').value) });
@@ -203,7 +203,7 @@ function renderPlayers() {
     b.onclick = async () => {
       const row = b.closest('tr');
       const p = playersList.find((x) => x.id === row.dataset.id);
-      if (!confirm(`Effacer le visage dessiné de ${p.name} ?`)) return;
+      if (!await confirmBox(`Effacer le visage dessiné de ${p.name} ?`)) return;
       const r = await run(`/api/admin/players/${row.dataset.id}/drawing/clear`, {});
       if (r) { toast(`🧽 Dessin de ${p.name} effacé`); loadPlayers(); }
     };
@@ -213,7 +213,7 @@ function renderPlayers() {
       const row = b.closest('tr');
       const p = playersList.find((x) => x.id === row.dataset.id);
       const ban = b.dataset.ban === '1';
-      if (ban && !confirm(`Bannir ${p.name} ? Il ne pourra plus se connecter ni rejoindre les batailles.`)) return;
+      if (ban && !await confirmBox(`Bannir ${p.name} ? Il ne pourra plus se connecter ni rejoindre les batailles.`)) return;
       const r = await run(`/api/admin/players/${row.dataset.id}/ban`, { banned: ban });
       if (r) { toast(ban ? `⛔ ${p.name} est banni` : `✅ ${p.name} est débanni`); loadPlayers(); }
     };

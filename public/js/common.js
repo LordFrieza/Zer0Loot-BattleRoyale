@@ -9,6 +9,42 @@ async function api(path, body) {
   return data;
 }
 
+// Fenêtre de dialogue au style du site (remplace confirm / alert / prompt du navigateur).
+// o : { title, message, ok, cancel (false = pas de bouton Annuler), input (valeur de départ d'un champ texte), danger }
+// Résout true / false (confirmation), la valeur saisie ou null (champ texte).
+function zlDialog(o) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal open zl-dialog';
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    box.setAttribute('role', 'dialog');
+    box.innerHTML = `${o.title ? `<h2>${esc(o.title)}</h2>` : ''}<p class="zl-dialog-msg"></p>
+      ${o.input != null ? '<input type="text" class="zl-dialog-input" maxlength="40">' : ''}
+      <div class="zl-dialog-btns">${o.cancel === false ? '' : `<button class="secondary" data-act="no">${esc(o.cancel || 'Annuler')}</button>`}
+      <button class="${o.danger ? 'danger' : 'gold'}" data-act="yes">${esc(o.ok || 'Confirmer')}</button></div>`;
+    box.querySelector('.zl-dialog-msg').textContent = o.message || '';
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+    const input = box.querySelector('.zl-dialog-input');
+    if (input) { input.value = o.input; setTimeout(() => { input.focus(); input.select(); }, 0); } else setTimeout(() => box.querySelector('[data-act="yes"]').focus(), 0);
+    const close = (v) => { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
+    const yes = () => close(input ? input.value : true);
+    const no = () => close(input ? null : false);
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); no(); }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); yes(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    box.querySelector('[data-act="yes"]').onclick = yes;
+    if (box.querySelector('[data-act="no"]')) box.querySelector('[data-act="no"]').onclick = no;
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) no(); });
+  });
+}
+const confirmBox = (message, o = {}) => zlDialog({ title: o.title || 'Confirmation', message, ok: o.ok, cancel: o.cancel, danger: o.danger });
+const alertBox = (message, o = {}) => zlDialog({ title: o.title || 'Information', message, ok: o.ok || 'OK', cancel: false });
+const promptBox = (message, value = '', o = {}) => zlDialog({ title: o.title || '', message, ok: o.ok || 'Valider', input: value });
+
 function toast(message, ms = 3500) {
   let wrap = document.querySelector('.toast-wrap');
   if (!wrap) {

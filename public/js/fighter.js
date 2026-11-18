@@ -169,6 +169,7 @@
     const c = cosmetic(id);
     if (!c) return;
     const t = performance.now();
+    if (id === 'aura_or' || id === 'aura_malvorath' || id === 'aura_immortel') { drawLegendAura(ctx, id, c, t); return; }
     const rainbow = id === 'aura_arcenciel';
     const col = (k) => (rainbow ? `hsl(${(t / 8 + k * 70) % 360}, 90%, 62%)` : c.color);
     ctx.save();
@@ -202,10 +203,104 @@
     ctx.restore();
   }
 
+  // Auras légendaires (exploits) : pluie de pièces d'or, runes de Malvorath, aura de l'immortel.
+  function drawLegendAura(ctx, id, c, t) {
+    ctx.save();
+    const pulse = 0.75 + Math.sin(t / 260) * 0.25;
+    const g = ctx.createRadialGradient(0, 17, 2, 0, 17, 30);
+    g.addColorStop(0, c.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= 0.8 * pulse;
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 17, 30, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha /= 0.8 * pulse;
+    ctx.globalCompositeOperation = 'source-over';
+    if (id === 'aura_or') {
+      // pièces d'or qui tombent en tournoyant
+      for (let k = 0; k < 7; k++) {
+        const ph = ((t / 1100) + k / 7) % 1;
+        const px = Math.sin(k * 2.7) * 15;
+        const py = -34 + ph * 52;
+        const w = Math.abs(Math.cos(t / 160 + k)) * 2.6 + 0.4;
+        ctx.globalAlpha = Math.min(1, (1 - ph) * 2);
+        ctx.fillStyle = '#ffd34a'; ctx.strokeStyle = '#a8740a'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.ellipse(px, py, w, 2.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    } else if (id === 'aura_malvorath') {
+      // runes violettes qui tournent autour du personnage
+      ctx.shadowColor = '#b98cff'; ctx.shadowBlur = 6;
+      ctx.strokeStyle = 'rgba(185, 140, 255, .7)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(0, 17, 20, 6, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '700 7px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const runes = ['ᚠ', 'ᚱ', 'ᛟ', 'ᛉ', 'ᚦ'];
+      for (let k = 0; k < 5; k++) {
+        const a = t / 900 + (k / 5) * Math.PI * 2;
+        const rx = Math.cos(a) * 18;
+        const ry = -2 + Math.sin(a) * 6 + Math.sin(t / 300 + k) * 2;
+        ctx.globalAlpha = 0.55 + Math.sin(a) * 0.45;
+        ctx.fillStyle = '#d8c2ff';
+        ctx.fillText(runes[k], rx, ry);
+      }
+      ctx.textBaseline = 'alphabetic';
+    } else {
+      // aura de l'immortel : anneau d'émeraude et étincelles qui montent
+      ctx.strokeStyle = `rgba(93, 255, 154, ${0.5 + Math.sin(t / 200) * 0.3})`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 17, 17 + Math.sin(t / 300) * 2, 5, 0, 0, Math.PI * 2); ctx.stroke();
+      for (let k = 0; k < 7; k++) {
+        const ph = ((t / 800) + k / 7) % 1;
+        const px = Math.sin(k * 2.3 + t / 500) * 14;
+        const py = 16 - ph * 40;
+        ctx.globalAlpha = (1 - ph);
+        ctx.fillStyle = k % 2 ? '#5dff9a' : '#ffe680';
+        ctx.beginPath(); ctx.moveTo(px, py - 2.2); ctx.lineTo(px + 1.4, py); ctx.lineTo(px, py + 2.2); ctx.lineTo(px - 1.4, py); ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   // Cape dans le dos (dessinée derrière le corps).
   function drawCape(ctx, id) {
     const c = cosmetic(id);
     if (!c) return;
+    if (id === 'ailes_pyrax') {
+      // ailes de dragon qui battent
+      const flap = Math.sin(performance.now() / 220) * 0.2;
+      // aile du fond (plus sombre, plus haute) puis aile de devant, déployées vers le haut et l'arrière
+      for (const [ang, sc, dark] of [[1.05, 0.85, true], [0.55, 1, false]]) {
+        ctx.save();
+        ctx.translate(-3, -7);
+        ctx.rotate(ang + flap);
+        ctx.scale(sc, sc);
+        ctx.fillStyle = dark ? shade(c.color, -0.3) : c.color; ctx.strokeStyle = shade(c.color, -0.5); ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(-26, -16); ctx.lineTo(-30, -4);
+        ctx.quadraticCurveTo(-24, 2, -26, 8); ctx.quadraticCurveTo(-18, 6, -16, 12); ctx.quadraticCurveTo(-10, 6, -4, 10);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = c.trim; ctx.lineWidth = 1;
+        for (const [x, y] of [[-26, -16], [-26, 8], [-16, 12]]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, y); ctx.stroke(); }
+        ctx.restore();
+      }
+      return;
+    }
+    if (id === 'pattes_maexxna') {
+      // quatre pattes d'araignée dans le dos, qui remuent
+      const t = performance.now();
+      ctx.strokeStyle = c.color; ctx.lineCap = 'round';
+      for (let k = 0; k < 4; k++) {
+        const side = k % 2 ? 1 : -1;
+        const up = k < 2 ? -1 : 1;
+        const wig = Math.sin(t / 180 + k) * 2;
+        const bx = side * 3;
+        const by = -2 + up * 3;
+        const kx = bx + side * 13;
+        const ky = by + up * 4 - 10 + wig;
+        const ex = kx + side * 8;
+        const ey = ky + 16;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(kx, ky); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.fillStyle = c.trim; ctx.beginPath(); ctx.arc(kx, ky, 1.3, 0, Math.PI * 2); ctx.fill();
+      }
+      return;
+    }
     const wave = Math.sin(performance.now() / 300) * 1.5;
     ctx.fillStyle = c.color;
     ctx.strokeStyle = c.trim || shade(c.color, -0.4);
@@ -219,12 +314,27 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    if (id === 'manteau_abysses' || id === 'cape_conquerant') {
+      ctx.save();
+      ctx.clip();
+      if (id === 'manteau_abysses') {
+        // étoiles des profondeurs qui scintillent
+        const t = performance.now();
+        for (let k = 0; k < 7; k++) { ctx.globalAlpha = 0.4 + Math.sin(t / 300 + k * 1.7) * 0.4; ctx.fillStyle = c.trim; ctx.fillRect(-18 + ((k * 7) % 20), -4 + ((k * 11) % 20), 1.3, 1.3); }
+      } else {
+        // emblème doré du conquérant
+        ctx.fillStyle = c.trim;
+        ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-5, 4); ctx.lineTo(-8, 9); ctx.lineTo(-11, 4); ctx.closePath(); ctx.fill();
+        ctx.fillRect(-20, 13, 18, 1.5);
+      }
+      ctx.restore();
+    }
   }
 
   // Col de la cape, par-dessus le corps.
   function drawCapeCollar(ctx, id) {
     const c = cosmetic(id);
-    if (!c) return;
+    if (!c || id === 'ailes_pyrax' || id === 'pattes_maexxna') return;
     ctx.fillStyle = c.color;
     roundRect(ctx, -10, -9, 20, 4, 2);
     ctx.fill();
@@ -242,6 +352,11 @@
       ctx.fillStyle = c.trim;
       ctx.fillRect(-9, 17.5, 9, 1.4);
       ctx.fillRect(0.5, 17.5, 9.5, 1.4);
+    }
+    if (id === 'chaussons_palais') {
+      // pompons dorés
+      ctx.fillStyle = c.trim;
+      ctx.beginPath(); ctx.arc(-3, 14.6, 1.8, 0, Math.PI * 2); ctx.arc(7, 14.6, 1.8, 0, Math.PI * 2); ctx.fill();
     }
     if (id === 'flammes') {
       const f = Math.sin(performance.now() / 90) * 1.5;
@@ -423,6 +538,19 @@
         ctx.restore();
         break;
       }
+      case 'lunettes_flambeur': {
+        // lunettes dorées en forme de pièces, avec un éclat qui passe
+        ctx.save();
+        ctx.shadowColor = '#ffd34a'; ctx.shadowBlur = 4;
+        ctx.beginPath(); ctx.arc(2.8, -17.4, 2.6, 0, Math.PI * 2); ctx.arc(7.9, -17.4, 2.6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = '#5a3a08';
+        ctx.beginPath(); ctx.arc(2.8, -17.4, 1.6, 0, Math.PI * 2); ctx.arc(7.9, -17.4, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-8, -17.5); ctx.lineTo(0.3, -17.5); ctx.stroke();
+        const sh = (performance.now() / 700) % 1;
+        ctx.fillStyle = `rgba(255,255,255,${0.9 * (1 - sh)})`; ctx.fillRect(1.6 + sh * 6, -18.6, 1.1, 1.1);
+        break;
+      }
       case 'masque':
         ctx.beginPath();
         ctx.moveTo(-9.6, -14.5);
@@ -529,6 +657,47 @@
         ctx.fillStyle = '#e8434f';
         ctx.beginPath(); ctx.arc(0, -24.5, 1.2, 0, Math.PI * 2); ctx.fill();
         break;
+      case 'casque_grokk':
+        // casque de troll : dôme de bronze, défenses d'ivoire et clous
+        drawHelmet(ctx, c.color);
+        ctx.fillStyle = c.trim; ctx.strokeStyle = INK; ctx.lineWidth = 1;
+        for (const d of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(8 * d, -24); ctx.quadraticCurveTo(18 * d, -24, 17 * d, -36); ctx.quadraticCurveTo(13 * d, -29, 6 * d, -27); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        ctx.fillStyle = '#c9b48a';
+        for (const x of [-5, 0, 5]) { ctx.beginPath(); ctx.arc(x, -28.5 + Math.abs(x) * 0.2, 1.1, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#c4122f'; ctx.beginPath(); ctx.arc(0, -24.5, 1.4, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'couronne_givre': {
+        // couronne de glace : pics de cristal luisants et flocon
+        ctx.save();
+        ctx.shadowColor = c.trim; ctx.shadowBlur = 8;
+        ctx.fillStyle = c.color; ctx.strokeStyle = c.trim; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(-9, -24);
+        for (const [x, h] of [[-7, 31], [-4.5, 27], [-2, 35], [0, 28], [2, 37], [4.5, 27], [7, 32]]) ctx.lineTo(x, -h);
+        ctx.lineTo(9, -24); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillRect(-6, -27, 1.2, 3); ctx.fillRect(1.4, -31, 1.2, 4);
+        const tw = (performance.now() / 500) % (Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,255,255,${0.5 + Math.sin(tw) * 0.5})`; ctx.lineWidth = 0.8;
+        for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI; ctx.beginPath(); ctx.moveTo(11 + Math.cos(a) * 2.5, -33 + Math.sin(a) * 2.5); ctx.lineTo(11 - Math.cos(a) * 2.5, -33 - Math.sin(a) * 2.5); ctx.stroke(); }
+        break;
+      }
+      case 'aureole_celeste': {
+        // double auréole qui tourne, avec des étoiles
+        const t = performance.now();
+        const bob = Math.sin(t / 400) * 1.2;
+        ctx.save();
+        ctx.shadowColor = '#fff6b0'; ctx.shadowBlur = 12;
+        ctx.strokeStyle = c.color; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.ellipse(0, -34 + bob, 9, 2.8, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = c.trim; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(0, -38 + bob, 6, 1.8, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#fffbe0';
+        for (let k = 0; k < 4; k++) { const a = t / 700 + (k / 4) * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * 11, -34 + bob + Math.sin(a) * 3.4, 1, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+        break;
+      }
       case 'chat':
         for (const d of [-1, 1]) {
           ctx.fillStyle = c.color;
@@ -610,6 +779,18 @@
         ctx.fillStyle = INK;
         ctx.beginPath(); ctx.arc(0, 0, 0.8, 0, Math.PI * 2); ctx.arc(0, 2.6, 0.8, 0, Math.PI * 2); ctx.fill();
         break;
+      case 'armure_grignotor': {
+        // armure-coffre : planches, ferrures dorées et serrure, avec une rangée de dents
+        ctx.fillStyle = shade(c.color, -0.25);
+        for (const y of [-3, 3]) ctx.fillRect(-10, y, 20, 1);
+        ctx.fillStyle = c.trim;
+        ctx.fillRect(-10, -8, 2.5, 18); ctx.fillRect(7.5, -8, 2.5, 18);
+        roundRect(ctx, -2.5, -1, 5, 5, 1); ctx.fill();
+        ctx.fillStyle = INK; ctx.fillRect(-0.5, 0.5, 1, 2);
+        ctx.fillStyle = '#f5f0e6';
+        for (let x = -7; x <= 5; x += 3) { ctx.beginPath(); ctx.moveTo(x, -8); ctx.lineTo(x + 1.5, -5); ctx.lineTo(x + 3, -8); ctx.closePath(); ctx.fill(); }
+        break;
+      }
       default:
     }
     ctx.restore();
@@ -686,6 +867,17 @@
         ctx.fillStyle = INK;
         ctx.fillRect(-1.5, 4.4, 1.1, 1.1); ctx.fillRect(0.5, 4.4, 1.1, 1.1);
         break;
+      case 'ceinture_tresor':
+        // ceinture garnie de pièces et de gemmes
+        ctx.fillStyle = c.color; ctx.fillRect(-10, 4, 20, 3);
+        ctx.fillStyle = c.trim;
+        ctx.shadowColor = c.trim; ctx.shadowBlur = 4;
+        roundRect(ctx, -3, 3, 6, 5, 1.5); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#3ddc5a'; ctx.beginPath(); ctx.arc(0, 5.5, 1.2, 0, Math.PI * 2); ctx.fill();
+        for (const [x, col] of [[-7, '#e8434f'], [6.5, '#3b8bff']]) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, 5.5, 1, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = c.trim; ctx.beginPath(); ctx.ellipse(-8, 8.6, 2, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+        break;
       default:
         ctx.fillStyle = c.color;
         ctx.fillRect(-10, 4, 20, 3);
@@ -708,6 +900,15 @@
       ctx.fillStyle = c.trim;
       const f = flicker(80, 1.2);
       ctx.beginPath(); ctx.moveTo(x - 2.5, y - 2); ctx.lineTo(x - 1, y - 7 + f); ctx.lineTo(x + 0.5, y - 3); ctx.lineTo(x + 1.6, y - 6 - f); ctx.lineTo(x + 2.8, y - 1.5); ctx.closePath(); ctx.fill();
+    } else if (id === 'gants_massacre') {
+      // gantelets du carnage : pointes et lueur rouge
+      ctx.save();
+      ctx.shadowColor = c.trim; ctx.shadowBlur = 6 + flicker(120, 2);
+      ctx.strokeStyle = c.trim; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y, 3.8, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#d8d8e0';
+      for (const a of [-0.9, 0, 0.9]) { ctx.beginPath(); ctx.moveTo(x + Math.cos(a - 1.57) * 3.4, y + Math.sin(a - 1.57) * 3.4); ctx.lineTo(x + Math.cos(a - 1.57) * 6.5, y + Math.sin(a - 1.57) * 6.5); ctx.lineTo(x + Math.cos(a - 1.3) * 3.4, y + Math.sin(a - 1.3) * 3.4); ctx.fill(); }
     } else if (id === 'griffes') {
       ctx.fillStyle = c.trim;
       for (const dy of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(x + 2.5, y + dy - 0.7); ctx.lineTo(x + 7, y + dy); ctx.lineTo(x + 2.5, y + dy + 0.7); ctx.fill(); }
