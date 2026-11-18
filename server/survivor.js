@@ -585,9 +585,11 @@ class SurvivorRun {
           break;
         }
         case 'dagues': {
-          const base = Math.atan2(P.fy, P.fx);
+          // Une volée en cercle (la première droit devant), décalée d'une demi-case à chaque lancer pour tout couvrir
+          w.side = -w.side;
+          const base = Math.atan2(P.fy, P.fx) + (w.side < 0 ? Math.PI / amount : 0);
           for (let i = 0; i < amount; i++) {
-            const a = base + (i - (amount - 1) / 2) * 0.09;
+            const a = base + (i / amount) * Math.PI * 2;
             this.addShot(w, { x: P.x, y: P.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life, r: 9, pierce: s.pierce, damage: s.damage, kb: 60 });
           }
           break;

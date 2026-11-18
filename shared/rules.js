@@ -2043,13 +2043,14 @@
   };
   const SURVIVOR_ENEMY_KINDS = Object.keys(SURVIVOR_ENEMIES);
   // Boss toutes les 5 vagues, dans cet ordre (puis le cycle reprend, plus fort).
+  // Vitesses ×1,5 (avant 58 à 66) : les boss sortent plus vite de la foule des monstres, on peut les frapper.
   const SURVIVOR_BOSSES = {
-    troll: { hp: 380, speed: 58, damage: 15, radius: 34, every: 4.5, label: 'Grokk' },
-    maexxna: { hp: 480, speed: 66, damage: 15, radius: 32, every: 5, label: 'Maexxna' },
-    mimic: { hp: 560, speed: 62, damage: 17, radius: 30, every: 4.5, label: 'Grignotor' },
-    dragon: { hp: 640, speed: 64, damage: 17, radius: 34, every: 3.8, label: 'Pyrax' },
-    liche: { hp: 720, speed: 58, damage: 17, radius: 28, every: 4.2, label: 'Givrenoire' },
-    sorcier: { hp: 800, speed: 62, damage: 18, radius: 26, every: 5, label: 'Malvorath' },
+    troll: { hp: 380, speed: 87, damage: 15, radius: 34, every: 4.5, label: 'Grokk' },
+    maexxna: { hp: 480, speed: 99, damage: 15, radius: 32, every: 5, label: 'Maexxna' },
+    mimic: { hp: 560, speed: 93, damage: 17, radius: 30, every: 4.5, label: 'Grignotor' },
+    dragon: { hp: 640, speed: 96, damage: 17, radius: 34, every: 3.8, label: 'Pyrax' },
+    liche: { hp: 720, speed: 87, damage: 17, radius: 28, every: 4.2, label: 'Givrenoire' },
+    sorcier: { hp: 800, speed: 93, damage: 18, radius: 26, every: 5, label: 'Malvorath' },
   };
   const SURVIVOR_BOSS_ORDER = ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier'];
   // Difficulté de la vague n (1, 2, …) : vie et dégâts des ennemis, nombre d'ennemis à l'écran.
@@ -2083,9 +2084,10 @@
       levels: [{ amount: 1 }, { damage: 6 }, { area: 0.15 }, { damage: 6 }, { area: 0.15 }, { damage: 8 }, { damage: 10, cooldown: -0.2 }],
     },
     dagues: {
-      label: 'Dagues', icon: '🗡️', color: '#cfd8e8', desc: 'Lance des dagues droit devant toi.',
-      base: { damage: 8, cooldown: 1, amount: 1, pierce: 1, speed: 620, duration: 1.1 },
-      levels: [{ amount: 1 }, { damage: 4 }, { amount: 1 }, { pierce: 1 }, { amount: 1 }, { damage: 5 }, { amount: 1, pierce: 1 }],
+      label: 'Dagues', icon: '🗡️', color: '#cfd8e8', desc: 'Lance une volée de dagues tout autour de toi.',
+      // Renforcées : 3 dagues dès le niveau 1 (10 au niveau 8), lancées en cercle autour du joueur
+      base: { damage: 9, cooldown: 1, amount: 3, pierce: 1, speed: 620, duration: 1.1 },
+      levels: [{ amount: 1 }, { damage: 4 }, { amount: 2 }, { pierce: 1 }, { amount: 2 }, { damage: 5 }, { amount: 2, pierce: 1 }],
     },
     baguette: {
       label: 'Baguette magique', icon: '🪄', color: '#b98cff', desc: 'Un trait magique vers l\'ennemi le plus proche.',

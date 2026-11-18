@@ -155,7 +155,17 @@ test('[SV-3] survivor : vagues de 30 s, ennemis selon la vague et le lieu-dit, �
 test('[SV-4] survivor : gemmes d\'XP, pause pendant le choix, armes jusqu\'au niveau 8, objets, coffres, relances', () => {
   assert.strictEqual(Rules.survivorXpToNext(1), 4);
   assert.deepStrictEqual(Rules.survivorWeaponStats('epee', 2).amount, 2);
-  assert.strictEqual(Rules.survivorWeaponStats('dagues', 8).amount, 5);
+  assert.deepStrictEqual([Rules.survivorWeaponStats('dagues', 1).amount, Rules.survivorWeaponStats('dagues', 8).amount], [3, 10]);
+  assert.deepStrictEqual(Object.values(Rules.SURVIVOR_BOSSES).map((b) => b.speed), [87, 99, 93, 96, 87, 93], 'boss ×1,5 plus rapides');
+  // Dagues : une volée tout autour du joueur
+  const dr = new sv.SurvivorRun({});
+  dr.weapons = [];
+  dr.addWeapon('dagues');
+  dr.weapons[0].cd = 0;
+  dr.fireWeapons(0.05);
+  const angles = dr.shots.map((s) => Math.atan2(s.vy, s.vx)).sort((a, b) => a - b);
+  assert.strictEqual(angles.length, 3);
+  assert.ok(Math.abs(angles[1] - angles[0] - (2 * Math.PI) / 3) < 1e-6 && Math.abs(angles[2] - angles[1] - (2 * Math.PI) / 3) < 1e-6, 'espacées de 120°');
   assert.match(Rules.survivorLevelText('dagues', 2), /\+1 projectile/);
   const run = new sv.SurvivorRun({ weapons: ['epee', 'dagues', 'baguette'], passives: ['coeur', 'bottes'] });
   run.gems.push({ x: run.p.x, y: run.p.y, v: 10, pull: true });
