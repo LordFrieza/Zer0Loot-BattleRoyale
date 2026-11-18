@@ -15,6 +15,7 @@ const market = require('./market');
 const casino = require('./casino');
 const survivor = require('./survivor');
 const housing = require('./housing');
+const schedule = require('./schedule');
 const { Bets } = require('./bets');
 const Rules = require('../shared/rules');
 
@@ -712,15 +713,20 @@ function notifyBets(results) {
 
 battle.on('cleared', () => notifyBets(bets.refundAll()));
 
-app.post('/api/admin/queue/open', requireAdmin, action((req) => {
-  const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
-  const mode = req.body.mode || 'br';
-  battle.openQueue(seconds, mode, req.body.boss || 'troll');
+// Ouvre la file d'un mode (admin, ou planification automatique) et l'annonce dans le chat.
+function openQueueFor(seconds, mode, boss) {
+  battle.openQueue(seconds, mode, boss || 'troll');
   const m = Rules.GAME_MODES[mode];
   const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}`
     : mode === 'rush' ? ' (les boss s\'enchaînent, de plus en plus forts !)' : '';
   twitch.say(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
   return { boss: mode === 'boss' ? battle.bossId : null };
+}
+
+app.post('/api/admin/queue/open', requireAdmin, action((req) => {
+  const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
+  scheduleCtl.forget(); // l'admin reprend la main : plus de lancement automatique
+  return openQueueFor(seconds, req.body.mode || 'br', req.body.boss || 'troll');
 }));
 
 app.post('/api/admin/queue/close', requireAdmin, action(() => battle.closeQueue()));
@@ -751,7 +757,10 @@ app.post('/api/admin/event', requireAdmin, action((req) => {
   return { pendingEvent };
 }));
 
-app.post('/api/admin/battle/start', requireAdmin, action(() => {
+app.post('/api/admin/battle/start', requireAdmin, action(() => startBattle()));
+
+// Lance la partie dont la file est fermée (admin, ou planification automatique à la fin des 5 min de file).
+function startBattle() {
   if (battle.mode !== 'br') {
     // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
     battle.start(refreshParticipant, null);
@@ -771,13 +780,36 @@ app.post('/api/admin/battle/start', requireAdmin, action(() => {
   const info = ev && Rules.BATTLE_EVENTS[ev];
   twitch.say(info ? `🔥 Que le combat commence ! Événement : ${info.icon} ${info.label} !` : '🔥 Que le combat commence !');
   return { event: ev, pendingEvent };
-}));
+}
+
+// ---------- Planification des parties ----------
+const scheduleCtl = {
+  phase: () => battle.phase,
+  open: (mode, boss, seconds) => openQueueFor(seconds, mode, boss),
+  start: () => { if (battle.phase === 'queue') battle.closeQueue(); startBattle(); },
+  cancel: (reason, c) => {
+    const m = Rules.GAME_MODES[c.mode];
+    battle.reset(); // rembourse aussi les paris
+    twitch.say(`⏰ ${m.icon} ${m.label} planifié annulé : ${reason}.`);
+    console.log(`[planning] ${c.mode} annulé : ${reason}`);
+  },
+  changed: () => io.emit('schedule', schedule.publicView()),
+  forget: () => { if (schedule.current) { schedule.reset(); io.emit('schedule', schedule.publicView()); } },
+};
+function scheduleTick(now = Date.now()) {
+  return schedule.check(scheduleCtl, now);
+}
+app.get('/api/schedule', (req, res) => res.json(schedule.publicView()));
+app.get('/api/admin/schedule', requireAdmin, (req, res) => res.json(schedule.publicView()));
+app.post('/api/admin/schedule', requireAdmin, action((req) => { const item = schedule.add(req.body || {}); scheduleCtl.changed(); return { item }; }));
+app.post('/api/admin/schedule/:id', requireAdmin, action((req) => { const item = schedule.update(req.params.id, req.body || {}); scheduleCtl.changed(); return { item }; }));
+app.post('/api/admin/schedule/:id/delete', requireAdmin, action((req) => { const r = schedule.remove(req.params.id); scheduleCtl.changed(); return r; }));
 
 app.post('/api/admin/poll/close', requireAdmin, action(() => {
   if (!battle.closePoll()) throw new Error('Aucun sondage en cours');
 }));
 
-app.post('/api/admin/battle/reset', requireAdmin, action(() => battle.reset()));
+app.post('/api/admin/battle/reset', requireAdmin, action(() => { scheduleCtl.forget(); return battle.reset(); }));
 
 // ---------- Récompenses ----------
 
@@ -1571,6 +1603,8 @@ function start(port = PORT) {
   setInterval(() => { if (sweepMarket()) io.emit('market'); }, 5 * 60 * 1000);
   // Survivor : 20 pas de simulation par seconde pour toutes les parties en cours.
   setInterval(survivorTick, 50);
+  // Planification : ouvre la file à l'heure dite, lance la partie à la fin des 5 min de file.
+  setInterval(() => scheduleTick(), 5000);
 
   // Nettoyage des sessions expirées.
   setInterval(() => {
@@ -1590,4 +1624,4 @@ function start(port = PORT) {
 if (require.main === module) start();
 
 module.exports = {
-  survivorTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };
+  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };

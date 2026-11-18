@@ -280,3 +280,48 @@ $('trades-suspect').onchange = loadTrades;
 $('trades-refresh').onclick = loadTrades;
 loadHistory();
 loadTrades();
+
+// ---------- Planification des parties ----------
+(function () {
+  const S = Rules.SCHEDULE;
+  const daysBox = $('sched-days');
+  daysBox.innerHTML = S.days.map((d, i) => `<label class="sched-day"><input type="checkbox" value="${i + 1}"> ${d.slice(0, 3)}</label>`).join('');
+  $('sched-mode').innerHTML = Object.entries(Rules.GAME_MODES).map(([k, m]) => `<option value="${k}">${m.icon} ${m.label}</option>`).join('');
+  $('sched-boss').innerHTML = Object.values(Rules.BOSSES).map((B) => `<option value="${B.id}">${B.icon} ${esc(B.name)}</option>`).join('');
+  $('sched-mode').onchange = () => { $('sched-boss').style.display = $('sched-mode').value === 'boss' ? '' : 'none'; };
+  const label = (it) => {
+    const m = Rules.GAME_MODES[it.mode];
+    const B = it.mode === 'boss' && Rules.BOSSES[it.boss];
+    return `${m.icon} ${m.label}${B ? ` · ${B.icon} ${esc(B.name)}` : ''}`;
+  };
+  function render(data) {
+    const next = data.next[0];
+    $('sched-list').innerHTML = (data.live ? `<div class="plan-live">🔴 ${label(data.live)} : file ouverte (lancement automatique à ${new Date(data.live.startAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})</div>` : '')
+      + (data.items.length ? data.items.map((it) => `<div class="sched-row ${it.enabled === false ? 'off' : ''}">
+        <b>${it.time}</b><span>${it.days.length === 7 ? 'Tous les jours' : it.days.map((d) => S.days[d - 1].slice(0, 3)).join(', ')}</span><span>${label(it)}</span>
+        ${next && next.id === it.id ? `<span class="muted">prochain : ${S.days[next.dow - 1].toLowerCase()} ${next.time}</span>` : '<span></span>'}
+        <button class="small secondary" data-stoggle="${it.id}" data-on="${it.enabled === false ? 1 : 0}">${it.enabled === false ? '▶ Activer' : '⏸ Désactiver'}</button>
+        <button class="small danger" data-sdel="${it.id}">🗑</button></div>`).join('')
+        : '<p class="muted">Aucun créneau. Choisis des jours, une heure et un mode, puis ajoute-le.</p>');
+    $('sched-list').querySelectorAll('[data-stoggle]').forEach((b) => { b.onclick = () => post(`/api/admin/schedule/${b.dataset.stoggle}`, { enabled: b.dataset.on === '1' }); });
+    $('sched-list').querySelectorAll('[data-sdel]').forEach((b) => {
+      b.onclick = async () => { if (await confirmBox('Supprimer ce créneau ?')) post(`/api/admin/schedule/${b.dataset.sdel}/delete`, {}); };
+    });
+  }
+  async function post(url, body) {
+    try { await api(url, body); } catch (e) { toast('⚠️ ' + e.message); }
+  }
+  async function load() {
+    try { render(await api('/api/admin/schedule')); } catch (e) { /* ignore */ }
+  }
+  $('sched-add').onclick = async () => {
+    const days = [...daysBox.querySelectorAll('input:checked')].map((i) => Number(i.value));
+    try {
+      await api('/api/admin/schedule', { days, time: $('sched-time').value, mode: $('sched-mode').value, boss: $('sched-boss').value });
+      toast('📅 Créneau ajouté');
+      daysBox.querySelectorAll('input').forEach((i) => { i.checked = false; });
+    } catch (e) { toast('⚠️ ' + e.message); }
+  };
+  socket.on('schedule', render);
+  load();
+})();

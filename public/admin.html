@@ -88,6 +88,18 @@
       </div>
     </div>
 
+    <div class="panel" id="schedule-panel">
+      <h2>📅 Planification des parties <span class="sub">Heure de Paris · file ouverte 5 min puis lancement automatique</span></h2>
+      <div class="sched-form">
+        <div class="sched-days" id="sched-days"></div>
+        <input type="time" id="sched-time" value="21:00">
+        <select id="sched-mode"></select>
+        <select id="sched-boss" style="display:none"></select>
+        <button class="gold" id="sched-add">➕ Ajouter le créneau</button>
+      </div>
+      <div class="sched-list" id="sched-list"></div>
+    </div>
+
     <div class="panel" id="players-panel">
       <h2>🧑‍🤝‍🧑 Joueurs <span class="sub" id="players-count"></span><button class="secondary small" id="players-refresh">↻ Actualiser</button></h2>
       <div class="row" style="margin-bottom:10px">

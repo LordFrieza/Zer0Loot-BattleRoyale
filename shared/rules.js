@@ -2633,6 +2633,50 @@
     return !!(it && it.unlock && achievementValue(character, it.unlock.metric) < it.unlock.goal);
   }
 
+  // ---------- Planification des parties (admin) ----------
+  // Créneaux hebdomadaires en heure de Paris : { id, days: [1..7] (1 = lundi), time: 'HH:MM', mode, boss }.
+  // À l'heure dite, la file s'ouvre pour SCHEDULE.queueSeconds, puis la partie se lance toute seule.
+  const SCHEDULE = { queueSeconds: 300, maxItems: 40, lateMinutes: 15, horizonDays: 7, days: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] };
+  const PARIS_DOW = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  // Date et heure de Paris d'un instant : { y, m, d, h, min, dow (1 = lundi) }.
+  function parisParts(ts) {
+    const parts = {};
+    for (const p of new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Paris', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', weekday: 'short', hourCycle: 'h23' }).formatToParts(new Date(ts))) parts[p.type] = p.value;
+    return { y: +parts.year, m: +parts.month, d: +parts.day, h: +parts.hour % 24, min: +parts.minute, dow: PARIS_DOW[parts.weekday] };
+  }
+  // Instant (ms) correspondant à une date et une heure de Paris (heure d'été comprise).
+  function parisToTs(y, m, d, h, min) {
+    const guess = Date.UTC(y, m - 1, d, h, min);
+    const off = (ts) => { const p = parisParts(ts); return Date.UTC(p.y, p.m - 1, p.d, p.h, p.min) - Math.floor(ts / 60000) * 60000; };
+    let ts = guess - off(guess);
+    ts = guess - off(ts); // second passage : bon décalage autour des changements d'heure
+    return ts;
+  }
+  function scheduleTimeValid(time) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || ''));
+  }
+  // Prochaines parties planifiées (de `now` - lateMinutes à `now` + horizonDays), triées : [{ id, at, mode, boss, dow, time }].
+  function scheduleUpcoming(items, now, days = SCHEDULE.horizonDays) {
+    const out = [];
+    const today = parisParts(now);
+    const base = Date.UTC(today.y, today.m - 1, today.d);
+    for (let k = -1; k <= days; k++) {
+      const day = new Date(base + k * 86400000);
+      const y = day.getUTCFullYear();
+      const m = day.getUTCMonth() + 1;
+      const d = day.getUTCDate();
+      const dow = ((today.dow - 1 + k) % 7 + 7) % 7 + 1;
+      for (const it of items || []) {
+        if (it.enabled === false || !(it.days || []).includes(dow) || !scheduleTimeValid(it.time)) continue;
+        const [h, min] = it.time.split(':').map(Number);
+        const at = parisToTs(y, m, d, h, min);
+        if (at < now - SCHEDULE.lateMinutes * 60000 || at > now + days * 86400000) continue;
+        out.push({ id: it.id, at, mode: it.mode, boss: it.boss || null, dow, time: it.time });
+      }
+    }
+    return out.sort((a, b) => a.at - b.at);
+  }
+
   // ---------- Twitch ----------
   const SUB_REWARD_GOLD = 5000; // par abonnement (sub, resub ou sub offert : au donateur)
 
@@ -2737,7 +2781,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
-    BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

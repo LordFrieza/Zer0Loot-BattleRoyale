@@ -1541,3 +1541,32 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .house-mail-log .pet-log-row { padding: 5px 8px; }
 .house-mail-log .pet-log-main .pet-log-total { margin-left: 4px; }
 .hml-ico { font-size: 20px; width: 32px; text-align: center; }
+
+/* Planning des parties : bandeau du haut et fenêtre de la semaine */
+.sched-chip { font: inherit; font-size: 13px; font-weight: 800; color: #cfe8ff; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(95, 211, 255, .45); background: rgba(95, 211, 255, .08); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.sched-chip:hover { background: rgba(95, 211, 255, .18); }
+.sched-chip.live { color: #ffd0d8; border-color: #ff4d6d; background: rgba(255, 77, 109, .14); animation: schedPulse 1.4s ease-in-out infinite; }
+.sched-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d6d; box-shadow: 0 0 8px #ff4d6d; }
+@keyframes schedPulse { 50% { box-shadow: 0 0 14px rgba(255, 77, 109, .6); } }
+.plan-modal .modal-box { max-width: 980px; text-align: left; }
+.plan-modal h2 { text-align: center; }
+.plan-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+@media (max-width: 800px) { .plan-week { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.plan-day { background: rgba(255, 255, 255, .04); border: 1px solid var(--border); border-radius: 10px; padding: 8px; min-height: 90px; }
+.plan-day.today { border-color: var(--accent); box-shadow: 0 0 12px rgba(184, 60, 255, .3); }
+.plan-day h4 { margin: 0 0 6px; font-size: 13px; }
+.plan-day h4 span { font-weight: 400; color: var(--muted, #a99bd6); font-size: 11px; }
+.plan-item { display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; margin-bottom: 5px; border-radius: 8px; border-left: 3px solid var(--c); background: rgba(255, 255, 255, .05); font-size: 12px; }
+.plan-item b { font-size: 13px; }
+.plan-item.next { background: rgba(95, 211, 255, .12); box-shadow: 0 0 10px rgba(95, 211, 255, .3); }
+.plan-item small { color: #9fe8ff; }
+.plan-live { text-align: center; padding: 8px; border-radius: 10px; background: rgba(255, 77, 109, .12); border: 1px solid #ff4d6d; margin-top: 8px; }
+
+.sched-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.sched-form input[type=time] { width: 130px; flex: 0 0 auto; }
+.sched-form select { width: auto; flex: 0 0 auto; padding: 8px 10px; border-radius: 10px; background: var(--bg2); color: inherit; border: 1px solid var(--border); font: inherit; }
+.sched-days { display: flex; flex-wrap: wrap; gap: 4px; }
+.sched-day { display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,.04); font-size: 13px; cursor: pointer; }
+.sched-list { display: flex; flex-direction: column; gap: 6px; }
+.sched-row { display: grid; grid-template-columns: 60px 1.2fr 1.6fr 1.2fr auto auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); font-size: 13px; }
+.sched-row.off { opacity: .5; }

@@ -469,6 +469,11 @@ de la file, confirme les `!join` et annonce le vainqueur.
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
+- **Planning des parties** (page admin, section 📅 Planification) : créneaux hebdomadaires en heure de Paris (jours,
+  heure, mode de jeu et boss). À l'heure dite, la file s'ouvre pendant **5 minutes** (annoncée dans le chat), puis la
+  partie se lance toute seule (annulée s'il manque des joueurs ; décalée jusqu'à 15 min si une partie est en cours).
+  Côté joueurs, un bandeau à côté de « Arène en direct » annonce le prochain mode et le temps restant (puis « file
+  ouverte » avec le compte à rebours du lancement) ; un clic ouvre le planning de la semaine.
 - **Classements** (top 10, podium pour le top 3, page perso et page admin) : victoires (Battle Royale, Roi de la Colline,
   Guerre des clans), kills (Battle Royale uniquement), batailles jouées (tous les modes du stream), record de profondeur
   en Expédition, record de salle du Raid de Donjon, record de vague au Survivor, coffres ouverts, légendaires sortis

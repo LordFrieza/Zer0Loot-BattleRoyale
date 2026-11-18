@@ -534,6 +534,14 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **LB-1** Le serveur doit calculer onze classements : victoires (Battle Royale, Roi de la Colline, Guerre des clans), kills (Battle Royale), batailles jouées (tous les modes du stream), record de profondeur en Expédition, record de salle du Raid de Donjon, record de vague au Survivor (`svBestWave`), coffres ouverts (`chests`), légendaires sortis des coffres (`lootStats.legendaire`), jackpots au casino (`jackpots`), profits du casino (gagné − misé, seulement les bilans positifs) et golds possédés en ce moment ; chacun précise ce qu'il compte, est limité à 10 entrées, hors joueurs bannis et hors valeurs nulles, départagés par niveau.
 - **LB-2** Quand une bataille se termine, qu'un titre change ou qu'un bannissement est modifié, le serveur doit diffuser `leaderboard`.
 
+## 17 bis. Planification des parties
+
+- **SCH-1** Les créneaux planifiés sont hebdomadaires et en heure de Paris (heure d'été comprise) : jours de la semaine (1 = lundi … 7 = dimanche), heure `HH:MM`, mode de jeu (et boss pour le Combat de Boss). `Rules.scheduleUpcoming` donne les prochaines parties sur 7 jours (un créneau désactivé est ignoré).
+- **SCH-2** L'admin doit pouvoir ajouter, modifier, activer / désactiver et supprimer des créneaux (`/api/admin/schedule…`, 40 au plus) ; le serveur refuse un créneau sans jour, à l'heure invalide, au mode ou au boss inconnu. `GET /api/schedule` donne à tous le planning, les prochaines parties et la partie dont la file est ouverte ; chaque changement est diffusé (`schedule`).
+- **SCH-3** À l'heure d'un créneau, le serveur doit ouvrir la file du mode pour **5 minutes** (annoncée dans le chat), puis lancer la partie tout seul à la fin de la file ; un créneau ne s'ouvre qu'une fois.
+- **SCH-4** Si une partie est en cours à l'heure dite, la file s'ouvre dès qu'elle est finie (jusqu'à 15 min de retard, sinon le créneau est sauté). S'il manque des joueurs au lancement, la partie planifiée est annulée (file réinitialisée, paris remboursés, annonce dans le chat). Si l'admin rouvre ou réinitialise la file, le lancement automatique est abandonné.
+- **SCH-5** La page joueur doit afficher à côté de « Arène en direct » le prochain mode planifié et le temps restant (ou « file ouverte » avec le compte à rebours du lancement) ; un clic ouvre le planning de la semaine. La page admin doit permettre de gérer les créneaux. (vérification manuelle)
+
 ## 18. Administration
 
 - **ADM-1** L'admin doit pouvoir choisir le mode de jeu avant d'ouvrir la file, ouvrir/fermer la file, lancer ou réinitialiser la bataille, choisir l'événement de la prochaine bataille (aucun, aléatoire ou l'un des quatre), ajouter des bots, simuler `!join` et sub.
