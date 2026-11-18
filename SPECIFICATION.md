@@ -86,7 +86,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CHAT-7** Là où `TWITCH_BOT_USERNAME` et `TWITCH_BOT_OAUTH` sont définis, le serveur doit se connecter avec ce compte (jeton préfixé par `oauth:` si besoin) ; `say()` ne doit écrire dans le chat que si `TWITCH_BOT_OAUTH` est défini et que le chat est connecté, sinon il ne doit rien faire.
 - **CHAT-8** Quand un `!join` aboutit, le bot doit confirmer ; si le joueur est un fantôme, il doit ajouter l'invitation à créer un compte et lier son Twitch.
 - **CHAT-9** Quand la file s'ouvre, le bot doit l'annoncer avec sa durée ; quand la bataille démarre, il doit l'annoncer (avec l'événement s'il y en a un) ; à la fin, il doit annoncer le vainqueur et ses kills, puis la cagnotte de paris redistribuée.
-- **CHAT-10** Quand un abonnement (`subscription`, `resub` ou `subgift`) est reçu, le serveur doit créditer **300 golds** à l'abonné (ou au donateur pour un sub offert), incrémenter son compteur `subs`, lui émettre une récompense `sub` et remercier dans le chat.
+- **CHAT-10** Quand un abonnement (`subscription`, `resub` ou `subgift`) est reçu, le serveur doit créditer **5 000 golds** à l'abonné (ou au donateur pour un sub offert), incrémenter son compteur `subs`, lui émettre une récompense `sub` et remercier dans le chat.
 - **CHAT-11** Si l'abonné est banni, alors la récompense de sub doit être ignorée.
 - **CHAT-12** Toutes les 5 s, le serveur doit diffuser l'état Twitch (`channel`, `chatConnected`, `botCanSpeak`, `oauth`).
 

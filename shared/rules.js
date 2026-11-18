@@ -2596,7 +2596,7 @@
   }
 
   // ---------- Twitch ----------
-  const SUB_REWARD_GOLD = 300; // par abonnement (sub, resub ou sub offert : au donateur)
+  const SUB_REWARD_GOLD = 5000; // par abonnement (sub, resub ou sub offert : au donateur)
 
   // ---------- Progression ----------
   /*

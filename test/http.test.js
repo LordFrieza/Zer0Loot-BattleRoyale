@@ -203,7 +203,8 @@ test('[ADM-4, BET-9, CHAT-6, ADM-5] bannir un inscrit : retiré de la file, pari
   assert.strictEqual(again.data.joined, false, 'un banni ne peut plus rejoindre');
 });
 
-test('[CHAT-10, CHAT-11] sub : 300 golds au fantôme, rien pour un banni', async () => {
+test('[CHAT-10, CHAT-11] sub : 5 000 golds au fantôme, rien pour un banni', async () => {
+  assert.strictEqual(Rules.SUB_REWARD_GOLD, 5000);
   assert.strictEqual((await admin.post('/api/admin/simulate-sub', { login: 'subber' })).status, 200);
   const subber = (await players()).find((p) => p.twitch === 'subber');
   assert.strictEqual(subber.gold, Rules.SUB_REWARD_GOLD);

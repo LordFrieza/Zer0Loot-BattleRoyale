@@ -464,7 +464,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Classements** (top 10, podium pour le top 3, page perso et page admin) : victoires (Battle Royale, Roi de la Colline,
   Guerre des clans), kills (Battle Royale uniquement), batailles jouées (tous les modes du stream), record de profondeur
   en Expédition et record de salle du Raid de Donjon. Chaque classement indique ce qu'il compte.
-- **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 300 golds à celui qui s'abonne ou qui offre
+- **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 5 000 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
 - **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / familier, effacement d'un
   visage dessiné, bannissement (déconnexion

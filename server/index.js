@@ -618,7 +618,7 @@ function joinFromTwitch(login, displayName, clan = null) {
 
 const clanText = (clan) => `${Rules.CLANS.teams[clan].icon} ${Rules.CLANS.teams[clan].label}`;
 
-// ---------- Abonnements Twitch : 300 golds pour celui qui s'abonne / offre l'abonnement ----------
+// ---------- Abonnements Twitch : Rules.SUB_REWARD_GOLD golds pour celui qui s'abonne / offre l'abonnement ----------
 
 function rewardSub(login, displayName, kind) {
   const user = game.getOrCreateTwitchUser(login, displayName);

@@ -49,7 +49,7 @@ function startChat(onCommand, onSub) {
   if (onSub) {
     client.on('subscription', (channel, username, method, message, userstate) => onSub({ ...subscriber(username, userstate), kind: 'sub' }));
     client.on('resub', (channel, username, months, message, userstate) => onSub({ ...subscriber(username, userstate), kind: 'resub' }));
-    // Un « sub offert » arrive une fois par abonnement offert (y compris pour les lots) : 300 golds chacun au donateur.
+    // Un « sub offert » arrive une fois par abonnement offert (y compris pour les lots) : Rules.SUB_REWARD_GOLD golds chacun au donateur.
     client.on('subgift', (channel, username, streakMonths, recipient, methods, userstate) => onSub({ ...subscriber(username, userstate), kind: 'gift' }));
   }
   client.connect().catch((err) => console.log('[twitch] connexion au chat impossible :', err.message || err));
