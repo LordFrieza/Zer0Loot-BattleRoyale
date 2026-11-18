@@ -1080,6 +1080,25 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .stat-btns button:disabled { opacity: .3; }
 tr.stat-changed td { background: rgba(255,210,63,.07); }
 .respec-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid rgba(255,210,63,.45); border-radius: 10px; background: rgba(255,210,63,.08); }
+.stat-btns .plus.capped { background: rgba(140,140,160,.18); border: 1px solid rgba(180,180,200,.4); color: #bbb; }
+/* Bulle « ? » des caractéristiques : détail et plafond */
+.stat-help-btn { width: 20px; height: 20px; padding: 0; margin-left: 4px; border-radius: 50%; font-size: 12px; font-weight: 900; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; cursor: help;
+  background: rgba(124,92,255,.2); border: 1px solid rgba(124,92,255,.6); color: #c9b8ff; }
+.stat-help-btn:hover { background: rgba(124,92,255,.45); color: #fff; }
+.cap-badge { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: .5px;
+  background: rgba(57,217,138,.16); border: 1px solid rgba(57,217,138,.55); color: #6ff0b0; }
+.cap-badge.waste { background: rgba(255,77,109,.15); border-color: rgba(255,77,109,.6); color: #ff8fa3; }
+.cap-left { display: inline-block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.stat-pop { position: fixed; z-index: 3000; display: none; width: min(340px, calc(100vw - 16px)); padding: 12px 14px; border-radius: 12px;
+  background: #1b1730; border: 1px solid rgba(124,92,255,.6); box-shadow: 0 12px 36px rgba(0,0,0,.55); font-size: 13px; line-height: 1.4; }
+.stat-pop .sp-title { font-weight: 900; font-size: 15px; margin-bottom: 4px; }
+.stat-pop p { margin: 6px 0; }
+.stat-pop .sp-line { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,.08); }
+.stat-pop .sp-line span { color: var(--muted); white-space: nowrap; }
+.stat-pop .sp-line b { text-align: right; }
+.stat-pop .sp-max { color: #6ff0b0; font-weight: 700; }
+.stat-pop .sp-small { font-size: 12px; }
 
 /* ======================= Casino ======================= */
 .casino-scene { border-radius: 14px; overflow: hidden; border: 2px solid #b8862b; box-shadow: 0 0 0 4px rgba(184, 134, 43, .18), 0 10px 40px rgba(0, 0, 0, .5); }

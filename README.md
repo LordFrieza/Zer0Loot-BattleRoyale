@@ -116,10 +116,15 @@ de la file, confirme les `!join` et annonce le vainqueur.
   double kill (2 kills d'affilée en moins de 8 s) = +1 coffre ; triple kill = annonce seulement ;
   massacre (5 kills dans la bataille) = +2 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
-- **Répartition des points** (onglet Personnage) : le bouton **+** place un point libre tout de suite ; le bouton **−**
-  retire un point pour le replacer ailleurs : les changements s'affichent en direct (ancienne valeur barrée → nouvelle
-  valeur de la stat, en vert ou en rouge), puis on **valide** d'un coup
+- **Répartition des points** (onglet Personnage) : les boutons **+** (placer un point libre) et **−** (retirer un point
+  pour le replacer ailleurs) ne changent rien tout de suite : la fiche montre l'effet en direct (ancienne valeur barrée →
+  nouvelle valeur, en vert ou en rouge, « aucun effet » au-delà du plafond), puis on **valide** d'un coup ou on annule
   (50 golds par point retiré, 500 golds au plus ; placer des points libres reste gratuit).
+- **Plafonds** : la bulle **?** de chaque caractéristique (au survol ou au clic) donne son effet par point, sa valeur
+  actuelle et son plafond, avec le nombre de points à partir duquel il est atteint (équipement et classe compris) ;
+  un badge **MAX** s'affiche au plafond, en rouge s'il y a des points placés en trop. Plafonds : vitesse 220 px/s,
+  esquive 60 %, critique 60 %, vitesse d'attaque ×2,5, vol de vie 40 %, précision 80 %, épines 50 %, chance 200
+  (table de loot ; bonus de forge maximal dès 40), stamina ×2,5 ; Vie, Force et Défense n'en ont pas.
 - **Stats** (valeurs de base, chaque point en plus, puis × les bonus % d'équipement et de classe) :
   - Vie : 100 PV + 10 par point
   - Force : 10 dégâts + 2 par point

@@ -83,3 +83,25 @@ test('[STAT-10] répartition en direct : déplacer des points, validation payant
   assert.throws(() => game.respecStats(c, { vie: 29, force: 1 }), /50 golds/);
   assert.strictEqual(Rules.statPointsMoved({ force: 5, vie: 1 }, { force: 2, vie: 4 }), 3);
 });
+
+test('[STAT-11] plafonds : nombre de points à partir duquel une stat ne progresse plus (équipement et classe compris)', () => {
+  for (const s of Rules.STATS) assert.ok(Rules.STAT_DETAILS[s] && Rules.STAT_DETAILS[s].per, `détail de ${s}`);
+  for (const s of ['vie', 'force', 'defense']) assert.strictEqual(Rules.statCapAt(s, {}, {}, 'guerrier'), null, `${s} sans plafond`);
+  // Sans bonus : vitesse 220 px/s à 32 points, critique 60 % à 30 points, chance 200
+  assert.strictEqual(Rules.statCapAt('vitesse', {}, {}, 'guerrier'), 32);
+  assert.strictEqual(Rules.statCapAt('critique', {}, {}, 'guerrier'), 30);
+  assert.strictEqual(Rules.statCapAt('chance', {}, {}, 'guerrier'), Rules.LUCK_CAP);
+  assert.strictEqual(Rules.statCapAt('chance', {}, { chance: 50 }, 'guerrier'), Rules.LUCK_CAP - 50, 'les bonus de Chance s\'ajoutent');
+  // Les bonus d'équipement font atteindre le plafond plus tôt
+  assert.ok(Rules.statCapAt('critique', {}, { critique: 50 }, 'guerrier') < 30);
+  for (const s of Rules.STATS) {
+    const at = Rules.statCapAt(s, {}, { critique: 20, esquive: 10 }, 'archer');
+    if (at === null) continue;
+    const key = Rules.STAT_DETAILS[s].key;
+    const d = (n) => Rules.derive({ [s]: n }, { critique: 20, esquive: 10 }, 'archer')[key];
+    assert.ok(d(at) >= Rules.STAT_DETAILS[s].max - 1e-9, `${s} plafonné à ${at}`);
+    if (at > 0) assert.ok(d(at - 1) < d(at), `${s} progresse encore juste avant`);
+    if (s === 'chance') assert.deepStrictEqual(Rules.lootTable(d(at + 5)), Rules.lootTable(d(at)), 'table de loot au plafond');
+    else assert.strictEqual(d(at + 5), d(at), `${s} : un point de plus ne change rien`);
+  }
+});

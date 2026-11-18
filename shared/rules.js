@@ -2770,7 +2770,45 @@
     }
   }
 
+  /*
+   * Détail d'une caractéristique pour la bulle « ? » de la fiche : effet d'un point et plafond.
+   * `key` = valeur dérivée plafonnée (voir derive()), `max` = son plafond ; sans `key`, la stat n'a pas de plafond.
+   */
+  const STAT_DETAILS = {
+    vie: { per: '+10 PV max de base par point', cap: null, note: 'Aucun plafond.' },
+    force: { per: '+2 dégâts de base par coup et par point', cap: null, note: 'Aucun plafond.' },
+    defense: { per: '+3 d\'armure par point ; réduction = armure / (armure + 100)', cap: null, note: 'Pas de plafond, mais chaque point rapporte un peu moins que le précédent.' },
+    vitesse: { per: '+5 px/s par point (60 px/s de base)', key: 'speed', max: 220, cap: '220 px/s' },
+    esquive: { per: '+3 d\'indice d\'esquive par point ; esquive = indice / (indice + 100)', key: 'dodge', max: 0.6, cap: '60 % d\'esquive' },
+    critique: { per: `+${CRIT_PER_POINT} % de critiques par point (${CRIT_BASE} % de base)`, key: 'crit', max: CRIT_CAP / 100, cap: `${CRIT_CAP} % de critiques` },
+    vitesse_attaque: { per: '+5 % d\'attaques par seconde par point', key: 'attackSpeed', max: 2.5, cap: '×2,5 attaques par seconde' },
+    vol_de_vie: { per: '+1,5 % de vol de vie par point (2 % de base)', key: 'lifesteal', max: 0.4, cap: '40 % des dégâts rendus' },
+    precision: { per: '+3 % de précision par point (5 % de base)', key: 'precision', max: 0.8, cap: '80 % d\'esquive adverse annulée' },
+    epines: { per: '+2 % des dégâts renvoyés par point (2 % de base)', key: 'thorns', max: 0.5, cap: '50 % des dégâts renvoyés' },
+    chance: { per: '+1 de chance effective par point (les bonus d\'équipement s\'ajoutent en points)', key: 'luck', max: LUCK_CAP, cap: `${LUCK_CAP} de chance effective (table de loot)`,
+      note: `À la forge, le bonus de chance est déjà au maximum dès ${FUSE_LUCK_BONUS_CAP / FUSE_LUCK_BONUS} de chance.` },
+    stamina: { per: `+${Math.round(STAMINA.perPoint * 100)} % de vitesse de remplissage de la barre par point`, key: 'staminaSpeed', max: STAMINA.cap, cap: `barre ×${String(STAMINA.cap).replace('.', ',')} plus rapide` },
+  };
+
+  /*
+   * Nombre de points (total : compétences + panoplies + arbre) à partir duquel la stat atteint son plafond,
+   * avec l'équipement et la classe donnés. null : pas de plafond, ou plafond inaccessible (multiplicateur nul).
+   */
+  function statCapAt(stat, points, gearPct, cls) {
+    const info = STAT_DETAILS[stat];
+    if (!info || !info.key) return null;
+    const p = Object.assign(emptyStats(), points);
+    const reached = (n) => derive(Object.assign({}, p, { [stat]: n }), gearPct, cls)[info.key] >= info.max - 1e-9;
+    let hi = 1;
+    while (!reached(hi)) { hi *= 2; if (hi > 4096) return null; }
+    let lo = 0;
+    if (reached(0)) return 0;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (reached(mid)) hi = mid; else lo = mid; }
+    return hi;
+  }
+
   return {
+    STAT_DETAILS, statCapAt,
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,

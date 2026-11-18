@@ -108,29 +108,93 @@ function classMod(stat) {
   return `<div class="${cls}" style="font-size:12px">${parts.join(' ')} ${ci.icon} classe</div>`;
 }
 
-// Répartition des points en cours (null : pas de modification en attente)
+// Répartition des points en cours (null : pas de modification en attente). Les boutons + et − préparent
+// un brouillon : on voit l'effet de chaque point (valeur avant → après) puis on valide d'un coup.
 let statDraft = null;
 
+// Bulle « ? » d'une caractéristique : détail, effet d'un point et plafond (avec l'équipement et la classe).
+function statHelpHtml(s, ctx) {
+  const info = Rules.STAT_INFO[s];
+  const det = Rules.STAT_DETAILS[s];
+  const own = ctx.points[s] - ctx.extra[s];
+  const lines = [`<div class="sp-title">${info.icon} ${info.label}</div>`, `<p>${info.desc}</p>`,
+    `<div class="sp-line"><span>Par point</span><b>${det.per}</b></div>`,
+    `<div class="sp-line"><span>Valeur actuelle</span><b>${Rules.describeDerived(s, ctx.values)}</b></div>`];
+  if (!det.key) {
+    lines.push(`<div class="sp-line"><span>Plafond</span><b>aucun</b></div>`);
+  } else {
+    lines.push(`<div class="sp-line"><span>Plafond</span><b>${det.cap}</b></div>`);
+    const at = ctx.capAt[s];
+    if (at === null) {
+      lines.push('<p class="down">Avec ton équipement et ta classe, cette stat ne peut pas atteindre son plafond.</p>');
+    } else {
+      const ownAt = Math.max(0, at - ctx.extra[s]);
+      const bonus = ctx.extra[s] ? ` (+${ctx.extra[s]} de panoplie / arbre)` : '';
+      lines.push(`<div class="sp-line"><span>Plafond atteint à</span><b>${ownAt} point(s)${bonus}</b></div>`);
+      if (ctx.points[s] >= at) {
+        const waste = ctx.points[s] - at;
+        lines.push(`<p class="sp-max">✅ Plafond atteint : un point de plus ne changerait rien.</p>`);
+        if (waste > 0 && own > 0) lines.push(`<p class="down">⚠️ ${Math.min(waste, own)} point(s) placé(s) au-delà du plafond ne servent à rien : retire-les avec − pour les mettre ailleurs.</p>`);
+      } else {
+        lines.push(`<p class="up">Encore <b>${at - ctx.points[s]}</b> point(s) utile(s) avant le plafond.</p>`);
+      }
+      lines.push('<p class="muted sp-small">Le plafond dépend de tes bonus d\'équipement et de classe : il peut changer quand tu changes d\'objets.</p>');
+    }
+  }
+  if (det.note) lines.push(`<p class="muted sp-small">${det.note}</p>`);
+  return lines.join('');
+}
+
+let statPop = null;
+function showStatPop(btn, html, pinned) {
+  if (!statPop) {
+    statPop = document.createElement('div');
+    statPop.className = 'stat-pop';
+    document.body.appendChild(statPop);
+    document.addEventListener('click', (e) => {
+      if (statPop.pinned && !statPop.contains(e.target) && !e.target.closest('[data-help]')) hideStatPop(true);
+    });
+    window.addEventListener('scroll', () => hideStatPop(true), { passive: true });
+  }
+  statPop.innerHTML = html;
+  statPop.pinned = !!pinned;
+  statPop.style.display = 'block';
+  const r = btn.getBoundingClientRect();
+  const w = statPop.offsetWidth;
+  const h = statPop.offsetHeight;
+  const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+  const top = r.bottom + 8 + h > window.innerHeight ? Math.max(8, r.top - h - 8) : r.bottom + 8;
+  statPop.style.left = left + 'px';
+  statPop.style.top = top + 'px';
+}
+function hideStatPop(force) {
+  if (statPop && (force || !statPop.pinned)) { statPop.style.display = 'none'; statPop.pinned = false; }
+}
+
 function renderStats() {
+  hideStatPop(true);
   const c = me.character;
   const placed = Rules.STATS.reduce((sum, s) => sum + (c.stats[s] || 0), 0);
   const total = placed + c.skillPoints;
   const draft = statDraft;
   const used = draft ? Rules.STATS.reduce((sum, s) => sum + draft[s], 0) : placed;
   const free = total - used;
-  // Valeurs en direct avec la répartition en cours (même calcul que le serveur : points + panoplies + arbre, équipement, classe)
-  let after = null;
-  if (draft) {
-    const setPts = Rules.setBonus(c.equipment).points;
-    const talentPts = Rules.talentBonus(c.cls, c.talents, c.talentExtra);
-    const points = Object.fromEntries(Rules.STATS.map((st) => [st, (draft[st] || 0) + (setPts[st] || 0) + (talentPts[st] || 0)]));
-    after = Rules.derive(points, c.gear, c.cls);
-  }
+  // Points totaux par stat (compétences + panoplies + arbre), même calcul que le serveur
+  const setPts = Rules.setBonus(c.equipment).points;
+  const talentPts = Rules.talentBonus(c.cls, c.talents, c.talentExtra);
+  const extra = Object.fromEntries(Rules.STATS.map((st) => [st, (setPts[st] || 0) + (talentPts[st] || 0)]));
+  const own = (st) => (draft ? draft[st] : c.stats[st] || 0);
+  const points = Object.fromEntries(Rules.STATS.map((st) => [st, own(st) + extra[st]]));
+  // Valeurs en direct avec la répartition en cours
+  const after = draft ? Rules.derive(points, c.gear, c.cls) : null;
+  const capAt = Object.fromEntries(Rules.STATS.map((st) => [st, Rules.statCapAt(st, points, c.gear, c.cls)]));
+  const ctx = { points, extra, capAt, values: after || c.derived };
   const valueCell = (s) => {
     const now = Rules.describeDerived(s, c.derived);
     if (!after) return now;
     const next = Rules.describeDerived(s, after);
-    if (next === now) return now;
+    const overCap = capAt[s] !== null && draft[s] > c.stats[s] && (c.stats[s] || 0) + extra[s] >= capAt[s];
+    if (next === now || overCap) return draft[s] !== c.stats[s] ? `${now}<span class="stat-after down">aucun effet (plafond)</span>` : now;
     const better = draft[s] >= c.stats[s]; // plus de points dans une stat = meilleure valeur
     return `<span class="stat-before">${now}</span><span class="stat-after ${better ? 'up' : 'down'}">→ ${next}</span>`;
   };
@@ -140,56 +204,77 @@ function renderStats() {
   $('stats').innerHTML = Rules.STATS.map((s) => {
     const info = Rules.STAT_INFO[s];
     const gear = c.gear[s];
-    const pts = draft ? draft[s] : c.stats[s];
+    const pts = own(s);
     const diff = draft ? draft[s] - c.stats[s] : 0;
+    const at = capAt[s];
+    const capped = at !== null && points[s] >= at;
+    const waste = capped ? Math.min(pts, points[s] - at) : 0;
+    const badge = at === null ? ''
+      : waste > 0 ? `<span class="cap-badge waste" title="${waste} point(s) au-delà du plafond : ils ne servent à rien">MAX · ${waste} inutile${waste > 1 ? 's' : ''}</span>`
+        : capped ? '<span class="cap-badge" title="Plafond atteint">MAX</span>'
+          : `<span class="cap-left" title="Points utiles avant le plafond">plafond dans ${at - points[s]} pt${at - points[s] > 1 ? 's' : ''}</span>`;
     return `<tr class="${diff ? 'stat-changed' : ''}">
-      <td class="stat-name">${info.icon} ${info.label}</td>
+      <td class="stat-name">${info.icon} ${info.label} <button class="stat-help-btn" data-help="${s}" aria-label="Détail de ${info.label}">?</button>${badge ? `<div>${badge}</div>` : ''}</td>
       <td class="stat-desc help">${info.desc}</td>
       <td class="stat-pts">${pts}${diff ? ` <small class="${diff > 0 ? 'up' : 'down'}">(${diff > 0 ? '+' : ''}${diff})</small>` : ''}</td>
       <td class="stat-gear">${gear ? '+' + gear + Rules.statUnit(s) + ' équip.' : ''}${classMod(s)}${setMod(s)}${talentMod(s)}</td>
       <td class="stat-value">${valueCell(s)}</td>
       <td class="stat-btns">
         <button class="minus" data-minus="${s}" title="Retirer un point (pour le replacer ailleurs)" ${pts > 0 ? '' : 'disabled'}>−</button>
-        <button class="plus" data-stat="${s}" title="Ajouter un point" ${free > 0 ? '' : 'disabled'}>+</button>
+        <button class="plus ${capped ? 'capped' : ''}" data-stat="${s}" title="${capped ? 'Plafond atteint : ce point ne servirait à rien' : 'Ajouter un point (tu valides ensuite)'}" ${free > 0 ? '' : 'disabled'}>+</button>
       </td>
     </tr>`;
   }).join('');
+  const startDraft = () => { if (!statDraft) statDraft = Object.fromEntries(Rules.STATS.map((st) => [st, c.stats[st] || 0])); };
   $('stats').querySelectorAll('[data-stat]').forEach((b) => {
     b.onclick = () => {
-      // Sans modification en cours, placer un point libre se fait tout de suite (gratuit).
-      if (!statDraft) { act('/api/stats/allocate', { stat: b.dataset.stat }, 'levelUp'); return; }
+      startDraft();
       statDraft[b.dataset.stat] += 1;
+      Sound.play('chestHit', 1);
       renderStats();
     };
   });
   $('stats').querySelectorAll('[data-minus]').forEach((b) => {
     b.onclick = () => {
-      if (!statDraft) statDraft = Object.fromEntries(Rules.STATS.map((st) => [st, c.stats[st] || 0]));
+      startDraft();
       statDraft[b.dataset.minus] -= 1;
       Sound.play('chestHit', 1);
       renderStats();
     };
   });
-  // Validation : 50 golds par point retiré, 500 golds au plus ; placer des points libres est gratuit.
+  $('stats').querySelectorAll('[data-help]').forEach((b) => {
+    const html = () => statHelpHtml(b.dataset.help, ctx);
+    b.onmouseenter = () => { if (!statPop || !statPop.pinned) showStatPop(b, html(), false); };
+    b.onmouseleave = () => hideStatPop(false);
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (statPop && statPop.pinned && statPop.dataset.stat === b.dataset.help) { hideStatPop(true); return; }
+      showStatPop(b, html(), true);
+      statPop.dataset.stat = b.dataset.help;
+    };
+  });
+  // Validation : placer des points libres est gratuit ; 50 golds par point retiré, 500 golds au plus.
   if (!draft) {
-    $('stats-reset').innerHTML = placed
-      ? `<span class="muted">Clique sur <b>−</b> pour retirer des points et les replacer ailleurs : tu valides ensuite d'un coup
-        (${Rules.STAT_RESET.perPoint} golds par point retiré, ${Rules.STAT_RESET.max} golds au plus).</span>`
-      : '';
+    $('stats-reset').innerHTML = `<span class="muted">Clique sur <b>+</b> ou <b>−</b> : tu vois ce que ça change avant de valider
+      (placer un point libre est gratuit ; ${Rules.STAT_RESET.perPoint} golds par point retiré, ${Rules.STAT_RESET.max} golds au plus).
+      La bulle <b>?</b> donne le détail et le plafond de chaque caractéristique.</span>`;
     return;
   }
   const moved = Rules.statPointsMoved(c.stats, draft);
   const price = Rules.statResetPrice(moved);
+  const added = used - placed + moved;
   const changed = moved > 0 || used !== placed;
+  const wasted = Rules.STATS.reduce((sum, st) => sum + (capAt[st] !== null && points[st] > capAt[st] && draft[st] > c.stats[st] ? Math.min(draft[st] - c.stats[st], points[st] - capAt[st]) : 0), 0);
   $('stats-reset').innerHTML = `<div class="respec-bar">
-      <span>🔁 <b>${moved}</b> point(s) déplacé(s)${free > 0 ? ` · <b>${free}</b> à placer` : ''} · coût : <b>${price} 🪙</b></span>
-      <button class="gold small" id="respec-ok" ${!changed || c.gold < price ? 'disabled' : ''}>✔ Valider la répartition</button>
+      <span>${moved ? `🔁 <b>${moved}</b> point(s) déplacé(s)` : `✨ <b>${Math.max(0, added)}</b> point(s) placé(s)`}${free > 0 ? ` · <b>${free}</b> à placer` : ''} · coût : <b>${price ? price + ' 🪙' : 'gratuit'}</b></span>
+      <button class="gold small" id="respec-ok" ${!changed || c.gold < price ? 'disabled' : ''}>✔ Valider</button>
       <button class="secondary small" id="respec-cancel">Annuler</button>
-      ${c.gold < price ? '<span class="down">Pas assez de golds</span>' : ''}</div>`;
+      ${c.gold < price ? '<span class="down">Pas assez de golds</span>' : ''}
+      ${wasted ? `<span class="down">⚠️ ${wasted} point(s) au-delà du plafond : ils ne servent à rien</span>` : ''}</div>`;
   $('respec-cancel').onclick = () => { statDraft = null; renderStats(); };
   $('respec-ok').onclick = async () => {
     const r = await act('/api/stats/respec', { stats: statDraft }, 'levelUp');
-    if (r) { statDraft = null; renderStats(); toast(`🔁 Nouvelle répartition validée${r.price ? ` pour ${r.price} golds` : ''} !`); }
+    if (r) { statDraft = null; renderStats(); toast(r.price ? `🔁 Nouvelle répartition validée pour ${r.price} golds !` : '✔ Points validés !'); }
   };
 }
 
