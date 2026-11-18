@@ -487,7 +487,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   moment). Chaque classement indique ce qu'il compte.
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 5 000 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
-- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / familier, effacement d'un
+- **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / émeraudes / familier, effacement d'un
   visage dessiné, bannissement (déconnexion
   immédiate, retrait de la file, paris remboursés), simulation de `!join` et de sub pour les tests. **Historique global**
   (les parties de tous les joueurs, filtres par joueur et par mode) et **échanges du marché** (vendeur, acheteur, objet,

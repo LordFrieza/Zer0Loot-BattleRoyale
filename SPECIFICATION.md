@@ -547,7 +547,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 - **ADM-1** L'admin doit pouvoir choisir le mode de jeu avant d'ouvrir la file, ouvrir/fermer la file, lancer ou réinitialiser la bataille, choisir l'événement de la prochaine bataille (aucun, aléatoire ou l'un des quatre), ajouter des bots, simuler `!join` et sub.
 - **ADM-2** L'admin doit pouvoir lister les joueurs (nom, pseudo, Twitch, fantôme, banni, classe, niveau, golds, coffres, record, titre).
-- **ADM-3** Quand l'admin donne des ressources à un joueur (golds, coffres, XP ou énergie), le serveur doit l'appliquer et notifier le joueur.
+- **ADM-3** Quand l'admin donne des ressources à un joueur (golds, coffres, XP, énergie, Clés de boss ou émeraudes), le serveur doit l'appliquer et notifier le joueur ; les émeraudes données ne comptent pas dans les émeraudes gagnées (statistiques). La liste des joueurs de l'admin affiche leurs émeraudes. Partout dans l'interface, les émeraudes s'affichent avec la même icône verte (jamais l'emoji 💎, bleu).
 - **ADM-4** Quand l'admin bannit un joueur, le serveur doit supprimer ses sessions, lui émettre `banned`, et, si une file est en cours, le retirer des participants et rembourser son pari et les paris placés sur lui.
 - **ADM-5** Si le joueur ciblé n'existe pas ou n'est pas un joueur, alors l'admin doit recevoir « Joueur introuvable ».
 

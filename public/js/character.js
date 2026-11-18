@@ -2581,10 +2581,12 @@ socket.on('svEnd', (r) => Survivor.onEnd(r));
 socket.on('svBoard', () => Survivor.onBoard());
 socket.on('reward', (r) => {
   Sound.play(REWARD_SOUNDS[r.type]);
-  const gains = [`+${r.reward.xp} XP`];
+  const gains = r.reward.xp || r.type !== 'gift' ? [`+${r.reward.xp} XP`] : [];
   if (r.reward.gold) gains.push(`+${r.reward.gold} 🪙`);
   if (r.reward.chests) gains.push(`+${r.reward.chests} coffre${r.reward.chests > 1 ? 's' : ''}`);
   if (r.keys) gains.push(`+${r.keys} 🗝️ Clé${r.keys > 1 ? 's' : ''} de boss`);
+  if (r.energy) gains.push(`+${r.energy} ⚡ énergie`);
+  if (r.emeralds) gains.push(`+${r.emeralds} {em} émeraude${r.emeralds > 1 ? 's' : ''}`);
   const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !`
     : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !` : REWARD_LABELS[r.type];
   const mult = r.mult && r.mult !== 1 ? ` (×${String(r.mult).replace('.', ',')} ${r.mult > 1 ? '⬆️ adversaires plus forts' : '⬇️ adversaires plus faibles'})` : '';

@@ -88,7 +88,7 @@ test('[ADM-1, ADM-2, ADM-5] admin : contrôles de la file, choix de l\'événeme
 
   const list = (await admin.get('/api/admin/players')).data;
   const me = list.find((p) => p.id === alice.id);
-  assert.deepStrictEqual(Object.keys(me).sort(), ['banned', 'chests', 'cls', 'drawing', 'ghost', 'gold', 'id', 'level', 'name', 'record', 'title', 'twitch', 'username']);
+  assert.deepStrictEqual(Object.keys(me).sort(), ['banned', 'chests', 'cls', 'drawing', 'emeralds', 'ghost', 'gold', 'id', 'level', 'name', 'record', 'title', 'twitch', 'username']);
   assert.ok(!list.some((p) => p.username === 'admin'), 'l\'admin n\'est pas un joueur');
 
   // La file : ouvrir, fermer (les inscrits restent), lancer, réinitialiser
@@ -277,6 +277,18 @@ test('[ADM-3, PRG-8, RT-3] don de ressources : appliqué et notifié au joueur',
   const gifts = toUser(since(mark), id, 'reward');
   assert.deepStrictEqual(gifts, [{ type: 'gift', reward: { gold: 10, chests: 2, xp: 350 }, levels: 1 }]);
   assert.ok(toUser(since(mark), id, 'me').length >= 1);
+  // Émeraudes (et Clés de boss) : ajoutées, notifiées, pas comptées comme gagnées
+  const before = (await c.get('/api/me')).data.character;
+  const mark2 = emitted.length;
+  const r2 = await post(`/api/admin/players/${id}/give`, { emeralds: 250, keys: 2 });
+  assert.strictEqual(r2.status, 200);
+  const after = (await c.get('/api/me')).data.character;
+  assert.deepStrictEqual([after.emeralds, after.bossKeys], [before.emeralds + 250, before.bossKeys + 2]);
+  assert.strictEqual(after.lifetime.emeraldsEarned || 0, before.lifetime.emeraldsEarned || 0, 'cadeau : pas des émeraudes gagnées');
+  assert.deepStrictEqual(toUser(since(mark2), id, 'reward').map((g) => [g.type, g.emeralds, g.keys]), [['gift', 250, 2]]);
+  const listed = (await admin.get('/api/admin/players')).data.find((p) => p.id === id);
+  assert.strictEqual(listed.emeralds, before.emeralds + 250);
+  assert.strictEqual((await post(`/api/admin/players/${id}/give`, { emeralds: 0 })).status, 400, 'rien à donner');
 });
 
 test('[LB-2, ADM-4, RT-3] bannissement et titre : « leaderboard » diffusé, « banned » envoyé au joueur', async () => {

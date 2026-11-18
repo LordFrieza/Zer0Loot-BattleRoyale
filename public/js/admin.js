@@ -156,7 +156,7 @@ function renderPlayers() {
     .filter((p) => !q || p.name.toLowerCase().includes(q) || (p.twitch || '').includes(q) || p.username.toLowerCase().includes(q))
     .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name));
   $('players-count').textContent = `${playersList.length} joueur(s)`;
-  $('players').innerHTML = `<tr><th>Joueur</th><th>Classe</th><th>Niv.</th><th>🪙</th><th><i class="ico-chest"></i></th><th>V / K / B</th><th>Donner</th><th></th></tr>`
+  $('players').innerHTML = `<tr><th>Joueur</th><th>Classe</th><th>Niv.</th><th>🪙</th><th><i class="ico-chest"></i></th><th><i class="ico-emerald" title="Émeraudes"></i></th><th>V / K / B</th><th>Donner</th><th></th></tr>`
     + list.map((p) => {
       const ci = p.cls && Rules.CLASS_INFO[p.cls];
       return `<tr class="${p.banned ? 'banned' : ''}" data-id="${p.id}">
@@ -165,11 +165,11 @@ function renderPlayers() {
           ${p.drawing ? `<div class="row" style="gap:6px;margin-top:4px"><canvas width="36" height="36" class="drawing-thumb" data-pixels="${p.drawing}" title="Visage dessiné"></canvas>
             <button class="small secondary" data-cleardraw title="Effacer ce dessin (modération)">🧽 Effacer le dessin</button></div>` : ''}</td>
         <td>${ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '—'}</td>
-        <td>${p.level}</td><td>${p.gold}</td><td>${p.chests}</td>
+        <td>${p.level}</td><td>${p.gold}</td><td>${p.chests}</td><td>${p.emeralds || 0}</td>
         <td>${p.record.wins} / ${p.record.kills} / ${p.record.battles}</td>
         <td><div class="row" style="gap:4px;flex-wrap:nowrap">
           <input type="number" min="1" value="100" data-amount>
-          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option><option value="keys">clés de boss</option><option value="pet">familier (au hasard)</option></select>
+          <select data-kind><option value="gold">golds</option><option value="chests">coffres</option><option value="xp">XP</option><option value="energy">énergie</option><option value="keys">clés de boss</option><option value="emeralds">émeraudes</option><option value="pet">familier (au hasard)</option></select>
           <button class="small" data-give>Donner</button></div></td>
         <td><button class="small ${p.banned ? 'secondary' : 'danger'}" data-ban="${p.banned ? '0' : '1'}">${p.banned ? 'Débannir' : 'Bannir'}</button></td>
       </tr>`;
@@ -182,7 +182,7 @@ function renderPlayers() {
       const r = await run(`/api/admin/players/${row.dataset.id}/give`, { [kind]: kind === 'pet' ? 'random' : amount });
       if (r) {
         const p = playersList.find((x) => x.id === row.dataset.id);
-        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : kind === 'keys' ? 'clé(s) de boss' : kind === 'pet' ? 'familier' : 'XP'} donné(s) à ${p.name}`);
+        toast(`🎁 ${amount} ${kind === 'gold' ? 'golds' : kind === 'chests' ? 'coffre(s)' : kind === 'energy' ? 'énergie(s)' : kind === 'keys' ? 'clé(s) de boss' : kind === 'emeralds' ? 'émeraude(s)' : kind === 'pet' ? 'familier' : 'XP'} donné(s) à ${p.name}`);
         loadPlayers();
       }
     };

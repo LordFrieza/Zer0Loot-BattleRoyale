@@ -130,7 +130,7 @@
     const have = o.price === 0 || mine.opts.includes(`${part}:${id}`);
     const cur = view.style[part] === id;
     const prev = stylePreview && stylePreview.part === part && stylePreview.id === id;
-    return `<button class="chip ${cur ? 'active' : ''} ${have ? '' : 'locked'} ${prev ? 'previewing' : ''}" data-style="${part}:${id}" title="${have ? 'Choisir' : 'Voir l\'aperçu sur ta maison'}">${o.color ? `<i class="hs-swatch" style="background:${o.color}"></i>` : ''}${o.label}${have ? '' : ` · ${fmt(o.price)} 💎`}</button>`;
+    return `<button class="chip ${cur ? 'active' : ''} ${have ? '' : 'locked'} ${prev ? 'previewing' : ''}" data-style="${part}:${id}" title="${have ? 'Choisir' : 'Voir l\'aperçu sur ta maison'}">${o.color ? `<i class="hs-swatch" style="background:${o.color}"></i>` : ''}${o.label}${have ? '' : ` · ${fmt(o.price)} ${EM}`}</button>`;
   }).join('')}</div></div>`).join('');
     } else {
       const order = Rules.HOUSING.sizeOrder;
@@ -140,7 +140,7 @@
     const cur = order.indexOf(view.size);
     const state = i < cur ? 'done' : i === cur ? 'cur' : i === cur + 1 ? 'next' : 'later';
     return `<div class="hs-size ${state}"><b>${S.label}</b><span>${S.cols} × ${S.rows} cases</span>
-          ${state === 'cur' ? '<em>Ta maison</em>' : state === 'done' ? '<em>✅</em>' : state === 'next' ? `<button class="small ${mine.emeralds >= S.price ? 'gold' : 'secondary'}" id="hs-grow" ${mine.emeralds >= S.price ? '' : 'disabled'}>Agrandir · ${fmt(S.price)} ${EM}</button>` : `<em>${fmt(S.price)} 💎</em>`}</div>`;
+          ${state === 'cur' ? '<em>Ta maison</em>' : state === 'done' ? '<em>✅</em>' : state === 'next' ? `<button class="small ${mine.emeralds >= S.price ? 'gold' : 'secondary'}" id="hs-grow" ${mine.emeralds >= S.price ? '' : 'disabled'}>Agrandir · ${fmt(S.price)} ${EM}</button>` : `<em>${fmt(S.price)} ${EM}</em>`}</div>`;
   }).join('')}</div><p class="muted hs-help">Une plus grande maison : plus de place pour les meubles et plus de points de déco. Les meubles déjà posés restent à leur place.</p>`;
     }
     let bar = '';
@@ -287,7 +287,7 @@
     try {
       const r = await api('/api/house/mail', {});
       const parts = [`+${fmt(r.gold)} 🪙`];
-      if (r.emeralds) parts.push(`+${r.emeralds} 💎`);
+      if (r.emeralds) parts.push(`+${r.emeralds} {em}`);
       if (r.chests) parts.push(`+${r.chests} coffre${r.chests > 1 ? 's' : ''}`);
       if (r.keys) parts.push(`+${r.keys} 🗝️`);
       for (const p of r.potions) parts.push(Rules.CONSUMABLES[p].icon);

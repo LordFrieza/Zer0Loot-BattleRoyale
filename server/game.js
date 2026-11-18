@@ -890,7 +890,7 @@ function clearDrawing(character) {
 
 // ---------- Admin ----------
 
-function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys = 0, pet = null }) {
+function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys = 0, emeralds = 0, pet = null }) {
   // Familier (pour tester l'enclos) : l'espèce demandée, ou une espèce pas encore obtenue
   if (pet) {
     upgrade(character);
@@ -903,11 +903,13 @@ function adminGive(character, { gold = 0, chests = 0, xp = 0, energy = 0, keys =
   const reward = { gold: clean(gold), chests: clean(chests), xp: clean(xp) };
   const extra = clean(energy);
   const extraKeys = Math.min(1000, clean(keys));
-  if (!reward.gold && !reward.chests && !reward.xp && !extra && !extraKeys) throw new Error('Rien à donner');
+  const extraEm = clean(emeralds);
+  if (!reward.gold && !reward.chests && !reward.xp && !extra && !extraKeys && !extraEm) throw new Error('Rien à donner');
   if (extra) addEnergy(character, extra);
   if (extraKeys) addKeys(character, extraKeys);
+  if (extraEm) { upgrade(character); character.emeralds += extraEm; } // cadeau : pas compté dans les émeraudes gagnées
   const levels = grant(character, reward, false); // cadeau : pas compté dans les golds gagnés
-  return { reward, levels, energy: extra || undefined, keys: extraKeys || undefined };
+  return { reward, levels, energy: extra || undefined, keys: extraKeys || undefined, emeralds: extraEm || undefined };
 }
 
 // ---------- Énergie du mode Solo ----------

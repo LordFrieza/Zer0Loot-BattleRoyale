@@ -17,6 +17,18 @@
   const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
   const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const EM = '<i class="ico-emerald"></i>';
+  // Icône d'émeraude dessinée sur le canvas (même forme et même vert que .ico-emerald) : centre (x, y), demi-largeur r
+  function emeraldIcon(ctx, x, y, r) {
+    const k = r / 10;
+    ctx.save();
+    ctx.translate(x - 12 * k, y - 12 * k);
+    ctx.scale(k, k);
+    ctx.fillStyle = '#20c26a'; ctx.strokeStyle = '#0a5a2e'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(7, 2); ctx.lineTo(17, 2); ctx.lineTo(22, 9); ctx.lineTo(12, 22); ctx.lineTo(2, 9); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(147, 255, 196, .8)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(7, 2); ctx.lineTo(12, 9); ctx.lineTo(17, 2); ctx.moveTo(2, 9); ctx.lineTo(22, 9); ctx.moveTo(12, 9); ctx.lineTo(12, 22); ctx.stroke();
+    ctx.restore();
+  }
 
   const X = Rules.SURVIVOR_EXPLORE;
   const ALTARS = Object.entries(ZONES).filter(([id]) => id !== 'village').map(([id, z]) => ({ zone: id, x: z.x, y: z.y }));
@@ -631,10 +643,10 @@
         svToast('La bénédiction s\'estompe…', 1600);
         break;
       case 'shardSpawn':
-        svToast('💎 Un éclat d\'émeraude est apparu sur la carte !', 1800);
+        svToast('{em} Un éclat d\'émeraude est apparu sur la carte !', 1800);
         break;
       case 'shard':
-        G.texts.push({ x: e.x, y: e.y - 10, v: '+1 💎', c: 2, t0: now });
+        G.texts.push({ x: e.x, y: e.y - 10, v: '+1', gem: true, c: 2, t0: now });
         Sound.play('petFind');
         break;
       case 'treasure':
@@ -642,7 +654,7 @@
         Sound.play('queueOpen');
         break;
       case 'treasureOpen':
-        svToast(`💰 Trésor ouvert ! +${e.emeralds} 💎 et des améliorations`, 3000, 'treasure');
+        svToast(`💰 Trésor ouvert ! +${e.emeralds} {em} et des améliorations`, 3000, 'treasure');
         Sound.play('chestBurst', 'legendaire');
         break;
       case 'revive':
@@ -1025,9 +1037,12 @@
       ctx.globalAlpha = 1 - p * p;
       ctx.font = `900 ${e.c ? 20 : 14}px system-ui, sans-serif`;
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
-      ctx.strokeText(e.v, e.x, e.y - 18 - p * 26);
+      const ty = e.y - 18 - p * 26;
+      const tx = e.gem ? e.x - 9 : e.x; // « +1 » suivi de l'icône d'émeraude
+      ctx.strokeText(e.v, tx, ty);
       ctx.fillStyle = e.c === 2 ? '#5dff9a' : e.c ? '#ffd34a' : '#fff';
-      ctx.fillText(e.v, e.x, e.y - 18 - p * 26);
+      ctx.fillText(e.v, tx, ty);
+      if (e.gem) emeraldIcon(ctx, tx + ctx.measureText(e.v).width / 2 + 10, ty - 7, 8);
     }
     ctx.globalAlpha = 1;
     // Interface (écran)
@@ -1128,7 +1143,13 @@
     ctx.textAlign = 'left';
     ctx.font = '800 13px system-ui';
     ctx.fillStyle = '#fff';
-    ctx.fillText(`❤️ ${f.hp} / ${f.maxHp}${f.revivals ? '   👼' : ''}${f.rerolls ? `   🎲 ${f.rerolls}` : ''}${f.em ? `   💎 +${f.em}` : ''}`, 14, 136);
+    ctx.fillText(`❤️ ${f.hp} / ${f.maxHp}${f.revivals ? '   👼' : ''}${f.rerolls ? `   🎲 ${f.rerolls}` : ''}`, 14, 136);
+    if (f.em) {
+      const lw = ctx.measureText(`❤️ ${f.hp} / ${f.maxHp}${f.revivals ? '   👼' : ''}${f.rerolls ? `   🎲 ${f.rerolls}` : ''}   `).width;
+      emeraldIcon(ctx, 14 + lw + 7, 131, 7);
+      ctx.fillStyle = '#5dff9a';
+      ctx.fillText(`+${f.em}`, 14 + lw + 17, 136);
+    }
     const Zc = ZONES[f.zone || 'village'];
     ctx.font = '700 12px system-ui';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.65)';
@@ -1209,14 +1230,14 @@
       const py = H / 2 + Math.sin(a) * k;
       ctx.save(); ctx.translate(px, py);
       ctx.fillStyle = 'rgba(10, 6, 24, .7)'; ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
-      ctx.font = '16px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 0, 1);
+      if (typeof icon === 'function') icon(); else { ctx.font = '16px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 0, 1); }
       ctx.rotate(a); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(17, -7); ctx.lineTo(17, 7); ctx.closePath(); ctx.fill();
       ctx.restore(); ctx.textBaseline = 'alphabetic';
     };
     if (f.tr) edge(f.tr.x, f.tr.y, '#ffd34a', '🧰');
     let near = null;
     for (let i = 0; i < (f.sh || []).length; i += 2) { const d = Math.hypot(f.sh[i] - G.me.x, f.sh[i + 1] - G.me.y); if (!near || d < near.d) near = { x: f.sh[i], y: f.sh[i + 1], d }; }
-    if (near) edge(near.x, near.y, '#5dff9a', '💎');
+    if (near) edge(near.x, near.y, '#5dff9a', () => emeraldIcon(ctx, 0, 0, 9));
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx + G.me.x * s, my + G.me.y * s, 3.5, 0, Math.PI * 2); ctx.fill();
     // Vie basse : bords rouges
     const low = f.hp / f.maxHp;
@@ -1245,7 +1266,7 @@
   function optLabel(o) {
     if (o.type === 'weapon') return `${Rules.SURVIVOR_WEAPONS[o.id].icon} ${Rules.SURVIVOR_WEAPONS[o.id].label}${o.level > 1 ? ` niv. ${o.level}` : ''}`;
     if (o.type === 'passive') return `${Rules.SURVIVOR_PASSIVES[o.id].icon} ${Rules.SURVIVOR_PASSIVES[o.id].label}${o.level > 1 ? ` niv. ${o.level}` : ''}`;
-    return o.type === 'heal' ? '🍗 Poulet rôti' : '💎 2 émeraudes';
+    return o.type === 'heal' ? '🍗 Poulet rôti' : '{em} 2 émeraudes';
   }
   function optCard(o, i) {
     let icon;
@@ -1260,7 +1281,7 @@
       const P = Rules.SURVIVOR_PASSIVES[o.id];
       icon = P.icon; name = P.label; desc = P.desc;
       lvl = o.level === 1 ? '<span class="sv-new">NOUVEL OBJET</span>' : `Niveau ${o.level - 1} → <b>${o.level}</b>`;
-    } else if (o.type === 'heal') { icon = '🍗'; name = 'Poulet rôti'; desc = 'Rend 30 % de ta vie.'; lvl = ''; } else { icon = '💎'; name = 'Éclat d\'émeraude'; desc = '+2 émeraudes à la fin de la partie.'; lvl = ''; }
+    } else if (o.type === 'heal') { icon = '🍗'; name = 'Poulet rôti'; desc = 'Rend 30 % de ta vie.'; lvl = ''; } else { icon = EM; name = 'Éclat d\'émeraude'; desc = '+2 émeraudes à la fin de la partie.'; lvl = ''; }
     return `<button class="sv-card ${o.type}" data-opt="${i}"><span class="sv-key">${i + 1}</span><span class="sv-ico">${icon}</span><span class="sv-name">${name}</span><span class="sv-lvl">${lvl}</span><span class="sv-desc">${desc}</span></button>`;
   }
   let choiceKey = '';
@@ -1326,7 +1347,8 @@
     const box = $('sv-toast');
     const el = document.createElement('div');
     el.className = `sv-note ${kind ? `k-${kind}` : ''}`; // classes préfixées (pas de conflit avec .chest, .boss… du reste du site)
-    el.innerHTML = `<div class="sv-note-title">${esc(text)}</div>${items && items.length ? `<div class="sv-note-items">${items.map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : ''}`;
+    const gem = (t) => esc(t).replace(/\{em\}|💎/g, EM); // émeraudes toujours en vert
+    el.innerHTML = `<div class="sv-note-title">${gem(text)}</div>${items && items.length ? `<div class="sv-note-items">${items.map((t) => `<span>${gem(t)}</span>`).join('')}</div>` : ''}`;
     box.prepend(el);
     while (box.children.length > 3) box.lastElementChild.remove();
     requestAnimationFrame(() => el.classList.add('show'));
@@ -1491,7 +1513,7 @@
         </div>
       </div>
       <div class="sv-zones"><div class="sv-zones-title">🗺️ Lieux-dits : chacun a son effet tant que tu y es. Explore pour trouver les <b>autels</b> (bénédiction de ${X.altar.duration} s),
-        les <b>éclats d'émeraude</b> (+${X.shard.emeralds} 💎 chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} 💎). 💧 La rivière, le lac et la mare ralentissent de moitié (toi comme les monstres) : passe par les ponts.</div>
+        les <b>éclats d'émeraude</b> (+${X.shard.emeralds} ${EM} chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} ${EM}). 💧 La rivière, le lac et la mare ralentissent de moitié (toi comme les monstres) : passe par les ponts.</div>
         <div class="sv-zones-grid">${Object.values(ZONES).map((z) => `<div class="sv-zone" style="--zc:${z.ground}"><b>${z.icon} ${z.label}</b><span>${z.bonus} : ${z.desc}</span></div>`).join('')}</div>
       </div>`;
     $('sv-lobby').querySelectorAll('[data-starter]').forEach((el) => {
@@ -1530,7 +1552,7 @@
       const lv = state.meta[id] || 0;
       const cost = Rules.survivorMetaCost(id, lv);
       return `<div class="sv-meta-card ${lv >= M.max ? 'maxed' : ''}">
-        <div class="smc-head"><span class="smc-ico">${M.icon}</span><b>${M.label}</b></div>
+        <div class="smc-head"><span class="smc-ico">${M.icon === '💎' ? EM : M.icon}</span><b>${M.label}</b></div>
         <div class="smc-desc">${M.desc} par niveau</div>
         <div class="smc-pips">${Array.from({ length: M.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div>
         ${cost == null ? '<div class="smc-max">MAX</div>' : `<button class="small ${em >= cost ? 'gold' : 'secondary'}" data-meta="${id}" ${em >= cost ? '' : 'disabled'}>${fmt(cost)} ${EM}</button>`}
@@ -1557,7 +1579,7 @@
         ${have ? '<div class="smc-ok">✅ Dans les tirages</div>' : `<button class="small ${em >= price ? 'gold' : 'secondary'}" data-unlock="passive:${id}" ${em >= price ? '' : 'disabled'}>Débloquer · ${fmt(price)} ${EM}</button>`}
       </div>`;
     }).join('');
-    $('sv-meta').innerHTML = `<h2>💎 Méta-progression <span class="sub">${EM} ${fmt(em)} émeraudes</span></h2>
+    $('sv-meta').innerHTML = `<h2>${EM} Méta-progression <span class="sub">${EM} ${fmt(em)} émeraudes</span></h2>
       <p class="muted" style="font-size:13px">Ces améliorations ne comptent qu'au Survivor (jamais dans les autres modes). Les armes et objets à débloquer
         rejoignent les tirages des montées de niveau ; une arme peut aussi devenir ton arme de départ.</p>
       <h3>📈 Stats de départ</h3><div class="sv-meta-grid">${metaCards}</div>

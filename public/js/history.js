@@ -38,7 +38,7 @@
       case 'dungeon': return `🏰 Salle ${d.room || 0} atteinte`;
       case 'rush': return `💀 ${d.killed || 0} boss vaincu${d.killed > 1 ? 's' : ''} ${(d.defeated || []).map((id) => (Rules.BOSSES[id] || {}).icon || '').join('')}`;
       case 'expedition': return `🕳️ Profondeur ${d.depth || 0}${d.relics ? ` · 🔮 ${d.relics} relique${d.relics > 1 ? 's' : ''}` : ''}${d.abandoned ? ' · remonté' : ''}`;
-      case 'survivor': return `🌊 Vague ${d.wave || 1} · ${(d.score || 0).toLocaleString('fr-FR')} points${d.bosses ? ` · 👹 ${d.bosses} boss` : ''}${d.emeralds ? ` · 💎 +${d.emeralds}` : ''}`;
+      case 'survivor': return `🌊 Vague ${d.wave || 1} · ${(d.score || 0).toLocaleString('fr-FR')} points${d.bosses ? ` · 👹 ${d.bosses} boss` : ''}${d.emeralds ? ` · <i class="ico-emerald"></i> +${d.emeralds}` : ''}`;
       case 'challenge': {
         const D = Rules.BOSS_CHALLENGE[d.difficulty];
         return boss ? `${boss.icon} ${boss.short} ${D ? `(${D.label})` : ''}${e.outcome === 'win' ? ' vaincu' : ` : il lui restait ${d.bossHp} % de vie`}` : '';

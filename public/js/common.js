@@ -54,7 +54,8 @@ function toast(message, ms = 3500) {
   }
   const el = document.createElement('div');
   el.className = 'toast';
-  el.textContent = message;
+  // {em} : icône verte des émeraudes (jamais l'emoji 💎, bleu, qu'on confondrait avec une autre monnaie)
+  el.innerHTML = esc(message).replace(/\{em\}/g, '<i class="ico-emerald"></i>');
   wrap.appendChild(el);
   setTimeout(() => el.remove(), ms);
 }

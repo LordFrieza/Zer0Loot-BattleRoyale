@@ -1145,6 +1145,7 @@ app.get('/api/admin/players', requireAdmin, (req, res) => {
       level: u.character.level,
       gold: u.character.gold,
       chests: u.character.chests,
+      emeralds: u.character.emeralds || 0,
       record: u.character.record,
       title: game.titleOf(u.character),
       drawing: u.character.drawing || null, // visage dessiné (modération)
@@ -1210,7 +1211,10 @@ app.post('/api/admin/players/:id/give', requireAdmin, action((req) => {
   const r = game.adminGive(user.character, req.body || {});
   pushMe(user);
   if (r.pet) io.to('user:' + user.id).emit('pet', { species: r.pet, duplicate: r.duplicate, from: 'admin' });
-  else io.to('user:' + user.id).emit('reward', { type: 'gift', reward: r.reward, levels: r.levels });
+  else {
+    const extra = Object.fromEntries(['energy', 'keys', 'emeralds'].filter((k) => r[k]).map((k) => [k, r[k]]));
+    io.to('user:' + user.id).emit('reward', { type: 'gift', reward: r.reward, levels: r.levels, ...extra });
+  }
   return r;
 }));
 
