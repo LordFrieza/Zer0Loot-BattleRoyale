@@ -1070,10 +1070,19 @@ function leaderboard() {
     battles: u.character.record.battles,
     expedition: (u.character.counters && u.character.counters.expeditionBest) || 0, // record de profondeur (mode Solo)
     dungeon: (u.character.counters && u.character.counters.dungeonBest) || 0, // record de salle (Raid de Donjon)
+    chests: (u.character.counters && u.character.counters.chests) || 0, // coffres ouverts
+    legendary: (u.character.lootStats && u.character.lootStats.legendaire) || 0, // légendaires sortis des coffres
+    survivor: (u.character.counters && u.character.counters.svBestWave) || 0, // vague record au Survivor
+    jackpots: (u.character.counters && u.character.counters.jackpots) || 0, // jackpots au casino
+    casino: u.character.lifetime ? (u.character.lifetime.casinoWon || 0) - (u.character.lifetime.casinoWagered || 0) : 0, // bilan du casino
+    gold: u.character.gold || 0, // fortune actuelle
   }));
   const top = (key) => list.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key] || b.level - a.level).slice(0, BOARD_SIZE)
     .map((p) => ({ ...p, value: p[key] }));
-  return { wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon') };
+  return {
+    wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon'),
+    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), jackpots: top('jackpots'), casino: top('casino'), gold: top('gold'),
+  };
 }
 
 app.get('/api/leaderboard', (req, res) => res.json(leaderboard()));

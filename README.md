@@ -245,7 +245,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   rond sur trois. Remise à zéro : 250 golds (gratuite en changeant de classe). Une branche complète demande 7 points
   (niveau 22) : ultime → stats → carrefour → stats (+3 Stamina) → carrefour → stats → spécialisation.
   Une fois la spécialisation obtenue, les ronds non choisis aux carrefours de **sa** branche se prennent en bonus pour
-  **5 points de compétence** chacun (jamais ceux de l'autre branche ; rendus par la remise à zéro).
+  **5 points d'arbre** chacun (jamais ceux de l'autre branche ; rendus par la remise à zéro).
   | Classe | Chemin gauche (ultime) | Chemin droit (ultime) |
   |---|---|---|
   | Guerriloot | Paladin — Rempart sacré | Berserker — Tourbillon |
@@ -471,7 +471,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.
 - **Classements** (top 10, podium pour le top 3, page perso et page admin) : victoires (Battle Royale, Roi de la Colline,
   Guerre des clans), kills (Battle Royale uniquement), batailles jouées (tous les modes du stream), record de profondeur
-  en Expédition et record de salle du Raid de Donjon. Chaque classement indique ce qu'il compte.
+  en Expédition, record de salle du Raid de Donjon, record de vague au Survivor, coffres ouverts, légendaires sortis
+  des coffres, jackpots au casino, profits du casino (gagné − misé) et joueurs les plus riches (golds possédés en ce
+  moment). Chaque classement indique ce qu'il compte.
 - **Abonnements Twitch** : chaque sub, resub ou sub offert rapporte 5 000 golds à celui qui s'abonne ou qui offre
   (lu dans le chat ; les viewers sans compte les récupèrent en liant leur Twitch).
 - **Outils admin** : liste de tous les joueurs (recherche), don de golds / coffres / XP / énergie / clés de boss / familier, effacement d'un

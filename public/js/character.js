@@ -677,14 +677,14 @@ function renderTalents() {
     const action = locked ? '<span class="muted">🔒 Arbre pas encore débloqué.</span>'
       : state === 'owned' ? `<b class="up">✅ ${(c.talentExtra || []).includes(sel.id) ? 'Pris en bonus' : 'Appris'}</b>`
         : state === 'available' ? `<button class="gold" id="talent-learn">Apprendre (1 point)</button>`
-          : state === 'extra' ? `<button class="gold" id="talent-extra" ${c.skillPoints < extraCost ? 'disabled' : ''}>⭐ Prendre en bonus (${extraCost} points de compétence)</button>
-            <span class="muted">Branche terminée : tu as ${c.skillPoints} point${c.skillPoints > 1 ? 's' : ''} de compétence.</span>`
+          : state === 'extra' ? `<button class="gold" id="talent-extra" ${st.available < extraCost ? 'disabled' : ''}>⭐ Prendre en bonus (${extraCost} points d'arbre)</button>
+            <span class="muted">Branche terminée : tu as ${st.available} point${st.available > 1 ? 's' : ''} d'arbre.</span>`
             : `<span class="muted">🔒 ${esc(reason)}</span>`;
     $('talent-detail').innerHTML = `<div class="talent-detail-box" style="--c:${tree[sel.branch].color}">
       <div class="talent-detail-title">${info.icon} <b>${esc(info.title)}</b></div>${info.html}<div class="row">${action}</div></div>`;
     const extraBtn = $('talent-extra');
     if (extraBtn) extraBtn.onclick = async () => {
-      if (!await confirmBox(`Prendre « ${info.title} » en bonus pour ${extraCost} points de compétence ?`, { title: '⭐ Nœud bonus' })) return;
+      if (!await confirmBox(`Prendre « ${info.title} » en bonus pour ${extraCost} points d'arbre ?`, { title: '⭐ Nœud bonus' })) return;
       if (await act('/api/talent/extra', { id: sel.id }, 'levelUp')) toast(`⭐ ${info.title} pris en bonus !`, 4000);
     };
     const learn = $('talent-learn');

@@ -42,7 +42,13 @@ function upgrade(character) {
   if (character.consumableSlot === undefined) character.consumableSlot = null; // potion prête pour la prochaine partie
   if (!character.presets) character.presets = []; // presets d'équipement
   if (!character.talents) character.talents = []; // nœuds appris dans l'arbre de compétences (dans l'ordre)
-  if (!Array.isArray(character.talentExtra)) character.talentExtra = []; // nœuds bonus (branche terminée), payés en points de compétence
+  if (!Array.isArray(character.talentExtra)) character.talentExtra = []; // nœuds bonus (branche terminée), 5 points d'arbre chacun
+  if (!character.talentExtraTree) {
+    // Première version (quelques heures) : payés en points de compétence. On les rend et on retire ces nœuds.
+    character.skillPoints = (character.skillPoints || 0) + character.talentExtra.length * Rules.TALENT_EXTRA_COST;
+    character.talentExtra = [];
+    character.talentExtraTree = true;
+  }
   // V2 : style de combat (tactique + techniques)
   character.tactics = Object.assign({}, Rules.DEFAULT_TACTICS, character.tactics);
   if (!Array.isArray(character.techs)) character.techs = [];
@@ -121,7 +127,8 @@ function newCharacter() {
     consumableSlot: null, // potion équipée pour la prochaine partie
     presets: [], // presets d'équipement : [{ id, name, items: { slot: itemId | null } }]
     talents: [], // arbre de compétences : nœuds appris, dans l'ordre
-    talentExtra: [], // nœuds bonus de la branche terminée (5 points de compétence chacun)
+    talentExtra: [], // nœuds bonus de la branche terminée (5 points d'arbre chacun)
+    talentExtraTree: true,
     tactics: { ...Rules.DEFAULT_TACTICS }, // style de combat : posture, cible préférée, distance de recul
     techs: [], // techniques signature choisies (1 emplacement au niveau 5, 2 au niveau 15)
     drawing: '', // visage dessiné : une couleur de Rules.DRAWING.palette par case (0 = transparent)
@@ -443,8 +450,7 @@ function chooseClass(character, cls) {
   character.cls = cls;
   const talentsReset = character.talents.length;
   character.talents = []; // l'arbre dépend de la classe : remis à zéro gratuitement
-  character.skillPoints += character.talentExtra.length * Rules.TALENT_EXTRA_COST; // nœuds bonus : points de compétence rendus
-  character.talentExtra = [];
+  character.talentExtra = []; // nœuds bonus retirés : leurs points d'arbre reviennent
   character.techs = character.techs.filter((id) => !Rules.techBlocker(cls, character.level, id)); // techniques d'une autre classe retirées
   if (character.tactics.kite !== null) character.tactics.kite = Math.min(character.tactics.kite, Rules.tacticsKiteMax(cls)) || null;
   for (const slot of ['weapon', 'offhand']) { // skins d'arme d'une autre classe : retirés (mais gardés)
@@ -706,7 +712,8 @@ function useConsumable(character) {
 
 function talentState(character) {
   const total = Rules.talentPoints(character.level);
-  return { total, spent: character.talents.length, available: total - character.talents.length };
+  const spent = character.talents.length + (character.talentExtra || []).length * Rules.TALENT_EXTRA_COST; // nœuds bonus : 5 points chacun
+  return { total, spent, available: total - spent };
 }
 
 function learnTalent(character, id) {
@@ -725,20 +732,17 @@ function resetTalents(character) {
   if (!character.talents.length) throw new Error('Ton arbre est déjà vierge');
   if (character.gold < Rules.TALENT_RESET_PRICE) throw new Error(`La remise à zéro coûte ${Rules.TALENT_RESET_PRICE} golds`);
   character.gold -= Rules.TALENT_RESET_PRICE;
-  const refunded = character.talents.length;
+  const refunded = talentState(character).spent; // points d'arbre rendus (nœuds bonus compris)
   character.talents = [];
-  const refundedSkill = character.talentExtra.length * Rules.TALENT_EXTRA_COST; // nœuds bonus : points de compétence rendus
-  character.skillPoints += refundedSkill;
   character.talentExtra = [];
-  return { price: Rules.TALENT_RESET_PRICE, refunded, refundedSkill };
+  return { price: Rules.TALENT_RESET_PRICE, refunded };
 }
 
-// Branche terminée : prendre un autre choix de la même branche pour TALENT_EXTRA_COST points de compétence.
+// Branche terminée : prendre un autre choix de la même branche pour TALENT_EXTRA_COST points d'arbre.
 function learnTalentExtra(character, id) {
   upgrade(character);
-  const blocker = Rules.talentExtraBlocker(character.cls, character.talents, character.talentExtra, id, character.skillPoints);
+  const blocker = Rules.talentExtraBlocker(character.cls, character.talents, character.talentExtra, id, talentState(character).available);
   if (blocker) throw new Error(blocker);
-  character.skillPoints -= Rules.TALENT_EXTRA_COST;
   character.talentExtra.push(id);
   return { id, cost: Rules.TALENT_EXTRA_COST };
 }

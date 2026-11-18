@@ -82,7 +82,7 @@ test('[TAL-4] arbre : remise à zéro payante', () => {
   game.learnTalent(c, 'right.g1');
   assert.throws(() => game.resetTalents(c), /250 golds/);
   c.gold = 300;
-  assert.deepStrictEqual(game.resetTalents(c), { price: 250, refunded: 2, refundedSkill: 0 });
+  assert.deepStrictEqual(game.resetTalents(c), { price: 250, refunded: 2 });
   assert.strictEqual(c.gold, 50);
   assert.deepStrictEqual(c.talents, []);
   game.learnTalent(c, 'left.ult'); // l'autre chemin est de nouveau ouvert
@@ -276,33 +276,39 @@ test('[ULT-11, ULT-12] Prière et Châtiment', () => {
   assert.ok(foes[0].stunUntil > c.time && foes[5].stunUntil === 0);
 });
 
-test('[TAL-7] arbre : branche terminée, les autres choix de la branche pour 5 points de compétence', () => {
+test('[TAL-7] arbre : branche terminée, les autres choix de la branche pour 5 points d\'arbre', () => {
   const c = game.newCharacter();
   game.chooseClass(c, 'mage');
-  c.level = 25;
-  c.skillPoints = 12;
-  assert.match(Rules.talentExtraBlocker('mage', c.talents, c.talentExtra, 'right.a2', c.skillPoints), /Termine d'abord/);
+  c.level = 46; // 15 points d'arbre
+  const sp = c.skillPoints;
+  assert.match(Rules.talentExtraBlocker('mage', c.talents, c.talentExtra, 'right.a2', 99), /Termine d'abord/);
   for (const id of ['right.ult', 'right.g1', 'right.a1', 'right.g2', 'right.b1', 'right.g3']) game.learnTalent(c, id);
   assert.throws(() => game.learnTalentExtra(c, 'right.a2'), /spécialisation/, 'pas avant la spécialisation');
   game.learnTalent(c, 'right.spec');
+  assert.strictEqual(game.talentState(c).available, 8);
   assert.throws(() => game.learnTalentExtra(c, 'left.a1'), /branche que tu as choisie/);
   assert.throws(() => game.learnTalentExtra(c, 'right.a1'), /Déjà apprise/);
   assert.throws(() => game.learnTalentExtra(c, 'right.spec'), /Déjà apprise/);
   const before = Rules.talentBonus('mage', c.talents, c.talentExtra);
   assert.deepStrictEqual(game.learnTalentExtra(c, 'right.a2'), { id: 'right.a2', cost: 5 });
-  assert.deepStrictEqual([c.skillPoints, c.talentExtra], [7, ['right.a2']]);
+  assert.deepStrictEqual(c.talentExtra, ['right.a2']);
+  assert.deepStrictEqual(game.talentState(c), { total: 15, spent: 12, available: 3 }, '5 points d\'arbre dépensés');
+  assert.strictEqual(c.skillPoints, sp, 'les points de compétence ne bougent pas');
   const after = Rules.talentBonus('mage', c.talents, c.talentExtra);
   const node = Rules.talentNodes('mage').find((n) => n.id === 'right.a2');
   for (const [st, v] of Object.entries(node.points)) assert.strictEqual(after[st], before[st] + v, 'les points du nœud bonus comptent dans les stats');
-  assert.ok(c.talents.length === 7, 'les points d\'arbre ne sont pas dépensés');
-  game.learnTalentExtra(c, 'right.b2');
-  assert.throws(() => game.learnTalentExtra(c, 'right.a3'), /5 points de compétence/);
-  // Remise à zéro (et changement de classe) : les points de compétence sont rendus
+  assert.throws(() => game.learnTalentExtra(c, 'right.b2'), /5 points d'arbre/);
+  // Remise à zéro : tous les points d'arbre reviennent (nœuds bonus compris)
   c.gold = 1000;
-  assert.deepStrictEqual(game.resetTalents(c), { price: 250, refunded: 7, refundedSkill: 10 });
-  assert.deepStrictEqual([c.skillPoints, c.talentExtra], [12, []]);
-  // Ancienne sauvegarde : le champ est ajouté vide
+  assert.deepStrictEqual(game.resetTalents(c), { price: 250, refunded: 12 });
+  assert.deepStrictEqual([c.talentExtra, game.talentState(c).available], [[], 15]);
+  // Ancienne sauvegarde : champ ajouté vide ; nœuds payés en points de compétence (1re version) rendus
   delete c.talentExtra;
+  delete c.talentExtraTree;
   game.upgrade(c);
   assert.deepStrictEqual(c.talentExtra, []);
+  c.talentExtra = ['right.a2'];
+  delete c.talentExtraTree;
+  game.upgrade(c);
+  assert.deepStrictEqual([c.talentExtra, c.skillPoints], [[], sp + 5]);
 });

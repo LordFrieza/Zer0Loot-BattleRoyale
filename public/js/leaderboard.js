@@ -1,4 +1,5 @@
-/* Classements (victoires, kills, batailles, records d'Expédition et de donjon) avec podium pour le top 3. Utilisé par la page perso et la page admin. */
+/* Classements (victoires, kills, batailles, records d'Expédition, de donjon et du Survivor, coffres, légendaires, casino, fortune)
+   avec podium pour le top 3. Utilisé par la page perso et la page admin. */
 (function () {
   const BOARDS = [
     { key: 'wins', label: 'Victoires', icon: '🏆', unit: 'victoire', note: 'Battle Royale, Roi de la Colline et Guerre des clans' },
@@ -6,7 +7,14 @@
     { key: 'battles', label: 'Batailles jouées', icon: '🎖️', unit: 'bataille', note: 'Tous les modes du stream' },
     { key: 'expedition', label: 'Expédition', icon: '🕳️', unit: 'profondeur', fmt: (n) => `profondeur ${n}`, note: 'Record de profondeur en mode Solo' },
     { key: 'dungeon', label: 'Raid de Donjon', icon: '🏰', unit: 'salle', fmt: (n) => `salle ${n}`, note: 'Salle la plus lointaine atteinte' },
+    { key: 'survivor', label: 'Survivor', icon: '🧟', unit: 'vague', fmt: (n) => `vague ${n}`, note: 'Vague la plus lointaine atteinte' },
+    { key: 'chests', label: 'Coffres ouverts', icon: '🎁', unit: 'coffre', fmt: (n) => `${fmtN(n)} coffre${n > 1 ? 's' : ''}`, note: 'Depuis la création du personnage' },
+    { key: 'legendary', label: 'Légendaires', icon: '🌟', unit: 'légendaire', fmt: (n) => `${fmtN(n)} légendaire${n > 1 ? 's' : ''}`, note: 'Objets légendaires sortis des coffres' },
+    { key: 'jackpots', label: 'Chanceux du casino', icon: '🎰', unit: 'jackpot', fmt: (n) => `${fmtN(n)} jackpot${n > 1 ? 's' : ''}`, note: 'Jackpots décrochés au casino' },
+    { key: 'casino', label: 'Profits du casino', icon: '💹', unit: 'golds', fmt: (n) => `+${fmtN(n)} 🪙`, note: 'Bilan du casino (gagné − misé), les plus gros gagnants' },
+    { key: 'gold', label: 'Les plus riches', icon: '💰', unit: 'golds', fmt: (n) => `${fmtN(n)} 🪙`, note: 'Golds possédés en ce moment' },
   ];
+  const fmtN = (n) => Number(n).toLocaleString('fr-FR');
   const MEDALS = ['🥇', '🥈', '🥉'];
 
   function name(p, meId) {
@@ -30,7 +38,7 @@
       </div>`;
     }).join('');
     const rest = list.slice(3).map((p, i) => `<li class="${p.id === meId ? 'lb-me-row' : ''}">
-      <span class="lb-rank">#${i + 4}</span><span class="lb-rest-name">${name(p, meId)}</span><span class="muted">Niv. ${p.level}</span><b>${p.value}</b></li>`).join('');
+      <span class="lb-rank">#${i + 4}</span><span class="lb-rest-name">${name(p, meId)}</span><span class="muted">Niv. ${p.level}</span><b>${b.fmt ? b.fmt(p.value) : p.value}</b></li>`).join('');
     return `<div class="lb-board">${head}<div class="lb-podium">${podium}</div>${rest ? `<ol class="lb-rest">${rest}</ol>` : ''}</div>`;
   }
 

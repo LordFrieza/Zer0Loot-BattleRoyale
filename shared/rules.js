@@ -1298,10 +1298,10 @@
     }
     return points;
   }
-  // Branche terminée (spécialisation apprise) : les autres choix de la même branche s'achètent avec des points de
-  // compétence (TALENT_EXTRA_COST chacun). Raison du refus, ou null.
+  // Branche terminée (spécialisation apprise) : les autres choix de la même branche s'achètent avec des points
+  // d'arbre (TALENT_EXTRA_COST chacun). available : points d'arbre disponibles. Raison du refus, ou null.
   const TALENT_EXTRA_COST = 5;
-  function talentExtraBlocker(cls, owned, extra, id, skillPoints) {
+  function talentExtraBlocker(cls, owned, extra, id, available) {
     const node = talentNodes(cls).find((n) => n.id === id);
     if (!node) return 'Compétence inconnue';
     owned = owned || [];
@@ -1311,7 +1311,7 @@
     if (!branch || !owned.includes(branch + '.spec')) return 'Termine d\'abord ta branche jusqu\'à la spécialisation';
     if (node.branch !== branch) return 'Seulement dans la branche que tu as choisie';
     if (node.type !== 'stat') return 'Compétence impossible à prendre en bonus';
-    if (skillPoints != null && skillPoints < TALENT_EXTRA_COST) return `Il faut ${TALENT_EXTRA_COST} points de compétence`;
+    if (available != null && available < TALENT_EXTRA_COST) return `Il faut ${TALENT_EXTRA_COST} points d'arbre`;
     return null;
   }
 

@@ -1407,7 +1407,7 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .sv-game canvas { display: block; width: 100%; height: auto; touch-action: none; }
 .sv-game:fullscreen { display: flex; align-items: center; justify-content: center; border: 0; border-radius: 0; }
 .sv-game:fullscreen canvas { width: auto; height: 100%; max-width: 100%; object-fit: contain; }
-.sv-buttons { position: absolute; right: 8px; top: 30px; display: flex; gap: 6px; }
+.sv-buttons { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 3; } /* en bas à gauche : loin du compteur de monstres et de la mini-carte */
 .sv-buttons button { width: 34px; height: 34px; padding: 0; justify-content: center; opacity: .8; }
 .sv-overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5, 3, 15, .55); backdrop-filter: blur(2px); z-index: 3; padding: 10px; }
 .sv-overlay.open { display: flex; }
