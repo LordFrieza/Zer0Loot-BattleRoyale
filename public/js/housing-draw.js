@@ -390,6 +390,14 @@
       glow(g, W / 2, H * 0.85, 30 * s, 'rgba(255, 140, 40, .6)');
       for (let i = -2; i <= 2; i++) flame(g, W / 2 + i * 7 * s, H - 4 * s, 1.6 * s, (t || 0) + i * 130);
       g.fillStyle = '#ffd34a'; g.fillRect(W / 2 - 18 * s, H * 0.06 - 8 * s, 5 * s, 8 * s); g.fillRect(W / 2 + 12 * s, H * 0.06 - 10 * s, 6 * s, 10 * s);
+      // Âtre en pierre qui avance sur le sol : la cheminée est posée par terre, pas accrochée au mur
+      const hy = H;
+      const hh = T * 0.32;
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(-2 * s, hy + hh - 2 * s, W + 4 * s, 6 * s);
+      rr(g, -4 * s, hy - 2 * s, W + 8 * s, hh, 3 * s, '#8d8580', '#5a5450');
+      g.strokeStyle = 'rgba(40, 35, 30, .45)'; g.lineWidth = 1.2 * s;
+      for (let i = 1; i < 4; i++) { const x = -4 * s + ((W + 8 * s) * i) / 4; g.beginPath(); g.moveTo(x, hy - 2 * s); g.lineTo(x, hy + hh - 2 * s); g.stroke(); }
+      glow(g, W / 2, hy + 2 * s, 26 * s, 'rgba(255, 140, 40, .35)');
     },
     vitrail(g, W, H, T, t) {
       const s = T / 48;
@@ -647,8 +655,9 @@
       const Fd = Rules.FURNITURE[p.id];
       items.push({ z: p.y + Fd.h, draw: () => { g.save(); g.translate(R.x + p.x * T, R.y + p.y * T); drawFurniture(g, p.id, Fd.w * T, Fd.h * T, T, { t: o.t, flip: p.flip }); g.restore(); } });
     }
+    // Les habitants passent toujours devant les meubles (dessinés après eux)
     for (const w of o.walkers || []) {
-      items.push({ z: w.y + 0.5, draw: () => {
+      items.push({ z: 1e6 + w.y, draw: () => {
         const px = R.x + (w.x + 0.5) * T;
         const py = R.y + (w.y + 0.6) * T;
         drawFighter(g, px, py - T * 0.35, w.f, { scale: T / 30, facing: w.facing, bob: w.bob || 0 });
