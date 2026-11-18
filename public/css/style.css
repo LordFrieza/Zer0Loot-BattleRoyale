@@ -1519,3 +1519,8 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .hs-preview .row { gap: 6px; flex-wrap: wrap; }
 .hs-part .chip.previewing { border-color: #ffd34a; box-shadow: 0 0 10px rgba(255, 211, 74, .5); border-style: solid; }
 .hs-item.shop button[data-htry] { margin-top: 2px; }
+
+.house-mail-log { margin-top: 14px; max-height: 320px; min-height: 0; }
+.house-mail-log .pet-log-row { padding: 5px 8px; }
+.house-mail-log .pet-log-main .pet-log-total { margin-left: 4px; }
+.hml-ico { font-size: 20px; width: 32px; text-align: center; }

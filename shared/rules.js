@@ -2254,6 +2254,7 @@
       manoir: { label: 'Manoir', cols: 17, rows: 10, price: 90000 },
     },
     sizeOrder: ['studio', 'maison', 'manoir'],
+    mailLogMax: 30, // ouvertures de la boîte aux lettres gardées dans l'historique
     maxLevel: 20,
     mailbox: { everyH: 6, max: 4 },
     listMax: 40,

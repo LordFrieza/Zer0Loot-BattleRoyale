@@ -973,6 +973,7 @@ function onSoloQueue(q) {
 }
 
 setInterval(() => { if (me) { renderEnergy(); renderRelicChoice(); } }, 1000);
+setInterval(() => { if (me) renderBadges(); }, 15000); // un courrier arrive aussi sans action du joueur
 
 // ---------- Marché ----------
 let marketOrders = null; // ordres en vente (chargés à l'ouverture de l'onglet, rafraîchis en direct)
@@ -1754,6 +1755,7 @@ function renderBadges() {
   set('solo', c.cls && !c.soloActive ? Rules.energyState(c.energy, Date.now()).value : 0);
   set('marche', (c.mail || []).filter((m) => !m.read).length);
   set('familier', window.petFindsWaiting ? petFindsWaiting() : 0);
+  set('maison', c.house ? Rules.houseMailDue(c.house.mailAt) : 0); // courriers qui attendent dans la boîte aux lettres
   set('succes', claim);
 }
 

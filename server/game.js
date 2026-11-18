@@ -918,7 +918,7 @@ function newSurvivor() {
 function newHouse(now = Date.now()) {
   const style = {};
   for (const [part, P] of Object.entries(Rules.HOUSE_PARTS)) style[part] = Object.keys(P.options)[0];
-  return { size: 'studio', owned: {}, placed: [], style, opts: [], mailAt: now, likes: [], visits: 0 };
+  return { size: 'studio', owned: {}, placed: [], style, opts: [], mailAt: now, likes: [], visits: 0, mailLog: [], mailTotals: { letters: 0, gold: 0, emeralds: 0, chests: 0, keys: 0, potions: 0 } };
 }
 
 function newPets() {

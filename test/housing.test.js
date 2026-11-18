@@ -107,11 +107,25 @@ test('[HOUSE-5] maison : boîte aux lettres (toutes les 6 h, 4 au plus, contenu 
   assert.strictEqual(r.letters, 2);
   assert.strictEqual(c.gold, gold + 2 * 180);
   assert.strictEqual(c.house.mailAt, 1000 + 12 * H, 'l\'heure entamée vers le courrier suivant est gardée');
+  // Historique et totaux
+  assert.strictEqual(c.house.mailLog.length, 1);
+  assert.deepStrictEqual([c.house.mailLog[0].letters, c.house.mailLog[0].gold, c.house.mailLog[0].at], [2, 360, 1000 + 13 * H]);
+  assert.deepStrictEqual([c.house.mailTotals.letters, c.house.mailTotals.gold], [2, 360]);
   // Après une longue absence : 4 courriers, et pas de nouveau tout de suite
   c.house.mailAt = 0;
   const now = 200 * H;
   assert.strictEqual(housing.collectMail(c, now).letters, 4);
   assert.strictEqual(Rules.houseMailDue(c.house.mailAt, now), 0);
+  assert.strictEqual(Rules.houseMailDue(c.house.mailAt, now + 6 * H - 1), 0, 'pas de 5ᵉ courrier juste après (le temps en trop est perdu)');
+  assert.strictEqual(Rules.houseMailDue(c.house.mailAt, now + 6 * H), 1);
+  assert.deepStrictEqual([c.house.mailLog.length, c.house.mailLog[0].letters, c.house.mailTotals.letters], [2, 4, 6], 'le plus récent en premier');
+  for (let i = 0; i < 40; i++) { c.house.mailAt = 0; housing.collectMail(c, now + i); }
+  assert.strictEqual(c.house.mailLog.length, Rules.HOUSING.mailLogMax, '30 ouvertures gardées au plus');
+  // Une ancienne maison sans historique en reçoit un vide (migration)
+  delete c.house.mailLog;
+  delete c.house.mailTotals;
+  game.upgrade(c);
+  assert.deepStrictEqual([c.house.mailLog, c.house.mailTotals.letters], [[], 0]);
   // Maison très décorée : la partie entière des coffres est garantie à chaque courrier
   const rich = player(1e8).character;
   rich.house.size = 'manoir';

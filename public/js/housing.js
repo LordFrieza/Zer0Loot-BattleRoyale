@@ -565,10 +565,54 @@
     return look;
   }
 
+  // Historique de la boîte aux lettres (comme celui des familiers)
+  let mailSig = '';
+  function whenText(at) {
+    const s = Math.max(0, Math.floor((Date.now() - at) / 1000));
+    if (s < 60) return 'à l\'instant';
+    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+    const d = new Date(at);
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  function renderMailLog() {
+    const H = me.character.house || {};
+    const log = H.mailLog || [];
+    const T = H.mailTotals || {};
+    const sig = `${log.length}:${log[0] ? log[0].at : 0}:${Math.floor(Date.now() / 60000)}`;
+    if (sig === mailSig) return;
+    mailSig = sig;
+    const chip = (v, label, cls = '') => (v ? `<span class="pet-log-total ${cls}">${label}</span>` : '');
+    const gains = (e) => [
+      chip(e.gold, `+<b>${fmt(e.gold)}</b> 🪙`, 'gold'),
+      chip(e.emeralds, `+<b>${e.emeralds}</b> ${EM}`),
+      chip(e.chests, `+<b>${e.chests}</b> <i class="ico-chest"></i>`),
+      chip(e.keys, `+<b>${e.keys}</b> 🗝️`, 'key'),
+      (e.potions || []).map((p) => (Rules.CONSUMABLES[p] ? `<span class="pet-log-total" title="${esc(Rules.CONSUMABLES[p].label)}">${Rules.CONSUMABLES[p].icon}</span>` : '')).join(''),
+    ].join('');
+    const totals = T.letters
+      ? `<div class="pet-log-totals"><span class="muted">Depuis le début :</span>
+        ${chip(T.letters, `📬 <b>${T.letters}</b> courrier${T.letters > 1 ? 's' : ''}`)}
+        ${chip(T.gold, `<b>${fmt(T.gold)}</b> 🪙`, 'gold')}
+        ${chip(T.emeralds, `<b>${fmt(T.emeralds)}</b> ${EM}`)}
+        ${chip(T.chests, `<b>${T.chests}</b> <i class="ico-chest"></i>`)}
+        ${chip(T.keys, `🗝️ <b>${T.keys}</b> clé${T.keys > 1 ? 's' : ''}`, 'key')}
+        ${chip(T.potions, `🧪 <b>${T.potions}</b> potion${T.potions > 1 ? 's' : ''}`)}</div>`
+      : '';
+    $('house-mail-log').innerHTML = `<h3>📜 Ce que ta boîte aux lettres t'a rapporté</h3>${totals}
+      <div class="pet-log-list">${log.length ? log.map((e) => `<div class="pet-log-row">
+          <span class="hml-ico">📬</span>
+          <div class="pet-log-main"><div><b>${e.letters} courrier${e.letters > 1 ? 's' : ''}</b> <span class="muted">(niv. ${e.level})</span> ${gains(e)}</div></div>
+          <span class="pet-log-when muted" title="${new Date(e.at).toLocaleString('fr-FR')}">${whenText(e.at)}</span>
+        </div>`).join('')
+    : '<p class="muted pet-log-empty">Rien pour l\'instant. Quand tu ouvres ta boîte aux lettres, ce qu\'elle contenait s\'affiche ici.</p>'}</div>`;
+  }
+
   function renderAll() {
     if (!view || !mine) return;
     renderHead();
     renderSide();
+    renderMailLog();
     document.querySelector('.house-main').classList.toggle('editing', editing && view.mine);
   }
 
@@ -594,7 +638,7 @@
   window.Housing = {
     enter,
     leave,
-    refresh() { if (mine) { mine.emeralds = me.character.emeralds; if (view && view.mine) renderHead(); } },
+    refresh() { if (mine) { mine.emeralds = me.character.emeralds; if (view && view.mine) renderHead(); renderMailLog(); } },
     get active() { return active; },
   };
 })();

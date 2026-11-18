@@ -105,9 +105,15 @@ function collectMail(c, now = Date.now()) {
   c.chests += got.chests;
   if (got.keys) game.addKeys(c, got.keys);
   c.emeralds += got.emeralds;
+  // Historique (30 dernières ouvertures) et totaux depuis le début
+  H.mailLog.unshift({ at: now, letters: due, level: L.level, ...got, potions: got.potions.slice() });
+  if (H.mailLog.length > Rules.HOUSING.mailLogMax) H.mailLog.length = Rules.HOUSING.mailLogMax;
+  const T = H.mailTotals;
+  T.letters += due; T.gold += got.gold; T.emeralds += got.emeralds; T.chests += got.chests; T.keys += got.keys; T.potions += got.potions.length;
   // Le temps entamé vers le courrier suivant est conservé (au-delà de 4 courriers en attente, il est perdu)
   const period = Rules.HOUSING.mailbox.everyH * 3600 * 1000;
-  H.mailAt = Math.max(H.mailAt + due * period, now - period + 1);
+  H.mailAt = H.mailAt + due * period;
+  if (H.mailAt <= now - period) H.mailAt = now; // boîte pleine : le temps en trop est perdu, prochain courrier dans 6 h
   return { letters: due, ...got, level: L.level };
 }
 
