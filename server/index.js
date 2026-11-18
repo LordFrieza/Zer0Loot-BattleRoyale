@@ -1107,13 +1107,14 @@ function leaderboard() {
     survivor: (u.character.counters && u.character.counters.svBestWave) || 0, // vague record au Survivor
     jackpots: (u.character.counters && u.character.counters.jackpots) || 0, // jackpots au casino
     casino: u.character.lifetime ? (u.character.lifetime.casinoWon || 0) - (u.character.lifetime.casinoWagered || 0) : 0, // bilan du casino
+    casinoLoss: u.character.lifetime ? (u.character.lifetime.casinoWagered || 0) - (u.character.lifetime.casinoWon || 0) : 0, // pertes nettes au casino
     gold: u.character.gold || 0, // fortune actuelle
   }));
   const top = (key) => list.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key] || b.level - a.level).slice(0, BOARD_SIZE)
     .map((p) => ({ ...p, value: p[key] }));
   return {
     wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon'),
-    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), jackpots: top('jackpots'), casino: top('casino'), gold: top('gold'),
+    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), jackpots: top('jackpots'), casino: top('casino'), casinoLoss: top('casinoLoss'), gold: top('gold'),
   };
 }
 

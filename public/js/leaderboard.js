@@ -1,4 +1,4 @@
-/* Classements (victoires, kills, batailles, records d'Expédition, de donjon et du Survivor, coffres, légendaires, casino, fortune)
+/* Classements (victoires, kills, batailles, records d'Expédition, de donjon et du Survivor, coffres, légendaires, casino (gagnants et poissards), fortune)
    avec podium pour le top 3. Utilisé par la page perso et la page admin. */
 (function () {
   const BOARDS = [
@@ -11,7 +11,8 @@
     { key: 'chests', label: 'Coffres ouverts', icon: '🎁', unit: 'coffre', fmt: (n) => `${fmtN(n)} coffre${n > 1 ? 's' : ''}`, note: 'Depuis la création du personnage' },
     { key: 'legendary', label: 'Légendaires', icon: '🌟', unit: 'légendaire', fmt: (n) => `${fmtN(n)} légendaire${n > 1 ? 's' : ''}`, note: 'Objets légendaires sortis des coffres' },
     { key: 'jackpots', label: 'Chanceux du casino', icon: '🎰', unit: 'jackpot', fmt: (n) => `${fmtN(n)} jackpot${n > 1 ? 's' : ''}`, note: 'Jackpots décrochés au casino' },
-    { key: 'casino', label: 'Profits du casino', icon: '💹', unit: 'golds', fmt: (n) => `+${fmtN(n)} 🪙`, note: 'Bilan du casino (gagné − misé), les plus gros gagnants' },
+    { key: 'casino', label: 'Profits positifs au casino', icon: '💹', unit: 'golds', fmt: (n) => `+${fmtN(n)} 🪙`, note: 'Bilan du casino (gagné − misé), les plus gros gagnants' },
+    { key: 'casinoLoss', label: 'Profits négatifs au casino', icon: '📉', unit: 'golds', fmt: (n) => `−${fmtN(n)} 🪙`, note: 'Bilan du casino (misé − gagné), les plus poissards en haut' },
     { key: 'gold', label: 'Les plus riches', icon: '💰', unit: 'golds', fmt: (n) => `${fmtN(n)} 🪙`, note: 'Golds possédés en ce moment' },
   ];
   const fmtN = (n) => Number(n).toLocaleString('fr-FR');

@@ -310,7 +310,7 @@ test('[PRG-3, PRG-4, PRG-5, BET-1, BET-7, BET-10, B-26, LB-1] bataille complète
 
   const board = (await alice.get('/api/leaderboard')).data;
   assert.strictEqual(board.wins[0].name, 'pl_win');
-  assert.deepStrictEqual(Object.keys(board), ['wins', 'kills', 'battles', 'expedition', 'dungeon', 'chests', 'legendary', 'survivor', 'jackpots', 'casino', 'gold']);
+  assert.deepStrictEqual(Object.keys(board), ['wins', 'kills', 'battles', 'expedition', 'dungeon', 'chests', 'legendary', 'survivor', 'jackpots', 'casino', 'casinoLoss', 'gold']);
   // Les plus riches : golds possédés en ce moment ; les autres classements suivent leurs compteurs
   const richest = board.gold[0];
   const all = Object.values(db.state.users).filter((u) => u.role === 'player' && u.character && !u.banned);
@@ -1122,7 +1122,7 @@ test('[HIST-1, HIST-4, LIFE-1, RUSH-5] historique et statistiques via l\'API, vu
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[CAS-1, CAS-4, CAS-6, CAS-8] casino via l\'API : salle, parties en cours sans secret, mises', async () => {
+test('[CAS-1, CAS-4, CAS-6, CAS-8, LB-1] casino via l\'API : salle, parties en cours sans secret, mises', async () => {
   const s = client();
   const id = (await register(s, 'pl_casino')).id;
   await s.post('/api/class', { cls: 'mage' });
@@ -1155,6 +1155,22 @@ test('[CAS-1, CAS-4, CAS-6, CAS-8] casino via l\'API : salle, parties en cours s
   assert.ok(!JSON.stringify(me).includes('cracks'), 'les parties en cours ne sont pas dans le personnage');
   assert.ok(me.lifetime.casinoBets >= 3);
   assert.strictEqual(me.counters.casinoPlays, me.lifetime.casinoBets);
+  // Classements du casino : gagnants (gagné − misé > 0) et poissards (misé − gagné > 0, le plus gros perdant en haut)
+  const mk = async (n, wagered, won) => {
+    const uid = (await register(client(), n)).id;
+    Object.assign(db.state.users[uid].character.lifetime, { casinoWagered: wagered, casinoWon: won });
+    return uid;
+  };
+  const winner = await mk('pl_cas_win', 1000, 4000);
+  const loser = await mk('pl_cas_lose', 9000, 1000);
+  const unlucky = await mk('pl_cas_lose2', 3000, 2500);
+  const lb = (await s.get('/api/leaderboard')).data;
+  assert.ok(lb.casino.some((p) => p.id === winner && p.value === 3000));
+  assert.ok(!lb.casino.some((p) => p.id === loser || p.id === unlucky), 'pas de perdant chez les gagnants');
+  const losers = lb.casinoLoss.filter((p) => p.id === loser || p.id === unlucky);
+  assert.deepStrictEqual(losers.map((p) => [p.id, p.value]), [[loser, 8000], [unlucky, 500]], 'le plus gros perdant en premier');
+  assert.ok(!lb.casinoLoss.some((p) => p.id === winner), 'pas de gagnant chez les poissards');
+  for (let i = 1; i < lb.casinoLoss.length; i++) assert.ok(lb.casinoLoss[i - 1].value >= lb.casinoLoss[i].value);
 });
 
 test('[SV-1, SV-6, SV-8, HOUSE-1, HOUSE-2, HOUSE-6] survivor et maison via l\'API', async () => {

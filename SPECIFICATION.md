@@ -532,7 +532,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 ## 17. Classements
 
-- **LB-1** Le serveur doit calculer onze classements : victoires (Battle Royale, Roi de la Colline, Guerre des clans), kills (Battle Royale), batailles jouées (tous les modes du stream), record de profondeur en Expédition, record de salle du Raid de Donjon, record de vague au Survivor (`svBestWave`), coffres ouverts (`chests`), légendaires sortis des coffres (`lootStats.legendaire`), jackpots au casino (`jackpots`), profits du casino (gagné − misé, seulement les bilans positifs) et golds possédés en ce moment ; chacun précise ce qu'il compte, est limité à 10 entrées, hors joueurs bannis et hors valeurs nulles, départagés par niveau.
+- **LB-1** Le serveur doit calculer douze classements : victoires (Battle Royale, Roi de la Colline, Guerre des clans), kills (Battle Royale), batailles jouées (tous les modes du stream), record de profondeur en Expédition, record de salle du Raid de Donjon, record de vague au Survivor (`svBestWave`), coffres ouverts (`chests`), légendaires sortis des coffres (`lootStats.legendaire`), jackpots au casino (`jackpots`), profits positifs au casino (gagné − misé, seulement les bilans positifs), profits négatifs au casino (`casinoLoss` : misé − gagné, seulement les bilans négatifs, le plus gros perdant en haut) et golds possédés en ce moment ; chacun précise ce qu'il compte, est limité à 10 entrées, hors joueurs bannis et hors valeurs nulles, départagés par niveau.
 - **LB-2** Quand une bataille se termine, qu'un titre change ou qu'un bannissement est modifié, le serveur doit diffuser `leaderboard`.
 
 ## 17 bis. Planification des parties
