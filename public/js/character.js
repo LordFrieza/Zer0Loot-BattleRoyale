@@ -1387,11 +1387,15 @@ function renderForge() {
   const price = rarity ? Rules.FUSE_PRICE[rarity] : 0;
   const poor = !!rarity && c.gold < price;
   if (rarity) {
-    const chance = Rules.fuseUpgradeChance(rarity, c.derived.luck);
+    const pity = (c.forgePity || {})[rarity] || 0;
+    const chance = Rules.fuseUpgradeChance(rarity, c.derived.luck, pity);
+    const luckPart = Rules.fuseUpgradeChance(rarity, c.derived.luck) - Rules.FUSE_UPGRADE[rarity];
     const next = Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1];
     $('fuse-info').innerHTML = (next
       ? `🎲 <b>${fr(chance)} %</b> de chances d'obtenir un objet <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span>
-         <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${fr(chance - Rules.FUSE_UPGRADE[rarity])} % grâce à ta chance : ${Rules.FUSE_LUCK_BONUS.toLocaleString('fr-FR')} % par point)</span>`
+         <span class="muted">(${Rules.FUSE_UPGRADE[rarity]} % + ${fr(luckPart)} % grâce à ta chance : ${Rules.FUSE_LUCK_BONUS.toLocaleString('fr-FR')} % par point${pity ? `
+         <b class="up">+ ${fr(pity * Rules.FUSE_PITY)} % après ${pity} échec${pity > 1 ? 's' : ''} d'affilée</b>` : ''})</span>
+         ${pity ? '' : `<br><span class="muted">Chaque échec ajoute +${Rules.FUSE_PITY} % à ta prochaine fusion <span class="c-${rarity}">${Rules.RARITY_INFO[rarity].label}</span> (jusqu'à la réussite).</span>`}`
       : '🎲 Légendaire : tu obtiendras un nouvel objet <span class="c-legendaire">Légendaire</span>.')
       + `<br>💰 Coût : <b>${price} 🪙</b>${poor ? ` <span class="down">(il te manque ${price - c.gold} 🪙)</span>` : ''}`;
   } else {
@@ -1581,13 +1585,13 @@ function renderBatch() {
   const price = Rules.FUSE_PRICE[batchRarity];
   const objs = n * Rules.FUSE_COUNT;
   const avail = batchAvailable(batchRarity);
-  const chance = Rules.fuseUpgradeChance(batchRarity, me.character.derived.luck);
+  const chance = Rules.fuseUpgradeChance(batchRarity, me.character.derived.luck, (me.character.forgePity || {})[batchRarity]);
   const next = Rules.RARITIES[Rules.RARITIES.indexOf(batchRarity) + 1];
   let why = '';
   if (avail < objs) why = `il te faut ${objs} objets, tu en as ${avail}`;
   else if (me.character.gold < n * price) why = `il te manque ${n * price - me.character.gold} 🪙`;
   $('batch-info').innerHTML = `${n} fusion${n > 1 ? 's' : ''} : <b>${objs} objets</b> détruits, <b>${n * price} 🪙</b>`
-    + (next ? ` · ${fr(chance)} % de chances de <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span> à chaque fusion` : '')
+    + (next ? ` · ${fr(chance)} % de chances de <span class="c-${next}">${Rules.RARITY_INFO[next].label}</span> à la première fusion (+${Rules.FUSE_PITY} % après chaque échec, retour à la normale après une réussite)` : '')
     + (why ? ` · <span class="down">${why}</span>` : '');
   $('batch-go').disabled = !!why;
 }
@@ -1609,7 +1613,7 @@ $('batch-go').onclick = async () => {
     return;
   }
   fuseSel.length = 0;
-  forge.playBatch(r, me.character.cls, () => { opening = false; render(); }, skipAnim.get());
+  forge.playBatch(r, me.character.cls, () => { opening = false; render(); pityToast(r.results[r.results.length - 1]); }, skipAnim.get());
 };
 
 $('reroll-item').onchange = (e) => { rerollItemId = e.target.value; renderRerollPreview(); };
@@ -1629,8 +1633,15 @@ $('fuse-go').onclick = async () => {
     return;
   }
   fuseSel.length = 0;
-  forge.play(inputs, r, me.character.cls, () => { opening = false; render(); }, skipAnim.get());
+  forge.play(inputs, r, me.character.cls, () => { opening = false; render(); pityToast(r); }, skipAnim.get());
 };
+
+// Après un échec : la prochaine fusion de cette rareté aura +1 % de réussite
+function pityToast(r) {
+  if (!r || r.upgraded || !r.pity) return;
+  const chance = Rules.fuseUpgradeChance(r.from, me.character.derived.luck, r.pity);
+  toast(`🍀 Raté… ta prochaine fusion « ${Rules.RARITY_INFO[r.from].label} » aura ${fr(chance)} % de réussite (+${r.pity * Rules.FUSE_PITY} %)`, 5000);
+}
 
 // ---------- Règles des combats ----------
 (function renderCombatInfo() {

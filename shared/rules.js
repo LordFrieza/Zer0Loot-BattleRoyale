@@ -279,10 +279,13 @@
   const FUSE_LUCK_BONUS = 0.5;
   const FUSE_LUCK_BONUS_CAP = 20;
   const FUSE_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
-  function fuseUpgradeChance(rarity, luck) {
+  // Échec à la forge : +1 % de réussite à la prochaine fusion de cette rareté (remis à 0 à la réussite)
+  const FUSE_PITY = 1;
+  // pity : nombre d'échecs d'affilée pour cette rareté (character.forgePity[rareté])
+  function fuseUpgradeChance(rarity, luck, pity = 0) {
     if (!FUSE_UPGRADE[rarity]) return 0;
     const bonus = Math.min(FUSE_LUCK_BONUS_CAP, (luck || 0) * FUSE_LUCK_BONUS);
-    return FUSE_UPGRADE[rarity] + (rarity === 'epique' ? bonus / 2 : bonus);
+    return Math.min(100, FUSE_UPGRADE[rarity] + (rarity === 'epique' ? bonus / 2 : bonus) + FUSE_PITY * Math.max(0, pity || 0));
   }
   // Relance d'une ligne : prix en golds selon la rareté de l'objet.
   const REROLL_PRICE = { commun: 10, peu_commun: 20, rare: 40, epique: 80, legendaire: 150 };
@@ -2819,7 +2822,7 @@
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
     REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
-    FUSE_COUNT, FUSE_BATCH_MAX, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
+    FUSE_COUNT, FUSE_BATCH_MAX, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PITY, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_AT_CAP, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,

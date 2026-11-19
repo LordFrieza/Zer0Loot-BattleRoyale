@@ -40,6 +40,7 @@ test('[FRG-2] forge : taux d\'amélioration selon la rareté et la chance', () =
   for (let i = 0; i < N; i++) {
     const items = [0, 1, 2].map(() => game.makeItem('commun'));
     c.inventory = items;
+    c.forgePity = {}; // taux de base, sans le bonus d'échecs (FRG-11)
     if (game.fuse(c, items.map((x) => x.id)).upgraded) up += 1;
   }
   assert.ok(Math.abs(up / N - 0.4) < 0.04, `${up / N}`);
@@ -47,6 +48,44 @@ test('[FRG-2] forge : taux d\'amélioration selon la rareté et la chance', () =
   const r = game.fuse(c, c.inventory.map((x) => x.id));
   assert.strictEqual(r.item.rarity, 'legendaire');
   assert.strictEqual(r.upgraded, false);
+});
+
+test('[FRG-11] forge : +1 % de réussite après chaque échec, par rareté, remis à zéro à la réussite', () => {
+  assert.strictEqual(Rules.fuseUpgradeChance('commun', 0, 3), 43);
+  assert.strictEqual(Rules.fuseUpgradeChance('epique', 999, 2), 17);
+  assert.strictEqual(Rules.fuseUpgradeChance('commun', 0, 500), 100, 'jamais plus de 100 %');
+  assert.strictEqual(Rules.fuseUpgradeChance('legendaire', 0, 9), 0);
+  const c = game.newCharacter();
+  assert.deepStrictEqual(c.forgePity, {});
+  c.gold = 1e9;
+  c.forgePity = { rare: 4 }; // les autres raretés ne bougent pas
+  let fails = 0;
+  let wins = 0;
+  for (let i = 0; i < 300; i++) {
+    const before = c.forgePity.commun || 0;
+    c.inventory = [0, 1, 2].map(() => game.makeItem('commun'));
+    const r = game.fuse(c, c.inventory.map((x) => x.id));
+    assert.strictEqual(r.chance, 40 + before, 'chance de base + 1 % par échec d\'affilée');
+    if (r.upgraded) { wins += 1; assert.strictEqual(c.forgePity.commun, undefined, 'réussite : retour à la normale'); } else { fails += 1; assert.strictEqual(c.forgePity.commun, before + 1); }
+    assert.strictEqual(r.pity, c.forgePity.commun || 0);
+    assert.strictEqual(c.forgePity.rare, 4);
+  }
+  assert.ok(fails > 0 && wins > 0);
+  // Forge en série : le bonus s'applique fusion après fusion
+  c.forgePity = {};
+  c.inventory = Array.from({ length: 30 }, () => game.makeItem('peu_commun'));
+  const b = game.fuseBatch(c, 'peu_commun', 10);
+  let p = 0;
+  for (const x of b.results) { assert.strictEqual(x.chance, 30 + p); p = x.upgraded ? 0 : p + 1; }
+  assert.strictEqual(c.forgePity.peu_commun || 0, p);
+  // Légendaire : pas de bonus (pas de rareté au-dessus)
+  c.inventory = [0, 1, 2].map(() => game.makeItem('legendaire'));
+  game.fuse(c, c.inventory.map((x) => x.id));
+  assert.strictEqual(c.forgePity.legendaire, undefined);
+  // Ancienne sauvegarde sans le champ
+  delete c.forgePity;
+  game.upgrade(c);
+  assert.deepStrictEqual(c.forgePity, {});
 });
 
 test('[FRG-5, FRG-6] forge : relance d\'une ligne', () => {

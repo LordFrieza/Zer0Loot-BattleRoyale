@@ -69,6 +69,8 @@ function upgrade(character) {
   if (character.pets.follow === undefined) character.pets.follow = null;
   // 2.0 : émeraudes, Survivor et Maison (tout neufs pour les anciens personnages)
   if (!Number.isFinite(character.emeralds)) character.emeralds = 0;
+  // 2.1 : forge, +1 % de réussite par échec d'affilée, par rareté
+  if (!character.forgePity || typeof character.forgePity !== 'object') character.forgePity = {};
   if (!character.survivor) character.survivor = newSurvivor();
   for (const [k, v] of Object.entries(newSurvivor())) if (character.survivor[k] === undefined) character.survivor[k] = v;
   if (character.survivorActive === undefined) character.survivorActive = null;
@@ -138,6 +140,7 @@ function newCharacter() {
     bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
     pets: newPets(), // familiers (onglet Familier)
     emeralds: 0, // émeraudes (Survivor → méta-progression et Maison)
+    forgePity: {}, // forge : échecs d'affilée par rareté ({ commun: 2 } = +2 % à la prochaine fusion commune)
     survivor: newSurvivor(), // Survivor : méta-progression, déblocages, record, récompense du jour
     survivorActive: null, // partie de Survivor en cours (golds rendus si le serveur redémarre)
     house: newHouse(), // Maison : meubles, disposition, façade, boîte aux lettres
@@ -480,8 +483,13 @@ function fuse(character, itemIds) {
   const price = Rules.FUSE_PRICE[rarity];
   if (character.gold < price) throw new Error(`La fusion coûte ${price} golds`);
   character.gold -= price;
-  const chance = Rules.fuseUpgradeChance(rarity, derived(character).luck);
+  const chance = Rules.fuseUpgradeChance(rarity, derived(character).luck, character.forgePity[rarity]);
   const upgraded = random() * 100 < chance;
+  // Échec : +1 % pour la prochaine fusion de cette rareté ; réussite : retour à la chance normale
+  if (Rules.FUSE_UPGRADE[rarity]) {
+    if (upgraded) delete character.forgePity[rarity];
+    else character.forgePity[rarity] = (character.forgePity[rarity] || 0) + 1;
+  }
   const resultRarity = upgraded ? Rules.RARITIES[Rules.RARITIES.indexOf(rarity) + 1] : rarity;
   character.inventory = character.inventory.filter((i) => !ids.includes(i.id));
   // 3 pièces de la même panoplie → le résultat fait partie de cette panoplie.
@@ -492,7 +500,7 @@ function fuse(character, itemIds) {
   addStat(character, 'itemsObtained');
   bump(character, 'fused');
   if (item.rarity === 'legendaire') bump(character, 'legendary');
-  return { item, upgraded, chance, from: rarity, price };
+  return { item, upgraded, chance, from: rarity, price, pity: character.forgePity[rarity] || 0 };
 }
 
 /*
