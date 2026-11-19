@@ -4,7 +4,7 @@ const { Rules, game } = require('./helpers');
 
 // ---------- Panoplies ----------
 
-test('[SET-2] panoplies : paliers 2 / 4 / 6 / 8 pièces', () => {
+test('[SET-2, SET-3] panoplies : paliers 2 / 4 / 6 / 8 pièces, Fortune doublée', () => {
   const eq = (n, set = 'nosferatu') => Object.fromEntries(Array.from({ length: n }, (_, i) => ['s' + i, { set }]));
   assert.strictEqual(Rules.setBonus(eq(1)).points.force, 0);
   assert.strictEqual(Rules.setBonus(eq(2)).points.force, 2);
@@ -14,6 +14,12 @@ test('[SET-2] panoplies : paliers 2 / 4 / 6 / 8 pièces', () => {
   assert.strictEqual(Rules.setBonus(eq(8)).points.force, 10);
   const mixed = Rules.setBonus({ a: { set: 'lynx' }, b: { set: 'lynx' }, c: { set: 'bastion' } });
   assert.deepStrictEqual([mixed.points.precision, mixed.points.critique, mixed.points.defense], [2, 2, 0]);
+  // Fortune : points doublés (+4 / +8 / +14 / +20 en Chance et en Esquive)
+  assert.deepStrictEqual([2, 3, 4, 6, 8].map((n) => [Rules.setBonus(eq(n, 'fortune')).points.chance, Rules.setBonus(eq(n, 'fortune')).points.esquive]),
+    [[4, 4], [4, 4], [8, 8], [14, 14], [20, 20]]);
+  assert.deepStrictEqual(Rules.setBonus(eq(5, 'fortune')).sets[0].next, { pieces: 6, points: 14 }, 'prochain palier');
+  assert.deepStrictEqual(Rules.setTiers('fortune').map((t) => t.points), [4, 8, 14, 20]);
+  assert.strictEqual(Rules.setTiers('lynx'), Rules.SET_TIERS);
 });
 
 test('[SET-2] panoplies : le bonus s\'ajoute aux stats du personnage', () => {

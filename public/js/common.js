@@ -86,7 +86,7 @@ function setTag(item) {
   const set = item.set && Rules.SETS[item.set];
   if (!set) return '';
   const stats = set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ');
-  const tiers = Rules.SET_TIERS.map((t) => `${t.pieces} pièces : +${t.points}`).join(' · ');
+  const tiers = Rules.setTiers(item.set).map((t) => `${t.pieces} pièces : +${t.points}`).join(' · ');
   return `<span class="set-tag" style="--c:${set.color}" title="Panoplie ${esc(set.label)} — bonus en ${stats} : ${tiers}">${set.icon} ${esc(set.label)}</span>`;
 }
 

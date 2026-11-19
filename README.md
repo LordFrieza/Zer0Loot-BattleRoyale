@@ -390,7 +390,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   pierre avec torches.
 - **Panoplies** : 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à 2 stats.
   Équiper 2 / 4 / 6 / 8 pièces d'une même panoplie donne +2 / +4 / +7 / +10 points dans ces 2 stats (comme des points de
-  compétence). Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces
+  compétence) ; la Fortune (Chance et Esquive) donne le double : +4 / +8 / +14 / +20. Chance qu'un objet soit une pièce de panoplie : 5 % (Commun) à 25 % (Légendaire). Fusionner 3 pièces
   d'une même panoplie donne une pièce de cette panoplie.
 - **Événements de bataille** (choisis par l'admin avant chaque bataille, annoncés au lancement, puis remis à « Aucun ») :
   Loot double (XP, golds et coffres ×2), Brouillard (nappes qui apparaissent / disparaissent ; on n'y est ciblé que de

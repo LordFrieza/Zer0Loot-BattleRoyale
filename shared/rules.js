@@ -312,7 +312,8 @@
     bastion: { label: 'Bastion', icon: '🏰', of: 'du Bastion', color: '#9aa4b8', stats: ['defense', 'vie'] },
     ouragan: { label: 'Ouragan', icon: '🌪️', of: 'de l\'Ouragan', color: '#5fd3ff', stats: ['vitesse_attaque', 'vitesse'] },
     lynx: { label: 'Œil de Lynx', icon: '🦅', of: 'de l\'Œil de Lynx', color: '#ffd23f', stats: ['precision', 'critique'] },
-    fortune: { label: 'Fortune', icon: '🍀', of: 'de Fortune', color: '#3ddc5a', stats: ['chance', 'esquive'] },
+    // Fortune : points doublés à chaque palier (la Chance et l'Esquive rapportent peu point par point)
+    fortune: { label: 'Fortune', icon: '🍀', of: 'de Fortune', color: '#3ddc5a', stats: ['chance', 'esquive'], points: [4, 8, 14, 20] },
     ronces: { label: 'Ronces', icon: '🌹', of: 'des Ronces', color: '#b14dff', stats: ['epines', 'vie'] },
   };
   // Paliers : nombre de pièces équipées → points bonus dans CHAQUE stat de la panoplie.
@@ -320,9 +321,15 @@
   // Chance qu'un objet tiré (coffre / forge) appartienne à une panoplie, selon sa rareté.
   const SET_DROP_CHANCE = { commun: 0.05, peu_commun: 0.08, rare: 0.12, epique: 0.18, legendaire: 0.25 };
 
-  function setTier(pieces) {
+  // Paliers d'une panoplie : ceux de SET_TIERS, ou ses propres points par palier (`points`, ex. Fortune).
+  function setTiers(key) {
+    const own = SETS[key] && SETS[key].points;
+    return own ? SET_TIERS.map((t, i) => ({ pieces: t.pieces, points: own[i] })) : SET_TIERS;
+  }
+
+  function setTier(pieces, key) {
     let tier = null;
-    for (const t of SET_TIERS) if (pieces >= t.pieces) tier = t;
+    for (const t of setTiers(key)) if (pieces >= t.pieces) tier = t;
     return tier;
   }
 
@@ -333,9 +340,9 @@
     const points = emptyStats();
     const sets = [];
     for (const [key, pieces] of Object.entries(counts)) {
-      const tier = setTier(pieces);
+      const tier = setTier(pieces, key);
       if (tier) for (const st of SETS[key].stats) points[st] += tier.points;
-      sets.push({ key, pieces, tier, next: SET_TIERS.find((t) => t.pieces > pieces) || null });
+      sets.push({ key, pieces, tier, next: setTiers(key).find((t) => t.pieces > pieces) || null });
     }
     sets.sort((a, b) => b.pieces - a.pieces);
     return { points, sets };
@@ -2817,7 +2824,7 @@
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
-    SETS, SET_TIERS, SET_DROP_CHANCE, setTier, setBonus,
+    SETS, SET_TIERS, SET_DROP_CHANCE, setTiers, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
     SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,

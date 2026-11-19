@@ -2028,7 +2028,7 @@ function renderSets() {
   const maxPieces = Rules.SET_TIERS[Rules.SET_TIERS.length - 1].pieces;
   $('sets-active').innerHTML = info.sets.map(({ key, pieces, tier, next }) => {
     const set = Rules.SETS[key];
-    const pips = Rules.SET_TIERS.map((t) => `<span class="set-pip ${pieces >= t.pieces ? 'on' : ''}" title="${t.pieces} pièces : ${setBonusText(set, t.points)}">${t.pieces}</span>`).join('');
+    const pips = Rules.setTiers(key).map((t) => `<span class="set-pip ${pieces >= t.pieces ? 'on' : ''}" title="${t.pieces} pièces : ${setBonusText(set, t.points)}">${t.pieces}</span>`).join('');
     return `<div class="set-chip ${tier ? '' : 'inactive'}" style="--c:${set.color}">
       <div class="set-head">${set.icon} <b>${esc(set.label)}</b><span class="muted">${pieces} / ${maxPieces} pièces</span></div>
       <div class="set-pips">${pips}</div>
@@ -2039,10 +2039,12 @@ function renderSets() {
 }
 
 (function renderSetsHelp() {
-  $('set-tiers').textContent = Rules.SET_TIERS.map((t) => `${t.pieces} pièces = +${t.points} points`).join(', ');
-  $('sets-help').innerHTML = Object.values(Rules.SETS).map((set) => `<div style="--c:${set.color}">${set.icon} <b style="color:${set.color}">${esc(set.label)}</b>
+  // Paliers communs, puis les panoplies qui ont leurs propres points (Fortune)
+  const special = Object.values(Rules.SETS).filter((s) => s.points).map((s) => `${s.label} : ${s.points.map((p) => '+' + p).join(' / ')}`);
+  $('set-tiers').textContent = Rules.SET_TIERS.map((t) => `${t.pieces} pièces = +${t.points} points`).join(', ') + (special.length ? ` (${special.join(' ; ')})` : '');
+  $('sets-help').innerHTML = Object.entries(Rules.SETS).map(([key, set]) => `<div style="--c:${set.color}">${set.icon} <b style="color:${set.color}">${esc(set.label)}</b>
     <span class="muted">· ${set.stats.map((st) => Rules.STAT_INFO[st].label).join(' et ')}</span>
-    <ul class="set-tier-list">${Rules.SET_TIERS.map((t) => `<li><b>${t.pieces} pièces</b> : ${setBonusText(set, t.points)}</li>`).join('')}</ul></div>`).join('');
+    <ul class="set-tier-list">${Rules.setTiers(key).map((t) => `<li><b>${t.pieces} pièces</b> : ${setBonusText(set, t.points)}</li>`).join('')}</ul></div>`).join('');
 })();
 
 // ---------- Succès ----------

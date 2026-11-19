@@ -496,6 +496,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 
 - **SET-1** Il doit exister 6 panoplies (Nosferatu, Bastion, Ouragan, Œil de Lynx, Fortune, Ronces), chacune liée à deux stats.
 - **SET-2** Quand des pièces d'une même panoplie sont équipées, le serveur doit ajouter des points dans chacune de ses deux stats selon le palier : 2 pièces → +2, 4 → +4, 6 → +7, 8 → +10.
+- **SET-3** La panoplie Fortune (Chance et Esquive) doit avoir ses propres paliers, doublés : 2 pièces → +4, 4 → +8, 6 → +14, 8 → +20 dans chacune de ses deux stats (`SETS.fortune.points`, `Rules.setTiers`) ; l'interface (fiche, aide des panoplies, infobulle des objets) doit afficher ces paliers.
 
 ## 14. Paris
 
