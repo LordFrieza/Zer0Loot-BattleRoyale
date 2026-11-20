@@ -1589,3 +1589,38 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .sched-list { display: flex; flex-direction: column; gap: 6px; }
 .sched-row { display: grid; grid-template-columns: 60px 1.2fr 1.6fr 1.2fr auto auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); font-size: 13px; }
 .sched-row.off { opacity: .5; }
+
+/* Survivor, lot 1 : défis du jour, armes secrètes, évolutions, notes (montre, bombe, malédiction, nuit) */
+.sv-note.k-watch { border-color: #8fd8ff; color: #d8f2ff; }
+.sv-note.k-bomb { border-color: #ff4d4d; color: #ffd0c0; font-size: 1.08em; }
+.sv-note.k-curse { border-color: #ff3a5a; color: #ffb0b8; }
+.sv-note.k-night { border-color: #7f8cff; color: #d0d8ff; }
+.sv-extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 12px; }
+.sv-box { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--border); }
+.sv-box.wide { grid-column: 1 / -1; }
+.sv-box h3 { margin: 0 0 8px; font-size: 15px; }
+.sv-box h3 .sub { font-size: 12px; color: var(--muted); font-weight: 600; margin-left: 6px; }
+.sv-challenge { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; margin-bottom: 6px; border-radius: 10px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08); font-size: 13px; }
+.sv-challenge em { font-style: normal; font-weight: 800; color: #7cff4f; white-space: nowrap; }
+.sv-challenge.done { border-color: rgba(124, 255, 79, .45); background: rgba(124, 255, 79, .07); }
+.sv-challenge.done b { text-decoration: line-through; color: var(--muted); }
+.sv-secret { display: flex; gap: 10px; align-items: center; padding: 6px 8px; margin-bottom: 6px; border-radius: 10px; background: rgba(255, 255, 255, .04); font-size: 13px; }
+.sv-secret > div { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.sv-secret span { color: var(--muted); }
+.sv-secret em { font-style: normal; font-size: 12px; font-weight: 700; }
+.sv-secret.done { border: 1px solid rgba(255, 211, 74, .5); background: rgba(255, 211, 74, .06); }
+.sv-secret-ico { font-size: 28px; width: 36px; text-align: center; }
+.sv-secret-bar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.sv-secret-bar i { display: block; height: 100%; background: linear-gradient(90deg, #b06bff, #ffd34a); }
+.sv-evo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.sv-evo { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .03); border: 1px dashed rgba(255, 255, 255, .18); font-size: 12px; }
+.sv-evo b { font-size: 14px; }
+.sv-evo span { color: var(--muted); }
+.sv-evo-recipe { font-size: 20px; }
+.sv-evo-recipe small { font-size: 10px; color: var(--muted); margin: 0 4px 0 2px; }
+.sv-evo.known { border: 1px solid var(--ec); background: color-mix(in srgb, var(--ec) 10%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--ec) 25%, transparent); }
+.sv-evo.known b { color: var(--ec); }
+.sv-howto { margin: 0; padding-left: 4px; list-style: none; display: grid; gap: 6px; font-size: 13px; }
+.sv-over-extras { display: flex; flex-direction: column; gap: 4px; margin: 8px auto 0; font-size: 14px; text-align: center; }
+.sv-built span.evo { background: rgba(255, 211, 74, .18); border: 1px solid rgba(255, 211, 74, .6); color: #ffd34a; }
+.sv-meta-card.secret { border-style: dashed; border-color: rgba(176, 107, 255, .5); }

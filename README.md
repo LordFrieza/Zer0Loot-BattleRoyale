@@ -412,10 +412,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
   Les gros gains (10× la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde ; statistiques de
   casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
-- **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (7 200 × 7 200 px,
+- **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (10 800 × 10 800 px,
   9 lieux-dits : village, forêt sombre, lac gelé, cimetière, champs de blé, volcan, ruines, marais, prairie fleurie, avec
   leurs ennemis favoris, aux frontières naturelles). Carte dessinée au naturel : sol lissé et fondu, routes de terre
-  sinueuses vers la clairière de chaque autel, rivière du lac gelé jusqu'à la mare du marais (avec des ponts), cratère de
+  sinueuses vers la clairière de chaque autel et en boucle entre les lieux-dits (+10 % de vitesse sur la route), rivière du lac gelé jusqu'à la mare du marais (avec des ponts), cratère de
   lave. Projectiles animés en douceur ; ceux des ennemis sont rouges (ou colorés pour les boss) avec un contour. On se déplace avec **ZQSD** / les flèches (ou au doigt) ; les armes attaquent seules. Tout est
   simulé par le serveur (la position envoyée est bornée à la vitesse permise). **Les stats habituelles ne comptent pas** :
   base commune (120 PV, vitesse 150…), améliorée seulement par la méta-progression du Survivor. Musique : *Last Battle*
@@ -427,7 +427,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     +50 % d'aimant et +0,5 PV/s.
   - **Exploration** : un **autel** par lieu-dit (2 s dessus → bénédiction de 40 s : ses bonus × 1,5, partout et sans
     contrepartie, + 25 % des PV ; recharge 150 s), des **éclats d'émeraude** loin du joueur (+1 émeraude chacun, toutes
-    les 35 s, 3 au plus) et un **trésor gardé** à 90 s puis toutes les 150 s (une élite et 6 gardiens qui restent à leur
+    les 30 s, 4 au plus) et un **trésor gardé** à 90 s puis toutes les 150 s (une élite et 6 gardiens qui restent à leur
     poste ; 2 améliorations + 3 émeraudes). Mini-carte et flèches au bord de l'écran pour les trouver.
   - Vagues de 30 s (monstres du donjon, de plus en plus nombreux et costauds), un ennemi d'élite toutes les 50 s (coffre
     d'une amélioration), un **boss toutes les 5 vagues** (la vague suivante attend qu'il soit vaincu ; ignoré 3 min, il s'enrage : vitesse et dégâts ×1,5) (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
@@ -439,7 +439,20 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Bourse de gemmes, Boussole, Cor de guerre, Gourde de soin, Talisman du vent, Rune de givre, Tome des possibles ;
     6 au plus).
   - **Eau** : la rivière, le lac gelé et la mare divisent la vitesse par deux (joueur et monstres) ; les ponts restent au sec.
-  - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres), une fois par
+  - **Bonus au sol** : poulet (soin), aimant, **Montre** ⏱️ (10 s de temps ralenti pour les monstres et leurs projectiles,
+    pas pour le joueur) et **Bombe** 💣 (plus rare : tous les monstres normaux à l'écran explosent ; élites à moitié, boss épargnés).
+  - **Évolutions d'armes** : une arme au niveau 8 + son objet → le prochain coffre la transforme (cinématique) : Lame du
+    Héros (Épée + Gantelet), Tempête de lames (Dagues + Bottes), Sceptre des arcanes (Baguette + Grimoire), Sanctuaire
+    ardent (Aura + Cœur), Hache du Titan (Hache + Armure), Couronne d'orage (Foudre + Couronne), Anneau éternel (Orbes +
+    Sablier), Marée d'acide (Fiole + Cristal). Recettes et découvertes dans le camp.
+  - **Gardiens légendaires** : 2 ou 3 (au hasard parmi 8, un par lieu-dit) dorment dans leur antre ; on en réveille un en
+    restant 3 s sur son sceau (un seul à la fois, il se rendort si on s'éloigne). Vaincu : +15 émeraudes et un coffre de 3.
+  - **Sanctuaires maudits** (6 au hasard, cumulables) : monstres +10 % de dégâts et de vitesse, émeraudes +10 % chacun.
+    **Encerclement** toutes les 4 vagues, **chariot doré** qui fuit (gemmes et 3 émeraudes), **jour et nuit** (cycle de
+    5 min, 1 min de nuit à la vision réduite, soir doré et aube rose).
+  - **Armes secrètes** (objectifs cumulés sur toutes les parties) : Boomerang (3 gardiens différents), Faux lunaire
+    (5 chariots dorés), Pluie d'étoiles (15 sanctuaires maudits). **Défis du jour** : 3 par jour, 10 émeraudes chacun.
+  - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres, × sanctuaires), une fois par
     jour **10 coffres + 3 Clés de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
     (classement des meilleurs scores).
   - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,

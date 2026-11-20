@@ -943,7 +943,12 @@ function spendEnergy(character, now = Date.now()) {
 // ---------- Familiers (onglet Familier) ----------
 
 function newSurvivor() {
-  return { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0 };
+  return {
+    meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0,
+    evos: [], // évolutions d'armes découvertes
+    secrets: { legends: [], carts: 0, curses: 0 }, // progression des armes secrètes (cumulée sur toutes les parties)
+    challenges: { day: '', done: [] }, // défis du jour réussis
+  };
 }
 
 function newHouse(now = Date.now()) {

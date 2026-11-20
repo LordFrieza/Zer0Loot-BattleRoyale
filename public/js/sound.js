@@ -482,6 +482,25 @@
       tone(midi(84 + n), big ? 0.16 : 0.07, { type: 'triangle', vol: big ? 0.07 : 0.045 });
       if (big) tone(midi(91 + n), 0.14, { type: 'triangle', vol: 0.05, delay: 0.05 });
     },
+    // Survivor : Montre (tic-tac qui ralentit et souffle grave)
+    svWatch() {
+      [0, 0.14, 0.32, 0.56, 0.86].forEach((d, i) => tone(i % 2 ? 1320 : 1760, 0.04, { type: 'square', vol: 0.05, delay: d }));
+      noise(1.2, { filter: 'lowpass', freq: 1400, sweep: 200, vol: 0.12 });
+      tone(660, 1, { type: 'sine', vol: 0.08, to: 165 });
+    },
+    // Survivor : Bombe (grosse détonation)
+    svBomb() {
+      noise(1.4, { filter: 'lowpass', freq: 1600, sweep: 90, vol: 0.5, attack: 0.002 });
+      tone(110, 0.9, { type: 'sine', vol: 0.4, to: 32 });
+      tone(55, 1.2, { type: 'triangle', vol: 0.3, to: 25 });
+      noise(0.25, { filter: 'highpass', freq: 3000, vol: 0.18 });
+    },
+    // Survivor : évolution d'arme (montée cristalline puis accord éclatant)
+    svEvolve() {
+      [60, 64, 67, 72, 76, 79, 84, 88, 91, 96].forEach((n, i) => tone(midi(n), 0.22, { type: 'triangle', vol: 0.07, delay: i * 0.07 }));
+      fanfare([[72, 0, 1], [76, 0, 1], [79, 0, 1], [84, 1, 3]], 0.18, 0.12, 0.75);
+      noise(1.6, { filter: 'highpass', freq: 6000, vol: 0.06, attack: 0.4 });
+    },
     chestPick() {
       [72, 76, 79, 84, 88].forEach((n, i) => tone(midi(n), 0.14, { type: 'square', vol: 0.05, delay: i * 0.06 }));
     },

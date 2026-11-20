@@ -574,8 +574,82 @@
         Sound.play('hit');
         break;
       case 'zap':
-        G.fx.push({ k: 'zap', x: e.x, y: e.y, r: e.r, t0: now, life: 260, seed: Math.random() });
+        G.fx.push({ k: 'zap', x: e.x, y: e.y, r: e.r, t0: now, life: e.chain ? 380 : 260, seed: Math.random(), evo: e.evo, chain: e.chain });
         Sound.play('shoot', 'mage');
+        break;
+      case 'spin':
+        G.fx.push({ k: 'spin', r: e.r, t0: now, life: 300, a0: Math.random() * Math.PI * 2 });
+        Sound.play('hit');
+        break;
+      case 'arc':
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 320, color: '#d6b0ff', fill: 'rgba(199, 155, 255, .25)' });
+        break;
+      case 'quake':
+        G.fx.push({ k: 'quake', x: e.x, y: e.y, r: e.r, t0: now, life: 500 });
+        if (now > (G.shakeUntil || 0)) { G.shakeUntil = now + 220; G.shakeAmp = 6; }
+        if (now - (G.quakeSnd || 0) > 200) { G.quakeSnd = now; Sound.play('slam'); }
+        break;
+      case 'legendWake': {
+        const D = Rules.SURVIVOR_GUARDIANS[e.zone];
+        svToast(`${D.icon} ${D.label} se réveille ! Éloigne-toi de son antre pour qu'il se rendorme.`, 3600, 'boss');
+        Sound.play('roar', true);
+        G.shakeUntil = now + 600; G.shakeAmp = 12;
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 300, t0: now, life: 900, color: '#c77dff' });
+        break;
+      }
+      case 'curse':
+        svToast(`☠️ Sanctuaire maudit activé (×${e.n}) : monstres +${e.n * 10} % de dégâts et de vitesse, émeraudes +${e.n * 10} % !`, 3400, 'curse');
+        Sound.play('curse');
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 220, t0: now, life: 800, color: '#ff3a5a', fill: 'rgba(120, 0, 30, .25)' });
+        break;
+      case 'ring':
+        svToast(`⚠️ Encerclement ! ${e.n} monstres se referment sur toi !`, 2600, 'boss');
+        Sound.play('slamWarn');
+        break;
+      case 'cart':
+        svToast('💰 Un chariot doré passe dans le coin ! Rattrape-le avant qu\'il ne s\'enfuie !', 3000, 'treasure');
+        Sound.play('coin');
+        break;
+      case 'cartGone':
+        svToast('Le chariot doré s\'est enfui…', 1800);
+        break;
+      case 'cartDown':
+        svToast(`💰 Chariot doré détruit ! Pluie de gemmes et +${e.emeralds} {em}`, 2800, 'treasure');
+        Sound.play('jackpot');
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 200, t0: now, life: 700, color: '#ffd34a' });
+        break;
+      case 'dusk':
+        svToast('🌇 Le soleil se couche… la nuit tombe dans 15 s.', 2600, 'night');
+        break;
+      case 'night':
+        svToast('🌙 La nuit est tombée : on n\'y voit plus très loin…', 2800, 'night');
+        Sound.play('roomEnter');
+        break;
+      case 'dawn':
+        svToast('🌅 Le jour se lève ! Tu as survécu à la nuit.', 2600, 'bless');
+        Sound.play('chestTier', 'rare');
+        break;
+      case 'starHit':
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 380, color: '#fff2a0', fill: 'rgba(255, 230, 120, .35)' });
+        if (now - (G.starSnd || 0) > 90) { G.starSnd = now; Sound.play('meteor'); }
+        break;
+      case 'faux':
+        Sound.play('tech', 'roulade');
+        break;
+      case 'legendSleep':
+        svToast(`💤 ${Rules.SURVIVOR_GUARDIANS[e.zone].label} retourne dormir dans son antre…`, 2600);
+        break;
+      case 'legendDown': {
+        const D = Rules.SURVIVOR_GUARDIANS[e.zone];
+        svToast(`🏆 ${D.label} est vaincu ! +${e.emeralds} {em} et un grand coffre`, 3600, 'treasure');
+        Sound.play('bossExplode');
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 320, t0: now, life: 1000, color: '#ffd34a' });
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 200, t0: now + 150, life: 900, color: '#c77dff' });
+        break;
+      }
+      case 'evolve':
+        G.cine = { id: e.id, t0: now };
+        Sound.play('svEvolve');
         break;
       case 'd':
         if (G.texts.length < 60) G.texts.push({ x: e.x + (Math.random() - 0.5) * 14, y: e.y, v: e.v, c: e.c, t0: now });
@@ -609,6 +683,19 @@
         Sound.play('petFind');
         svToast('🧲 Toutes les gemmes accourent !', 1600);
         break;
+      case 'watch':
+        Sound.play('svWatch');
+        svToast(`⏱️ Le temps ralentit pour les monstres pendant ${SV.watch.duration} s !`, 2200, 'watch');
+        G.fx.push({ k: 'ring', x: G.me.x, y: G.me.y, r: 420, t0: now, life: 900, color: '#8fd8ff' });
+        G.watchAt = now;
+        break;
+      case 'bomb':
+        Sound.play('svBomb');
+        svToast(`💣 BOUM ! ${e.n} monstre${e.n > 1 ? 's' : ''} pulvérisé${e.n > 1 ? 's' : ''} !`, 2400, 'bomb');
+        G.bombAt = now;
+        G.shakeUntil = now + 450;
+        G.shakeAmp = 14;
+        break;
       case 'wave':
         svToast(`🌊 Vague ${e.n}`, 1600);
         Sound.play('roomEnter');
@@ -627,7 +714,7 @@
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 220, t0: now, life: 700, color: '#ffd34a' });
         break;
       case 'boom':
-        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 420, color: e.act === 'leap' ? '#d9a441' : '#ff6b3d' });
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 420, color: e.act === 'leap' ? '#d9a441' : e.act === 'frost' ? '#9fe0ff' : '#ff6b3d' });
         Sound.play('slam');
         break;
       case 'blink':
@@ -686,12 +773,12 @@
     const dt = Math.min(0.05, (now - (G.last || now)) / 1000);
     G.last = now;
     const f = G.frame;
-    const stopped = !f || f.pend || f.paused || G.paused || f.over;
+    const stopped = !f || f.pend || f.paused || G.paused || f.over || f.cine;
     const d = inputDir();
     G.me.moving = !stopped && (d.x || d.y);
     if (G.me.moving) {
-      // L'eau ralentit (le serveur fait de même) : il vaut mieux passer par les ponts
-      const spd = ((f && f.spd) || SV.player.speed) * (Rules.survivorWater(G.me.x, G.me.y) ? SV.waterSlow : 1);
+      // L'eau ralentit, les routes accélèrent (le serveur fait de même)
+      const spd = ((f && f.spd) || SV.player.speed) * Rules.survivorGround(G.me.x, G.me.y);
       G.me.x = Math.max(20, Math.min(SV.map.w - 20, G.me.x + d.x * spd * dt));
       G.me.y = Math.max(20, Math.min(SV.map.h - 20, G.me.y + d.y * spd * dt));
       G.me.fx = d.x;
@@ -709,8 +796,10 @@
   // ---------- Dessin ----------
   function draw(now) {
     const f = G.frame;
-    const camX = Math.max(W / 2, Math.min(SV.map.w - W / 2, G.me.x)) - W / 2;
-    const camY = Math.max(H / 2, Math.min(SV.map.h - H / 2, G.me.y)) - H / 2;
+    // Tremblement de l'écran (bombe, réveil d'un gardien…)
+    const shake = now < (G.shakeUntil || 0) ? G.shakeAmp * ((G.shakeUntil - now) / 450) : 0;
+    const camX = Math.max(W / 2, Math.min(SV.map.w - W / 2, G.me.x)) - W / 2 + (shake ? (Math.random() - 0.5) * shake : 0);
+    const camY = Math.max(H / 2, Math.min(SV.map.h - H / 2, G.me.y)) - H / 2 + (shake ? (Math.random() - 0.5) * shake : 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Sol
     const cx0 = Math.floor(camX / CHUNK);
@@ -726,12 +815,20 @@
     for (const a of f.ar) {
       if (a.k === 'acid') {
         const g = ctx.createRadialGradient(a.x, a.y, 4, a.x, a.y, a.r);
-        g.addColorStop(0, 'rgba(140, 255, 80, .55)');
-        g.addColorStop(1, 'rgba(60, 200, 40, .15)');
+        g.addColorStop(0, a.s ? 'rgba(80, 255, 200, .55)' : 'rgba(140, 255, 80, .55)');
+        g.addColorStop(1, a.s ? 'rgba(30, 180, 160, .18)' : 'rgba(60, 200, 40, .15)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = 'rgba(200, 255, 160, .7)';
         for (let i = 0; i < 4; i++) { const b = (t * 2 + i * 0.7) % 1; ctx.beginPath(); ctx.arc(a.x + Math.cos(i * 2.3) * a.r * 0.5, a.y + Math.sin(i * 1.7) * a.r * 0.4 - b * 6, 3 * (1 - b), 0, Math.PI * 2); ctx.fill(); }
+      } else if (a.k === 'bog') {
+        // Vase du Roi des marais : flaque sombre qui bouillonne (elle fait mal)
+        const g = ctx.createRadialGradient(a.x, a.y, 4, a.x, a.y, a.r);
+        g.addColorStop(0, 'rgba(70, 90, 30, .7)'); g.addColorStop(1, 'rgba(50, 70, 20, .25)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(180, 230, 90, .7)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = 'rgba(190, 240, 110, .75)';
+        for (let i = 0; i < 6; i++) { const b = (t * 1.5 + i * 0.37) % 1; ctx.beginPath(); ctx.arc(a.x + Math.cos(i * 2.1) * a.r * 0.55, a.y + Math.sin(i * 1.3) * a.r * 0.45, 5 * b, 0, Math.PI * 2); ctx.stroke(); }
       } else if (a.k === 'web') {
         ctx.strokeStyle = 'rgba(240, 240, 255, .55)';
         ctx.lineWidth = 1.5;
@@ -747,15 +844,27 @@
         ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
       }
     }
-    // Aura de feu
+    // Aura de feu (Sanctuaire ardent : lumière sacrée dorée et cercle de runes qui tourne)
     if (f.aura) {
       const pulse = 1 + Math.sin(t * 6) * 0.04;
-      const g = ctx.createRadialGradient(G.me.x, G.me.y, 6, G.me.x, G.me.y, f.aura * pulse);
-      g.addColorStop(0, 'rgba(255, 160, 60, .05)');
-      g.addColorStop(0.7, 'rgba(255, 110, 30, .22)');
-      g.addColorStop(1, 'rgba(255, 70, 20, .45)');
+      const R = f.aura * pulse;
+      const g = ctx.createRadialGradient(G.me.x, G.me.y, 6, G.me.x, G.me.y, R);
+      if (f.auraEvo) {
+        g.addColorStop(0, 'rgba(255, 255, 230, .08)'); g.addColorStop(0.7, 'rgba(255, 230, 120, .2)'); g.addColorStop(1, 'rgba(255, 200, 60, .42)');
+      } else {
+        g.addColorStop(0, 'rgba(255, 160, 60, .05)'); g.addColorStop(0.7, 'rgba(255, 110, 30, .22)'); g.addColorStop(1, 'rgba(255, 70, 20, .45)');
+      }
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(G.me.x, G.me.y, f.aura * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(G.me.x, G.me.y, R, 0, Math.PI * 2); ctx.fill();
+      if (f.auraEvo) {
+        ctx.save(); ctx.translate(G.me.x, G.me.y); ctx.rotate(t * 0.6);
+        ctx.strokeStyle = 'rgba(255, 240, 170, .8)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, R * 0.92, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = '700 15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(255, 245, 190, .9)';
+        const runes = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃ';
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ctx.save(); ctx.rotate(a); ctx.fillText(runes[i], 0, -R * 0.92); ctx.restore(); }
+        ctx.restore(); ctx.textBaseline = 'alphabetic';
+      }
     }
     // Autels des lieux-dits
     ALTARS.forEach((A, i) => {
@@ -778,6 +887,45 @@
       const label = ready ? `Autel : ${Z.bonus}` : `Autel : ${cd} s`;
       ctx.strokeText(label, A.x, A.y + 34); ctx.fillStyle = ready ? '#fff2a8' : '#ccc'; ctx.fillText(label, A.x, A.y + 34);
     });
+    // Sanctuaires maudits : obélisque sombre aux runes rouges (activé : fissuré, flammes rouges)
+    for (const [x, y, charge, done] of f.cu || []) {
+      if (Math.abs(x - G.me.x) > W / 2 + 120 || Math.abs(y - G.me.y) > H / 2 + 160) continue;
+      const CU = Rules.SURVIVOR_CURSE;
+      ctx.fillStyle = 'rgba(60, 0, 20, .35)'; ctx.beginPath(); ctx.ellipse(x, y + 8, 80, 32, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = done ? 'rgba(255, 60, 80, .8)' : `rgba(255, 60, 80, ${0.35 + Math.sin(t * 2.5) * 0.25})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, y + 8, CU.radius, CU.radius * 0.4, 0, 0, Math.PI * 2); ctx.stroke();
+      if (charge > 0) { ctx.strokeStyle = '#ff3a5a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(x, y + 8, CU.radius + 6, (CU.radius + 6) * 0.4, 0, -Math.PI / 2, -Math.PI / 2 + (charge / 100) * Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = done ? '#3a1820' : '#2a2030';
+      ctx.beginPath(); ctx.moveTo(x - 16, y + 6); ctx.lineTo(x - 10, y - 64); ctx.lineTo(x, y - 78); ctx.lineTo(x + 10, y - 64); ctx.lineTo(x + 16, y + 6); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = done ? '#ff3a5a' : `rgba(255, 70, 90, ${0.5 + Math.sin(t * 3) * 0.4})`;
+      ctx.font = '900 14px serif'; ctx.textAlign = 'center';
+      ctx.fillText('ᛟ', x, y - 46); ctx.fillText('ᚦ', x, y - 26);
+      if (done) {
+        // Flammes maudites au sommet
+        for (let i = 0; i < 3; i++) { const fl = (t * 2 + i * 0.33) % 1; ctx.fillStyle = `rgba(255, ${60 + i * 40}, 80, ${1 - fl})`; ctx.beginPath(); ctx.arc(x + Math.sin(t * 5 + i) * 4, y - 82 - fl * 22, 7 * (1 - fl) + 2, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.font = '800 11px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)';
+      const lbl = done ? 'Sanctuaire maudit (activé)' : `☠️ Sanctuaire maudit · reste ${CU.charge} s dessus`;
+      ctx.strokeText(lbl, x, y + 36); ctx.fillStyle = done ? '#ff8a9a' : '#ffb0b8'; ctx.fillText(lbl, x, y + 36);
+      if (!done) { const l2 = `monstres +${CU.enemy * 100} % · émeraudes +${CU.emeralds * 100} %`; ctx.strokeText(l2, x, y + 50); ctx.fillStyle = '#ddd'; ctx.fillText(l2, x, y + 50); }
+    }
+    // Étoiles filantes : l'étoile tombe du ciel vers son point d'impact
+    for (const a of f.ar) {
+      if (a.k !== 'star') continue;
+      const left = Math.max(0, a.left - (now - G.frameAt) / 1000);
+      const k = 1 - left / 0.6;
+      ctx.strokeStyle = 'rgba(255, 230, 120, .5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      const sx = a.x + 260 * (1 - k);
+      const sy = a.y - 520 * (1 - k);
+      const tl = ctx.createLinearGradient(sx, sy, sx + 70, sy - 140);
+      tl.addColorStop(0, 'rgba(255, 250, 200, .95)'); tl.addColorStop(1, 'rgba(255, 200, 80, 0)');
+      ctx.strokeStyle = tl; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 70, sy - 140); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.shadowColor = '#ffe680'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(sx, sy, 7, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    }
     // Trésor gardé : un coffre doré sous un rayon de lumière
     if (f.tr) {
       const x = f.tr.x;
@@ -836,9 +984,9 @@
       ctx.fillStyle = 'rgba(255,255,255,.65)';
       ctx.beginPath(); ctx.moveTo(x, y - s * 1.4); ctx.lineTo(x + s * 0.4, y - s * 0.2); ctx.lineTo(x - s * 0.3, y); ctx.closePath(); ctx.fill();
     }
-    // Bonus au sol (poulet, aimant, coffre) : pastille contourée qui pulse, halo coloré et petite flèche qui rebondit
-    const PK = ['🍗', '🧲', '🎁'];
-    const PKC = ['#ff9f43', '#5dc8ff', '#ffd34a'];
+    // Bonus au sol (poulet, aimant, coffre, montre, bombe) : pastille contourée qui pulse, halo coloré et petite flèche qui rebondit
+    const PK = ['🍗', '🧲', '🎁', '⏱️', '💣'];
+    const PKC = ['#ff9f43', '#5dc8ff', '#ffd34a', '#8fd8ff', '#ff4d4d'];
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < f.pk.length; i += 3) {
@@ -863,6 +1011,38 @@
       ctx.beginPath(); ctx.moveTo(x - 7, ay - 6); ctx.lineTo(x + 7, ay - 6); ctx.lineTo(x, ay + 3); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
     ctx.textBaseline = 'alphabetic';
+    // Chariot doré : caisse dorée sur roues, pièces qui s'envolent, barre de vie
+    if (f.ct) {
+      const c = f.ct;
+      const dir = c.fx < 0 ? -1 : 1;
+      ctx.save(); ctx.translate(c.x, c.y);
+      const gl = ctx.createRadialGradient(0, -20, 6, 0, -20, 90);
+      gl.addColorStop(0, 'rgba(255, 220, 90, .45)'); gl.addColorStop(1, 'rgba(255, 220, 90, 0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, -20, 90, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 8, 40, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.scale(dir, 1);
+      ctx.fillStyle = '#7a4a1e'; ctx.fillRect(-34, -30, 68, 26);
+      ctx.fillStyle = '#ffcf3a'; ctx.fillRect(-30, -40, 60, 14);
+      ctx.strokeStyle = '#a06a10'; ctx.lineWidth = 2; ctx.strokeRect(-34, -30, 68, 26);
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? '#ffe680' : '#ffd34a'; ctx.beginPath(); ctx.arc(-22 + i * 11, -42 - (i % 2) * 4, 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke(); }
+      ctx.strokeStyle = '#4a2a10'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(34, -18); ctx.lineTo(52, -26); ctx.stroke();
+      for (const wx of [-22, 22]) {
+        ctx.fillStyle = '#3a2410'; ctx.beginPath(); ctx.arc(wx, -2, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 2;
+        for (let s = 0; s < 4; s++) { const a = now / 90 + (s * Math.PI) / 4; ctx.beginPath(); ctx.moveTo(wx, -2); ctx.lineTo(wx + Math.cos(a) * 9, -2 + Math.sin(a) * 9); ctx.stroke(); }
+      }
+      ctx.restore();
+      for (let i = 0; i < 3; i++) { const p = ((now / 600) + i / 3) % 1; ctx.globalAlpha = 1 - p; ctx.fillStyle = '#ffe680'; ctx.beginPath(); ctx.arc(c.x + Math.sin(i * 2 + now / 300) * 20, c.y - 50 - p * 40, 4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(c.x - 32, c.y - 70, 64, 6);
+      ctx.fillStyle = '#ffd34a'; ctx.fillRect(c.x - 31, c.y - 69, 62 * (c.hp / 100), 4);
+    }
+    // Antres des gardiens légendaires : le gardien endormi et son sceau
+    const anyAwake = (f.lg || []).some((l) => l.st === 1);
+    for (const l of f.lg || []) {
+      if (Math.abs(l.x - G.me.x) > W / 2 + 200 || Math.abs(l.y - G.me.y) > H / 2 + 260) continue;
+      drawLair(l, now, t, anyAwake);
+    }
     // Personnages, ennemis et boss, triés par profondeur
     const k = Math.min(1, (now - G.frameAt) / 100);
     const list = [];
@@ -917,32 +1097,80 @@
       }
       drawMonster(ctx, b.x, b.y - BD[1], { kind: b.kind, enraged: b.rage }, { scale: BD[0], t: now, facing: b.x > G.me.x ? -1 : 1, enraged: b.rage });
     }
+    if (f.lb) {
+      if (!meDrawn && f.lb.y > G.me.y) drawMe();
+      drawGuardian(f.lb.z, f.lb.x, f.lb.y, now, { facing: f.lb.x > G.me.x ? -1 : 1, awake: true });
+    }
     if (!meDrawn) drawMe();
     // Orbes gardiens
     if (f.orb) {
       const o = f.orb;
+      for (const [n, r, spd] of o.rings) {
+        if (o.evo) { ctx.strokeStyle = 'rgba(168, 240, 255, .18)'; ctx.lineWidth = o.size * 0.8; ctx.beginPath(); ctx.arc(G.me.x, G.me.y, r, 0, Math.PI * 2); ctx.stroke(); }
+        for (let i = 0; i < n; i++) {
+          const a = (G.srvT - o.t0) * spd + (i / n) * Math.PI * 2;
+          const x = G.me.x + Math.cos(a) * r;
+          const y = G.me.y + Math.sin(a) * r;
+          const g = ctx.createRadialGradient(x, y, 1, x, y, o.size * (o.evo ? 1.25 : 1));
+          g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, o.evo ? '#a8f0ff' : '#5fd3ff'); g.addColorStop(1, 'rgba(95, 211, 255, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, o.size * (o.evo ? 1.25 : 1), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    // Faux lunaire : des faux spectrales font un tour éclair autour du joueur
+    if (f.faux) {
+      const o = f.faux;
       for (let i = 0; i < o.n; i++) {
         const a = (G.srvT - o.t0) * o.spd + (i / o.n) * Math.PI * 2;
         const x = G.me.x + Math.cos(a) * o.r;
         const y = G.me.y + Math.sin(a) * o.r;
-        const g = ctx.createRadialGradient(x, y, 1, x, y, o.size);
-        g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, '#5fd3ff'); g.addColorStop(1, 'rgba(95, 211, 255, 0)');
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(x, y, o.size, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2);
+        ctx.strokeStyle = 'rgba(216, 208, 255, .35)'; ctx.lineWidth = o.size * 0.9; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(-o.r, 0, o.r, -0.35, 0); ctx.stroke();
+        ctx.shadowColor = '#b8a8ff'; ctx.shadowBlur = 16;
+        ctx.fillStyle = '#eeeaff';
+        ctx.beginPath(); ctx.moveTo(0, -o.size); ctx.quadraticCurveTo(o.size * 1.2, -o.size * 0.2, o.size * 0.2, o.size); ctx.quadraticCurveTo(o.size * 0.5, 0, 0, -o.size); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#6a5a8a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -o.size * 0.8); ctx.lineTo(-o.size * 0.6, o.size * 1.2); ctx.stroke();
+        ctx.restore();
       }
     }
     // Projectiles lancés (dagues, haches) : simulés à partir de leur lancer
     for (const [id, s] of G.shots) {
       const age = (now - s.t0) / 1000;
       if (age > s.life) { G.shots.delete(id); continue; }
-      const x = s.x + s.vx * age;
-      const y = s.y + s.vy * age + 0.5 * s.g * age * age;
+      // Tempête de lames : aller puis retour sur la même ligne
+      const run = s.ret ? s.life / 2 - Math.abs(age - s.life / 2) : age;
+      const x = s.x + s.vx * run;
+      const y = s.y + s.vy * run + 0.5 * s.g * age * age;
       ctx.save();
       ctx.translate(x, y);
       if (s.w === 'hache') {
-        ctx.rotate(age * 14);
-        ctx.font = '30px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (s.evo) {
+          // Hache du Titan : énorme, avec une traînée de braises
+          const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 46);
+          glow.addColorStop(0, 'rgba(255, 160, 60, .55)'); glow.addColorStop(1, 'rgba(255, 90, 20, 0)');
+          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 46, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.rotate(age * (s.evo ? 10 : 14));
+        ctx.font = `${s.evo ? 56 : 30}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('🪓', 0, 0);
+      } else if (s.w === 'boomerang') {
+        ctx.rotate(age * 16);
+        ctx.font = '34px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🪃', 0, 0);
+      } else if (s.ret) {
+        // Dague de la tempête : bleu glacé, traînée lumineuse
+        const dir = age < s.life / 2 ? 1 : -1;
+        ctx.rotate(Math.atan2(s.vy * dir, s.vx * dir));
+        ctx.strokeStyle = 'rgba(160, 235, 255, .55)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-40, 0); ctx.stroke();
+        ctx.shadowColor = '#9fe8ff'; ctx.shadowBlur = 10;
+        ctx.fillStyle = '#e8fbff';
+        ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-5, -5); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#3a6a9a'; ctx.fillRect(-12, -3, 8, 6);
       } else {
         ctx.rotate(Math.atan2(s.vy, s.vx));
         ctx.fillStyle = '#e8eef8';
@@ -954,6 +1182,7 @@
     }
     // Traits magiques et projectiles ennemis : avancés à chaque image selon leur vitesse, recalés en douceur sur le serveur
     const dtF = Math.min(0.2, (now - G.frameAt) / 1000);
+    const wandEvo = f.weapons.some(([id, , e]) => id === 'baguette' && e);
     for (const p of G.proj.values()) {
       const tx = p.x + p.vx * dtF;
       const ty = p.y + p.vy * dtF;
@@ -963,19 +1192,29 @@
       const y = p.ry;
       const ang = Math.atan2(p.vy, p.vx);
       if (p.bolt) {
-        // Trait magique violet avec traînée
-        const tail = ctx.createLinearGradient(x, y, x - Math.cos(ang) * 34, y - Math.sin(ang) * 34);
-        tail.addColorStop(0, 'rgba(199, 155, 255, .8)'); tail.addColorStop(1, 'rgba(150, 80, 255, 0)');
-        ctx.strokeStyle = tail; ctx.lineWidth = 8; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(ang) * 34, y - Math.sin(ang) * 34); ctx.stroke();
-        const g = ctx.createRadialGradient(x, y, 1, x, y, 12);
-        g.addColorStop(0, '#fff'); g.addColorStop(0.4, '#c79bff'); g.addColorStop(1, 'rgba(150, 80, 255, 0)');
+        // Trait magique violet avec traînée (Sceptre des arcanes : plus gros, cœur rose et étincelles)
+        const big = wandEvo ? 1.6 : 1;
+        const tail = ctx.createLinearGradient(x, y, x - Math.cos(ang) * 34 * big, y - Math.sin(ang) * 34 * big);
+        tail.addColorStop(0, wandEvo ? 'rgba(255, 170, 255, .9)' : 'rgba(199, 155, 255, .8)'); tail.addColorStop(1, 'rgba(150, 80, 255, 0)');
+        ctx.strokeStyle = tail; ctx.lineWidth = 8 * big; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(ang) * 34 * big, y - Math.sin(ang) * 34 * big); ctx.stroke();
+        const g = ctx.createRadialGradient(x, y, 1, x, y, 12 * big);
+        g.addColorStop(0, '#fff'); g.addColorStop(0.4, wandEvo ? '#ff9cf0' : '#c79bff'); g.addColorStop(1, 'rgba(150, 80, 255, 0)');
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 12 * big, 0, Math.PI * 2); ctx.fill();
+        if (wandEvo) for (let i = 0; i < 3; i++) { const a = now / 90 + i * 2.1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 14, y + Math.sin(a) * 14, 2, 0, Math.PI * 2); ctx.fill(); }
         continue;
       }
       // Projectile ennemi : rouge vif (ou couleur de l'attaque du boss), contour sombre et halo pour bien le voir
       const [c, r] = ESHOT[p.kind] || ESHOT[0];
+      if (f.slow) {
+        // Temps ralenti : une longue traînée bleutée derrière le projectile
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const tl = ctx.createLinearGradient(x, y, x - (p.vx / sp) * 60, y - (p.vy / sp) * 60);
+        tl.addColorStop(0, 'rgba(160, 220, 255, .55)'); tl.addColorStop(1, 'rgba(160, 220, 255, 0)');
+        ctx.strokeStyle = tl; ctx.lineWidth = r * 1.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (p.vx / sp) * 60, y - (p.vy / sp) * 60); ctx.stroke();
+      }
       ctx.fillStyle = 'rgba(255, 40, 40, .22)';
       ctx.beginPath(); ctx.arc(x, y, r + 7, 0, Math.PI * 2); ctx.fill();
       ctx.shadowColor = c; ctx.shadowBlur = 14;
@@ -1006,17 +1245,52 @@
         ctx.ellipse(e.len * 0.42, 0, e.len * 0.42, e.h * 0.32, 0, Math.PI / 2, -Math.PI / 2, true);
         ctx.fill();
         ctx.restore();
+      } else if (e.k === 'spin') {
+        // Lame du Héros : un cercle de lumière dorée qui balaie tout autour
+        ctx.save();
+        ctx.translate(G.me.x, G.me.y - 6);
+        const sweep = Math.min(1, p * 1.6) * Math.PI * 2;
+        ctx.globalAlpha = 1 - p * p;
+        for (let k = 0; k < 3; k++) {
+          ctx.strokeStyle = k === 0 ? 'rgba(255, 245, 200, .95)' : k === 1 ? 'rgba(255, 211, 74, .7)' : 'rgba(255, 150, 40, .4)';
+          ctx.lineWidth = (22 - k * 6) * (1 - p * 0.5);
+          ctx.beginPath(); ctx.arc(0, 0, e.r * (0.7 + k * 0.12), e.a0, e.a0 + sweep); ctx.stroke();
+        }
+        ctx.restore();
+      } else if (e.k === 'quake') {
+        ctx.save();
+        ctx.globalAlpha = 1 - p;
+        ctx.fillStyle = 'rgba(120, 70, 30, .35)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * (0.5 + p * 0.5), e.r * 0.6 * (0.5 + p * 0.5), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ffb060'; ctx.lineWidth = 5 * (1 - p) + 1;
+        ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * (0.5 + p * 0.6), e.r * 0.6 * (0.5 + p * 0.6), 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(60, 30, 10, .6)'; ctx.lineWidth = 2;
+        for (let i = 0; i < 6; i++) { const a = i * 1.05 + e.x; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(a) * e.r * 0.7, e.y + Math.sin(a) * e.r * 0.45); ctx.stroke(); }
+        ctx.restore();
       } else if (e.k === 'zap') {
         ctx.save();
         ctx.globalAlpha = 1 - p;
-        ctx.strokeStyle = '#fff6a0'; ctx.lineWidth = 4; ctx.shadowColor = '#ffe63c'; ctx.shadowBlur = 16;
+        ctx.strokeStyle = e.evo ? '#ffffff' : '#fff6a0'; ctx.lineWidth = e.evo ? 6 : 4; ctx.shadowColor = '#ffe63c'; ctx.shadowBlur = e.evo ? 26 : 16;
         ctx.beginPath(); ctx.moveTo(e.x + 30, e.y - 420);
         for (let i = 1; i <= 7; i++) ctx.lineTo(e.x + (hash(i, Math.floor(e.seed * 1000)) - 0.5) * 40, e.y - 420 + i * 60);
         ctx.stroke();
+        // Couronne d'orage : l'éclair rebondit d'ennemi en ennemi
+        if (e.chain) {
+          let px = e.x;
+          let py = e.y;
+          ctx.lineWidth = 3;
+          for (const [cx, cy] of e.chain) {
+            ctx.beginPath(); ctx.moveTo(px, py);
+            for (let i = 1; i < 4; i++) ctx.lineTo(px + (cx - px) * (i / 4) + (hash(i, cx) - 0.5) * 26, py + (cy - py) * (i / 4) + (hash(i, cy) - 0.5) * 26);
+            ctx.lineTo(cx, cy); ctx.stroke();
+            ctx.fillStyle = 'rgba(255, 245, 160, .5)'; ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2); ctx.fill();
+            px = cx; py = cy;
+          }
+        }
         ctx.fillStyle = 'rgba(255, 240, 150, .35)';
         ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r, e.r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       } else if (e.k === 'ring') {
+        if (e.fill) { ctx.fillStyle = e.fill; ctx.globalAlpha = 1 - p; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * (0.4 + p * 0.6), e.r * 0.75 * (0.4 + p * 0.6), 0, 0, Math.PI * 2); ctx.fill(); }
         ctx.strokeStyle = e.color; ctx.globalAlpha = 1 - p; ctx.lineWidth = 6 * (1 - p) + 1;
         ctx.beginPath(); ctx.ellipse(e.x, e.y, e.r * (0.4 + p * 0.6), e.r * 0.75 * (0.4 + p * 0.6), 0, 0, Math.PI * 2); ctx.stroke();
         ctx.globalAlpha = 1;
@@ -1047,7 +1321,153 @@
     ctx.globalAlpha = 1;
     // Interface (écran)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawDaylight(f, now, Math.round(camX), Math.round(camY));
     drawHud(f, now, camX, camY);
+  }
+
+  // ---------- Jour et nuit ----------
+  // Soir doré, nuit (obscurité percée par la lumière autour du joueur, des autels, des sanctuaires…), aube rose
+  let darkCv = null;
+  function drawDaylight(f, now, camX, camY) {
+    const L = Rules.survivorDaylight(G.srvT);
+    const tint = (color, a, mode) => { ctx.save(); ctx.globalCompositeOperation = mode; ctx.fillStyle = color.replace('A', a); ctx.fillRect(0, 0, W, H); ctx.restore(); };
+    if (L.warm > 0.01) {
+      // Fin de soirée : lumière orangée qui vient d'en haut à gauche, ombres violettes en bas
+      tint('rgba(255, 150, 60, A)', 0.5 * L.warm, 'soft-light');
+      const g = ctx.createLinearGradient(0, 0, W * 0.7, H);
+      g.addColorStop(0, `rgba(255, 200, 110, ${0.28 * L.warm})`); g.addColorStop(0.55, `rgba(255, 120, 70, ${0.1 * L.warm})`); g.addColorStop(1, `rgba(110, 40, 120, ${0.22 * L.warm})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const sun = ctx.createRadialGradient(-60, -60, 10, -60, -60, W * 0.6);
+      sun.addColorStop(0, `rgba(255, 230, 150, ${0.35 * L.warm})`); sun.addColorStop(1, 'rgba(255, 200, 120, 0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = sun; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    if (L.pink > 0.01) {
+      tint('rgba(255, 140, 190, A)', 0.45 * L.pink, 'soft-light');
+      const g = ctx.createLinearGradient(W, 0, 0, H);
+      g.addColorStop(0, `rgba(255, 190, 210, ${0.25 * L.pink})`); g.addColorStop(1, `rgba(140, 160, 255, ${0.12 * L.pink})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    if (L.dark > 0.01) {
+      if (!darkCv) { darkCv = document.createElement('canvas'); darkCv.width = W; darkCv.height = H; }
+      const d = darkCv.getContext('2d');
+      d.globalCompositeOperation = 'source-over';
+      d.clearRect(0, 0, W, H);
+      d.fillStyle = `rgba(6, 10, 34, ${L.dark})`; d.fillRect(0, 0, W, H);
+      d.globalCompositeOperation = 'destination-out';
+      const hole = (wx, wy, r, k = 1) => {
+        const x = wx - camX;
+        const y = wy - camY;
+        if (x < -r || y < -r || x > W + r || y > H + r) return;
+        const g = d.createRadialGradient(x, y, r * 0.1, x, y, r);
+        g.addColorStop(0, `rgba(0,0,0,${k})`); g.addColorStop(0.6, `rgba(0,0,0,${k * 0.6})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+        d.fillStyle = g; d.beginPath(); d.arc(x, y, r, 0, Math.PI * 2); d.fill();
+      };
+      hole(G.me.x, G.me.y - 10, 290 + Math.sin(now / 300) * 6);
+      if (f.aura) hole(G.me.x, G.me.y, f.aura * 1.4, 0.6);
+      ALTARS.forEach((A, i) => { if (!f.alt || !f.alt[i] || f.alt[i][0] <= 0) hole(A.x, A.y - 30, 170, 0.85); });
+      for (const [x, y, , done] of f.cu || []) hole(x, y - 40, done ? 150 : 110, 0.7);
+      for (const l of f.lg || []) if (l.st === 0) hole(l.x, l.y + 120, 150, 0.7);
+      if (f.lb) hole(f.lb.x, f.lb.y - 40, 200, 0.8);
+      if (f.b) hole(f.b.x, f.b.y - 30, 160, 0.6);
+      if (f.tr) hole(f.tr.x, f.tr.y - 30, 200, 0.9);
+      if (f.ct) hole(f.ct.x, f.ct.y - 20, 170, 0.9);
+      for (let i = 0; i < (f.sh || []).length; i += 2) hole(f.sh[i], f.sh[i + 1], 100, 0.7);
+      for (let i = 0; i < f.pk.length; i += 3) hole(f.pk[i], f.pk[i + 1], 80, 0.6);
+      for (const e of G.fx) if (e.k === 'ring' || e.k === 'zap' || e.k === 'quake') hole(e.x, e.y, (e.r || 80) * 1.2, 0.8 * (1 - (now - e.t0) / e.life));
+      for (const p of G.proj.values()) if (!p.bolt && p.rx != null) hole(p.rx, p.ry, 40, 0.7); // les projectiles ennemis luisent : on les voit venir
+      ctx.drawImage(darkCv, 0, 0);
+      // Lucioles
+      if (L.dark > 0.4) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const k = (L.dark - 0.4) / 0.38;
+        for (let i = 0; i < 46; i++) {
+          const gx = Math.floor(camX / 300) + (i % 6) - 1;
+          const gy = Math.floor(camY / 300) + Math.floor(i / 6) % 5 - 1;
+          const seed = hash(gx, gy, 300 + i);
+          if (seed < 0.5) continue;
+          const x = gx * 300 + hash(gx, gy, 301 + i) * 300 + Math.sin(now / 900 + i) * 20 - camX;
+          const y = gy * 300 + hash(gx, gy, 302 + i) * 300 + Math.cos(now / 700 + i * 1.3) * 16 - camY;
+          const a = k * (0.4 + 0.6 * Math.abs(Math.sin(now / 500 + i)));
+          const g = ctx.createRadialGradient(x, y, 0, x, y, 9);
+          g.addColorStop(0, `rgba(220, 255, 150, ${a})`); g.addColorStop(1, 'rgba(160, 255, 100, 0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  // Gardien légendaire : dessin d'un boss ou d'un monstre, grandi et teinté, avec une aura violette (éveillé) ou endormi
+  const LIFT = { troll: 30, dragon: 26, sorcier: 20, mimic: 18, liche: 20, maexxna: 6 };
+  const BOSS_SC = { troll: 1, dragon: 0.9, sorcier: 0.95, mimic: 0.95, liche: 0.95, maexxna: 0.9 };
+  function drawGuardian(zone, x, y, now, o = {}) {
+    const D = Rules.SURVIVOR_GUARDIANS[zone];
+    const sc = D.scale * (BOSS_SC[D.draw] || 1);
+    const lift = (LIFT[D.draw] || 0) * sc;
+    ctx.fillStyle = 'rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(x, y + 6, D.radius * 1.4, D.radius * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    if (o.awake) {
+      // Aura légendaire : halo violet et anneau doré qui tourne
+      const rg = ctx.createRadialGradient(x, y - 40, 10, x, y - 40, D.radius * 3.2);
+      rg.addColorStop(0, `rgba(190, 110, 255, ${0.35 + Math.sin(now / 200) * 0.1})`); rg.addColorStop(1, 'rgba(190, 110, 255, 0)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y - 40, D.radius * 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(x, y + 4); ctx.scale(1, 0.35); ctx.rotate(now / 700);
+      ctx.strokeStyle = 'rgba(255, 211, 74, .75)'; ctx.lineWidth = 5; ctx.setLineDash([22, 14]);
+      ctx.beginPath(); ctx.arc(0, 0, D.radius * 1.7, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+    ctx.save();
+    const filters = [];
+    if (D.hue) filters.push(`hue-rotate(${D.hue}deg)`);
+    if (D.gray) filters.push('grayscale(0.85) brightness(1.1)');
+    if (!o.awake) filters.push('brightness(0.62) saturate(0.7)');
+    if (filters.length) ctx.filter = filters.join(' ');
+    const breathe = o.awake ? 1 : 1 + Math.sin(now / 700) * 0.03;
+    drawMonster(ctx, x, y - lift, { kind: D.draw }, { scale: sc * breathe, t: o.awake ? now : 0, facing: o.facing || 1 });
+    ctx.restore();
+  }
+  function drawLair(l, now, t, anyAwake) {
+    const D = Rules.SURVIVOR_GUARDIANS[l.z];
+    const GD = Rules.SURVIVOR_GUARDIAN;
+    // Sol de l'antre : cercle de pierres sombres
+    ctx.fillStyle = 'rgba(30, 15, 45, .35)'; ctx.beginPath(); ctx.ellipse(l.x, l.y + 10, 150, 95, 0, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const sx = l.x + Math.cos(a) * 150;
+      const sy = l.y + 10 + Math.sin(a) * 95;
+      ctx.fillStyle = l.st === 2 ? '#6a6670' : '#4a3a5a';
+      ctx.beginPath(); ctx.moveTo(sx - 9, sy + 6); ctx.lineTo(sx - 6, sy - 26); ctx.lineTo(sx + 5, sy - 30); ctx.lineTo(sx + 9, sy + 6); ctx.closePath(); ctx.fill();
+      if (l.st === 0) { ctx.fillStyle = `rgba(199, 125, 255, ${0.5 + Math.sin(t * 2 + i) * 0.4})`; ctx.fillRect(sx - 2, sy - 20, 4, 6); }
+    }
+    if (l.st === 0) {
+      drawGuardian(l.z, l.x, l.y, now, { facing: 1 });
+      // Zzz
+      ctx.font = '900 18px system-ui'; ctx.textAlign = 'center';
+      for (let i = 0; i < 3; i++) { const p = ((t * 0.5 + i / 3) % 1); ctx.globalAlpha = 1 - p; ctx.fillStyle = '#e8d8ff'; ctx.fillText('z', l.x + 40 + p * 30, l.y - 90 - p * 50 - i * 4); }
+      ctx.globalAlpha = 1;
+      // Sceau : rester dessus pour réveiller le gardien
+      const sx = l.x;
+      const sy = l.y + 130;
+      const R = GD.sealRadius;
+      const locked = anyAwake;
+      ctx.fillStyle = locked ? 'rgba(80, 80, 90, .35)' : `rgba(160, 90, 255, ${0.22 + Math.sin(t * 3) * 0.08})`;
+      ctx.beginPath(); ctx.ellipse(sx, sy, R, R * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = locked ? 'rgba(150,150,150,.6)' : '#c77dff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(sx, sy, R, R * 0.55, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.55); ctx.rotate(-t * 0.8);
+      ctx.strokeStyle = locked ? 'rgba(150,150,150,.5)' : 'rgba(230, 200, 255, .8)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; const b = ((i + 2) / 5) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8); ctx.lineTo(Math.cos(b) * R * 0.8, Math.sin(b) * R * 0.8); ctx.stroke(); }
+      ctx.restore();
+      if (l.c > 0) { ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(sx, sy, R + 6, (R + 6) * 0.55, 0, -Math.PI / 2, -Math.PI / 2 + (l.c / 100) * Math.PI * 2); ctx.stroke(); }
+      ctx.font = '800 12px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)';
+      const t1 = `${D.icon} ${D.label} · Gardien légendaire`;
+      const t2 = locked ? 'Un autre gardien est éveillé…' : `Reste ${GD.wake} s sur le sceau pour le réveiller`;
+      ctx.strokeText(t1, sx, sy + R * 0.55 + 20); ctx.fillStyle = '#e6ccff'; ctx.fillText(t1, sx, sy + R * 0.55 + 20);
+      ctx.strokeText(t2, sx, sy + R * 0.55 + 36); ctx.fillStyle = locked ? '#bbb' : '#fff2a8'; ctx.fillText(t2, sx, sy + R * 0.55 + 36);
+    } else if (l.st === 2) {
+      ctx.font = '34px system-ui'; ctx.textAlign = 'center'; ctx.fillText('🏆', l.x, l.y);
+      ctx.font = '800 12px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)';
+      ctx.strokeText(`${D.label} · vaincu`, l.x, l.y + 30); ctx.fillStyle = '#ffd34a'; ctx.fillText(`${D.label} · vaincu`, l.x, l.y + 30);
+    }
   }
 
   function myLook() {
@@ -1094,6 +1514,40 @@
   }
 
   function drawHud(f, now) {
+    // Montre : le monde se teinte de bleu, une horloge compte les secondes
+    if (f.slow > 0) {
+      const left = Math.max(0, f.slow - (now - G.frameAt) / 1000);
+      const fade = Math.min(1, left / 1.2, (now - (G.watchAt || 0)) / 300 + 0.2);
+      ctx.fillStyle = `rgba(70, 130, 255, ${0.12 * fade})`; ctx.fillRect(0, 0, W, H);
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.9);
+      vg.addColorStop(0, 'rgba(120, 190, 255, 0)'); vg.addColorStop(1, `rgba(90, 160, 255, ${0.35 * fade})`);
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+      // Horloge à droite du chrono
+      const cx = W / 2 + 128;
+      const cy = 50;
+      ctx.fillStyle = 'rgba(10, 20, 50, .8)'; ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8fd8ff'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, 20, -Math.PI / 2, -Math.PI / 2 + (left / SV.watch.duration) * Math.PI * 2); ctx.stroke();
+      const ang = -Math.PI / 2 + (now / 1000) * Math.PI * 0.35; // aiguille au ralenti
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * 13, cy + Math.sin(ang) * 13); ctx.stroke();
+      ctx.font = '900 14px system-ui'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      ctx.strokeText(`⏱️ ${Math.ceil(left)} s`, cx + 30, cy + 5); ctx.fillStyle = '#cfeaff'; ctx.fillText(`⏱️ ${Math.ceil(left)} s`, cx + 30, cy + 5);
+    }
+    // Bombe : éclair blanc puis onde de choc
+    const ba = now - (G.bombAt || -1e9);
+    if (ba < 900) {
+      if (ba < 260) { ctx.fillStyle = `rgba(255, 250, 235, ${0.85 * (1 - ba / 260)})`; ctx.fillRect(0, 0, W, H); }
+      const p = ba / 900;
+      const sx = G.me.x - (Math.max(W / 2, Math.min(SV.map.w - W / 2, G.me.x)) - W / 2);
+      const sy = G.me.y - (Math.max(H / 2, Math.min(SV.map.h - H / 2, G.me.y)) - H / 2);
+      ctx.save();
+      ctx.globalAlpha = 1 - p;
+      ctx.strokeStyle = '#ffdd88'; ctx.lineWidth = 30 * (1 - p) + 4; ctx.shadowColor = '#ff7a1f'; ctx.shadowBlur = 30;
+      ctx.beginPath(); ctx.ellipse(sx, sy, W * 0.75 * p, W * 0.55 * p, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 6 * (1 - p) + 1;
+      ctx.beginPath(); ctx.ellipse(sx, sy, W * 0.6 * p, W * 0.44 * p, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     // Barre d'expérience
     ctx.fillStyle = 'rgba(10, 6, 24, .75)';
     ctx.fillRect(0, 0, W, 22);
@@ -1125,12 +1579,24 @@
     ctx.fillStyle = '#fff';
     ctx.fillText(`💀 ${fmt(f.kills)}`, W - 14, 50);
     if (f.wave >= SV.dailyWave) { ctx.font = '800 13px system-ui'; ctx.fillStyle = '#ffd34a'; ctx.fillText('★ Vague 30 atteinte !', W - 14, 70); }
+    // Jour / nuit : l'heure qu'il est et le temps avant le prochain changement
+    {
+      const D = Rules.SURVIVOR_DAY;
+      const L = Rules.survivorDaylight(G.srvT);
+      const toNight = L.c < D.nightAt ? D.nightAt - L.c : null;
+      const toDay = L.c >= D.nightAt ? D.cycle - L.c + D.dawn : L.c < D.dawn ? D.dawn - L.c : null;
+      const txt = L.phase === 'night' ? `🌙 Nuit · jour dans ${mmss(toDay)}` : L.phase === 'dawn' ? '🌅 Aube' : L.phase === 'evening' ? `🌇 Soir · nuit dans ${mmss(toNight)}` : `☀️ Jour · nuit dans ${mmss(toNight)}`;
+      ctx.font = '800 13px system-ui'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      const dy = f.wave >= SV.dailyWave ? 88 : 70;
+      ctx.strokeText(txt, W - 14, dy); ctx.fillStyle = L.phase === 'night' ? '#b8c8ff' : L.phase === 'evening' ? '#ffc070' : '#fff2c0'; ctx.fillText(txt, W - 14, dy);
+    }
     // Armes et objets
     let x = 12;
     ctx.textAlign = 'center';
-    for (const [id, lv] of f.weapons) {
+    const evoReady = Rules.survivorEvoReady(f.weapons.map(([id, level, evo]) => ({ id, level, evo })), Object.fromEntries(f.passives));
+    for (const [id, lv, evo] of f.weapons) {
       const Wp = Rules.SURVIVOR_WEAPONS[id];
-      hudSlot(x, 32, Wp.icon, lv, Rules.SURVIVOR_WEAPON_MAX, '#ffd34a');
+      hudSlot(x, 32, Wp.icon, lv, Rules.SURVIVOR_WEAPON_MAX, '#ffd34a', evo ? 2 : evoReady.includes(id) ? 1 : 0, now);
       x += 40;
     }
     x = 12;
@@ -1160,10 +1626,18 @@
       const bl = `✨ Bénédiction ${Bz.bonus} (${Math.ceil(Math.max(0, f.bless.left - (now - G.frameAt) / 1000))} s)`;
       ctx.strokeText(bl, 14, 174); ctx.fillStyle = '#b6ffa0'; ctx.fillText(bl, 14, 174);
     }
+    let wy = f.bless ? 192 : 174;
+    if (f.curse) {
+      const cl = `☠️ Malédictions ×${f.curse} : monstres +${f.curse * 10} % · émeraudes +${f.curse * 10} %`;
+      ctx.strokeText(cl, 14, wy); ctx.fillStyle = '#ff8a9a'; ctx.fillText(cl, 14, wy);
+      wy += 18;
+    }
     if (Rules.survivorWater(G.me.x, G.me.y)) {
       const wl = '💧 Dans l\'eau : vitesse −50 % (passe par les ponts !)';
-      const wy = f.bless ? 192 : 174;
       ctx.strokeText(wl, 14, wy); ctx.fillStyle = '#9fdcff'; ctx.fillText(wl, 14, wy);
+    } else if (Rules.survivorRoad(G.me.x, G.me.y)) {
+      const rl = `🛤️ Sur la route : vitesse +${Math.round(SV.roadSpeed * 100)} %`;
+      ctx.strokeText(rl, 14, wy); ctx.fillStyle = '#ffe2a8'; ctx.fillText(rl, 14, wy);
     }
     // Boss
     if (f.b) {
@@ -1184,6 +1658,28 @@
         const py = H / 2 + Math.sin(a) * (H / 2 - 50);
         ctx.save(); ctx.translate(px, py); ctx.rotate(a);
         ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-8, -11); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+    // Gardien légendaire éveillé : sa barre de vie (sous celle du boss) et une flèche s'il est hors de l'écran
+    if (f.lb) {
+      const D = Rules.SURVIVOR_GUARDIANS[f.lb.z];
+      const bw = 520;
+      const bx = W / 2 - bw / 2;
+      const by = f.b ? 120 : 96;
+      ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(bx, by, bw, 18);
+      const lg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      lg.addColorStop(0, '#7b2cff'); lg.addColorStop(1, '#c77dff');
+      ctx.fillStyle = lg; ctx.fillRect(bx + 2, by + 2, (bw - 4) * (f.lb.hp / f.lb.maxHp), 14);
+      ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 1.5; ctx.strokeRect(bx - 1, by - 1, bw + 2, 20);
+      ctx.textAlign = 'center'; ctx.font = '900 12px system-ui'; ctx.fillStyle = '#fff';
+      ctx.fillText(`${D.icon} ${D.label} (légendaire) — ${fmt(f.lb.hp)} / ${fmt(f.lb.maxHp)}`, W / 2, by + 14);
+      const dx = f.lb.x - G.me.x;
+      const dy = f.lb.y - G.me.y;
+      if (Math.abs(dx) > W / 2 - 40 || Math.abs(dy) > H / 2 - 40) {
+        const a = Math.atan2(dy, dx);
+        ctx.save(); ctx.translate(W / 2 + Math.cos(a) * (H / 2 - 50), H / 2 + Math.sin(a) * (H / 2 - 50)); ctx.rotate(a);
+        ctx.fillStyle = '#c77dff'; ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-8, -11); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill();
         ctx.restore();
       }
     }
@@ -1219,6 +1715,12 @@
     for (let i = 0; i < (f.sh || []).length; i += 2) { ctx.fillStyle = '#5dff9a'; ctx.beginPath(); ctx.arc(mx + f.sh[i] * s, my + f.sh[i + 1] * s, 3, 0, Math.PI * 2); ctx.fill(); }
     if (f.tr) { ctx.fillStyle = '#ffd34a'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.fillText('★', mx + f.tr.x * s, my + f.tr.y * s + 4); }
     if (f.b) { ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.arc(mx + f.b.x * s, my + f.b.y * s, 4, 0, Math.PI * 2); ctx.fill(); }
+    for (const [x, y, , done] of f.cu || []) { ctx.fillStyle = done ? '#ff3a5a' : 'rgba(150, 20, 40, .9)'; ctx.fillRect(mx + x * s - 2, my + y * s - 3, 4, 6); }
+    if (f.ct && Math.floor(now / 250) % 2) { ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.arc(mx + f.ct.x * s, my + f.ct.y * s, 4, 0, Math.PI * 2); ctx.fill(); }
+    for (const l of f.lg || []) {
+      ctx.fillStyle = l.st === 2 ? 'rgba(160,160,160,.8)' : l.st === 1 ? '#ff6bff' : '#c77dff';
+      ctx.save(); ctx.translate(mx + l.x * s, my + l.y * s); ctx.rotate(Math.PI / 4); ctx.fillRect(-3.5, -3.5, 7, 7); ctx.restore();
+    }
     // Flèches vers le trésor et l'éclat le plus proche, hors de l'écran
     const edge = (tx, ty, color, icon) => {
       const dx = tx - G.me.x;
@@ -1235,6 +1737,7 @@
       ctx.restore(); ctx.textBaseline = 'alphabetic';
     };
     if (f.tr) edge(f.tr.x, f.tr.y, '#ffd34a', '🧰');
+    if (f.ct) edge(f.ct.x, f.ct.y, '#ffd34a', '💰');
     let near = null;
     for (let i = 0; i < (f.sh || []).length; i += 2) { const d = Math.hypot(f.sh[i] - G.me.x, f.sh[i + 1] - G.me.y); if (!near || d < near.d) near = { x: f.sh[i], y: f.sh[i + 1], d }; }
     if (near) edge(near.x, near.y, '#5dff9a', () => emeraldIcon(ctx, 0, 0, 9));
@@ -1250,20 +1753,118 @@
     if (f.paused && !G.over) {
       ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, W, H);
     }
+    if (G.cine) drawEvolution(now);
   }
 
-  function hudSlot(x, y, icon, lv, max, color) {
-    ctx.fillStyle = 'rgba(10, 6, 24, .7)';
-    ctx.fillRect(x, y, 36, 36);
-    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 35, 35);
+  // Cinématique d'évolution : l'arme et son objet se rejoignent, éclair, puis l'arme évoluée apparaît en grand
+  const EVO_MS = SV.evoPause * 1000;
+  function drawEvolution(now) {
+    const c = G.cine;
+    const t = now - c.t0;
+    if (t > EVO_MS) { G.cine = null; return; }
+    const E = Rules.SURVIVOR_EVOLUTIONS[c.id];
+    const Wp = Rules.SURVIVOR_WEAPONS[c.id];
+    const P = Rules.SURVIVOR_PASSIVES[E.passive];
+    const fade = Math.min(1, t / 250, (EVO_MS - t) / 300);
+    const cx = W / 2;
+    const cy = H / 2 - 20;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = 'rgba(8, 4, 20, .78)'; ctx.fillRect(0, 0, W, H);
+    // Rayons de lumière qui tournent
+    const power = Math.min(1, t / 1000);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(now / 1800);
+    for (let i = 0; i < 14; i++) {
+      ctx.rotate((Math.PI * 2) / 14);
+      const g = ctx.createLinearGradient(0, 0, 0, -H);
+      g.addColorStop(0, `rgba(255, 220, 120, ${0.35 * power})`); g.addColorStop(1, 'rgba(255, 220, 120, 0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-40 - 30 * power, -H); ctx.lineTo(40 + 30 * power, -H); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (t < 1000) {
+      // L'arme et l'objet se rejoignent en tournant l'un autour de l'autre
+      const k = t / 1000;
+      const e = k * k * (3 - 2 * k);
+      const d = 200 * (1 - e);
+      const a = e * Math.PI * 1.5;
+      for (const [icon, side] of [[Wp.icon, -1], [P.icon, 1]]) {
+        const x = cx + Math.cos(a) * d * side;
+        const y = cy + Math.sin(a) * d * side * 0.5;
+        const g = ctx.createRadialGradient(x, y, 4, x, y, 60);
+        g.addColorStop(0, 'rgba(255, 240, 180, .7)'); g.addColorStop(1, 'rgba(255, 200, 80, 0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '64px system-ui'; ctx.fillStyle = '#fff'; ctx.fillText(icon, x, y);
+      }
+      ctx.font = '900 22px system-ui'; ctx.fillStyle = '#fff2a8';
+      ctx.fillText(`${Wp.label} niv. 8  +  ${P.label}`, cx, cy + 140);
+    } else {
+      const k = (t - 1000) / (EVO_MS - 1000);
+      // Éclair blanc et anneaux qui s'élargissent
+      if (t < 1350) { ctx.fillStyle = `rgba(255, 255, 255, ${1 - (t - 1000) / 350})`; ctx.fillRect(0, 0, W, H); }
+      for (let i = 0; i < 3; i++) {
+        const r = (k * 1.6 - i * 0.15) * 420;
+        if (r <= 0) continue;
+        ctx.strokeStyle = `rgba(255, 220, 120, ${Math.max(0, 0.8 - k - i * 0.15)})`; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      // Étincelles
+      for (let i = 0; i < 40; i++) {
+        const a = hash(i, 1, 77) * Math.PI * 2;
+        const v = 120 + hash(i, 2, 77) * 380;
+        const x = cx + Math.cos(a) * v * Math.min(1, k * 2);
+        const y = cy + Math.sin(a) * v * Math.min(1, k * 2) + k * k * 80;
+        ctx.fillStyle = i % 3 ? E.color : '#ffffff';
+        ctx.globalAlpha = fade * Math.max(0, 1 - k * 1.2);
+        ctx.beginPath(); ctx.arc(x, y, 3 + hash(i, 3, 77) * 3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = fade;
+      // L'arme évoluée, en grand
+      const pop = Math.min(1, k * 5);
+      const size = 120 * (0.6 + 0.4 * pop) * (1 + Math.sin(now / 160) * 0.04);
+      const g = ctx.createRadialGradient(cx, cy, 10, cx, cy, size * 1.2);
+      g.addColorStop(0, E.color); g.addColorStop(0.5, 'rgba(255, 220, 120, .35)'); g.addColorStop(1, 'rgba(255, 220, 120, 0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, size * 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = E.color; ctx.shadowBlur = 30;
+      ctx.font = `${Math.round(size)}px system-ui`; ctx.fillStyle = '#fff'; ctx.fillText(Wp.icon, cx, cy);
+      ctx.shadowBlur = 0;
+      ctx.font = '900 20px system-ui'; ctx.fillStyle = '#fff'; ctx.globalAlpha = fade * pop;
+      ctx.fillText('✨ ÉVOLUTION ! ✨', cx, cy - 120);
+      const tg = ctx.createLinearGradient(cx - 220, 0, cx + 220, 0);
+      tg.addColorStop(0, '#ffe9a8'); tg.addColorStop(0.5, '#ffd34a'); tg.addColorStop(1, '#ff9a3d');
+      ctx.font = '900 46px system-ui'; ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(40, 20, 0, .85)';
+      ctx.strokeText(E.label, cx, cy + 112); ctx.fillStyle = tg; ctx.fillText(E.label, cx, cy + 112);
+      ctx.font = '700 17px system-ui'; ctx.fillStyle = '#f3e9ff';
+      ctx.fillText(E.desc, cx, cy + 156);
+    }
+    ctx.restore();
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // evo : 0 normal, 1 prête à évoluer (au prochain coffre), 2 évoluée
+  function hudSlot(x, y, icon, lv, max, color, evo = 0, now = 0) {
+    if (evo === 2) {
+      const g = ctx.createLinearGradient(x, y, x + 36, y + 36);
+      g.addColorStop(0, '#5a3a00'); g.addColorStop(1, '#2a1640');
+      ctx.fillStyle = g; ctx.fillRect(x, y, 36, 36);
+      ctx.save(); ctx.shadowColor = '#ffd34a'; ctx.shadowBlur = 10 + Math.sin(now / 200) * 4;
+      ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, 34, 34); ctx.restore();
+    } else {
+      ctx.fillStyle = 'rgba(10, 6, 24, .7)';
+      ctx.fillRect(x, y, 36, 36);
+      ctx.strokeStyle = evo === 1 ? `rgba(255, 211, 74, ${0.5 + Math.sin(now / 150) * 0.5})` : 'rgba(255,255,255,.25)'; ctx.lineWidth = evo === 1 ? 2 : 1; ctx.strokeRect(x + 0.5, y + 0.5, 35, 35);
+    }
     ctx.font = '20px system-ui'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
     ctx.fillText(icon, x + 18, y + 16);
     ctx.textBaseline = 'alphabetic';
+    if (evo === 2) { ctx.font = '900 10px system-ui'; ctx.fillStyle = '#ffd34a'; ctx.fillText('★★★', x + 18, y + 34); ctx.font = '20px system-ui'; return; }
     for (let i = 0; i < max; i++) { ctx.fillStyle = i < lv ? color : 'rgba(255,255,255,.2)'; ctx.fillRect(x + 3 + i * (30 / max), y + 30, 30 / max - 1, 3); }
   }
 
   // ---------- Fenêtres par-dessus le jeu ----------
   function optLabel(o) {
+    if (o.type === 'evo') return `✨ ÉVOLUTION : ${Rules.SURVIVOR_EVOLUTIONS[o.id].label}`;
     if (o.type === 'weapon') return `${Rules.SURVIVOR_WEAPONS[o.id].icon} ${Rules.SURVIVOR_WEAPONS[o.id].label}${o.level > 1 ? ` niv. ${o.level}` : ''}`;
     if (o.type === 'passive') return `${Rules.SURVIVOR_PASSIVES[o.id].icon} ${Rules.SURVIVOR_PASSIVES[o.id].label}${o.level > 1 ? ` niv. ${o.level}` : ''}`;
     return o.type === 'heal' ? '🍗 Poulet rôti' : '{em} 2 émeraudes';
@@ -1372,8 +1973,8 @@
         <div><span>Monstres</span><b>${fmt(res.kills)}</b></div><div><span>Boss</span><b>${res.bosses}</b></div>
         <div><span>Niveau</span><b>${res.level}</b></div><div><span>Score</span><b class="gold-text">${fmt(res.score)}</b></div>
       </div>
-      <div class="sv-emeralds">+<span id="sv-em-count">0</span> ${EM} émeraudes</div>${daily}
-      <div class="sv-built">${(res.weapons || []).map(([id, lv]) => `<span>${Rules.SURVIVOR_WEAPONS[id].icon} ${lv}</span>`).join('')}${(res.passives || []).map(([id, lv]) => `<span>${Rules.SURVIVOR_PASSIVES[id].icon} ${lv}</span>`).join('')}</div>
+      <div class="sv-emeralds">+<span id="sv-em-count">0</span> ${EM} émeraudes</div>${daily}${overExtras(res)}
+      <div class="sv-built">${(res.weapons || []).map(([id, lv, evo]) => `<span class="${evo ? 'evo' : ''}">${Rules.SURVIVOR_WEAPONS[id].icon} ${evo ? '★' : lv}</span>`).join('')}${(res.passives || []).map(([id, lv]) => `<span>${Rules.SURVIVOR_PASSIVES[id].icon} ${lv}</span>`).join('')}</div>
       <div class="row" style="justify-content:center;gap:10px;margin-top:12px"><button class="gold" id="sv-again">🔁 Rejouer (${SV.price} 🪙)</button><button class="secondary" id="sv-back">🏕️ Retour au camp</button></div></div>`;
     el.classList.add('open');
     // Les émeraudes défilent
@@ -1390,6 +1991,17 @@
     $('sv-again').onclick = () => { stopGame(); startGame(); };
     $('sv-back').onclick = () => { stopGame(); loadState(); };
     if (typeof refresh === 'function') refresh().catch(() => {});
+  }
+
+  // Fin de partie : défis réussis, armes secrètes débloquées, gardiens vaincus, malédictions
+  function overExtras(res) {
+    const lines = [];
+    if (res.curses) lines.push(`☠️ ${res.curses} sanctuaire${res.curses > 1 ? 's' : ''} maudit${res.curses > 1 ? 's' : ''} : émeraudes ×${String(res.curseMult || 1).replace('.', ',')}`);
+    for (const z of res.legends || []) lines.push(`🏆 ${Rules.SURVIVOR_GUARDIANS[z].icon} ${Rules.SURVIVOR_GUARDIANS[z].label} vaincu`);
+    for (const id of res.evos || []) lines.push(`✨ Évolution : ${Rules.SURVIVOR_EVOLUTIONS[id].label}`);
+    for (const id of res.challenges || []) lines.push(`🎯 Défi du jour réussi : ${Rules.SURVIVOR_CHALLENGES[id].text} (+${Rules.SURVIVOR_CHALLENGE_REWARD} ${EM})`);
+    for (const id of res.secrets || []) lines.push(`<b class="gold-text">🗝️ Arme secrète débloquée : ${Rules.SURVIVOR_WEAPONS[id].icon} ${Rules.SURVIVOR_WEAPONS[id].label} !</b>`);
+    return lines.length ? `<div class="sv-over-extras">${lines.map((l) => `<div>${l}</div>`).join('')}</div>` : '';
   }
 
   // ---------- Lancer / arrêter ----------
@@ -1504,7 +2116,8 @@
           <div class="sv-starters">${weapons.map((id) => {
     const Wp = Rules.SURVIVOR_WEAPONS[id];
     const ok = state.starters.includes(id);
-    return `<button class="sv-starter ${ok ? '' : 'locked'} ${starter === id ? 'active' : ''}" data-starter="${id}" ${ok ? '' : 'disabled'} title="${ok ? Wp.desc : 'À débloquer dans la méta-progression'}">${Wp.icon}<span>${Wp.label}</span>${ok ? '' : '<em>🔒</em>'}</button>`;
+    const hidden = Wp.secret && !state.unlocked.weapons.includes(id);
+    return `<button class="sv-starter ${ok ? '' : 'locked'} ${starter === id ? 'active' : ''}" data-starter="${id}" ${ok ? '' : 'disabled'} title="${ok ? Wp.desc : hidden ? 'Arme secrète' : 'À débloquer dans la méta-progression'}">${hidden ? '❔' : Wp.icon}<span>${hidden ? '???' : Wp.label}</span>${ok ? '' : '<em>🔒</em>'}</button>`;
   }).join('')}</div>
           <button class="gold big-btn sv-play" id="sv-play" ${c.gold < SV.price ? 'disabled' : ''}>▶ Jouer — ${SV.price} 🪙</button>
           <div class="sv-daily-status ${state.dailyDone ? 'done' : ''}">${state.dailyDone ? '✅ Récompense de la vague 30 déjà obtenue aujourd\'hui (revient demain)' : `🎁 Récompense du jour : atteins la vague ${SV.dailyWave} → +${SV.daily.chests} coffres et +${SV.daily.keys} Clés de boss`}</div>
@@ -1512,6 +2125,7 @@
           <div class="muted" style="font-size:12px">⌨️ ZQSD ou flèches pour bouger · tes armes tirent seules · Échap : pause · 1-4 : choisir</div>
         </div>
       </div>
+      ${lobbyExtras()}
       <div class="sv-zones"><div class="sv-zones-title">🗺️ Lieux-dits : chacun a son effet tant que tu y es. Explore pour trouver les <b>autels</b> (bénédiction de ${X.altar.duration} s),
         les <b>éclats d'émeraude</b> (+${X.shard.emeralds} ${EM} chacun) et les <b>trésors gardés</b> (${X.treasure.upgrades} améliorations et +${X.treasure.emeralds} ${EM}). 💧 La rivière, le lac et la mare ralentissent de moitié (toi comme les monstres) : passe par les ponts.</div>
         <div class="sv-zones-grid">${Object.values(ZONES).map((z) => `<div class="sv-zone" style="--zc:${z.ground}"><b>${z.icon} ${z.label}</b><span>${z.bonus} : ${z.desc}</span></div>`).join('')}</div>
@@ -1525,6 +2139,44 @@
     });
     $('sv-play').onclick = startGame;
     drawHero();
+  }
+
+  // Défis du jour, évolutions découvertes, armes secrètes, et ce qu'on trouve sur la carte
+  function lobbyExtras() {
+    const ch = (state.challenges || []).map(({ id, done }) => {
+      const CH = Rules.SURVIVOR_CHALLENGES[id];
+      return `<div class="sv-challenge ${done ? 'done' : ''}"><span>${done ? '✅' : '🎯'}</span><b>${CH.text}</b><em>${done ? 'Réussi' : `+${Rules.SURVIVOR_CHALLENGE_REWARD} ${EM}`}</em></div>`;
+    }).join('');
+    const evos = Object.entries(Rules.SURVIVOR_EVOLUTIONS).map(([id, E]) => {
+      const Wp = Rules.SURVIVOR_WEAPONS[id];
+      const P = Rules.SURVIVOR_PASSIVES[E.passive];
+      const known = (state.evos || []).includes(id);
+      return `<div class="sv-evo ${known ? 'known' : ''}" style="--ec:${E.color}" title="${known ? esc(E.desc) : 'Arme au niveau 8 + cet objet, puis ouvre un coffre (élite, boss, trésor ou gardien)'}">
+        <div class="sv-evo-recipe">${Wp.icon}<small>niv. 8</small> + ${P.icon}</div>
+        <b>${known ? E.label : '???'}</b><span>${known ? E.desc : `${Wp.label} + ${P.label}`}</span></div>`;
+    }).join('');
+    const secrets = Object.entries(Rules.SURVIVOR_SECRETS).map(([id, SE]) => {
+      const Wp = Rules.SURVIVOR_WEAPONS[id];
+      const st = (state.secrets || {})[id] || { progress: 0 };
+      return `<div class="sv-secret ${st.unlocked ? 'done' : ''}"><span class="sv-secret-ico">${st.unlocked ? Wp.icon : '❔'}</span>
+        <div><b>${st.unlocked ? Wp.label : 'Arme secrète'}</b><span>${SE.text}</span>
+        <div class="sv-secret-bar"><i style="width:${Math.round((st.progress / SE.goal) * 100)}%"></i></div><em>${st.unlocked ? '✅ Débloquée : elle sort dans les tirages' : `${st.progress} / ${SE.goal}`}</em></div></div>`;
+    }).join('');
+    const GD = Rules.SURVIVOR_GUARDIAN;
+    return `<div class="sv-extras">
+      <div class="sv-box"><h3>🎯 Défis du jour <span class="sub">en une seule partie · nouveaux défis chaque jour</span></h3>${ch}</div>
+      <div class="sv-box"><h3>🗝️ Armes secrètes <span class="sub">objectifs cumulés sur toutes tes parties</span></h3>${secrets}</div>
+      <div class="sv-box wide"><h3>✨ Évolutions <span class="sub">${(state.evos || []).length} / ${Object.keys(Rules.SURVIVOR_EVOLUTIONS).length} découvertes</span></h3>
+        <p class="muted" style="font-size:12px;margin:0 0 8px">Une arme au niveau 8 et son objet : le prochain coffre (élite, boss, trésor gardé ou gardien) la fait évoluer en version surpuissante.</p>
+        <div class="sv-evo-grid">${evos}</div></div>
+      <div class="sv-box wide"><h3>🗺️ Sur la carte</h3><ul class="sv-howto">
+        <li>🌙 <b>Gardiens légendaires</b> : ${GD.count[0]} ou ${GD.count[1]} dorment dans des lieux-dits tirés au hasard. Reste ${GD.wake} s sur leur sceau pour en réveiller un (un seul à la fois). Vaincu : +${GD.emeralds} ${EM} et un coffre de ${GD.chest} améliorations. Éloigne-toi trop et il retourne dormir.</li>
+        <li>☠️ <b>Sanctuaires maudits</b> (${Rules.SURVIVOR_CURSE.count} par partie, placés au hasard) : chacun activé rend les monstres +10 % plus forts et plus rapides, mais te donne +10 % d'émeraudes. Cumulables !</li>
+        <li>💰 <b>Chariot doré</b> : il passe de temps en temps et te fuit. Détruis-le pour une pluie de gemmes et +${Rules.SURVIVOR_CART.emeralds} ${EM}.</li>
+        <li>⏱️ <b>Montre</b> : 10 s de temps ralenti pour les monstres. 💣 <b>Bombe</b> (plus rare) : tous les monstres normaux à l'écran explosent.</li>
+        <li>🌙 <b>Nuit</b> : 1 min toutes les 5 min, on y voit moins loin. ⚠️ <b>Encerclement</b> toutes les ${Rules.SURVIVOR_RING.every} vagues. 🛤️ Les <b>routes</b> font aller +${Math.round(SV.roadSpeed * 100)} % plus vite.</li>
+      </ul></div>
+    </div>`;
   }
 
   // Petit tableau du camp : ton personnage face à une horde
@@ -1563,6 +2215,12 @@
       const have = state.unlocked.weapons.includes(id);
       const st = state.starters.includes(id);
       const u = U.weapons[id];
+      if (Wp.secret && !have) {
+        const SE = Rules.SURVIVOR_SECRETS[id];
+        const st = (state.secrets || {})[id] || { progress: 0 };
+        return `<div class="sv-meta-card unlock secret"><div class="smc-head"><span class="smc-ico">❔</span><b>Arme secrète</b></div>
+          <div class="smc-desc">${SE.text} (${st.progress} / ${SE.goal})</div><div class="sv-secret-bar"><i style="width:${Math.round((st.progress / SE.goal) * 100)}%"></i></div></div>`;
+      }
       return `<div class="sv-meta-card unlock ${have ? 'owned' : ''}">
         <div class="smc-head"><span class="smc-ico">${Wp.icon}</span><b>${Wp.label}</b></div>
         <div class="smc-desc">${Wp.desc}</div>

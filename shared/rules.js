@@ -1831,8 +1831,9 @@
   // (payée en émeraudes) améliore les stats de départ. Simulation côté serveur (server/survivor.js).
   const SURVIVOR = {
     price: 300, // golds la partie
-    map: { w: 7200, h: 7200 },
-    mapScale: 1.5, // la carte dessinée sur une base de 4 800 px, agrandie ×1,5 (lieux-dits, rivière, lac…)
+    map: { w: 10800, h: 10800 },
+    mapScale: 2.25, // la carte dessinée sur une base de 4 800 px, agrandie ×2,25 (lieux-dits, rivière, lac…)
+    roadSpeed: 0.1, // sur les routes (et les ponts) : +10 % de vitesse
     waterSlow: 0.5, // dans l'eau (rivière, lac, mare) hors des ponts : vitesse ×0,5, joueur comme ennemis
     waveSeconds: 30,
     bossEvery: 5,
@@ -1853,7 +1854,12 @@
     maxPassives: 6,
     gems: [{ v: 1, color: '#4fa8ff' }, { v: 5, color: '#3ddc5a' }, { v: 25, color: '#ff4d6d' }], // petite, moyenne, grosse
     maxGems: 320,
-    drops: { chicken: 0.004, magnet: 0.0015 },
+    drops: { chicken: 0.004, magnet: 0.0015, watch: 0.0012, bomb: 0.0006 }, // par monstre tué
+    // Montre : le temps ralentit pour les ennemis et leurs projectiles (pas pour le joueur ni ses armes)
+    watch: { duration: 10, enemy: 0.35, boss: 0.7 },
+    // Bombe : tue les monstres normaux à l'écran ; élites, gardiens et chariot perdent la moitié de leur vie ; boss épargnés
+    bomb: { tough: 0.5 },
+    evoPause: 2.6, // s : le jeu s'arrête le temps de la cinématique d'évolution
     eliteEvery: 50, // s : un ennemi d'élite (coffre d'une amélioration)
     elite: { hp: 9, damage: 1.5, scale: 1.7, xp: 25 },
   };
@@ -1862,22 +1868,43 @@
   // et un effet tant que le joueur s'y trouve (fx) : xp, regen (PV/s), gems (gemmes ×(1+gems)), slow (ralentit les
   // ennemis), speed, magnet, damage, burn (PV perdus par seconde), crit, area, enemyHp (vie des ennemis qui y apparaissent).
   const SURVIVOR_ZONES = {
-    village: { label: 'Village', x: 3600, y: 3600, size: 0.8, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
-    foret: { label: 'Forêt sombre', x: 1425, y: 1650, size: 1.2, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
-    lac: { label: 'Lac gelé', x: 3450, y: 1170, size: 1.0, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
-    cimetiere: { label: 'Cimetière', x: 5700, y: 1725, size: 0.95, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
-    champs: { label: 'Champs de blé', x: 5925, y: 3525, size: 1.05, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
-    volcan: { label: 'Volcan', x: 5850, y: 5775, size: 1.05, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
-    ruines: { label: 'Ruines', x: 4125, y: 6075, size: 0.9, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
-    marais: { label: 'Marais', x: 1725, y: 5475, size: 1.05, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
-    prairie: { label: 'Prairie fleurie', x: 1200, y: 3525, size: 1.0, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
+    village: { label: 'Village', x: 2400, y: 2400, size: 0.8, ground: '#78b35e', enemies: ['gobelin', 'rat'], bonus: 'Refuge', icon: '🏡', fx: { regen: 1, xp: -0.25 }, desc: '+1 PV/s, mais −25 % d\'expérience' },
+    foret: { label: 'Forêt sombre', x: 950, y: 1100, size: 1.2, ground: '#2f6a39', enemies: ['araignee', 'gobelin'], bonus: 'Gibier', icon: '🌲', fx: { xp: 0.3, enemyHp: 0.2 }, desc: '+30 % d\'expérience, ennemis +20 % de vie' },
+    lac: { label: 'Lac gelé', x: 2300, y: 780, size: 1.0, ground: '#cfe7f2', enemies: ['chauve_souris', 'squelette'], bonus: 'Glace', icon: '❄️', fx: { slow: 0.25 }, desc: 'ennemis ralentis de 25 %' },
+    cimetiere: { label: 'Cimetière', x: 3800, y: 1150, size: 0.95, ground: '#5a6150', enemies: ['squelette', 'chauve_souris'], bonus: 'Âmes', icon: '🪦', fx: { gems: 1, enemyHp: 0.15 }, desc: 'gemmes d\'expérience ×2, ennemis +15 % de vie' },
+    champs: { label: 'Champs de blé', x: 3950, y: 2350, size: 1.05, ground: '#c8b356', enemies: ['rat', 'gobelin'], bonus: 'Vent', icon: '🌾', fx: { speed: 0.15, magnet: 0.3 }, desc: '+15 % de vitesse, +30 % de rayon de ramassage' },
+    volcan: { label: 'Volcan', x: 3900, y: 3850, size: 1.05, ground: '#5a2c22', enemies: ['dragonnet', 'flammeche'], bonus: 'Fournaise', icon: '🌋', fx: { damage: 0.3, burn: 1.5 }, desc: '+30 % de dégâts, mais −1,5 PV/s' },
+    ruines: { label: 'Ruines', x: 2750, y: 4050, size: 0.9, ground: '#a59c88', enemies: ['gobelin_violet', 'squelette'], bonus: 'Reliques', icon: '🏛️', fx: { crit: 0.15 }, desc: '+15 % de coups critiques' },
+    marais: { label: 'Marais', x: 1150, y: 3650, size: 1.05, ground: '#4c5d38', enemies: ['slime', 'rat'], bonus: 'Brume', icon: '🐸', fx: { area: 0.25, speed: -0.1 }, desc: '+25 % de zone, −10 % de vitesse' },
+    prairie: { label: 'Prairie fleurie', x: 800, y: 2350, size: 1.0, ground: '#8ec46b', enemies: ['slime', 'chauve_souris'], bonus: 'Pollen', icon: '🌸', fx: { magnet: 0.5, regen: 0.5 }, desc: '+50 % de rayon de ramassage, +0,5 PV/s' },
   };
+  // Coordonnées données sur la base de 4 800 px : agrandies ici à la taille de la carte
+  for (const z of Object.values(SURVIVOR_ZONES)) { z.x *= SURVIVOR.mapScale; z.y *= SURVIVOR.mapScale; }
   // Raisons d'explorer : autels (bénédiction d'un lieu-dit), éclats d'émeraude, trésors gardés.
   const SURVIVOR_EXPLORE = {
     altar: { radius: 70, charge: 2, duration: 40, cooldown: 150, mult: 1.5, heal: 0.25 }, // un autel par lieu-dit (sauf le village)
-    shard: { every: 35, max: 3, dist: [1350, 2550], radius: 34, emeralds: 1 }, // éclats d'émeraude, jamais au village
+    shard: { every: 30, max: 4, dist: [2000, 3800], radius: 34, emeralds: 1 }, // éclats d'émeraude, jamais au village
     treasure: { first: 90, every: 150, upgrades: 2, emeralds: 3, guards: 6, radius: 42, aggro: 450 }, // les gardiens restent au trésor tant que le joueur est à plus de 450 px
   };
+  // Sanctuaires maudits (placés au hasard à chaque partie, cumulables) : chacun activé donne aux monstres +10 % de
+  // dégâts et de vitesse, et au joueur +10 % d'émeraudes en fin de partie.
+  const SURVIVOR_CURSE = { count: 6, charge: 2, radius: 56, enemy: 0.1, emeralds: 0.1, minVillage: 1100 };
+  // Encerclement : toutes les 4 vagues (sauf les vagues de boss), un anneau de monstres se referme sur le joueur.
+  const SURVIVOR_RING = { every: 4, min: 40, max: 90, perWave: 3, radius: 540 };
+  // Chariot doré : il apparaît de temps en temps et fuit le joueur ; détruit, il fait pleuvoir gemmes et émeraudes.
+  const SURVIVOR_CART = { first: 100, every: [120, 170], life: 32, hp: 240, speed: 132, radius: 28, gems: 24, gemValue: 5, emeralds: 3, dist: 700 };
+  // Jour et nuit : un cycle de 5 min avec 1 min de nuit (vision réduite), un soir doré et une aube rose.
+  const SURVIVOR_DAY = { cycle: 300, offset: 20, dawn: 20, eveningAt: 190, nightAt: 240, warnBefore: 15 };
+  // Lumière à l'instant t (s) : dark (obscurité 0 à 1), warm (lumière dorée du soir), pink (aube), phase
+  function survivorDaylight(t) {
+    const D = SURVIVOR_DAY;
+    const c = (((t + D.offset) % D.cycle) + D.cycle) % D.cycle;
+    const smooth = (k) => k * k * (3 - 2 * k);
+    if (c < D.dawn) { const k = c / D.dawn; return { phase: 'dawn', dark: 0.78 * Math.pow(1 - k, 1.6), warm: 0, pink: Math.sin(Math.PI * Math.min(1, k * 1.2)) * 0.9, c }; }
+    if (c < D.eveningAt) return { phase: 'day', dark: 0, warm: 0, pink: 0, c };
+    if (c < D.nightAt) { const k = (c - D.eveningAt) / (D.nightAt - D.eveningAt); return { phase: 'evening', dark: 0.7 * smooth(Math.max(0, (k - 0.35) / 0.65)), warm: Math.sin(Math.PI * Math.min(1, k * 1.15)), pink: 0, c }; }
+    return { phase: 'night', dark: 0.7 + 0.08 * Math.min(1, (c - D.nightAt) / 4), warm: 0, pink: 0, c };
+  }
   // Effet de zone (fx) en jeu : celui du lieu-dit où l'on est, plus la bénédiction d'autel en cours (parties positives × 1,5).
   function survivorZoneFx(zone, blessing) {
     const fx = { ...((SURVIVOR_ZONES[zone] || {}).fx || {}) };
@@ -1956,13 +1983,13 @@
     const S = (pts) => pts.map(([x, y]) => [x * K, y * K]);
     const Z = (id) => [SURVIVOR_ZONES[id].x, SURVIVOR_ZONES[id].y];
     // Route sinueuse : une grande courbe et de petites ondulations
-    const winding = (a, b, seed) => {
+    const winding = (a, b, seed, wide = 1) => {
       const dx = b[0] - a[0];
       const dy = b[1] - a[1];
       const len = Math.hypot(dx, dy);
       const nx = -dy / len;
       const ny = dx / len;
-      const amp = (110 + survivorHash(seed, 1, 7) * 120) * K * (survivorHash(seed, 2, 7) < 0.5 ? -1 : 1);
+      const amp = (110 + survivorHash(seed, 1, 7) * 120) * K * wide * (survivorHash(seed, 2, 7) < 0.5 ? -1 : 1);
       const ph = survivorHash(seed, 3, 7) * Math.PI * 2;
       const pts = [];
       const n = Math.max(4, Math.round(len / (260 * K)));
@@ -1978,12 +2005,23 @@
       const k = 1 + (svNoise(i * 0.7, 0, seed) - 0.5) * 0.45;
       return [(cx + Math.cos(a) * r * k) * K, (cy + Math.sin(a) * r * 0.72 * k) * K];
     });
-    const roads = Object.keys(SURVIVOR_ZONES).filter((id) => id !== 'village').map((id, i) => winding(Z('village'), Z(id), i + 1));
+    // Routes : du village vers chaque lieu-dit, puis une grande boucle qui relie les lieux-dits voisins
+    const outer = Object.keys(SURVIVOR_ZONES).filter((id) => id !== 'village');
+    const roads = outer.map((id, i) => winding(Z('village'), Z(id), i + 1));
+    const ring = outer.slice().sort((a, b) => Math.atan2(SURVIVOR_ZONES[a].y - Z('village')[1], SURVIVOR_ZONES[a].x - Z('village')[0]) - Math.atan2(SURVIVOR_ZONES[b].y - Z('village')[1], SURVIVOR_ZONES[b].x - Z('village')[0]));
+
     const river = svCatmull(S([[2130, 640], [2030, 1000], [1820, 1380], [1640, 1720], [1580, 2080], [1440, 2420], [1470, 2800], [1340, 3150], [1150, 3360]]), 12);
     const lake = blob(2250, 400, 320, 21);
     const pond = blob(1060, 3440, 150, 44, 22);
     const crater = { x: 4330 * K, y: 4330 * K, r: 260 * K };
     const lava = blob(4330, 4330, 150, 33, 22);
+    // Boucle : pour chaque tronçon, la première courbe qui évite le lac, la mare et la lave
+    const wet = (pts) => pts.some(([x, y]) => svInPoly(x, y, lake) || svInPoly(x, y, pond) || Math.hypot(x - crater.x, y - crater.y) < crater.r);
+    ring.forEach((id, i) => {
+      let best = null;
+      for (let k = 0; k < 12 && !best; k++) { const r = winding(Z(id), Z(ring[(i + 1) % ring.length]), 40 + i + k * 8, 0.55 + k * 0.15); if (!wet(r)) best = r; }
+      roads.push(best || winding(Z(id), Z(ring[(i + 1) % ring.length]), 40 + i, 0.15));
+    });
     const width = { river: 44 * K, road: 46 * K, bridge: [84 * K, 54 * K] };
     // Ponts : là où une route croise la rivière
     const bridges = [];
@@ -2000,7 +2038,7 @@
         }
       }
     }
-    // Grille de l'eau (cases de 16 px) : 1 = eau, 0 = terre ferme ou pont
+    // Grille du sol (cases de 16 px) : 1 = eau, 2 = route ou pont, 0 = terre ferme
     const C = 16;
     const cols = Math.ceil(SURVIVOR.map.w / C);
     const rows = Math.ceil(SURVIVOR.map.h / C);
@@ -2010,6 +2048,15 @@
         for (let gx = Math.max(0, Math.floor(x0 / C)); gx <= Math.min(cols - 1, Math.floor(x1 / C)); gx++) if (test(gx * C + C / 2, gy * C + C / 2)) grid[gy * cols + gx] = v;
       }
     };
+    // Routes (2), puis l'eau par-dessus (1), puis les ponts (2 : on y va aussi vite que sur la route)
+    const rh = width.road / 2 + 4;
+    for (const road of roads) {
+      for (let i = 0; i < road.length - 1; i++) {
+        const [ax, ay] = road[i];
+        const [bx, by] = road[i + 1];
+        mark(Math.min(ax, bx) - rh, Math.min(ay, by) - rh, Math.max(ax, bx) + rh, Math.max(ay, by) + rh, (x, y) => svSegDist(x, y, ax, ay, bx, by) <= rh, 2);
+      }
+    }
     const half = width.river / 2;
     for (let i = 0; i < river.length - 1; i++) {
       const [ax, ay] = river[i];
@@ -2026,7 +2073,7 @@
       const c = Math.cos(b.a);
       const s = Math.sin(b.a);
       const R = Math.hypot(L, Wd) / 2;
-      mark(b.x - R, b.y - R, b.x + R, b.y + R, (x, y) => { const dx = x - b.x; const dy = y - b.y; return Math.abs(dx * c + dy * s) <= L / 2 && Math.abs(-dx * s + dy * c) <= Wd / 2; }, 0);
+      mark(b.x - R, b.y - R, b.x + R, b.y + R, (x, y) => { const dx = x - b.x; const dy = y - b.y; return Math.abs(dx * c + dy * s) <= L / 2 && Math.abs(-dx * s + dy * c) <= Wd / 2; }, 2);
     }
     svMapCache = { roads, river, lake, pond, crater, lava, bridges, width, grid, cell: C, cols, rows };
     return svMapCache;
@@ -2038,6 +2085,18 @@
     const gy = Math.floor(y / M.cell);
     if (gx < 0 || gy < 0 || gx >= M.cols || gy >= M.rows) return false;
     return M.grid[gy * M.cols + gx] === 1;
+  }
+  // Ce point est-il sur une route (ou un pont) ? On y va SURVIVOR.roadSpeed plus vite.
+  function survivorRoad(x, y) {
+    const M = survivorMap();
+    const gx = Math.floor(x / M.cell);
+    const gy = Math.floor(y / M.cell);
+    if (gx < 0 || gy < 0 || gx >= M.cols || gy >= M.rows) return false;
+    return M.grid[gy * M.cols + gx] === 2;
+  }
+  // Multiplicateur de vitesse du terrain : eau (lente), route (rapide), sinon 1
+  function survivorGround(x, y) {
+    return survivorWater(x, y) ? SURVIVOR.waterSlow : survivorRoad(x, y) ? 1 + SURVIVOR.roadSpeed : 1;
   }
 
   // Les deux lieux-dits les plus proches et leurs distances pondérées (pour fondre les sols à la frontière).
@@ -2082,6 +2141,23 @@
     sorcier: { hp: 800, speed: 93, damage: 18, radius: 26, every: 5, label: 'Malvorath' },
   };
   const SURVIVOR_BOSS_ORDER = ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier'];
+  /*
+   * Gardiens légendaires : un par lieu-dit (sauf le village), seuls 2 ou 3 d'entre eux (au hasard) dorment sur la
+   * carte à chaque partie. On les réveille exprès en restant `wake` secondes sur leur sceau ; un seul éveillé à la fois.
+   * Ils sont bien plus forts qu'un boss de vague (vie × la difficulté de la vague au réveil) et retournent dormir si
+   * on s'éloigne trop de leur antre. draw : dessin réutilisé (boss ou monstre), hue : teinte, attacks : leurs attaques.
+   */
+  const SURVIVOR_GUARDIAN = { count: [2, 3], wake: 3, sealRadius: 62, lairDist: 270, leash: 1500, every: 3.4, hp: 2000, damage: 16, emeralds: 15, chest: 3 };
+  const SURVIVOR_GUARDIANS = {
+    foret: { label: 'Reine sylvestre', icon: '🕷️', draw: 'maexxna', scale: 1.25, hue: 70, speed: 92, radius: 42, attacks: ['web', 'spiders', 'spit'] },
+    lac: { label: 'Seigneur de l\'Hiver', icon: '❄️', draw: 'liche', scale: 1.35, hue: 0, speed: 84, radius: 36, attacks: ['nova', 'frost', 'nova'] },
+    cimetiere: { label: 'Roi des morts', icon: '💀', draw: 'sorcier', scale: 1.35, hue: -150, speed: 88, radius: 34, attacks: ['blink', 'raise'] },
+    champs: { label: 'Grignotor doré', icon: '💰', draw: 'mimic', scale: 1.4, hue: 15, speed: 96, radius: 40, attacks: ['leap', 'coins', 'leap'] },
+    volcan: { label: 'Pyrax l\'Ancien', icon: '🔥', draw: 'dragon', scale: 1.2, hue: -25, speed: 92, radius: 44, attacks: ['fan', 'meteor'] },
+    ruines: { label: 'Colosse des ruines', icon: '🗿', draw: 'troll', scale: 1.4, hue: 0, gray: true, speed: 78, radius: 46, attacks: ['quake', 'rocks'] },
+    marais: { label: 'Roi des marais', icon: '🐸', draw: 'slime', scale: 3.4, hue: 0, speed: 70, radius: 50, attacks: ['split', 'bog'] },
+    prairie: { label: 'Roi gobelin', icon: '👑', draw: 'gobelin_violet', scale: 2.8, hue: 0, speed: 98, radius: 40, attacks: ['charge', 'summon', 'charge'] },
+  };
   // Difficulté de la vague n (1, 2, …) : vie et dégâts des ennemis, nombre d'ennemis à l'écran.
   function survivorWave(n) {
     const k = Math.max(0, n - 1);
@@ -2148,7 +2224,70 @@
       base: { damage: 7, cooldown: 3, amount: 1, area: 1, duration: 2.6, range: 64 },
       levels: [{ amount: 1 }, { damage: 3 }, { area: 0.2 }, { duration: 0.8 }, { amount: 1 }, { damage: 4 }, { area: 0.25, amount: 1 }],
     },
+    // Armes secrètes : elles ne s'achètent pas, elles se débloquent en remplissant un objectif sur plusieurs parties (SURVIVOR_SECRETS)
+    boomerang: {
+      label: 'Boomerang', icon: '🪃', color: '#e0a060', desc: 'Lancé vers l\'ennemi le plus proche, il revient en traversant tout.', secret: true,
+      base: { damage: 18, cooldown: 1.5, amount: 1, area: 1, pierce: 99, speed: 540, duration: 1.4 },
+      levels: [{ amount: 1 }, { damage: 7 }, { area: 0.2 }, { amount: 1 }, { damage: 8 }, { cooldown: -0.3 }, { amount: 1, damage: 10 }],
+    },
+    faux: {
+      label: 'Faux lunaire', icon: '🌙', color: '#d8d0ff', desc: 'Des faux spectrales fauchent tout autour de toi en un éclair.', secret: true,
+      base: { damage: 30, cooldown: 2.4, amount: 1, area: 1, speed: 7, duration: 0.9, range: 150 },
+      levels: [{ amount: 1 }, { damage: 10 }, { area: 0.2 }, { duration: 0.3 }, { damage: 12 }, { cooldown: -0.4 }, { amount: 1, damage: 14 }],
+    },
+    etoiles: {
+      label: 'Pluie d\'étoiles', icon: '🌠', color: '#ffe680', desc: 'Des étoiles filantes s\'écrasent sur les ennemis autour de toi.', secret: true,
+      base: { damage: 34, cooldown: 2.2, amount: 3, area: 1, range: 70 },
+      levels: [{ amount: 1 }, { damage: 10 }, { area: 0.2 }, { amount: 1 }, { damage: 12 }, { cooldown: -0.4 }, { amount: 2 }],
+    },
   };
+  // Armes secrètes : objectif cumulé sur toutes les parties (progression dans character.survivor.secrets)
+  const SURVIVOR_SECRETS = {
+    boomerang: { goal: 3, metric: 'legends', text: 'Vaincre 3 gardiens légendaires différents' },
+    faux: { goal: 5, metric: 'carts', text: 'Détruire 5 chariots dorés' },
+    etoiles: { goal: 15, metric: 'curses', text: 'Activer 15 sanctuaires maudits' },
+  };
+  // Défis du jour : 3 tirés chaque jour (heure de Paris, les mêmes pour tout le monde), à réussir en une seule partie.
+  const SURVIVOR_CHALLENGE_REWARD = 10; // émeraudes par défi réussi
+  const SURVIVOR_CHALLENGES = {
+    kills500: { text: 'Vaincre 500 monstres', metric: 'kills', goal: 500 },
+    wave10: { text: 'Atteindre la vague 10', metric: 'wave', goal: 10 },
+    wave15: { text: 'Atteindre la vague 15', metric: 'wave', goal: 15 },
+    boss2: { text: 'Vaincre 2 boss', metric: 'bosses', goal: 2 },
+    treasure2: { text: 'Ouvrir 2 trésors gardés', metric: 'treasures', goal: 2 },
+    shards4: { text: 'Ramasser 4 éclats d\'émeraude', metric: 'shards', goal: 4 },
+    altars3: { text: 'Recevoir 3 bénédictions d\'autel', metric: 'altars', goal: 3 },
+    curse2: { text: 'Activer 2 sanctuaires maudits', metric: 'curses', goal: 2 },
+    cart1: { text: 'Détruire un chariot doré', metric: 'carts', goal: 1 },
+    legend1: { text: 'Vaincre un gardien légendaire', metric: 'legends', goal: 1 },
+    evo1: { text: 'Faire évoluer une arme', metric: 'evos', goal: 1 },
+    night1: { text: 'Survivre à une nuit entière', metric: 'nights', goal: 1 },
+    level20: { text: 'Atteindre le niveau 20', metric: 'level', goal: 20 },
+    bomb1: { text: 'Faire exploser une bombe', metric: 'bombs', goal: 1 },
+  };
+  // Les 3 défis d'un jour (« AAAA-MM-JJ ») : tirage fixe à partir de la date
+  function survivorChallengesOf(day) {
+    const ids = Object.keys(SURVIVOR_CHALLENGES);
+    let seed = 0;
+    for (const ch of String(day)) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
+    const out = [];
+    for (let k = 0; out.length < 3 && k < 50; k++) {
+      const id = ids[Math.floor(survivorHash(seed, k, 91) * ids.length)];
+      if (!out.includes(id)) out.push(id);
+    }
+    return out;
+  }
+  // Valeur d'une mesure (défis du jour, armes secrètes) pour un résultat de partie
+  function survivorMetric(r, metric) {
+    const f = r.found || {};
+    switch (metric) {
+      case 'legends': return (r.legends || []).length;
+      case 'evos': return (r.evos || []).length;
+      case 'treasures': case 'shards': case 'altars': case 'carts': case 'nights': case 'bombs': return f[metric] || 0;
+      case 'curses': return r.curses || 0;
+      default: return r[metric] || 0;
+    }
+  }
   const SURVIVOR_WEAPON_MAX = 8;
   // Stats d'une arme à un niveau donné.
   function survivorWeaponStats(id, level) {
@@ -2158,6 +2297,29 @@
       for (const [k, v] of Object.entries(W.levels[i])) s[k] = Math.round(((s[k] || 0) + v) * 1000) / 1000;
     }
     return s;
+  }
+  // Évolutions : une arme au niveau 8 + l'objet indiqué → au prochain coffre (élite, boss, trésor, gardien), elle se
+  // transforme en version surpuissante (stats fixes, nouveau comportement). Les stats du joueur (zone, projectiles…) s'appliquent toujours.
+  const SURVIVOR_EVOLUTIONS = {
+    epee: { label: 'Lame du Héros', passive: 'gant', color: '#ffd34a', desc: 'Une taillade dorée tout autour de toi, qui repousse tout.',
+      stats: { damage: 60, cooldown: 0.85, area: 1, amount: 1, range: 165 } },
+    dagues: { label: 'Tempête de lames', passive: 'bottes', color: '#9fe8ff', desc: '12 dagues qui partent en cercle et reviennent en traversant tout.',
+      stats: { damage: 22, cooldown: 0.75, amount: 12, pierce: 6, speed: 700, duration: 1.2 } },
+    baguette: { label: 'Sceptre des arcanes', passive: 'grimoire', color: '#c79bff', desc: 'Des traits qui explosent à chaque impact.',
+      stats: { damage: 30, cooldown: 0.75, amount: 5, pierce: 2, speed: 520, duration: 2.4, blast: 85 } },
+    aura: { label: 'Sanctuaire ardent', passive: 'coeur', color: '#fff0a0', desc: 'Une aura sacrée, plus grande, qui te soigne à chaque ennemi brûlé.',
+      stats: { damage: 18, cooldown: 0.4, area: 1, range: 155, heal: 0.6 } },
+    hache: { label: 'Hache du Titan', passive: 'armure', color: '#ff8a3d', desc: 'D\'énormes haches en éventail qui font trembler le sol en retombant.',
+      stats: { damage: 70, cooldown: 1.3, amount: 4, area: 1.8, speed: 600, duration: 1.7, quake: 115 } },
+    foudre: { label: 'Couronne d\'orage', passive: 'couronne', color: '#fff36b', desc: 'Chaque éclair rebondit sur 3 ennemis voisins.',
+      stats: { damage: 55, cooldown: 1.5, amount: 6, area: 1, range: 80, chain: 3 } },
+    orbes: { label: 'Anneau éternel', passive: 'sablier', color: '#a8f0ff', desc: 'Deux anneaux d\'orbes qui ne s\'arrêtent jamais de tourner.',
+      stats: { damage: 30, cooldown: 1, amount: 6, area: 1.3, speed: 3.6, duration: 1, range: 100, always: true } },
+    fiole: { label: 'Marée d\'acide', passive: 'cristal', color: '#4fffc0', desc: 'Des flaques géantes qui ralentissent, et une traînée d\'acide derrière toi.',
+      stats: { damage: 15, cooldown: 1.6, amount: 3, area: 1.6, duration: 5, range: 64, slow: 0.4 } },
+  };
+  function survivorEvoReady(weapons, passives) {
+    return weapons.filter((w) => !w.evo && w.level >= SURVIVOR_WEAPON_MAX && SURVIVOR_EVOLUTIONS[w.id] && (passives[SURVIVOR_EVOLUTIONS[w.id].passive] || 0) > 0).map((w) => w.id);
   }
   // Ce que gagne une arme en passant au niveau `level` (2 à 8), en texte.
   const SV_STAT_TEXT = {
@@ -2232,6 +2394,10 @@
       foudre: { price: 10000, starter: 18000 },
       orbes: { price: 15000, starter: 25000 },
       fiole: { price: 22000, starter: 35000 },
+      // Armes secrètes : pas de prix, l'objectif les débloque (puis on peut payer pour commencer avec)
+      boomerang: { price: null, starter: 20000 },
+      faux: { price: null, starter: 20000 },
+      etoiles: { price: null, starter: 20000 },
     },
     passives: {
       coeur: 0, bottes: 0, gant: 0, aimant: 0, pomme: 0,
@@ -2835,9 +3001,9 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
-    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWave, survivorBoss,
+    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
-    SURVIVOR_UNLOCKS, survivorStats, survivorScore, survivorEmeralds, parisDay,
+    SURVIVOR_UNLOCKS, SURVIVOR_EVOLUTIONS, survivorEvoReady, SURVIVOR_SECRETS, SURVIVOR_CHALLENGES, SURVIVOR_CHALLENGE_REWARD, survivorChallengesOf, survivorMetric, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
     PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
