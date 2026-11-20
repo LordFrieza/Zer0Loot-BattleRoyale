@@ -2243,9 +2243,9 @@
   };
   // Armes secrètes : objectif cumulé sur toutes les parties (progression dans character.survivor.secrets)
   const SURVIVOR_SECRETS = {
-    boomerang: { goal: 3, metric: 'legends', text: 'Vaincre 3 gardiens légendaires différents' },
-    faux: { goal: 5, metric: 'carts', text: 'Détruire 5 chariots dorés' },
-    etoiles: { goal: 15, metric: 'curses', text: 'Activer 15 sanctuaires maudits' },
+    boomerang: { goal: 15, metric: 'legends', text: 'Vaincre 15 gardiens légendaires' },
+    faux: { goal: 30, metric: 'carts', text: 'Détruire 30 chariots dorés' },
+    etoiles: { goal: 50, metric: 'curses', text: 'Activer 50 sanctuaires maudits' },
   };
   // Défis du jour : 3 tirés chaque jour (heure de Paris, les mêmes pour tout le monde), à réussir en une seule partie.
   const SURVIVOR_CHALLENGE_REWARD = 10; // émeraudes par défi réussi

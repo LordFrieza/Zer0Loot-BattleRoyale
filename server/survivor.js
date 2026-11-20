@@ -1438,7 +1438,8 @@ function finish(userId, now = Date.now()) {
   game.addStat(c, 'emeraldsEarned', emeralds);
   // Évolutions découvertes et progression des armes secrètes
   for (const id of res.evos || []) if (!S.evos.includes(id)) S.evos.push(id);
-  for (const z of res.legends || []) if (!S.secrets.legends.includes(z)) S.secrets.legends.push(z);
+  for (const z of res.legends || []) if (!S.secrets.legends.includes(z)) S.secrets.legends.push(z); // gardiens déjà rencontrés
+  S.secrets.legendKills += (res.legends || []).length; // Boomerang : gardiens vaincus au total
   S.secrets.carts += (res.found && res.found.carts) || 0;
   S.secrets.curses += res.curses || 0;
   const secrets = [];
@@ -1467,10 +1468,10 @@ function finish(userId, now = Date.now()) {
   return out;
 }
 
-// Progression d'une arme secrète (gardiens différents vaincus, chariots détruits, sanctuaires activés)
+// Progression d'une arme secrète (gardiens vaincus, chariots détruits, sanctuaires activés, au total)
 function secretProgress(S, id) {
   const m = Rules.SURVIVOR_SECRETS[id].metric;
-  return m === 'legends' ? S.secrets.legends.length : S.secrets[m] || 0;
+  return m === 'legends' ? S.secrets.legendKills || 0 : S.secrets[m] || 0;
 }
 
 function abandon(userId) {

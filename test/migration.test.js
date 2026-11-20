@@ -58,7 +58,7 @@ test('[DB-8] migration V1 → V2 : toute la progression est conservée, les nouv
     // 2.0 : émeraudes, Survivor et Maison tout neufs
     assert.strictEqual(c.emeralds, 0);
     assert.deepStrictEqual(c.forgePity, {}, 'forge : aucun échec compté');
-    assert.deepStrictEqual(c.survivor, { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0, evos: [], secrets: { legends: [], carts: 0, curses: 0 }, challenges: { day: '', done: [] } });
+    assert.deepStrictEqual(c.survivor, { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0, evos: [], secrets: { legends: [], legendKills: 0, carts: 0, curses: 0 }, challenges: { day: '', done: [] } });
     assert.strictEqual(c.survivorActive, null);
     assert.deepStrictEqual([c.house.size, c.house.placed, c.house.owned, c.house.likes], ['studio', [], {}, []]);
     assert.deepStrictEqual(c.house.style, { murs: 'blanc', toit: 'tuiles', fenetres: 'simples', porte: 'bois', jardin: 'aucun', papier: 'beige', sol: 'parquet' });

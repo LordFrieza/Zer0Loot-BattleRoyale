@@ -73,6 +73,8 @@ function upgrade(character) {
   if (!character.forgePity || typeof character.forgePity !== 'object') character.forgePity = {};
   if (!character.survivor) character.survivor = newSurvivor();
   for (const [k, v] of Object.entries(newSurvivor())) if (character.survivor[k] === undefined) character.survivor[k] = v;
+  // 2.2 : armes secrètes, les gardiens vaincus se comptent au total (avant : gardiens différents)
+  if (!Number.isFinite(character.survivor.secrets.legendKills)) character.survivor.secrets.legendKills = (character.survivor.secrets.legends || []).length;
   if (character.survivorActive === undefined) character.survivorActive = null;
   if (!character.house) character.house = newHouse();
   const freshHouse = newHouse();
@@ -946,7 +948,7 @@ function newSurvivor() {
   return {
     meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0,
     evos: [], // évolutions d'armes découvertes
-    secrets: { legends: [], carts: 0, curses: 0 }, // progression des armes secrètes (cumulée sur toutes les parties)
+    secrets: { legends: [], legendKills: 0, carts: 0, curses: 0 }, // progression des armes secrètes (cumulée sur toutes les parties)
     challenges: { day: '', done: [] }, // défis du jour réussis
   };
 }

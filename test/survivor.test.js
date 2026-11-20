@@ -864,26 +864,31 @@ test('[SV-19] survivor : armes secrètes débloquées par des objectifs sur plus
   const u = player(50000);
   const c = u.character;
   c.emeralds = 1e6;
-  assert.throws(() => sv.buyUnlock(c, 'weapon', 'faux'), /Arme secrète : détruire 5 chariots dorés/);
+  assert.deepStrictEqual([SE.boomerang.goal, SE.faux.goal, SE.etoiles.goal], [15, 30, 50]);
+  assert.throws(() => sv.buyUnlock(c, 'weapon', 'faux'), /Arme secrète : détruire 30 chariots dorés/);
   assert.ok(!sv.unlockedWeapons(c).includes('faux'));
-  // Deux parties : 3 puis 2 chariots → la Faux est débloquée
-  for (const carts of [3, 2]) {
+  // Deux parties : 20 puis 10 chariots → la Faux est débloquée
+  for (const carts of [20, 10]) {
     const run = sv.start(u);
     run.found.carts = carts;
     const res = sv.finish(u.id);
-    assert.deepStrictEqual(res.secrets, carts === 2 ? ['faux'] : []);
+    assert.deepStrictEqual(res.secrets, carts === 10 ? ['faux'] : []);
   }
-  assert.strictEqual(c.survivor.secrets.carts, 5);
+  assert.strictEqual(c.survivor.secrets.carts, 30);
   assert.ok(sv.unlockedWeapons(c).includes('faux'));
   assert.ok(sv.stateOf(u).secrets.faux.unlocked);
-  // Gardiens différents (un même gardien ne compte qu'une fois)
+  // Gardiens : comptés au total (un même gardien compte à chaque victoire)
   for (const legends of [['foret', 'lac'], ['lac']]) {
     const run = sv.start(u);
     run.found.legends = legends;
     sv.finish(u.id);
   }
-  assert.deepStrictEqual(c.survivor.secrets.legends, ['foret', 'lac']);
-  assert.strictEqual(sv.stateOf(u).secrets.boomerang.progress, 2);
+  assert.deepStrictEqual([c.survivor.secrets.legendKills, c.survivor.secrets.legends], [3, ['foret', 'lac']]);
+  assert.strictEqual(sv.stateOf(u).secrets.boomerang.progress, 3);
+  // Ancienne sauvegarde (gardiens différents seulement) : le compte repart de là
+  delete c.survivor.secrets.legendKills;
+  game.upgrade(c);
+  assert.strictEqual(c.survivor.secrets.legendKills, 2);
   // Arme de départ ensuite (20 000 émeraudes)
   sv.buyUnlock(c, 'starter', 'faux');
   assert.ok(sv.starters(c).includes('faux'));

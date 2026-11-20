@@ -450,8 +450,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Sanctuaires maudits** (6 au hasard, cumulables) : monstres +10 % de dégâts et de vitesse, émeraudes +10 % chacun.
     **Encerclement** toutes les 4 vagues, **chariot doré** qui fuit (gemmes et 3 émeraudes), **jour et nuit** (cycle de
     5 min, 1 min de nuit à la vision réduite, soir doré et aube rose).
-  - **Armes secrètes** (objectifs cumulés sur toutes les parties) : Boomerang (3 gardiens différents), Faux lunaire
-    (5 chariots dorés), Pluie d'étoiles (15 sanctuaires maudits). **Défis du jour** : 3 par jour, 10 émeraudes chacun.
+  - **Armes secrètes** (objectifs cumulés sur toutes les parties) : Boomerang (15 gardiens vaincus), Faux lunaire
+    (30 chariots dorés), Pluie d'étoiles (50 sanctuaires maudits). **Défis du jour** : 3 par jour, 10 émeraudes chacun.
   - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres, × sanctuaires), une fois par
     jour **10 coffres + 3 Clés de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
     (classement des meilleurs scores).
