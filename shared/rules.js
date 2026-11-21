@@ -1701,9 +1701,9 @@
     normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 450, gold: 375, chests: 2 } },
     heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 900, gold: 750, chests: 3 } },
     legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1500, gold: 1350, chests: 6 } },
-    fabuleux: { label: 'Fabuleux', icon: '🌟', ultimate: true, hp: 38, damage: 5.5, special: 1.6, attackSpeed: 1.35, enrageAt: 100, healTaken: 0.45, reward: { xp: 3000, gold: 3500, chests: 10, keys: 1 } },
-    mythique: { label: 'Mythique', icon: '🌟🌟', ultimate: true, hp: 65, damage: 8, special: 1.9, attackSpeed: 1.55, enrageAt: 85, healTaken: 0.25, reward: { xp: 5000, gold: 7000, chests: 16, keys: 2 } },
-    divin: { label: 'Divin', icon: '👑', ultimate: true, hp: 82, damage: 9.5, special: 2, attackSpeed: 1.65, enrageAt: 80, healTaken: 0.2, reward: { xp: 8000, gold: 15000, chests: 25, keys: 3 } },
+    fabuleux: { label: 'Fabuleux', icon: '🌟', ultimate: true, hp: 38, damage: 5.5, special: 1.6, attackSpeed: 1.35, enrageAt: 100, healTaken: 0.45, reward: { xp: 3000, gold: 3500, chests: 10 } },
+    mythique: { label: 'Mythique', icon: '🌟🌟', ultimate: true, hp: 65, damage: 8, special: 1.9, attackSpeed: 1.55, enrageAt: 85, healTaken: 0.25, reward: { xp: 5000, gold: 7000, chests: 16 } },
+    divin: { label: 'Divin', icon: '👑', ultimate: true, hp: 82, damage: 9.5, special: 2, attackSpeed: 1.65, enrageAt: 80, healTaken: 0.2, reward: { xp: 8000, gold: 15000, chests: 25 } },
   };
   const BOSS_CHALLENGE_ORDER = ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin'];
   // Rang d'une difficulté (0 = Normal) : « Héroïque ou plus », « Légendaire ou plus »…
@@ -1860,7 +1860,7 @@
   }
 
   // ---------- Casino ----------
-  // Six jeux, chacun tenu par un boss en smoking (croupier = identifiant du boss). Tous les tirages se font côté serveur.
+  // Neuf jeux, chacun tenu par un boss en smoking (croupier = identifiant du boss). Tous les tirages se font côté serveur.
   const CASINO = {
     bets: [10, 25, 50, 100, 250, 500], // mises proposées
     maxBet: 500,

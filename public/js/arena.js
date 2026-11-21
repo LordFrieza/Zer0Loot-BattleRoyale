@@ -607,7 +607,7 @@
           this.announces.push({ text: `🥚 ${B.short.toUpperCase()} PART PONDRE !`, sub: `Détruisez les ${e.eggs} œufs avant qu'ils n'éclosent !`, subSize: 24, color: '#ffc21a', life: 3.4, age: 0 });
           if (window.Sound) Sound.play('roar', false);
         } else if (e.t === 'bossReturn') {
-          this.announces.push({ text: e.label, sub: e.drop ? 'Elle mord désormais plus vite !' : e.hatched ? `${e.hatched} dragonnet${e.hatched > 1 ? 's' : ''} ${e.hatched > 1 ? 'ont' : 'a'} éclos !` : 'Tous les œufs ont été détruits !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
+          this.announces.push({ text: e.label, sub: e.sub ? e.sub : e.drop ? 'Elle mord désormais plus vite !' : e.hatched ? `${e.hatched} dragonnet${e.hatched > 1 ? 's' : ''} ${e.hatched > 1 ? 'ont' : 'a'} éclos !` : 'Tous les œufs ont été détruits !', subSize: 24, color: '#ff4d6d', life: 3, age: 0 });
           if (e.drop) { const boss = this.disp.get('boss'); if (boss) { boss.x = e.x; boss.y = e.y; } }
           this.shake = Math.max(this.shake || 0, 0.6);
           if (window.Sound) Sound.play('roar', true);

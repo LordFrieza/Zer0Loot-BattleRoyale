@@ -284,8 +284,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Défi des boss** : l'un des 9 boss (Troll, Dragon, Magicien, Mimic, Liche de glace, Maexxna, Ether, Lilith, Daedra), seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
     2 coffres), Héroïque (900, 750, 3) ou Légendaire (1 500, 1 350, 6). Une victoire en Héroïque ou plus débloque la peau légendaire du boss.
     **Difficultés ultimes**, pour les héros entièrement légendaires : **Fabuleux** (vie ×38, dégâts ×5,5 ; 3 000 XP,
-    3 500 golds, 10 coffres, 1 Clé de boss), **Mythique** (×65, ×8 ; 5 000, 7 000, 16, 2 clés) et **Divin** (×82, ×9,5 ;
-    8 000, 15 000, 25, 3 clés) : en plus, attaques spéciales ×1,6 à ×2 plus fréquentes, coups ×1,35 à ×1,65 plus rapides,
+    3 500 golds, 10 coffres), **Mythique** (×65, ×8 ; 5 000, 7 000, 16) et **Divin** (×82, ×9,5 ;
+    8 000, 15 000, 25 ; jamais de Clé de boss en récompense) : en plus, attaques spéciales ×1,6 à ×2 plus fréquentes, coups ×1,35 à ×1,65 plus rapides,
     rage à 100 / 85 / 80 s et soins du héros réduits (×0,45 / ×0,25 / ×0,2). Un palier réussi compte pour ceux du dessous
     (succès Fabuleux, Mythique, Divin).
     Les boss sont nettement renforcés en solo (le Légendaire est réservé aux meilleurs builds) ; la vie et les dégâts du

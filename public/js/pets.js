@@ -333,7 +333,7 @@
       if (g.kind === 'emerald') return `${g.emeralds} émeraude${g.emeralds > 1 ? 's' : ''}`;
       if (g.kind === 'ticket') return `🎟️ ${g.tickets} ticket${g.tickets > 1 ? 's' : ''} de casino`;
       return '';
-    });
+    }).map((txt, i) => (r.gifts[i].surprise ? `${txt} (surprise !)` : txt));
     toast(`🐾 Trouvailles : ${lines.join(' · ')}`, 7000);
     for (const gift of scene.gifts) burst(gift.x, gift.y - 10, ['🎉', '✨', '⭐'], 12);
   }

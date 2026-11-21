@@ -286,7 +286,7 @@ test('[SOLO-10] défis ultimes Fabuleux, Mythique, Divin : boss bien plus coriac
   assert.ok(U.every((D) => D.ultimate));
   assert.deepStrictEqual(U.map((D) => [D.hp, D.damage, D.special, D.attackSpeed, D.enrageAt, D.healTaken]),
     [[38, 5.5, 1.6, 1.35, 100, 0.45], [65, 8, 1.9, 1.55, 85, 0.25], [82, 9.5, 2, 1.65, 80, 0.2]]);
-  assert.deepStrictEqual(U.map((D) => D.reward.keys), [1, 2, 3]);
+  assert.ok(Object.values(Rules.BOSS_CHALLENGE).every((D) => !D.reward.keys), 'aucune difficulté ne rend de Clé de boss (pas de farm infini)');
   assert.deepStrictEqual(Rules.BOSS_CHALLENGE_ORDER, ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin']);
   assert.deepStrictEqual(['normal', 'legendaire', 'divin', 'inconnu'].map(Rules.challengeRank), [0, 2, 5, 0]);
   const st = Rules.bossStats(1, 'ether', 20);
@@ -309,20 +309,20 @@ test('[SOLO-10] défis ultimes Fabuleux, Mythique, Divin : boss bien plus coriac
   assert.ok(Math.abs(div.boss.addScale.damage / leg.boss.addScale.damage - D.damage ** 0.7 / Rules.BOSS_CHALLENGE.legendaire.damage) < 1e-9);
 });
 
-test('[SOLO-11] défis ultimes réussis : Clés de boss en plus et compteurs par palier (chaque palier compte pour ceux du dessous)', () => {
+test('[SOLO-11] défis ultimes réussis : compteurs par palier (chaque palier compte pour ceux du dessous), aucune Clé de boss rendue', () => {
   const { soloRewards } = require('../server/index');
   const c = game.newCharacter();
   game.chooseClass(c, 'mage');
   const user = { id: 'solo-ult', username: 'Ult', role: 'player', character: c };
   const keys = c.bossKeys;
   soloRewards(user, { solo: 'boss', victory: true, difficulty: 'mythique', boss: { id: 'lilith' }, reward: { ...Rules.BOSS_CHALLENGE.mythique.reward }, duration: 60 });
-  assert.strictEqual(c.bossKeys, keys + 2);
+  assert.strictEqual(c.bossKeys, keys, 'pas de clé en récompense');
   const k = c.counters;
   assert.deepStrictEqual([k.heroWins, k.legendWins, k.fabuleuxWins, k.mythiqueWins, k.divinWins || 0], [1, 1, 1, 1, 0]);
-  assert.strictEqual(c.history[0].gains.keys, 2);
+  assert.strictEqual(c.history[0].gains.keys, undefined);
   // Défaite : ni clé ni compteur
   soloRewards(user, { solo: 'boss', victory: false, difficulty: 'divin', boss: { id: 'lilith' }, reward: null, duration: 60 });
-  assert.strictEqual(c.bossKeys, keys + 2);
+  assert.strictEqual(c.bossKeys, keys);
   assert.strictEqual(k.divinWins || 0, 0);
   // Succès des paliers ultimes
   assert.ok(['fabuleuxWins', 'mythiqueWins', 'divinWins'].every((m) => Rules.ACHIEVEMENTS.some((a) => a.metric === m)));

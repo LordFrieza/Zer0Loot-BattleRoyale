@@ -1653,3 +1653,8 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .race-pick { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; background: rgba(255, 255, 255, .04); border: 2px solid color-mix(in srgb, var(--dc) 50%, transparent); color: var(--text); cursor: pointer; font: inherit; box-shadow: none; }
 .race-pick b { color: var(--dc); }
 .race-pick.active { background: color-mix(in srgb, var(--dc) 20%, transparent); border-color: #ffd34a; box-shadow: 0 0 14px rgba(255, 211, 74, .6); }
+.gold-chip.ticket-chip { color: #ff9ae0; border-color: rgba(255, 154, 224, .5); background: rgba(255, 154, 224, .1); text-decoration: none; }
+.casino-tickets { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--muted); border: 1px dashed rgba(255, 154, 224, .35); }
+.casino-tickets.has { color: var(--text); background: linear-gradient(90deg, rgba(255, 154, 224, .16), rgba(255, 154, 224, .04)); border: 1px solid rgba(255, 154, 224, .6); }
+.cm-tickets { margin-left: 8px; color: #ff9ae0; }
+.ticket-note { font-size: 12px; font-weight: 700; color: #ff9ae0; }

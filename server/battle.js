@@ -804,7 +804,7 @@ class Battle extends EventEmitter {
         b.intangible = false;
         b.stage = null;
         b.slamIn = b.slamEvery * 0.5;
-        this.events.push({ t: 'bossReturn', label: 'ETHER REPREND FORME !', x: Math.round(b.x), y: Math.round(b.y) });
+        this.events.push({ t: 'bossReturn', label: 'ETHER REPREND FORME !', sub: 'Il redevient vulnérable : frappez-le !', x: Math.round(b.x), y: Math.round(b.y) });
       }
     } else if (st.kind === 'illusions') {
       // Lilith et ses illusions : toutes brisées → elle est étourdie ; sinon elles explosent à la fin
@@ -842,7 +842,7 @@ class Battle extends EventEmitter {
         b.x = spot.x;
         b.y = spot.y;
         b.slamIn = b.slamEvery * 0.6;
-        this.events.push({ t: 'bossReturn', label: 'DAEDRA REDESCEND DES FLAMMES !', x: Math.round(b.x), y: Math.round(b.y), drop: true });
+        this.events.push({ t: 'bossReturn', label: 'DAEDRA REDESCEND DES FLAMMES !', sub: 'Elle s\'abat sur le plus gros groupe !', x: Math.round(b.x), y: Math.round(b.y), drop: true });
         this.slams.push({ kind: 'hellland', x: b.x, y: b.y, r: 150, t: 0.01, warn: 0.01, ratio: 1 });
       }
     } else if (st.kind === 'shield') {

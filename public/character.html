@@ -26,6 +26,7 @@
       <button type="button" class="mail-btn" id="mail-btn" title="Courrier">✉️<span class="mail-count" id="mail-count"></span></button>
       <span class="gold-chip" id="gold-chip" title="Tes golds"></span>
       <a href="#survivor" class="gold-chip emerald-chip" id="emerald-chip" title="Tes émeraudes (gagnées au Survivor, dépensées en méta-progression et à la Maison)"></a>
+      <a href="#casino" class="gold-chip ticket-chip" id="ticket-chip" style="display:none" title="Tickets de casino : chacun paie une mise de 50 golds dans n'importe quel jeu du casino (sauf la Caisse de Grignotor)"></a>
       <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
       <a href="#solo" class="energy-chip key-chip" id="key-chip" title="Clés de boss (Défi des boss)"></a>
       <span id="who"></span>
@@ -463,11 +464,13 @@
 
     <section class="tab" data-tab="casino">
     <div class="panel casino-panel">
-      <h2>🎰 Casino <span class="sub">Six jeux tenus par des boss en smoking</span><button class="help-btn" type="button">?</button></h2>
+      <h2>🎰 Casino <span class="sub">Neuf jeux tenus par des boss en smoking</span><button class="help-btn" type="button">?</button></h2>
       <p class="muted help">Clique sur une table de la salle (ou sur une carte ci-dessous) pour t'y asseoir. Chaque partie se paie en
         golds : 10 à 500 par mise, 100 la caisse de Grignotor. Tous les tirages sont faits par le serveur. Les gros gains
         (10 fois la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde. Joue pour le plaisir : en moyenne,
-        la maison garde quelques pourcents de chaque mise.</p>
+        la maison garde quelques pourcents de chaque mise. Les <b>tickets de casino</b> (rapportés par Mini Lilith) paient une
+        mise de 50 golds à ta place : ouvre un jeu et clique sur « 🎟️ Ticket » à côté des mises.</p>
+      <div class="casino-tickets" id="casino-tickets"></div>
       <div class="casino-scene"><canvas id="casino-canvas" width="1100" height="700"></canvas></div>
       <div class="casino-games" id="casino-games"></div>
       <div class="casino-cols">

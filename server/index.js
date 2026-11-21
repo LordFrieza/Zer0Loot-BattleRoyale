@@ -1492,8 +1492,6 @@ function soloRewards(user, result, f = null) {
   let levels = 0;
   // Clés de boss trouvées dans l'Expédition (jamais en répétition) : gardées même en cas de défaite
   let keys = result.solo === 'expedition' && !result.training ? Math.max(0, result.keys || 0) : 0;
-  // Défis ultimes réussis : des Clés de boss en plus (Fabuleux 1, Mythique 2, Divin 3)
-  if (result.solo === 'boss' && result.victory && result.reward && result.reward.keys) keys += result.reward.keys;
   if (keys) game.addKeys(c, keys);
   if (result.reward) {
     const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };

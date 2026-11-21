@@ -697,8 +697,11 @@ test('[ETH-3, ETH-4] Ether : intangible avec mains spectrales (chaque main détr
   assert.ok(Math.abs(b.boss.stage.until - (until - E.intangible.shorten)) < 1e-9);
   // Il reprend forme à la fin ; les mains restantes disparaissent
   b.time = b.boss.stage.until + 0.01;
+  b.events = [];
   b.updateBoss(0.05);
   assert.strictEqual(b.boss.intangible, false);
+  const back = b.events.find((e) => e.t === 'bossReturn');
+  assert.ok(back && back.sub && !/œuf/.test(back.sub), 'son propre texte de retour (pas celui des œufs de Pyrax)');
   assert.ok(!b.adds.some((a) => a.kind === 'main' && a.alive));
   // Feux follets à 50 % : ils explosent au contact
   b.boss.hp = b.boss.maxHp * 0.49;

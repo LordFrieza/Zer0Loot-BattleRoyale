@@ -1,6 +1,6 @@
 /*
  * Onglet Casino (neuf jeux, trois rangées de tables) : la salle animée (joueurs qui se promènent entre les tables, croupiers en smoking), la fenêtre
- * de jeu commune (croupier qui parle, solde, mise, effets) et le fil des gros gains. Les six jeux sont dans
+ * de jeu commune (croupier qui parle, solde, mise, effets) et le fil des gros gains. Les neuf jeux sont dans
  * casino-games.js (window.CasinoGames). Tous les tirages sont faits par le serveur (/api/casino/*).
  * Utilise les globales de la page : me, api, toast, esc, opening, refresh (character.js), Sound, Rules.
  */
@@ -12,7 +12,7 @@
   const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
 
   // ---------- Salle ----------
-  // Emplacements des six jeux (centre de la table) et du croupier (ses pieds, derrière la table).
+  // Emplacements des neuf jeux (centre de la table) et du croupier (ses pieds, derrière la table).
   const STATIONS = {
     slots: { x: 185, y: 235, w: 250, h: 120, cx: 300, cy: 200 },
     roulette: { x: 550, y: 238, w: 240, h: 110, cx: 550, cy: 186 },
@@ -680,8 +680,18 @@
     if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
     return new Date(at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   }
+  // Bandeau des tickets de casino (Mini Lilith), au-dessus de la salle
+  function renderTickets() {
+    const n = me.character.casinoTickets || 0;
+    const el = $('casino-tickets');
+    el.className = `casino-tickets ${n ? 'has' : ''}`;
+    el.innerHTML = n
+      ? `🎟️ Tu as <b>${n} ticket${n > 1 ? 's' : ''} de casino</b> : chacun paie <b>une mise de ${C.ticket} golds</b> à ta place, dans n'importe quel jeu sauf la Caisse de Grignotor. Ouvre un jeu puis clique sur <b>« 🎟️ Ticket »</b> à côté des mises (les gains sont pour toi).`
+      : `🎟️ <b>Tickets de casino</b> : Mini Lilith (le familier de Lilith) en rapporte. Chacun paie une mise de ${C.ticket} golds dans n'importe quel jeu sauf la Caisse.`;
+  }
   function renderStats() {
     if (!me) return;
+    renderTickets();
     const L = me.character.lifetime || {};
     const net = (L.casinoWon || 0) - (L.casinoWagered || 0);
     $('casino-stats').innerHTML = `<h3>📊 Mes jeux</h3>
@@ -780,7 +790,8 @@
   }
 
   function showGold() {
-    cm.goldEl.innerHTML = `🪙 <b>${fmt(cm.gold)}</b>`;
+    const n = (me && me.character.casinoTickets) || 0;
+    cm.goldEl.innerHTML = `🪙 <b>${fmt(cm.gold)}</b>${n ? ` <span class="cm-tickets" title="Tickets de casino : une mise gratuite de ${C.ticket} golds chacun">🎟️ <b>${n}</b></span>` : ''}`;
   }
 
   function openGame(id) {
@@ -915,9 +926,15 @@
     box.btn.style.display = n ? '' : 'none';
     box.btn.classList.toggle('active', box.on);
     box.btn.innerHTML = `🎟️ Ticket <small>×${n}</small>`;
+    box.btn.title = box.on ? `Ticket utilisé : la mise de ${C.ticket} golds est payée par le ticket (clique pour jouer avec tes golds)` : `Utiliser un ticket : mise de ${C.ticket} golds payée par le ticket (il t'en reste ${n})`;
+    let note = box.btn.nextElementSibling;
+    if (!note || !note.classList.contains('ticket-note')) { note = document.createElement('span'); note.className = 'ticket-note'; box.btn.after(note); }
+    note.textContent = box.on ? `Mise de ${C.ticket} 🪙 offerte par le ticket` : '';
   }
   function syncTickets() {
     for (const box of ticketBoxes) { if (!box.btn.isConnected) ticketBoxes.delete(box); else paint(box); }
+    if (cm.el) showGold();
+    if (me && $('casino-tickets')) renderTickets();
   }
   api_.ticketToggle = ticketToggle;
 
