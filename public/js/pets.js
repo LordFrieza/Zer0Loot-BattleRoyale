@@ -412,10 +412,7 @@
 
   // Ciel selon l'heure réelle : jour, couchant, nuit étoilée.
   function drawSky(ctx, t) {
-    const d = new Date();
-    const h = d.getHours() + d.getMinutes() / 60;
-    const night = h < 6 || h >= 20.5;
-    const dusk = (h >= 18 && h < 20.5) || (h >= 6 && h < 7.5);
+    const { h, night, dusk } = skyPhase();
     const g = ctx.createLinearGradient(0, 0, 0, GROUND);
     if (night) { g.addColorStop(0, '#0b1030'); g.addColorStop(1, '#2a2e5e'); } else if (dusk) { g.addColorStop(0, '#4a5bb0'); g.addColorStop(0.6, '#f08a6a'); g.addColorStop(1, '#ffc27a'); } else { g.addColorStop(0, '#6fb8ff'); g.addColorStop(1, '#cfeaff'); }
     ctx.fillStyle = g;
@@ -829,7 +826,7 @@
         ctx.fillStyle = '#5e3b1c'; ctx.beginPath(); ctx.arc(px, -22, 6, 0, Math.PI * 2); ctx.fill();
       }
     }
-    drawItems(ctx, t, false, null, { own, spots: YARD_SPOTS, w: YARD_W, ground: 40, lanternY: -20, petName: data.pet ? data.pet.name : '' });
+    drawItems(ctx, t, skyPhase().night, null, { own, spots: YARD_SPOTS, w: YARD_W, ground: 40, lanternY: -20, petName: data.pet ? data.pet.name : '' });
     // Familier principal qui se promène dans l'enclos
     if (data.pet && window.drawPet) {
       const key = data.pet.species + '|' + data.pet.name;

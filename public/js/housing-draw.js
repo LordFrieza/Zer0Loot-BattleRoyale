@@ -694,13 +694,10 @@
     const st = house.style;
     const P = Rules.HOUSE_PARTS;
     const t = o.t || 0;
-    // Ciel, collines, sol
-    const sky = g.createLinearGradient(0, 0, 0, ch);
-    sky.addColorStop(0, '#7ec8f0'); sky.addColorStop(0.7, '#cfeeff');
-    g.fillStyle = sky; g.fillRect(0, 0, cw, ch);
-    g.fillStyle = 'rgba(255,255,255,.85)';
-    for (let i = 0; i < 3; i++) { const x = ((t / 60 + i * 230) % (cw + 160)) - 80; const y = 30 + i * 18; g.beginPath(); g.ellipse(x, y, 34, 11, 0, 0, Math.PI * 2); g.ellipse(x + 22, y - 6, 22, 10, 0, 0, Math.PI * 2); g.fill(); }
-    if (o.sky) o.sky(g, cw, ch, t); // ce qui passe dans le ciel (housing-life.js)
+    // Ciel selon l'heure réelle du joueur (comme l'enclos du Familier) : jour, aube / crépuscule, nuit étoilée
+    const ph = o.phase || (typeof skyPhase === 'function' ? skyPhase() : { night: false, dusk: false, sun: 0.5 });
+    drawFrontSky(g, cw, ch, t, ph);
+    if (o.sky) o.sky(g, cw, ch, t, ph); // ce qui passe dans le ciel (housing-life.js)
     g.fillStyle = '#8cc56a'; g.beginPath(); g.ellipse(cw * 0.2, ch * 0.8, cw * 0.4, 70, 0, 0, Math.PI * 2); g.ellipse(cw * 0.85, ch * 0.82, cw * 0.35, 60, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#6fb35a'; g.fillRect(0, ch * 0.8, cw, ch * 0.2);
     const size = house.size || 'studio';
@@ -747,8 +744,9 @@
     // Fenêtres
     const winY = by + bh * 0.25;
     const wins = size === 'studio' ? [bx + bw * 0.18, bx + bw * 0.68] : size === 'maison' ? [bx + bw * 0.12, bx + bw * 0.3, bx + bw * 0.62, bx + bw * 0.8] : [bx + bw * 0.08, bx + bw * 0.22, bx + bw * 0.66, bx + bw * 0.8];
-    for (const wx of wins) drawWindow(g, st.fenetres, wx, winY, 30, 30, t);
-    if (size === 'manoir') for (const wx of [bx + bw * 0.4, bx + bw * 0.53]) drawWindow(g, st.fenetres, wx, by + 8, 26, 22, t);
+    const lit = []; // fenêtres allumées la nuit
+    for (const wx of wins) { drawWindow(g, st.fenetres, wx, winY, 30, 30, t); lit.push([wx, winY, 30, 30]); }
+    if (size === 'manoir') for (const wx of [bx + bw * 0.4, bx + bw * 0.53]) { drawWindow(g, st.fenetres, wx, by + 8, 26, 22, t); lit.push([wx, by + 8, 26, 22]); }
     // Porte
     const door = P.porte.options[st.porte] || P.porte.options.bois;
     const dw = 34;
@@ -777,6 +775,9 @@
       g.fillStyle = '#c4122f'; g.fillRect(mx + 12, my - 60 + Math.sin(t / 200) * 1.5, 3, 18); g.fillRect(mx + 12, my - 60 + Math.sin(t / 200) * 1.5, 10, 7);
       g.fillStyle = '#fff'; g.fillRect(mx - 8, my - 44, 12, 6);
     }
+    if (o.front) o.front(g, cw, ch, t, ph); // passants au premier plan
+    // La nuit, tout s'assombrit… sauf les lumières : fenêtres, lanternes, lampe de la porte, lune
+    if (ph.night || ph.dusk) drawFrontNight(g, cw, ch, t, ph, { lit, cx, dy, dw, gy, by, bw, bx, lanterns: st.jardin === 'lanternes' ? [cx - 50, cx + 50] : [], seed: (house.id || '').length + bw });
     // Nom du propriétaire
     if (o.name) {
       g.font = '800 13px system-ui'; g.textAlign = 'center';
@@ -785,8 +786,71 @@
       rr(g, cw / 2 - w / 2, 8, w, 22, 11, 'rgba(10, 6, 24, .7)');
       g.fillStyle = '#fff'; g.fillText(label, cw / 2, 23);
     }
-    if (o.front) o.front(g, cw, ch, t); // passants au premier plan
     return { mailbox: { x: mx - 16, y: my - 64, w: 40, h: 68 } };
+  }
+
+  // Ciel de la façade : dégradé selon le moment, soleil qui suit sa course, nuages ; étoiles et lune la nuit.
+  function drawFrontSky(g, cw, ch, t, ph) {
+    const sky = g.createLinearGradient(0, 0, 0, ch * 0.8);
+    if (ph.night) { sky.addColorStop(0, '#070b26'); sky.addColorStop(1, '#25285a'); }
+    else if (ph.dusk) { sky.addColorStop(0, '#3e4d9e'); sky.addColorStop(0.55, '#e9876a'); sky.addColorStop(1, '#ffc27a'); }
+    else { sky.addColorStop(0, '#7ec8f0'); sky.addColorStop(0.7, '#cfeeff'); }
+    g.fillStyle = sky; g.fillRect(0, 0, cw, ch);
+    if (ph.night) {
+      for (let i = 0; i < 70; i++) {
+        const x = (i * 137.5) % cw;
+        const y = (i * 53.3) % (ch * 0.6);
+        g.fillStyle = `rgba(255,255,255,${0.35 + 0.45 * Math.abs(Math.sin(t / 600 + i * 1.7))})`;
+        g.fillRect(x, y, i % 7 ? 1.6 : 2.4, i % 7 ? 1.6 : 2.4);
+      }
+      // étoile filante de temps en temps
+      const sp = (t / 9000) % 1;
+      if (sp < 0.08) { const k = sp / 0.08; g.strokeStyle = `rgba(255,255,255,${1 - k})`; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cw * 0.15 + k * 160, 20 + k * 50); g.lineTo(cw * 0.15 + k * 160 - 30, 20 + k * 50 - 9); g.stroke(); }
+      // lune (croissant) et son halo
+      const mx = cw * 0.86;
+      const my = 46;
+      const halo = g.createRadialGradient(mx, my, 10, mx, my, 70);
+      halo.addColorStop(0, 'rgba(255, 246, 208, .35)'); halo.addColorStop(1, 'rgba(255, 246, 208, 0)');
+      g.fillStyle = halo; g.beginPath(); g.arc(mx, my, 70, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff6d0'; g.beginPath(); g.arc(mx, my, 22, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#0d1236'; g.beginPath(); g.arc(mx + 11, my - 6, 20, 0, Math.PI * 2); g.fill();
+      return;
+    }
+    // soleil : se lève à gauche, culmine à midi, se couche à droite
+    const sx = cw * 0.08 + ph.sun * cw * 0.84;
+    const sy = ch * 0.62 - Math.sin(ph.sun * Math.PI) * ch * 0.52;
+    const sg = g.createRadialGradient(sx, sy, 6, sx, sy, 64);
+    sg.addColorStop(0, ph.dusk ? '#ffd59a' : '#fffbe0');
+    sg.addColorStop(0.4, ph.dusk ? 'rgba(255,170,90,.6)' : 'rgba(255,240,150,.5)');
+    sg.addColorStop(1, 'rgba(255,240,150,0)');
+    g.fillStyle = sg; g.beginPath(); g.arc(sx, sy, 64, 0, Math.PI * 2); g.fill();
+    g.fillStyle = ph.dusk ? 'rgba(255,220,200,.75)' : 'rgba(255,255,255,.85)';
+    for (let i = 0; i < 3; i++) { const x = ((t / 60 + i * 230) % (cw + 160)) - 80; const y = 30 + i * 18; g.beginPath(); g.ellipse(x, y, 34, 11, 0, 0, Math.PI * 2); g.ellipse(x + 22, y - 6, 22, 10, 0, 0, Math.PI * 2); g.fill(); }
+  }
+
+  // Nuit (ou crépuscule) sur la rue : voile bleu sombre, puis les lumières par-dessus (fenêtres jaunes qui
+  // s'éteignent peu à peu après minuit, lampe au-dessus de la porte, lanternes du jardin).
+  function drawFrontNight(g, cw, ch, t, ph, L) {
+    g.fillStyle = ph.night ? 'rgba(8, 12, 48, .5)' : 'rgba(255, 110, 60, .1)';
+    g.fillRect(0, ch * 0.3, cw, ch * 0.7);
+    if (ph.night) { g.fillStyle = 'rgba(8, 12, 48, .5)'; g.fillRect(0, 0, cw, ch * 0.3); }
+    if (!ph.night && ph.h < 12) return; // aube : rien n'est encore allumé
+    // Après minuit, de moins en moins de fenêtres allumées (jusqu'à 6 h)
+    const late = ph.h < 6 ? ph.h / 6 : 0;
+    L.lit.forEach(([x, y, w, h], i) => {
+      if (late && ((i * 7 + L.seed) % 10) / 10 < late * 0.8) return;
+      const flick = 0.92 + Math.sin(t / 700 + i * 2.3) * 0.04;
+      glow(g, x + w / 2, y + h / 2, w * 1.4, `rgba(255, 200, 100, ${0.45 * flick})`);
+      g.fillStyle = `rgba(255, 214, 120, ${0.85 * flick})`; g.fillRect(x + 1, y + 1, w - 2, h - 2);
+      g.strokeStyle = '#5a3416'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2, y + h); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke();
+    });
+    // Lampe au-dessus de la porte
+    const lx = L.cx;
+    const ly = L.dy - 10;
+    glow(g, lx, ly, 46, 'rgba(255, 210, 120, .55)');
+    rr(g, lx - 5, ly - 6, 10, 10, 3, '#ffe9a8', '#3a3a42');
+    // Lanternes du jardin
+    for (const x of L.lanterns) { glow(g, x, L.gy - 44, 40, 'rgba(255, 210, 120, .7)'); rr(g, x - 6, L.gy - 52, 12, 14, 3, '#fff2c0', '#3a3a42'); }
   }
 
   function drawWindow(g, kind, x, y, w, h, t) {

@@ -45,6 +45,15 @@ const confirmBox = (message, o = {}) => zlDialog({ title: o.title || 'Confirmati
 const alertBox = (message, o = {}) => zlDialog({ title: o.title || 'Information', message, ok: o.ok || 'OK', cancel: false });
 const promptBox = (message, value = '', o = {}) => zlDialog({ title: o.title || '', message, ok: o.ok || 'Valider', input: value });
 
+// Moment de la journée d'après l'heure réelle du joueur (enclos du Familier et façade de la Maison, mêmes horaires) :
+// nuit de 20 h 30 à 6 h, aube de 6 h à 7 h 30, crépuscule de 18 h à 20 h 30. window.ZL_HOUR (nombre) force l'heure pour les essais.
+function skyPhase(d = new Date()) {
+  const h = typeof window.ZL_HOUR === 'number' ? window.ZL_HOUR : d.getHours() + d.getMinutes() / 60;
+  const night = h < 6 || h >= 20.5;
+  const dusk = !night && (h >= 18 || h < 7.5);
+  return { h, night, dusk, day: !night && !dusk, sun: Math.max(0, Math.min(1, (h - 6) / 14.5)) };
+}
+
 function toast(message, ms = 3500) {
   let wrap = document.querySelector('.toast-wrap');
   if (!wrap) {

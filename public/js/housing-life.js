@@ -66,9 +66,10 @@
   }
 
   // ---------- Ciel ----------
-  function newSky(now, cw) {
+  function newSky(now, cw, night) {
     const dir = Math.random() < 0.5 ? 1 : -1;
-    const kind = pick(['avion', 'avion', 'pyrax', 'pyrax', 'ballon', 'chauves', 'oiseaux']);
+    // La nuit (heure réelle du joueur) : chauves-souris et Pyrax, plus rarement un avion ; ni oiseaux ni montgolfière
+    const kind = pick(night ? ['chauves', 'chauves', 'chauves', 'pyrax', 'avion'] : ['avion', 'avion', 'pyrax', 'pyrax', 'ballon', 'chauves', 'oiseaux']);
     const speed = { avion: 70, pyrax: 85, ballon: 22, chauves: 60, oiseaux: 45 }[kind];
     const pad = kind === 'avion' ? 420 : 160;
     // Haut dans le ciel, au-dessus du toit
@@ -138,10 +139,10 @@
       }
     }
   }
-  function drawSky(g, cw, ch, t) {
+  function drawSky(g, cw, ch, t, ph) {
     const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
     last = t;
-    if (!sky && t >= skyAt) sky = newSky(t, cw);
+    if (!sky && t >= skyAt) sky = newSky(t, cw, !!(ph && ph.night));
     if (sky) {
       sky.x += sky.dir * sky.speed * dt;
       if (sky.kind === 'avion') drawPlane(g, sky, t);
