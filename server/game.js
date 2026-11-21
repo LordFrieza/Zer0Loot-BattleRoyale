@@ -69,6 +69,8 @@ function upgrade(character) {
   if (character.pets.follow === undefined) character.pets.follow = null;
   // 2.0 : émeraudes, Survivor et Maison (tout neufs pour les anciens personnages)
   if (!Number.isFinite(character.emeralds)) character.emeralds = 0;
+  // 2.3 : tickets de casino (familier de Lilith)
+  if (!Number.isFinite(character.casinoTickets)) character.casinoTickets = 0;
   // 2.1 : forge, +1 % de réussite par échec d'affilée, par rareté
   if (!character.forgePity || typeof character.forgePity !== 'object') character.forgePity = {};
   if (!character.survivor) character.survivor = newSurvivor();
@@ -142,6 +144,7 @@ function newCharacter() {
     bossKeys: Rules.SOLO.startKeys, // Clés de boss (Défi des boss), sans limite, trouvées dans l'Expédition
     pets: newPets(), // familiers (onglet Familier)
     emeralds: 0, // émeraudes (Survivor → méta-progression et Maison)
+    casinoTickets: 0, // tickets de casino (Mini Lilith) : une partie gratuite à 50 golds
     forgePity: {}, // forge : échecs d'affilée par rareté ({ commun: 2 } = +2 % à la prochaine fusion commune)
     survivor: newSurvivor(), // Survivor : méta-progression, déblocages, record, récompense du jour
     survivorActive: null, // partie de Survivor en cours (golds rendus si le serveur redémarre)
@@ -965,7 +968,7 @@ function newPets() {
 
 // Total de tout ce que les familiers ont rapporté (le journal, lui, ne garde que les dernières trouvailles).
 function newPetTotals() {
-  return { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 };
+  return { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0, emeralds: 0, tickets: 0 };
 }
 
 function findPet(character, id) {
@@ -1114,10 +1117,27 @@ function buyEnclos(character, itemId) {
 // Une trouvaille, selon l'espèce et le niveau du familier.
 function petFind(character, pet, fx) {
   const L = pet.level;
-  const find = Rules.PETS[pet.species].find;
+  let find = Rules.PETS[pet.species].find;
+  // Mini Daedra : la trouvaille d'un autre familier, au hasard, à son niveau
+  const surprise = find === 'random';
+  if (surprise) find = Rules.PET_RANDOM_FINDS[rand(0, Rules.PET_RANDOM_FINDS.length - 1)];
+  const out = petFindOf(character, pet, fx, find, L);
+  if (surprise) out.surprise = true;
+  return out;
+}
+
+function petFindOf(character, pet, fx, find, L) {
   const luck = 10 + 4 * L;
-  if (find === 'gold') { const gold = Rules.petFindValue(pet.species, L, fx); character.gold += gold; addStat(character, 'goldEarned', gold); return { kind: 'gold', gold }; }
-  if (find === 'xp') { const xp = Rules.petFindValue(pet.species, L, fx); const levels = addXp(character, xp); return { kind: 'xp', xp, levels }; }
+  if (find === 'gold') { const gold = Rules.petFindValue(pet.species, L, fx, 'gold'); character.gold += gold; addStat(character, 'goldEarned', gold); return { kind: 'gold', gold }; }
+  if (find === 'xp') { const xp = Rules.petFindValue(pet.species, L, fx, 'xp'); const levels = addXp(character, xp); return { kind: 'xp', xp, levels }; }
+  // Mini Ether : des émeraudes
+  if (find === 'emerald') { const emeralds = Rules.petFindValue(pet.species, L, fx, 'emerald'); character.emeralds += emeralds; addStat(character, 'emeraldsEarned', emeralds); return { kind: 'emerald', emeralds }; }
+  // Mini Lilith : un ticket de casino (une partie gratuite à 50 golds), parfois deux
+  if (find === 'ticket') {
+    const tickets = 1 + (random() < 0.03 * L ? 1 : 0);
+    character.casinoTickets = (character.casinoTickets || 0) + tickets;
+    return { kind: 'ticket', tickets };
+  }
   if (find === 'chest') {
     const chests = 1 + (random() < 0.03 * L ? 1 : 0);
     character.chests += chests;
@@ -1171,6 +1191,9 @@ function logFinds(character, gifts, now) {
     if (g.kind === 'chest') { entry.chests = g.chests; T.chests += g.chests; }
     if (g.kind === 'potion') { entry.potion = g.potion; T.potions += 1; if (g.key) { entry.key = g.key; T.keys += g.key; } }
     if (g.kind === 'item') { entry.item = { name: g.item.name, rarity: g.item.rarity, slot: g.item.slot }; T.items += 1; }
+    if (g.kind === 'emerald') { entry.emeralds = g.emeralds; T.emeralds += g.emeralds; }
+    if (g.kind === 'ticket') { entry.tickets = g.tickets; T.tickets += g.tickets; }
+    if (g.surprise) entry.surprise = true;
     P.log.unshift(entry);
   }
   P.log.length = Math.min(P.log.length, Rules.PET.logMax);
@@ -1284,6 +1307,7 @@ function absorbGhost(user, ghost) {
   mergePets(c, g);
   // Émeraudes, Survivor et Maison du fantôme (il ne peut pas y jouer sans compte, mais au cas où)
   c.emeralds += g.emeralds || 0;
+  c.casinoTickets = (c.casinoTickets || 0) + (g.casinoTickets || 0);
   if (g.survivor && g.survivor.best && (!c.survivor.best || g.survivor.best.score > c.survivor.best.score)) c.survivor.best = g.survivor.best;
   for (const [id, n] of Object.entries((g.house && g.house.owned) || {})) c.house.owned[id] = (c.house.owned[id] || 0) + n;
   // Historique et statistiques du fantôme : réunis (records au maximum)

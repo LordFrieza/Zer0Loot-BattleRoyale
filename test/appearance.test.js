@@ -66,14 +66,14 @@ test('[LOOK-5] skins d\'équipement et skins réservés à une classe', () => {
 test('[LOOK-6] cosmétiques d\'exploit : visibles, verrouillés, puis gratuits', () => {
   const exploits = Object.entries(Rules.COSMETICS).filter(([, it]) => it.unlock);
   assert.deepStrictEqual(exploits.map(([id]) => id).sort(),
-    ['ailes_pyrax', 'armure_grignotor', 'aura_champion', 'aura_immortel', 'aura_malvorath', 'aura_or', 'aureole_celeste', 'bottes_legende', 'cape_conquerant', 'cape_guerre', 'casque_grokk',
+    ['ailes_daedra', 'ailes_pyrax', 'armure_grignotor', 'aura_champion', 'aura_ether', 'aura_immortel', 'aura_malvorath', 'aura_or', 'aureole_celeste', 'bottes_legende', 'cape_conquerant', 'cape_guerre', 'casque_grokk',
       'ceinture_tresor', 'chaussons_palais', 'couronne_givre', 'couronne_os', 'gants_massacre', 'lunettes_flambeur', 'manteau_abysses', 'masque_abysses', 'pattes_maexxna',
-      'peau_dragon', 'peau_liche', 'peau_maexxna', 'peau_mimic', 'peau_ogre', 'peau_spectre']);
-  // Légendes : 15 exploits très longs, tous gratuits et marqués legend
+      'peau_daedra', 'peau_dragon', 'peau_ether', 'peau_liche', 'peau_lilith', 'peau_maexxna', 'peau_mimic', 'peau_ogre', 'peau_spectre', 'sourire_lilith']);
+  // Légendes : 18 exploits très longs, tous gratuits et marqués legend
   const legends = exploits.filter(([, it]) => it.legend);
-  assert.strictEqual(legends.length, 15);
+  assert.strictEqual(legends.length, 18);
   assert.ok(legends.every(([, it]) => it.price === 0 && Rules.COUNTERS.concat(['level', 'wins', 'kills']).includes(it.unlock.metric)));
-  assert.deepStrictEqual(Object.values(Rules.LEGEND_BOSS_COUNTER).map((m) => Rules.COSMETICS[Object.keys(Rules.COSMETICS).find((id) => Rules.COSMETICS[id].unlock && Rules.COSMETICS[id].unlock.metric === m)].unlock.goal), [100, 100, 100, 100, 100, 100]);
+  assert.deepStrictEqual(Object.values(Rules.LEGEND_BOSS_COUNTER).map((m) => Rules.COSMETICS[Object.keys(Rules.COSMETICS).find((id) => Rules.COSMETICS[id].unlock && Rules.COSMETICS[id].unlock.metric === m)].unlock.goal), [100, 100, 100, 100, 100, 100, 100, 100, 100]);
   // Pluie d'or : record de golds possédés, mis à jour à chaque envoi du personnage
   const rich = game.newCharacter();
   rich.gold = 1000000;

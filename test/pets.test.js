@@ -44,7 +44,7 @@ test('[PET-2] enclos : anciennes sauvegardes, familier principal, fusion d\'un f
   const old = game.newCharacter();
   delete old.pets;
   game.upgrade(old);
-  assert.deepStrictEqual(old.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 } });
+  assert.deepStrictEqual(old.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0, emeralds: 0, tickets: 0 } });
   const c = withPet('troll');
   game.addPet(c, 'mimic');
   assert.strictEqual(c.pets.active, 'troll');
@@ -239,7 +239,7 @@ test('[PET-10] journal de l\'enclos : une ligne par trouvaille (40 au plus), tot
   assert.ok(gold.every((e) => e.pet === dragon.id && e.species === 'dragon' && e.name === dragon.name && e.gold === Rules.petFindValue('dragon', 1)));
   const potion = log.find((e) => e.kind === 'potion');
   assert.strictEqual(potion.potion, r.gifts.find((g) => g.kind === 'potion').potion);
-  assert.deepStrictEqual(c.pets.totals, { finds: 3, gold: 2 * Rules.petFindValue('dragon', 1), xp: 0, chests: 0, potions: 1, keys: potion.key || 0, items: 0 });
+  assert.deepStrictEqual(c.pets.totals, { finds: 3, gold: 2 * Rules.petFindValue('dragon', 1), xp: 0, chests: 0, potions: 1, keys: potion.key || 0, items: 0, emeralds: 0, tickets: 0 });
   // Objet : nom, rareté et emplacement seulement ; la plus récente en premier ; 40 lignes au plus
   const t = withPet('troll', 0);
   for (let i = 1; i <= 45; i++) { t.pets.list[0].finds = 1; t.pets.list[0].at = i * H; game.collectFinds(t, i * H); }

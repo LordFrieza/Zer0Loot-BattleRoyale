@@ -169,7 +169,7 @@
     const c = cosmetic(id);
     if (!c) return;
     const t = performance.now();
-    if (id === 'aura_or' || id === 'aura_malvorath' || id === 'aura_immortel') { drawLegendAura(ctx, id, c, t); return; }
+    if (id === 'aura_or' || id === 'aura_malvorath' || id === 'aura_immortel' || id === 'aura_ether') { drawLegendAura(ctx, id, c, t); return; }
     const rainbow = id === 'aura_arcenciel';
     const col = (k) => (rainbow ? `hsl(${(t / 8 + k * 70) % 360}, 90%, 62%)` : c.color);
     ctx.save();
@@ -241,6 +241,20 @@
         ctx.fillText(runes[k], rx, ry);
       }
       ctx.textBaseline = 'alphabetic';
+    } else if (id === 'aura_ether') {
+      // brume d'Ether : petits fantômes qui montent en ondulant, voile bleuté au sol
+      for (let k = 0; k < 5; k++) {
+        const ph = ((t / 1400) + k / 5) % 1;
+        const px = Math.sin(k * 2.4 + t / 600) * 15;
+        const py = 14 - ph * 46;
+        ctx.globalAlpha = Math.sin(ph * Math.PI) * 0.85;
+        ctx.fillStyle = '#e8eeff';
+        ctx.beginPath(); ctx.arc(px, py, 3.2, Math.PI, 0); ctx.lineTo(px + 3.2, py + 3.5);
+        for (let w = 0; w < 3; w++) ctx.lineTo(px + 3.2 - (w + 0.5) * 2.13, py + (w % 2 ? 3.5 : 2.2));
+        ctx.lineTo(px - 3.2, py + 3.5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#2a3050';
+        ctx.fillRect(px - 1.6, py - 0.6, 1, 1.2); ctx.fillRect(px + 0.6, py - 0.6, 1, 1.2);
+      }
     } else {
       // aura de l'immortel : anneau d'émeraude et étincelles qui montent
       ctx.strokeStyle = `rgba(93, 255, 154, ${0.5 + Math.sin(t / 200) * 0.3})`; ctx.lineWidth = 1.5;
@@ -261,8 +275,8 @@
   function drawCape(ctx, id) {
     const c = cosmetic(id);
     if (!c) return;
-    if (id === 'ailes_pyrax') {
-      // ailes de dragon qui battent
+    if (id === 'ailes_pyrax' || id === 'ailes_daedra') {
+      // ailes de dragon (Pyrax) ou de succube (Daedra, membranes sombres aux nervures de feu) qui battent
       const flap = Math.sin(performance.now() / 220) * 0.2;
       // aile du fond (plus sombre, plus haute) puis aile de devant, déployées vers le haut et l'arrière
       for (const [ang, sc, dark] of [[1.05, 0.85, true], [0.55, 1, false]]) {
@@ -334,7 +348,7 @@
   // Col de la cape, par-dessus le corps.
   function drawCapeCollar(ctx, id) {
     const c = cosmetic(id);
-    if (!c || id === 'ailes_pyrax' || id === 'pattes_maexxna') return;
+    if (!c || id === 'ailes_pyrax' || id === 'ailes_daedra' || id === 'pattes_maexxna') return;
     ctx.fillStyle = c.color;
     roundRect(ctx, -10, -9, 20, 4, 2);
     ctx.fill();
@@ -536,6 +550,21 @@
         ctx.fillStyle = '#7fe8ff';
         ctx.beginPath(); ctx.ellipse(3.2, -17.2, 1.6, 1.1, 0, 0, Math.PI * 2); ctx.ellipse(7.8, -17.2, 1.6, 1.1, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
+        break;
+      }
+      case 'sourire_lilith': {
+        // le grand sourire du chat de Lilith, et ses yeux dorés qui brillent
+        ctx.save();
+        ctx.shadowColor = c.trim; ctx.shadowBlur = 5;
+        ctx.fillStyle = '#ffd34a';
+        ctx.beginPath(); ctx.ellipse(3, -17.4, 1.8, 1.3, 0, 0, Math.PI * 2); ctx.ellipse(8, -17.4, 1.8, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1a0a10';
+        ctx.fillRect(2.7, -18.5, 0.6, 2.2); ctx.fillRect(7.7, -18.5, 0.6, 2.2);
+        ctx.restore();
+        ctx.fillStyle = '#2a0a18';
+        ctx.beginPath(); ctx.moveTo(-2, -13.5); ctx.quadraticCurveTo(5.5, -7, 12, -13.5); ctx.quadraticCurveTo(5.5, -10.5, -2, -13.5); ctx.fill();
+        ctx.fillStyle = c.color;
+        for (let k = 0; k < 6; k++) { const tx = -0.5 + k * 2.1; ctx.beginPath(); ctx.moveTo(tx, -13 + Math.abs(k - 2.5) * -0.2); ctx.lineTo(tx + 1, -11.4 + Math.abs(k - 2.5) * 0.25); ctx.lineTo(tx + 2, -13 + Math.abs(k - 2.5) * -0.2); ctx.closePath(); ctx.fill(); }
         break;
       }
       case 'lunettes_flambeur': {
@@ -1083,6 +1112,40 @@
   // Peaux légendaires : détails par-dessus la tête
   function drawBodyExtras(ctx, id, c) {
     switch (id) {
+      case 'peau_ether': {
+        // ectoplasme : contour lumineux, orbites sombres et bouche ronde de fantôme
+        ctx.save();
+        ctx.shadowColor = '#b8c8ff'; ctx.shadowBlur = 6;
+        ctx.fillStyle = '#20263e';
+        ctx.beginPath(); ctx.ellipse(3, -17.2, 1.8, 2.4, 0, 0, Math.PI * 2); ctx.ellipse(8, -17.2, 1.8, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(5.5, -11.5, 1.4, 1.9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        break;
+      }
+      case 'peau_lilith': {
+        // oreilles de chat (blanc et noir), rayures, moustaches
+        for (const [ex, dir] of [[-5, -1], [5, 1]]) {
+          ctx.fillStyle = '#1e140c';
+          ctx.beginPath(); ctx.moveTo(ex - 4, -24); ctx.lineTo(ex + dir * 1.5, -32); ctx.lineTo(ex + 4, -24); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#f4e6d0';
+          ctx.beginPath(); ctx.moveTo(ex - 2, -24.5); ctx.lineTo(ex + dir * 1, -29.5); ctx.lineTo(ex + 2, -24.5); ctx.closePath(); ctx.fill();
+        }
+        ctx.strokeStyle = 'rgba(30,20,12,.55)'; ctx.lineWidth = 1.2;
+        for (const x of [-6, -2, 2]) { ctx.beginPath(); ctx.moveTo(x, -25); ctx.lineTo(x + 1, -21); ctx.stroke(); }
+        ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 0.5;
+        for (const dy of [-12.5, -11]) { ctx.beginPath(); ctx.moveTo(8, dy); ctx.lineTo(14, dy - 0.8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(2, dy); ctx.lineTo(-3, dy - 0.8); ctx.stroke(); }
+        break;
+      }
+      case 'peau_daedra': {
+        // petites cornes noires et queue de démon
+        ctx.fillStyle = '#16090c'; ctx.strokeStyle = '#000'; ctx.lineWidth = 0.6;
+        for (const [hx, d] of [[-3, -1], [6, 1]]) { ctx.beginPath(); ctx.moveTo(hx - 1.6, -24); ctx.quadraticCurveTo(hx + d * 3, -29, hx + d * 1.5, -32); ctx.quadraticCurveTo(hx + d * 1, -28, hx + 1.6, -24); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+        const w = Math.sin(performance.now() / 300) * 2;
+        ctx.strokeStyle = c.color; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-6, 6); ctx.quadraticCurveTo(-16, 8 + w, -18, -2 + w); ctx.stroke();
+        ctx.fillStyle = c.color; ctx.beginPath(); ctx.moveTo(-18, -2 + w); ctx.lineTo(-21, -6 + w); ctx.lineTo(-15.5, -4.5 + w); ctx.closePath(); ctx.fill();
+        break;
+      }
       case 'peau_ogre':
         ctx.fillStyle = shade(c.color, -0.15);
         ctx.beginPath(); ctx.moveTo(-8, -20); ctx.lineTo(-14, -24); ctx.lineTo(-9, -15); ctx.closePath(); ctx.fill();

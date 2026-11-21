@@ -340,6 +340,7 @@ class Battle extends EventEmitter {
     this.adds = []; // œufs, dragonnets, cristaux, illusions, copies, serviteurs, araignées, cocons
     this.addSeq = 0;
     this.webs = [];
+    this.firewalls = []; // colonnes et cercles de feu de Daedra (infranchissables)
     this.spawnBoss(this.bossId);
   }
 
@@ -357,8 +358,9 @@ class Battle extends EventEmitter {
       const sc = Rules.BOSS_SOLO_SCALE[B.id];
       st.maxHp = Math.round(st.maxHp * sc.hp * D.hp);
       st.damage = Math.round(st.damage * sc.damage * D.damage * 10) / 10;
-      addScale.hp *= D.hp;
-      addScale.damage *= D.damage;
+      addScale.hp *= D.ultimate ? Math.sqrt(D.hp) : D.hp;
+      addScale.damage *= D.ultimate ? D.damage ** 0.7 : D.damage;
+      this.healTaken = D.healTaken || 1; // défis ultimes : soins et vol de vie du héros réduits
     }
     st.maxHp = Math.round(st.maxHp * scale.hp);
     st.damage = Math.round(st.damage * scale.damage * 10) / 10;
@@ -409,6 +411,11 @@ class Battle extends EventEmitter {
       stage: null, // étape en cours : { kind, until, … }
     });
     const b = this.boss;
+    // Défis ultimes : attaques spéciales plus fréquentes, coups plus rapides, rage finale plus tôt
+    const DC = this.solo && Rules.BOSS_CHALLENGE[this.solo.difficulty];
+    if (DC && DC.special) { b.slamEvery /= DC.special; b.slamIn = b.slamEvery * 0.7; }
+    if (DC && DC.attackSpeed) b.cooldown /= DC.attackSpeed;
+    b.enrageAt = (DC && DC.enrageAt) || B.enrageAt;
     if (B.flight) for (const at of B.flight.at) b.script.push({ at, kind: 'flight' });
     if (B.nest) b.script.push({ at: B.nest.at, kind: 'nest' });
     if (B.shield) for (const at of B.shield.at) b.script.push({ at, kind: 'shield' });
@@ -428,6 +435,19 @@ class Battle extends EventEmitter {
       b.webIn = 2;
       b.spiderIn = B.spiders.every * 0.6;
     }
+    // Ether : intangibilité (mains spectrales), feux follets, furie ; il esquive et riposte
+    if (B.intangible) for (const at of B.intangible.at) b.script.push({ at, kind: 'intangible' });
+    if (B.wisps) b.script.push({ at: B.wisps.at, kind: 'wisps' });
+    if (B.fury) b.script.push({ at: B.fury.at, kind: 'fury' });
+    b.counter = B.counter || 0;
+    // Lilith : illusions, chapeau à chatons, neuvième vie
+    if (B.illusions) B.illusions.at.forEach((at, i) => b.script.push({ at, kind: 'illusions', count: B.illusions.counts[i] }));
+    if (B.hat) b.script.push({ at: B.hat.at, kind: 'hat' });
+    if (B.ninelives) b.script.push({ at: B.ninelives.at, kind: 'ninelives' });
+    // Daedra : portails infernaux, embrasement ; démons de feu réguliers
+    if (B.portals) b.script.push({ at: B.portals.at, kind: 'portals' });
+    if (B.inferno) b.script.push({ at: B.inferno.at, kind: 'inferno' });
+    if (B.demons) { b.demonIn = B.demons.every * 0.5; b.demonEvery = B.demons.every; }
     b.script.sort((a, c) => c.at - a.at);
     this.fighters.push(b);
     return b;
@@ -435,7 +455,7 @@ class Battle extends EventEmitter {
 
   // Intouchable pour cet attaquant ? (Dragon en vol ou parti, Magicien protégé par son bouclier)
   immune(target, attacker) {
-    if (target.away || target.shielded || target.protectUntil > this.time) return true;
+    if (target.away || target.shielded || target.intangible || target.protectUntil > this.time) return true;
     // Gelé par la Liche, ou enfermé dans un cocon de Maexxna : on ne peut plus le cibler ni le blesser.
     if (target.iceUntil > this.time || target.cocooned) return true;
     return !!(target.flying && attacker && attacker.range < target.flyMinRange);
@@ -454,7 +474,7 @@ class Battle extends EventEmitter {
         b.slamEvery *= 0.8;
         this.events.push({ t: 'bossPhase', phase: b.phase, label: ph.label });
       }
-      if (!b.enraged && this.time - (b.bornAt || 0) >= B.enrageAt) {
+      if (!b.enraged && this.time - (b.bornAt || 0) >= (b.enrageAt || B.enrageAt)) {
         b.enraged = true;
         b.dmgMult *= B.enrageMult;
         this.events.push({ t: 'bossEnrage' });
@@ -473,9 +493,23 @@ class Battle extends EventEmitter {
         else if (step.kind === 'cocoon') this.spinCocoons(B);
         else if (step.kind === 'ceiling') this.startCeiling(B);
         else if (step.kind === 'frenzy') this.startFrenzy(B);
+        else if (step.kind === 'intangible') this.startIntangible(B);
+        else if (step.kind === 'wisps') this.spawnWisps(B);
+        else if (step.kind === 'fury') this.startFury(B);
+        else if (step.kind === 'illusions') this.startIllusions(B, step.count);
+        else if (step.kind === 'hat') this.spawnHat(B);
+        else if (step.kind === 'ninelives') this.nineLives(B);
+        else if (step.kind === 'portals') this.openPortals(B);
+        else if (step.kind === 'inferno') this.startInferno(B);
       }
-      if (b.stage) this.updateStage(dt, B);
+      if (b.vanish) this.updateVanish(B);
+      else if (b.stage) this.updateStage(dt, B);
       else this.bossSpecials(dt, B);
+      if (b.shuffleAt && this.time >= b.shuffleAt) this.doShuffle(B);
+      if (B.wisps) this.updateWisps();
+      if (B.hat) this.updateHat(dt, B);
+      if (B.demons) this.updateDemons(dt, B);
+      if (B.portals) this.updatePortals(dt, B);
       if (b.bossId === 'sorcier') this.updateCurses(B);
       if (B.copies) b.guarded = this.adds.some((a) => a.kind === 'copie' && a.alive);
       if (B.freeze) this.updateFreeze(dt, B);
@@ -575,6 +609,67 @@ class Battle extends EventEmitter {
         const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
         this.slams.push({ kind: 'spray', cone: true, x: b.x, y: b.y, r: S.length, angle, half: S.angle, t: S.warn, warn: S.warn, ratio: S.ratio, poison: S.poison, duration: S.duration });
       }
+    } else if (B.id === 'ether') {
+      // Rotation : hurlement autour de lui, chaînes spectrales vers des héros, moisson d'âmes sous leurs pieds
+      const k = (b.turn = ((b.turn || 0) + 1) % 3);
+      b.nextSpecial = 0;
+      if (k === 1) {
+        const W = B.wail;
+        this.slams.push({ kind: 'wail', x: b.x, y: b.y, r: W.radius, t: W.warn, warn: W.warn, ratio: W.ratio, slow: W.slow, duration: W.slowFor, follow: true });
+      } else if (k === 2) {
+        const C = B.chains;
+        const count = Math.min(C.max, C.base + Math.floor(heroes.length / C.perPlayers));
+        for (const h of [...heroes].sort(() => Math.random() - 0.5).slice(0, count)) {
+          const ang = Math.atan2(h.y - b.y, h.x - b.x);
+          const len = Math.hypot(h.x - b.x, h.y - b.y) + 90;
+          this.slams.push({ kind: 'chain', line: true, x: b.x, y: b.y, tx: b.x + Math.cos(ang) * len, ty: b.y + Math.sin(ang) * len, w: C.width, r: len, t: C.warn, warn: C.warn, ratio: C.ratio, stun: C.stun });
+        }
+      } else {
+        const S = B.souls;
+        const count = Math.min(S.max, S.base + Math.floor(heroes.length / S.perPlayers));
+        for (const h of [...heroes].sort(() => Math.random() - 0.5).slice(0, count)) this.slams.push({ kind: 'soul', x: h.x, y: h.y, r: S.radius, t: S.warn, warn: S.warn, ratio: S.ratio, drain: S.drain });
+      }
+    } else if (B.id === 'lilith') {
+      // Rotation : bond, éventail de cartes, disparition (frappe dans le dos), bonneteau
+      const k = (b.turn = ((b.turn || 0) + 1) % 4);
+      b.nextSpecial = 0;
+      if (k === 1) {
+        const far = heroes.reduce((a, h) => (Math.hypot(h.x - b.x, h.y - b.y) > Math.hypot(a.x - b.x, a.y - b.y) ? h : a), heroes[0]);
+        b.leaping = true;
+        b.targetKey = null;
+        this.slams.push({ kind: 'leap', leap: true, x: far.x, y: far.y, r: B.pounce.radius, t: B.pounce.warn, warn: B.pounce.warn, ratio: B.pounce.ratio, fx: b.x, fy: b.y });
+      } else if (k === 2) {
+        const C = B.cards;
+        const spot = densestSpot(heroes, 120);
+        const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
+        this.slams.push({ kind: 'cards', cone: true, x: b.x, y: b.y, r: C.length, angle, half: C.angle, t: C.warn, warn: C.warn, ratio: C.ratio, bleed: C.bleed, duration: C.duration });
+      } else if (k === 3) {
+        const h = heroes[Math.floor(Math.random() * heroes.length)];
+        b.vanish = { until: this.time + B.vanish.hide, target: h.key };
+        b.away = true;
+        b.targetKey = null;
+        for (const f of this.fighters) if (f.targetKey === b.key) f.targetKey = null;
+        this.events.push({ t: 'vanish', to: b.key, x: Math.round(b.x), y: Math.round(b.y) });
+      } else {
+        b.shuffleAt = this.time + B.shuffle.warn;
+        this.events.push({ t: 'shuffleWarn', duration: B.shuffle.warn });
+      }
+    } else if (B.id === 'daedra') {
+      // Rotation : colonnes de feu à travers l'arène, fouet infernal, cercle infernal autour d'un héros
+      const k = (b.turn = ((b.turn || 0) + 1) % 3);
+      b.nextSpecial = 0;
+      if (k === 1) this.firePillar(B, densestSpot(heroes, 120));
+      else if (k === 2) {
+        const L = B.lash;
+        const spot = densestSpot(heroes, 120);
+        const angle = Math.atan2(spot.y - b.y, spot.x - b.x);
+        this.slams.push({ kind: 'lash', cone: true, x: b.x, y: b.y, r: L.length, angle, half: L.angle, t: L.warn, warn: L.warn, ratio: L.ratio, poison: B.poison.dot * 1.5, duration: 3 });
+      } else {
+        const R = B.ring;
+        const h = heroes[Math.floor(Math.random() * heroes.length)];
+        this.slams.push({ kind: 'firering', band: R.width, x: h.x, y: h.y, r: R.radius, t: R.warn, warn: R.warn, ratio: R.ratio, ringWall: { life: R.life } });
+        this.slams.push({ kind: 'ringblast', x: h.x, y: h.y, r: R.radius - R.width / 2, t: R.blastWarn, warn: R.blastWarn, delay: R.warn + R.life - R.blastWarn, ratio: R.blastRatio });
+      }
     } else {
       // Malédiction sur quelques combattants, puis zones d'ombre sous leurs pieds
       if (n === 0) this.castCurse(B, heroes);
@@ -594,6 +689,7 @@ class Battle extends EventEmitter {
     for (const s of this.slams) {
       // La nova de la Liche part de là où elle se trouve au moment de l'impact.
       if (s.follow && b.alive) { s.x = b.x; s.y = b.y; }
+      if (s.delay > 0) { s.delay -= dt; continue; } // attaque programmée (explosion du cercle infernal)
       s.t -= dt;
       if (s.t > 0) continue;
       this.events.push({ t: 'slam', kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, loot: s.loot, tx: s.tx != null ? Math.round(s.tx) : undefined, ty: s.ty != null ? Math.round(s.ty) : undefined });
@@ -601,19 +697,23 @@ class Battle extends EventEmitter {
       if (s.leap) { b.leaping = false; b.x = s.x; b.y = s.y; b.slamIn = Math.max(b.slamIn, b.slamEvery * 0.5); }
       if (!b.alive) continue;
       if (s.web) this.addWeb(s.x, s.y);
+      // Colonnes et cercles de feu de Daedra : ils restent au sol, infranchissables
+      if (s.wall) this.firewalls.push({ id: (this.wallSeq = (this.wallSeq || 0) + 1), x1: s.x, y1: s.y, x2: s.tx, y2: s.ty, w: s.w, until: this.time + s.wall.life, burn: s.wall.burn });
+      if (s.ringWall) this.firewalls.push({ id: (this.wallSeq = (this.wallSeq || 0) + 1), ring: true, x: s.x, y: s.y, r: s.r, w: s.band, until: this.time + s.ringWall.life, burn: Rules.DAEDRA.pillars.burn });
       const raw = b.damage * b.dmgMult * s.ratio;
       for (const f of this.players) {
         if (!f.alive || !inSlam(s, f) || this.immune(f, b)) continue;
         if (raw > 0) this.hit(b, f, raw * (0.9 + Math.random() * 0.2), { splash: true });
+        if (s.drain) this.heal(b, raw * s.drain); // moisson d'âmes : Ether se soigne
         if (!f.alive) continue;
         // Effets du vomi du Mimic, des pics de la Liche, du venin de Maexxna
         if (s.bleed) this.addBuff(f, 'saignement', s.duration, { poison: s.bleed, tick: this.time + 0.5, src: b });
         if (s.poison) this.addBuff(f, 'venin', s.duration, { poison: s.poison, tick: this.time + 0.5, src: b });
-        if (s.slow) this.addBuff(f, s.kind === 'vomit' ? 'bile' : 'givre', s.duration, { speed: s.slow });
+        if (s.slow) this.addBuff(f, s.kind === 'vomit' ? 'bile' : s.kind === 'wail' ? 'effroi' : 'givre', s.duration, { speed: s.slow });
         if (s.stun) this.stun(f, s.stun);
       }
     }
-    this.slams = this.slams.filter((s) => s.t > 0);
+    this.slams = this.slams.filter((s) => s.t > 0 || s.delay > 0);
   }
 
   updateStage(dt, B) {
@@ -687,6 +787,63 @@ class Battle extends EventEmitter {
         b.slamIn = b.slamEvery * 0.6;
         this.events.push({ t: 'bossReturn', label: 'MAEXXNA REDESCEND, FOLLE DE RAGE !', x: Math.round(b.x), y: Math.round(b.y), drop: true });
         this.slams.push({ kind: 'land', x: b.x, y: b.y, r: 120, t: 0.01, warn: 0.01, ratio: 0.8 });
+      }
+    } else if (st.kind === 'intangible') {
+      // Ether intangible : il hurle régulièrement et de nouvelles mains jaillissent ; il revient à la fin (plus tôt si on détruit les mains)
+      const I = B.intangible;
+      st.wailIn -= dt;
+      if (st.wailIn <= 0 && heroes.length) {
+        st.wailIn = I.wailEvery;
+        const W = B.wail;
+        this.slams.push({ kind: 'wail', x: b.x, y: b.y, r: W.radius, t: W.warn, warn: W.warn, ratio: W.ratio, slow: W.slow, duration: W.slowFor, follow: true });
+      }
+      st.handIn -= dt;
+      if (st.handIn <= 0 && heroes.length) { st.handIn = I.handEvery; this.spawnHands(B, 1); }
+      if (this.time >= st.until) {
+        for (const a of this.adds) if (a.kind === 'main' && a.alive) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
+        b.intangible = false;
+        b.stage = null;
+        b.slamIn = b.slamEvery * 0.5;
+        this.events.push({ t: 'bossReturn', label: 'ETHER REPREND FORME !', x: Math.round(b.x), y: Math.round(b.y) });
+      }
+    } else if (st.kind === 'illusions') {
+      // Lilith et ses illusions : toutes brisées → elle est étourdie ; sinon elles explosent à la fin
+      const I = B.illusions;
+      const left = this.adds.filter((a) => a.illusion && a.alive);
+      if (!left.length) {
+        b.stage = null;
+        b.dazedUntil = this.time + I.dazed;
+        this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LILITH EST ÉTOURDIE !', sub: `Toutes ses illusions sont brisées : elle subit +${Math.round((I.dazedTaken - 1) * 100)} % de dégâts !` });
+      } else if (this.time >= st.until) {
+        for (const a of left) {
+          this.slams.push({ kind: 'pop', x: a.x, y: a.y, r: I.blastRadius, t: I.blastWarn, warn: I.blastWarn, ratio: I.blastRatio });
+          a.alive = false;
+          a.hp = 0;
+          this.events.push({ t: 'vanish', to: a.key });
+        }
+        b.stage = null;
+        this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LES ILLUSIONS EXPLOSENT !', sub: 'Lilith éclate de rire…' });
+      } else this.bossSpecials(dt, B);
+    } else if (st.kind === 'inferno') {
+      // Daedra s'élève : colonnes de feu qui jaillissent partout et pluie de flammes, puis elle retombe
+      const I = B.inferno;
+      st.wallIn -= dt;
+      if (st.wallIn <= 0 && heroes.length) { st.wallIn = I.wallEvery; this.firePillar(B, heroes[Math.floor(Math.random() * heroes.length)]); }
+      st.rainIn -= dt;
+      if (st.rainIn <= 0 && heroes.length) {
+        st.rainIn = I.rainEvery;
+        const h = heroes[Math.floor(Math.random() * heroes.length)];
+        this.slams.push({ kind: 'hellfire', x: h.x, y: h.y, r: I.rainRadius, t: I.rainWarn, warn: I.rainWarn, ratio: I.rainRatio, fx: h.x, fy: -40 });
+      }
+      if (this.time >= st.until) {
+        b.away = false;
+        b.stage = null;
+        const spot = heroes.length ? densestSpot(heroes, 140) : { x: ARENA.w / 2, y: ARENA.h / 2 };
+        b.x = spot.x;
+        b.y = spot.y;
+        b.slamIn = b.slamEvery * 0.6;
+        this.events.push({ t: 'bossReturn', label: 'DAEDRA REDESCEND DES FLAMMES !', x: Math.round(b.x), y: Math.round(b.y), drop: true });
+        this.slams.push({ kind: 'hellland', x: b.x, y: b.y, r: 150, t: 0.01, warn: 0.01, ratio: 1 });
       }
     } else if (st.kind === 'shield') {
       const crystals = this.adds.filter((a) => a.kind === 'cristal' && a.alive);
@@ -1030,6 +1187,288 @@ class Battle extends EventEmitter {
     b.speed *= B.frenzy.speedMult;
     b.spiderIn = Math.min(b.spiderIn, 2);
     this.events.push({ t: 'bossPhase', phase: b.phase, label: 'MAEXXNA ENTRE EN FRÉNÉSIE !', sub: 'Elle mord plus vite et court plus vite !' });
+  }
+
+  // ---------- Ether le Fantôme : intangibilité, mains spectrales, feux follets, furie ----------
+
+  startIntangible(B) {
+    const b = this.boss;
+    const I = B.intangible;
+    b.intangible = true;
+    b.stage = { kind: 'intangible', until: this.time + I.duration, wailIn: 2, handIn: I.handEvery };
+    for (const f of this.fighters) if (f.targetKey === b.key) f.targetKey = null;
+    const H = I.hands;
+    this.spawnHands(B, Math.max(H.min, Math.min(H.max, Math.ceil(this.players.length / H.per))));
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'ETHER DEVIENT INTANGIBLE !', sub: 'Détruisez les mains spectrales pour le faire revenir !' });
+  }
+
+  // Mains spectrales : elles jaillissent du sol près des héros, ne bougent pas et agrippent (étourdissent) ceux qu'elles frappent
+  spawnHands(B, count) {
+    const b = this.boss;
+    const H = B.intangible.hands;
+    const heroes = this.players.filter((p) => p.alive);
+    if (!heroes.length) return;
+    const hp = Math.round((H.hpBase + H.hpPerPlayer * this.players.length) * b.addScale.hp);
+    for (let i = 0; i < count; i++) {
+      const h = heroes[Math.floor(Math.random() * heroes.length)];
+      const a = Math.random() * Math.PI * 2;
+      const d = 30 + Math.random() * 40;
+      this.addMonster({
+        kind: 'main', name: 'Main spectrale', x: Math.max(40, Math.min(ARENA.w - 40, h.x + Math.cos(a) * d)), y: Math.max(60, Math.min(ARENA.h - 30, h.y + Math.sin(a) * d)),
+        r: 16, hp, damage: b.damage * H.damageRatio * b.addScale.damage, speed: 0, cooldown: H.cooldown, range: H.range, grab: H.grab, dodge: 0.1,
+      });
+    }
+    this.events.push({ t: 'hands', count });
+  }
+
+  spawnWisps(B) {
+    const b = this.boss;
+    const W = B.wisps;
+    const count = Math.min(W.max, W.base + Math.floor(this.players.length / W.perPlayers));
+    const pos = spawnPositions(count, { x0: 80, y0: 90, x1: ARENA.w - 80, y1: ARENA.h - 60 });
+    const hp = Math.round((W.hpBase + W.hpPerPlayer * this.players.length) * b.addScale.hp);
+    for (const p of pos) {
+      this.addMonster({
+        kind: 'feu_follet', name: 'Feu follet', x: p.x, y: p.y, r: W.radius, hp, damage: b.damage * W.ratio * b.addScale.damage,
+        speed: W.speed, cooldown: 0.3, range: 18, dodge: 0.25, kamikaze: { r: W.blast }, expireAt: this.time + W.life,
+      });
+    }
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LES FEUX FOLLETS ERRENT…', sub: 'Ils explosent au contact : abattez-les de loin !' });
+  }
+
+  updateWisps() {
+    for (const a of this.adds) if (a.kind === 'feu_follet' && a.alive && a.expireAt && this.time >= a.expireAt) { a.alive = false; a.hp = 0; this.events.push({ t: 'vanish', to: a.key }); }
+  }
+
+  startFury(B) {
+    const b = this.boss;
+    const F = B.fury;
+    if (F.dodge) b.dodge += F.dodge;
+    if (F.attackSpeedMult) b.cooldown /= F.attackSpeedMult;
+    if (F.range) b.range += F.range;
+    if (F.demonEvery) { b.demonEvery = F.demonEvery; b.demonIn = Math.min(b.demonIn || 0, 2); }
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: `${B.short.toUpperCase()} ENTRE EN FURIE !`, sub: B.id === 'ether' ? 'Il esquive encore plus et frappe plus vite !' : 'Fouet plus long, plus rapide, et des démons sans arrêt !' });
+  }
+
+  // ---------- Lilith le Chat : illusions, disparition, bonneteau, chapeau, neuvième vie ----------
+
+  startIllusions(B, count) {
+    const b = this.boss;
+    const I = B.illusions;
+    const spots = spawnPositions(count + 1, { x0: 240, y0: 200, x1: ARENA.w - 120, y1: ARENA.h - 70 }).sort(() => Math.random() - 0.5);
+    this.blink(b, spots[0]);
+    for (let i = 1; i <= count; i++) {
+      // Indiscernables : même nom, même dessin, même vitesse (seule la vraie Lilith porte la clé « boss »)
+      this.addMonster({
+        kind: 'lilith', name: b.name, illusion: true, x: spots[i].x, y: spots[i].y, r: b.r,
+        hp: Math.round(b.maxHp * I.hpRatio), damage: b.damage * I.damageRatio, speed: b.speed, cooldown: b.cooldown,
+        range: b.range, dodge: b.dodge, precision: b.precision, cleave: b.cleave,
+      });
+    }
+    for (const f of this.fighters) if (f.targetKey === b.key) f.targetKey = null;
+    b.stage = { kind: 'illusions', until: this.time + I.duration };
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LILITH SE MULTIPLIE !', sub: 'Brisez toutes les illusions avant qu\'elles n\'explosent !' });
+  }
+
+  // Disparition : seul son sourire flotte, puis elle surgit dans le dos de sa cible
+  updateVanish(B) {
+    const b = this.boss;
+    if (this.time < b.vanish.until) return;
+    const heroes = this.players.filter((p) => p.alive);
+    const h = heroes.find((p) => p.key === b.vanish.target) || heroes[0];
+    b.vanish = null;
+    b.away = false;
+    if (!h) return;
+    const side = h.x > b.x ? 1 : -1;
+    this.blink(b, { x: Math.max(50, Math.min(ARENA.w - 50, h.x + side * 46)), y: h.y });
+    const V = B.vanish;
+    this.slams.push({ kind: 'claw', x: h.x, y: h.y, r: V.radius, t: V.warn, warn: V.warn, ratio: V.ratio });
+    b.slamIn = Math.max(b.slamIn, b.slamEvery * 0.6);
+  }
+
+  // Bonneteau : les héros échangent leurs places (et restent un instant sonnés)
+  doShuffle(B) {
+    const b = this.boss;
+    b.shuffleAt = 0;
+    const S = B.shuffle;
+    const heroes = this.players.filter((p) => p.alive && p.iceUntil <= this.time && !p.cocooned);
+    const spots = heroes.map((p) => ({ x: p.x, y: p.y }));
+    const order = spots.map((_, i) => i).sort(() => Math.random() - 0.5);
+    if (order.length > 1 && order.every((v, i) => v === i)) order.push(order.shift());
+    heroes.forEach((p, i) => {
+      const to = spots[order[i]];
+      this.events.push({ t: 'blink', to: p.key, fx: Math.round(p.x), fy: Math.round(p.y), x: Math.round(to.x), y: Math.round(to.y), shuffle: true });
+      p.x = to.x;
+      p.y = to.y;
+      p.targetKey = null;
+      if (b.alive) this.hit(b, p, b.damage * b.dmgMult * S.ratio, { splash: true });
+      if (p.alive) this.stun(p, S.stun);
+    });
+    this.events.push({ t: 'shuffle', count: heroes.length });
+  }
+
+  spawnHat(B) {
+    const b = this.boss;
+    const H = B.hat;
+    const hp = Math.round((H.hpBase + H.hpPerPlayer * this.players.length) * b.addScale.hp);
+    this.addMonster({ kind: 'chapeau', name: 'Chapeau magique', x: ARENA.w / 2, y: ARENA.h / 2 + 40, r: 24, hp, inert: true });
+    b.hatIn = 1.5;
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LE CHAPEAU MAGIQUE !', sub: 'Détruisez-le avant qu\'il ne déborde de chatons !' });
+  }
+
+  updateHat(dt, B) {
+    const b = this.boss;
+    const hat = this.adds.find((a) => a.kind === 'chapeau' && a.alive);
+    if (!hat) return;
+    b.hatIn -= dt;
+    if (b.hatIn > 0) return;
+    const H = B.hat;
+    b.hatIn = H.every;
+    const alive = this.adds.filter((a) => a.kind === 'chaton' && a.alive).length;
+    const K = H.kitten;
+    for (let i = 0; i < Math.min(H.per, H.alive - alive); i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.addMonster({
+        kind: 'chaton', name: 'Chaton', x: hat.x + Math.cos(a) * 40, y: hat.y + Math.sin(a) * 30, r: K.radius,
+        hp: Math.round((K.hpBase + K.hpPerPlayer * this.players.length) * b.addScale.hp), damage: b.damage * K.damageRatio * b.addScale.damage,
+        speed: K.speed, cooldown: K.cooldown, range: K.range, dodge: 0.2,
+      });
+    }
+    this.events.push({ t: 'kittens', x: Math.round(hat.x), y: Math.round(hat.y) });
+  }
+
+  nineLives(B) {
+    const b = this.boss;
+    const N = B.ninelives;
+    b.hp = Math.min(b.maxHp, b.hp + b.maxHp * N.heal);
+    b.cooldown /= N.attackSpeedMult;
+    b.speed *= N.speedMult;
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'NEUVIÈME VIE !', sub: `Lilith se relève avec ${Math.round(N.heal * 100)} % de vie, plus vive que jamais !` });
+  }
+
+  // ---------- Daedra la Succube : colonnes et cercles de feu, démons, portails, embrasement ----------
+
+  // Colonne de feu : un mur qui traverse toute l'arène en passant par un point (annoncé, puis infranchissable un moment)
+  firePillar(B, spot) {
+    const P = B.pillars;
+    const ang = [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4][Math.floor(Math.random() * 4)];
+    const L = 1500;
+    this.slams.push({
+      kind: 'pillar', line: true, x: spot.x - Math.cos(ang) * L, y: spot.y - Math.sin(ang) * L, tx: spot.x + Math.cos(ang) * L, ty: spot.y + Math.sin(ang) * L,
+      w: P.width, r: L * 2, t: P.warn, warn: P.warn, ratio: P.ratio, wall: { life: P.life, burn: P.burn },
+    });
+  }
+
+  // Les murs de feu repoussent les héros du côté d'où ils viennent (on ne les franchit pas) et brûlent ceux qui s'y collent
+  updateFirewalls(dt) {
+    this.firewalls = this.firewalls.filter((w) => w.until > this.time);
+    if (!this.firewalls.length) return;
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      p.wallSide = p.wallSide || {};
+      let touching = false;
+      for (const w of this.firewalls) {
+        const lim = w.w / 2 + p.r;
+        if (w.ring) {
+          const dx = p.x - w.x;
+          const dy = p.y - w.y;
+          const d = Math.hypot(dx, dy) || 0.01;
+          const gap = d - w.r;
+          if (Math.abs(gap) >= lim) { p.wallSide[w.id] = gap > 0 ? 1 : -1; continue; }
+          const side = p.wallSide[w.id] || (gap > 0 ? 1 : -1);
+          const target = Math.max(1, w.r + side * lim);
+          p.x = w.x + (dx / d) * target;
+          p.y = w.y + (dy / d) * target;
+        } else {
+          const ex = w.x2 - w.x1;
+          const ey = w.y2 - w.y1;
+          const len = Math.hypot(ex, ey) || 1;
+          const nx = -ey / len;
+          const ny = ex / len;
+          const sd = (p.x - w.x1) * nx + (p.y - w.y1) * ny; // distance signée au mur
+          if (Math.abs(sd) >= lim) { p.wallSide[w.id] = sd > 0 ? 1 : -1; continue; }
+          const side = p.wallSide[w.id] || (sd > 0 ? 1 : -1);
+          p.x += nx * (side * lim - sd);
+          p.y += ny * (side * lim - sd);
+        }
+        p.x = Math.max(16, Math.min(ARENA.w - 16, p.x));
+        p.y = Math.max(16, Math.min(ARENA.h - 16, p.y));
+        touching = touching || w;
+      }
+      if (!touching) { p.wallTick = 0; continue; }
+      p.wallTick = (p.wallTick || 0) + dt;
+      if (p.wallTick >= 0.5 && this.boss) {
+        p.wallTick -= 0.5;
+        const dmg = Math.max(1, Math.round(p.maxHp * touching.burn * 0.5));
+        p.hp -= dmg;
+        this.events.push({ t: 'hit', from: this.boss.key, to: p.key, dmg, burn: true });
+        if (p.hp <= 0) this.kill(this.boss, p);
+      }
+    }
+  }
+
+  updateDemons(dt, B) {
+    const b = this.boss;
+    if (!this.players.some((p) => p.alive) || b.guarded) return; // les portails ouverts remplacent les démons réguliers
+    b.demonIn -= dt;
+    if (b.demonIn > 0) return;
+    b.demonIn = b.demonEvery || B.demons.every;
+    const D = B.demons;
+    this.spawnDemons(B, Math.max(D.min, Math.min(D.max, Math.ceil(this.players.length / D.per))));
+  }
+
+  spawnDemons(B, count, from = null) {
+    const D = B.demons;
+    const b = this.boss;
+    const alive = this.adds.filter((a) => a.kind === 'demon' && a.alive).length;
+    const n = Math.min(D.alive - alive, count);
+    if (n <= 0) return;
+    const pos = from ? Array.from({ length: n }, (_, i) => from[i % from.length]) : spawnPositions(n, { x0: 80, y0: 80, x1: ARENA.w - 80, y1: ARENA.h - 60 });
+    for (const p of pos) {
+      this.addMonster({
+        kind: 'demon', name: 'Démon de feu', x: p.x + (Math.random() - 0.5) * 30, y: p.y + (Math.random() - 0.5) * 30, r: D.radius,
+        hp: Math.round((D.hpBase + D.hpPerPlayer * this.players.length) * b.addScale.hp), damage: b.damage * D.damageRatio * b.addScale.damage,
+        speed: D.speed, cooldown: D.cooldown, range: D.range, dodge: 0.08, poison: { ...D.poison },
+      });
+    }
+    this.events.push({ t: 'demons', count: n });
+  }
+
+  openPortals(B) {
+    const b = this.boss;
+    const P = B.portals;
+    const hp = Math.round((P.hpBase + P.hpPerPlayer * this.players.length) * b.addScale.hp);
+    // En triangle autour d'elle : là où se bat le gros de la troupe
+    const off = Math.random() * Math.PI * 2;
+    const spots = Array.from({ length: P.count }, (_, i) => {
+      const a = off + (i / P.count) * Math.PI * 2;
+      return [Math.max(60, Math.min(ARENA.w - 60, b.x + Math.cos(a) * P.dist)), Math.max(90, Math.min(ARENA.h - 50, b.y + Math.sin(a) * P.dist * 0.7))];
+    });
+    for (const [x, y] of spots) this.addMonster({ kind: 'portail', name: 'Portail infernal', x, y, r: 26, hp, inert: true });
+    b.portalIn = 2;
+    b.guardMult = P.guard;
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'LES PORTAILS DES ENFERS S\'OUVRENT !', sub: `Daedra subit ${Math.round((1 - P.guard) * 100)} % de dégâts en moins tant qu'ils tiennent !` });
+  }
+
+  updatePortals(dt, B) {
+    const b = this.boss;
+    const portals = this.adds.filter((a) => a.kind === 'portail' && a.alive);
+    b.guarded = portals.length > 0;
+    if (!portals.length) return;
+    b.portalIn -= dt;
+    if (b.portalIn > 0) return;
+    b.portalIn = B.portals.every;
+    this.spawnDemons(B, portals.length, portals.map((p) => ({ x: p.x, y: p.y })));
+  }
+
+  startInferno(B) {
+    const b = this.boss;
+    b.away = true;
+    b.targetKey = null;
+    b.stage = { kind: 'inferno', until: this.time + B.inferno.duration, wallIn: 0.8, rainIn: 1.2 };
+    for (const f of this.fighters) if (f.targetKey === b.key) f.targetKey = null;
+    this.events.push({ t: 'bossPhase', phase: b.phase, label: 'DAEDRA EMBRASE L\'ARÈNE !', sub: 'Les colonnes de feu jaillissent de partout !' });
+    this.events.push({ t: 'bossFly', duration: B.inferno.duration });
   }
 
   addMonster(o) {
@@ -1611,6 +2050,7 @@ class Battle extends EventEmitter {
 
     if (this.koth) this.updateKoth(dt);
     if (this.clans) this.updateClans(dt);
+    if (this.firewalls && this.firewalls.length) this.updateFirewalls(dt);
 
     if (this.mode === 'br') this.checkBrEnd();
     else if (this.mode === 'koth') this.checkKothEnd();
@@ -1971,6 +2411,7 @@ class Battle extends EventEmitter {
     this.bossId = id;
     this.slams = [];
     this.zones = [];
+    this.firewalls = []; // les murs de feu de Daedra s'éteignent
     this.adds = (this.adds || []).filter((a) => a.alive);
     this.fighters = this.fighters.filter((f) => f === this.boss || f.team === HEROES || f.alive);
     this.spawnBoss(id, Rules.rushScale(r.round, r.mult));
@@ -2545,9 +2986,21 @@ class Battle extends EventEmitter {
 
   attack(attacker, target) {
     const proj = attacker.projectile || undefined;
+    // Feu follet d'Ether : il explose au contact
+    if (attacker.kamikaze) {
+      const K = attacker.kamikaze;
+      this.events.push({ t: 'slam', kind: 'wispboom', x: Math.round(attacker.x), y: Math.round(attacker.y), r: K.r });
+      for (const o of this.fighters) if (o.alive && o.team !== attacker.team && Math.hypot(o.x - attacker.x, o.y - attacker.y) <= K.r + o.r) this.hit(attacker, o, attacker.damage, { splash: true });
+      attacker.alive = false;
+      attacker.hp = 0;
+      this.events.push({ t: 'vanish', to: attacker.key });
+      return;
+    }
     // La précision de l'attaquant réduit l'esquive de la cible.
     if (Math.random() < target.dodge * (1 - attacker.precision)) {
       this.events.push({ t: 'dodge', from: attacker.key, to: target.key, proj });
+      // Ether : riposte aussitôt après une esquive
+      if (target.counter && target.alive && Math.random() < target.counter) { target.cd = Math.min(target.cd, 0.05); this.events.push({ t: 'counter', from: target.key, to: attacker.key }); }
       return;
     }
     const crit = attacker.nextCrit || Math.random() < attacker.crit;
@@ -2556,6 +3009,7 @@ class Battle extends EventEmitter {
     const tx = target.x;
     const ty = target.y;
     this.hit(attacker, target, raw, { crit, proj });
+    if (attacker.grab && target.alive) this.stun(target, attacker.grab); // main spectrale : elle agrippe
     if (attacker.techs.length && target.alive) this.attackTechniques(attacker, target);
     // Monstres venimeux (rat, gobelin violet) : chaque coup qui touche empoisonne (sans cumul, la durée repart).
     if (attacker.poison && target.alive && !target.isCrystal && !target.inert) {
@@ -2580,7 +3034,8 @@ class Battle extends EventEmitter {
   hit(attacker, target, raw, opts = {}) {
     if (!target.alive || this.immune(target, attacker)) return;
     if (target.isCrystal && this.clans && this.clans.overtime) raw *= Rules.CLANS.overtimeMult; // mort subite
-    if (target.guarded) raw *= Rules.MIMIC.copies.guard; // Mimic protégé par ses copies
+    if (target.guarded) raw *= target.guardMult || Rules.MIMIC.copies.guard; // Mimic protégé par ses copies, Daedra par ses portails
+    if (target.dazedUntil > this.time) raw *= Rules.LILITH.illusions.dazedTaken; // Lilith étourdie
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
@@ -2601,6 +3056,7 @@ class Battle extends EventEmitter {
 
   heal(f, amount) {
     if (!f.alive || amount <= 0) return;
+    if (this.healTaken && this.healTaken !== 1 && f.team === HEROES) amount *= this.healTaken; // défis ultimes
     const before = f.hp;
     f.hp = Math.min(f.maxHp, f.hp + amount);
     f.healAcc += f.hp - before;
@@ -2650,6 +3106,12 @@ class Battle extends EventEmitter {
       const held = this.players.find((p) => p.key === victim.holds);
       if (held && held.cocooned === victim.key) { held.cocooned = null; if (held.alive) this.events.push({ t: 'freed', to: held.key }); }
     }
+    // Main spectrale détruite : Ether redevient tangible plus tôt.
+    if (victim.kind === 'main' && this.boss && this.boss.stage && this.boss.stage.kind === 'intangible') {
+      this.boss.stage.until -= Rules.ETHER.intangible.shorten;
+      this.events.push({ t: 'handDown', x: Math.round(victim.x), y: Math.round(victim.y) });
+    }
+    if (victim.illusion) this.events.push({ t: 'illusionPop', x: Math.round(victim.x), y: Math.round(victim.y) });
     // Flammèche abattue pendant l'envol : le dragon brûle et devra se poser plus tôt.
     if (victim.kind === 'flammeche' && this.boss && this.boss.alive && this.boss.flying && this.boss.stage) {
       const S = Rules.BOSSES.dragon.sprites;
@@ -2770,17 +3232,23 @@ class Battle extends EventEmitter {
         key: b.key, id: b.bossId, name: b.name, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, phase: b.phase, enraged: b.enraged, alive: b.alive,
         flying: b.flying || undefined, away: b.away || undefined, shielded: b.shielded || undefined,
         guarded: b.guarded || undefined, leaping: b.leaping || undefined,
+        intangible: b.intangible || undefined, vanish: b.vanish ? true : undefined, dazed: b.dazedUntil > this.time || undefined,
+        shuffleIn: b.shuffleAt ? Math.round((b.shuffleAt - this.time) * 10) / 10 : undefined,
         // Liche : prochain gel (secondes) ; nombre de héros gelés
         freezeIn: b.ice ? Math.max(0, Math.round((b.ice.next - this.time) * 10) / 10) : undefined,
         // Compte à rebours de l'étape en cours (vol, nid), pour la barre du boss
         timer: b.stage && b.stage.until > this.time ? { kind: b.stage.kind, left: Math.round((b.stage.until - this.time) * 10) / 10 } : undefined,
       } : null,
-      slams: this.slams.map((s) => ({
+      slams: this.slams.filter((s) => !(s.delay > 0)).map((s) => ({
         kind: s.kind, x: Math.round(s.x), y: Math.round(s.y), r: s.r, p: Math.round((1 - s.t / s.warn) * 100) / 100, w: s.warn,
         fx: s.fx != null ? Math.round(s.fx) : undefined, fy: s.fy != null ? Math.round(s.fy) : undefined, loot: s.loot,
         tx: s.tx != null ? Math.round(s.tx) : undefined, ty: s.ty != null ? Math.round(s.ty) : undefined, w: s.w,
-        a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half,
+        a: s.angle !== undefined ? Math.round(s.angle * 1000) / 1000 : undefined, half: s.half, band: s.band,
       })),
+      // Murs de feu de Daedra (segments ou cercles), secondes restantes
+      walls: this.firewalls && this.firewalls.length ? this.firewalls.map((w) => (w.ring
+        ? { id: w.id, ring: true, x: Math.round(w.x), y: Math.round(w.y), r: w.r, w: w.w, left: Math.round((w.until - this.time) * 10) / 10 }
+        : { id: w.id, x1: Math.round(w.x1), y1: Math.round(w.y1), x2: Math.round(w.x2), y2: Math.round(w.y2), w: w.w, left: Math.round((w.until - this.time) * 10) / 10 })) : undefined,
       gold: this.gold ? {
         chests: this.gold.chests.map((c) => ({ id: c.id, x: Math.round(c.x), y: Math.round(c.y), fall: Math.max(0, Math.round((c.land - this.time) * 100) / 100) })),
         items: this.gold.items.map((c) => ({ id: c.id, kind: c.kind, x: Math.round(c.x), y: Math.round(c.y), fall: Math.max(0, Math.round((c.land - this.time) * 100) / 100) })),
@@ -2856,6 +3324,7 @@ function inSlam(s, f) {
   const dy = f.y - s.y;
   const dist = Math.hypot(dx, dy);
   if (s.line) return distToSegment(f, { x: s.x, y: s.y }, { x: s.tx, y: s.ty }) <= s.w / 2 + f.r;
+  if (s.band) return Math.abs(dist - s.r) <= s.band / 2 + f.r; // anneau (cercle infernal)
   if (s.kind !== 'cone' && !s.cone) return dist <= s.r;
   if (dist > s.r + f.r) return false;
   let diff = Math.abs(Math.atan2(dy, dx) - s.angle);

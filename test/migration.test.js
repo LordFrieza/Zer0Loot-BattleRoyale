@@ -53,10 +53,11 @@ test('[DB-8] migration V1 → V2 : toute la progression est conservée, les nouv
     assert.deepStrictEqual([c.mail, c.marketLog], [[], []], 'courrier et historique du marché vides');
     assert.strictEqual(c.energy.value, Rules.SOLO.energyMax);
     assert.strictEqual(c.bossKeys, Rules.SOLO.startKeys, 'une Clé de boss offerte');
-    assert.deepStrictEqual(c.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0 } }, 'enclos vide');
+    assert.deepStrictEqual(c.pets, { list: [], active: null, follow: null, food: {}, enclos: [], log: [], totals: { finds: 0, gold: 0, xp: 0, chests: 0, potions: 0, keys: 0, items: 0, emeralds: 0, tickets: 0 } }, 'enclos vide');
     assert.deepStrictEqual(c.history, [], 'historique vide');
     // 2.0 : émeraudes, Survivor et Maison tout neufs
     assert.strictEqual(c.emeralds, 0);
+    assert.strictEqual(c.casinoTickets, 0, 'tickets de casino');
     assert.deepStrictEqual(c.forgePity, {}, 'forge : aucun échec compté');
     assert.deepStrictEqual(c.survivor, { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0, evos: [], secrets: { legends: [], legendKills: 0, carts: 0, curses: 0 }, challenges: { day: '', done: [] } });
     assert.strictEqual(c.survivorActive, null);

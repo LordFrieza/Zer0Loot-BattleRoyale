@@ -1471,7 +1471,9 @@ function soloRewards(user, result, f = null) {
   c.soloActive = null;
   let levels = 0;
   // Clés de boss trouvées dans l'Expédition (jamais en répétition) : gardées même en cas de défaite
-  const keys = result.solo === 'expedition' && !result.training ? Math.max(0, result.keys || 0) : 0;
+  let keys = result.solo === 'expedition' && !result.training ? Math.max(0, result.keys || 0) : 0;
+  // Défis ultimes réussis : des Clés de boss en plus (Fabuleux 1, Mythique 2, Divin 3)
+  if (result.solo === 'boss' && result.victory && result.reward && result.reward.keys) keys += result.reward.keys;
   if (keys) game.addKeys(c, keys);
   if (result.reward) {
     const reward = { xp: result.reward.xp, gold: result.reward.gold, chests: result.reward.chests };
@@ -1488,15 +1490,20 @@ function soloRewards(user, result, f = null) {
     game.bump(c, 'challengeWins');
     if (Rules.SOLO_BOSS_COUNTER[id]) game.bump(c, Rules.SOLO_BOSS_COUNTER[id]);
     if (Rules.BOSS_WIN_COUNTER[id]) game.bump(c, Rules.BOSS_WIN_COUNTER[id]);
-    // Héroïque ou Légendaire : débloque la peau légendaire du boss
-    if (result.difficulty === 'heroique' || result.difficulty === 'legendaire') {
+    // Héroïque ou plus : débloque la peau légendaire du boss ; Légendaire ou plus : skins d'exploit (100 victoires)
+    const rank = Rules.challengeRank(result.difficulty);
+    if (rank >= Rules.challengeRank('heroique')) {
       game.bump(c, 'heroWins');
       if (Rules.HERO_BOSS_COUNTER[id]) game.bump(c, Rules.HERO_BOSS_COUNTER[id]);
     }
-    if (result.difficulty === 'legendaire') {
+    if (rank >= Rules.challengeRank('legendaire')) {
       game.bump(c, 'legendWins');
-      if (Rules.LEGEND_BOSS_COUNTER[id]) game.bump(c, Rules.LEGEND_BOSS_COUNTER[id]); // skins d'exploit (100 victoires)
+      if (Rules.LEGEND_BOSS_COUNTER[id]) game.bump(c, Rules.LEGEND_BOSS_COUNTER[id]);
     }
+    // Défis ultimes : chaque palier réussi compte aussi pour ceux du dessous
+    if (rank >= Rules.challengeRank('fabuleux')) game.bump(c, 'fabuleuxWins');
+    if (rank >= Rules.challengeRank('mythique')) game.bump(c, 'mythiqueWins');
+    if (rank >= Rules.challengeRank('divin')) game.bump(c, 'divinWins');
   }
   // Historique : expédition (profondeur) ou défi (vie restante du boss)
   game.recordActivity(c, {

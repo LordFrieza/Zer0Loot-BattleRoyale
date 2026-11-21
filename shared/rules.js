@@ -415,8 +415,8 @@
     { id: 'expedition40', metric: 'expeditionBest', goal: 40, name: 'Seigneur des profondeurs', desc: 'Atteindre la profondeur 40 en Expédition', gold: 1000 },
     { id: 'relics50', metric: 'relics', goal: 50, name: 'Collectionneur de reliques', desc: 'Choisir 50 reliques en Expédition', gold: 200 },
     { id: 'challenge1', metric: 'challengeWins', goal: 1, name: 'Duelliste', desc: 'Réussir 1 Défi des boss (mode Solo)', gold: 50 },
-    { id: 'hero1', metric: 'heroWins', goal: 1, name: 'Héroïque', desc: 'Réussir un Défi des boss en Héroïque ou Légendaire', gold: 200 },
-    { id: 'legend1', metric: 'legendWins', goal: 1, name: 'Légende vivante', desc: 'Réussir un Défi des boss en Légendaire', gold: 500 },
+    { id: 'hero1', metric: 'heroWins', goal: 1, name: 'Héroïque', desc: 'Réussir un Défi des boss en Héroïque (ou plus)', gold: 200 },
+    { id: 'legend1', metric: 'legendWins', goal: 1, name: 'Légende vivante', desc: 'Réussir un Défi des boss en Légendaire (ou plus)', gold: 500 },
     { id: 'sold1', metric: 'sold', goal: 1, name: 'Marchand', desc: 'Vendre 1 objet au marché', gold: 30 },
     { id: 'sold10', metric: 'sold', goal: 10, name: 'Négociant', desc: 'Vendre 10 objets au marché', gold: 200 },
     { id: 'bought1', metric: 'bought', goal: 1, name: 'Client', desc: 'Acheter 1 objet au marché', gold: 20 },
@@ -424,6 +424,12 @@
     { id: 'mimic1', metric: 'mimicWins', goal: 1, name: 'Briseur de coffres', desc: 'Vaincre le Mimic (Combat de Boss, Boss Rush ou Défi des boss)', gold: 150 },
     { id: 'liche1', metric: 'licheWins', goal: 1, name: 'Dégel', desc: 'Vaincre la Liche de glace', gold: 150 },
     { id: 'maexxna1', metric: 'maexxnaWins', goal: 1, name: 'Arachnophobe', desc: 'Vaincre Maexxna la Veuve noire', gold: 150 },
+    { id: 'ether1', metric: 'etherWins', goal: 1, name: 'Exorciste', desc: 'Vaincre Ether le Fantôme', gold: 200 },
+    { id: 'lilith1', metric: 'lilithWins', goal: 1, name: 'Dresseur de chats', desc: 'Vaincre Lilith le Chat', gold: 200 },
+    { id: 'daedra1', metric: 'daedraWins', goal: 1, name: 'Briseur de chaînes', desc: 'Vaincre Daedra la Succube', gold: 200 },
+    { id: 'fabuleux1', metric: 'fabuleuxWins', goal: 1, name: 'Fabuleux', desc: 'Réussir un Défi des boss en Fabuleux (ou plus)', gold: 3000 },
+    { id: 'mythique1', metric: 'mythiqueWins', goal: 1, name: 'Mythique', desc: 'Réussir un Défi des boss en Mythique (ou plus)', gold: 8000 },
+    { id: 'divin1', metric: 'divinWins', goal: 1, name: 'Divin', desc: 'Réussir un Défi des boss en Divin', gold: 20000 },
     { id: 'rush3', metric: 'rushBest', goal: 3, name: 'Enchaîneur', desc: 'Vaincre 3 boss dans une même partie de Boss Rush', gold: 150 },
     { id: 'rush6', metric: 'rushBest', goal: 6, name: 'Marathonien des boss', desc: 'Vaincre 6 boss dans une même partie de Boss Rush', gold: 600 },
     { id: 'pet1', metric: 'pets', goal: 1, name: 'Ami des bêtes', desc: 'Obtenir un familier (5 % de chance par boss vaincu)', gold: 100 },
@@ -444,17 +450,19 @@
     'legendWins', 'heroTroll', 'heroDragon', 'heroSorcier', 'techs', 'sold', 'bought',
     'mimicWins', 'licheWins', 'maexxnaWins', 'soloMimic', 'soloLiche', 'soloMaexxna', 'heroMimic', 'heroLiche', 'heroMaexxna', 'rushBest', 'pets', 'petFollowers', 'petFinds',
     'casinoPlays', 'jackpots', 'casinoLegend', 'svBestWave', 'svBosses', 'decoLevel',
-    'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak'];
+    'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak',
+    'etherWins', 'lilithWins', 'daedraWins', 'soloEther', 'soloLilith', 'soloDaedra', 'heroEther', 'heroLilith', 'heroDaedra',
+    'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
   const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
-  const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna' };
+  const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna', ether: 'soloEther', lilith: 'soloLilith', daedra: 'soloDaedra' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
-  const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins', mimic: 'mimicWins', liche: 'licheWins', maexxna: 'maexxnaWins' };
-  // Défi des boss réussi en Héroïque ou Légendaire : débloque la peau légendaire du boss.
-  const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier', mimic: 'heroMimic', liche: 'heroLiche', maexxna: 'heroMaexxna' };
-  // Défi des boss réussi en Légendaire, par boss (skins d'exploit à 100 victoires).
-  const LEGEND_BOSS_COUNTER = { troll: 'legendTroll', dragon: 'legendDragon', sorcier: 'legendSorcier', mimic: 'legendMimic', liche: 'legendLiche', maexxna: 'legendMaexxna' };
+  const BOSS_WIN_COUNTER = { troll: 'trollWins', dragon: 'dragonWins', sorcier: 'sorcierWins', mimic: 'mimicWins', liche: 'licheWins', maexxna: 'maexxnaWins', ether: 'etherWins', lilith: 'lilithWins', daedra: 'daedraWins' };
+  // Défi des boss réussi en Héroïque ou plus : débloque la peau légendaire du boss.
+  const HERO_BOSS_COUNTER = { troll: 'heroTroll', dragon: 'heroDragon', sorcier: 'heroSorcier', mimic: 'heroMimic', liche: 'heroLiche', maexxna: 'heroMaexxna', ether: 'heroEther', lilith: 'heroLilith', daedra: 'heroDaedra' };
+  // Défi des boss réussi en Légendaire ou plus, par boss (skins d'exploit à 100 victoires).
+  const LEGEND_BOSS_COUNTER = { troll: 'legendTroll', dragon: 'legendDragon', sorcier: 'legendSorcier', mimic: 'legendMimic', liche: 'legendLiche', maexxna: 'legendMaexxna', ether: 'legendEther', lilith: 'legendLilith', daedra: 'legendDaedra' };
 
   function achievementValue(character, metric) {
     if (metric === 'battles' || metric === 'kills' || metric === 'wins') return (character.record && character.record[metric]) || 0;
@@ -491,7 +499,7 @@
     },
     boss: {
       label: 'Combat de Boss', icon: '👹', color: '#7ccf6a', coop: true, minPlayers: 1,
-      desc: 'Tout le monde s\'allie contre un boss géant (Troll, Dragon, Magicien, Mimic, Liche de glace ou Maexxna). On gagne ensemble… ou on perd ensemble.',
+      desc: 'Tout le monde s\'allie contre un boss géant (Troll, Dragon, Magicien, Mimic, Liche de glace, Maexxna, Fantôme, Chat ou Succube). On gagne ensemble… ou on perd ensemble.',
     },
     dungeon: {
       label: 'Raid de Donjon', icon: '🏰', color: '#5fd3ff', coop: true, minPlayers: 1,
@@ -848,7 +856,133 @@
     reward: { xp: 500, gold: 500, chests: 3 },
   };
 
-  const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER, mimic: MIMIC, liche: LICHE, maexxna: MAEXXNA };
+  /*
+   * Ether le Fantôme : un gros fantôme insaisissable. Il esquive une grande partie des coups (et riposte aussitôt),
+   * hurle, enchaîne les héros avec des chaînes spectrales et moissonne leurs âmes pour se soigner. À 70 % et 35 %, il
+   * devient intangible (aucun coup ne le touche) et fait jaillir des mains spectrales qui agrippent les héros : chaque
+   * main détruite le fait revenir plus tôt. À 50 %, des feux follets errants le rejoignent ; à 15 %, il devient furieux.
+   */
+  const ETHER = {
+    id: 'ether',
+    kind: 'ether',
+    name: 'Ether le Fantôme',
+    short: 'Ether',
+    icon: '👻',
+    color: '#b8c8ff',
+    desc: 'Insaisissable : esquive et riposte, devient intangible en invoquant des mains spectrales, enchaîne les héros et dévore leurs âmes.',
+    marks: [0.7, 0.5, 0.35, 0.15],
+    hpBase: 200,
+    hpPerPlayer: 300,
+    damageBase: 6.5,
+    damagePerPlayer: 0.2,
+    cooldown: 1.25, // toucher glacial
+    speed: 68,
+    radius: 52,
+    reduction: 0.1,
+    precision: 0.25,
+    dodge: 0.35, // très difficile à toucher (la Précision des héros réduit son esquive)
+    counter: 0.35, // après une esquive, 35 % de chances de riposter aussitôt
+    range: 70,
+    specialEvery: 6.5, // en rotation : hurlement, chaînes spectrales, moisson d'âmes
+    wail: { warn: 1.3, radius: 190, ratio: 0.85, slow: 0.55, slowFor: 2.5 },
+    chains: { base: 2, perPlayers: 6, max: 5, warn: 1.3, width: 46, ratio: 1, stun: 1 },
+    souls: { base: 2, perPlayers: 6, max: 5, radius: 75, warn: 1.4, ratio: 0.8, drain: 0.5 }, // soigne Ether de 50 % des dégâts
+    intangible: { at: [0.7, 0.35], duration: 14, shorten: 1.2, wailEvery: 4, handEvery: 3.5,
+      hands: { per: 3, min: 3, max: 10, hpBase: 55, hpPerPlayer: 7, damageRatio: 0.45, cooldown: 1.6, range: 70, grab: 1 } },
+    wisps: { at: 0.5, base: 4, perPlayers: 4, max: 12, hpBase: 30, hpPerPlayer: 4, speed: 78, radius: 12, blast: 70, ratio: 1.2, life: 18 },
+    fury: { at: 0.15, dodge: 0.15, attackSpeedMult: 1.25 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  /*
+   * Lilith le Chat : une chatte espiègle au sourire immense. Elle bondit, lance des éventails de cartes tranchantes,
+   * disparaît (seul son sourire flotte) pour frapper dans le dos, et joue au bonneteau avec les héros (ils échangent
+   * leurs places). À 75 % et 40 %, elle se multiplie en illusions indiscernables : les briser toutes l'étourdit,
+   * sinon elles explosent. À 50 %, un chapeau magique fait sortir des chatons ; à 10 %, sa neuvième vie la relève.
+   */
+  const LILITH = {
+    id: 'lilith',
+    kind: 'lilith',
+    name: 'Lilith le Chat',
+    short: 'Lilith',
+    icon: '😼',
+    color: '#c8925a',
+    desc: 'Illusions indiscernables, disparitions, bonneteau qui échange les héros de place, chapeau à chatons et neuf vies.',
+    marks: [0.75, 0.5, 0.4, 0.1],
+    hpBase: 200,
+    hpPerPlayer: 290,
+    damageBase: 6,
+    damagePerPlayer: 0.2,
+    cooldown: 0.95, // coups de griffes
+    speed: 92,
+    radius: 46,
+    reduction: 0.12,
+    precision: 0.3,
+    dodge: 0.12,
+    range: 46,
+    cleaveRadius: 60,
+    cleaveRatio: 0.45,
+    specialEvery: 6, // en rotation : bond, cartes, disparition, bonneteau
+    pounce: { warn: 1, radius: 110, ratio: 0.9 },
+    cards: { warn: 1.1, length: 320, angle: 0.55, ratio: 0.75, bleed: 0.02, duration: 4 },
+    vanish: { hide: 1.4, warn: 0.7, radius: 95, ratio: 1.25 },
+    shuffle: { warn: 1.6, ratio: 0.3, stun: 0.6 },
+    illusions: { at: [0.75, 0.4], counts: [3, 5], duration: 14, hpRatio: 0.03, damageRatio: 0.4, blastRadius: 110, blastWarn: 1, blastRatio: 1.1, dazed: 5, dazedTaken: 1.5 },
+    hat: { at: 0.5, hpBase: 140, hpPerPlayer: 16, every: 4, per: 2, alive: 12,
+      kitten: { hpBase: 26, hpPerPlayer: 3, damageRatio: 0.22, speed: 125, radius: 10, cooldown: 0.8, range: 24 } },
+    ninelives: { at: 0.1, heal: 0.2, attackSpeedMult: 1.25, speedMult: 1.2 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  /*
+   * Daedra la Succube : son fouet de feu frappe de très loin et brûle. Ses colonnes de feu traversent l'arène et
+   * séparent les héros (on ne peut pas les franchir, elles brûlent), ses cercles infernaux enferment un héros avant
+   * d'exploser, et elle appelle des démons de feu. À 66 %, trois portails infernaux la protègent (dégâts réduits) et
+   * crachent des démons ; à 33 %, elle s'élève et embrase l'arène ; à 15 %, elle entre en furie.
+   */
+  const DAEDRA = {
+    id: 'daedra',
+    kind: 'daedra',
+    name: 'Daedra la Succube',
+    short: 'Daedra',
+    icon: '😈',
+    color: '#ff3b5c',
+    desc: 'Fouet de feu à longue portée, colonnes de flammes infranchissables, cercles infernaux, portails et nuées de démons de feu.',
+    marks: [0.66, 0.33, 0.15],
+    hpBase: 220,
+    hpPerPlayer: 280,
+    damageBase: 7,
+    damagePerPlayer: 0.22,
+    cooldown: 1.15, // coups de fouet
+    speed: 64,
+    radius: 44,
+    reduction: 0.15,
+    precision: 0.3,
+    dodge: 0.06,
+    range: 175,
+    projectile: 'whip',
+    poison: { dot: 0.012, duration: 3 }, // chaque coup de fouet brûle (1,2 % de la vie max par seconde)
+    specialEvery: 6.5, // en rotation : colonnes de feu, fouet infernal, cercle infernal
+    pillars: { warn: 1.4, width: 56, ratio: 1.2, life: 8, burn: 0.01 }, // burn : part de la vie max perdue par seconde collé au mur
+    lash: { warn: 1, length: 290, angle: 0.8, ratio: 1 },
+    ring: { warn: 1.2, radius: 130, width: 40, life: 5, ratio: 0.6, blastWarn: 1.2, blastRatio: 1.1 },
+    demons: { every: 14, per: 4, min: 2, max: 6, alive: 10, hpBase: 30, hpPerPlayer: 4, damageRatio: 0.25, speed: 105, radius: 14, cooldown: 1, range: 28, poison: { dot: 0.008, duration: 3 } },
+    portals: { at: 0.66, count: 3, hpBase: 110, hpPerPlayer: 12, every: 6, guard: 0.6, dist: 190 }, // autour d'elle ; tant qu'ils tiennent : dégâts subis ×0,6, un démon par portail toutes les 6 s (et pas d'autres démons)
+    inferno: { at: 0.33, duration: 12, wallEvery: 1.6, rainEvery: 1.1, rainRadius: 85, rainWarn: 1.1, rainRatio: 0.8 },
+    fury: { at: 0.15, attackSpeedMult: 1.3, range: 40, demonEvery: 6 },
+    phases: [],
+    enrageAt: 150,
+    enrageMult: 3,
+    reward: { xp: 500, gold: 500, chests: 3 },
+  };
+
+  const BOSSES = { troll: BOSS, dragon: DRAGON, sorcier: SORCIER, mimic: MIMIC, liche: LICHE, maexxna: MAEXXNA, ether: ETHER, lilith: LILITH, daedra: DAEDRA };
 
   /*
    * V2 : les boss sont plus résistants (×1,25), et encore plus face à des combattants expérimentés :
@@ -1550,17 +1684,32 @@
   const BOSS_SOLO_SCALE = {
     troll: { hp: 1.1, damage: 2.1 }, dragon: { hp: 1.1, damage: 2.4 }, sorcier: { hp: 0.6, damage: 1.1 },
     mimic: { hp: 0.55, damage: 1.45 }, liche: { hp: 0.55, damage: 1.4 }, maexxna: { hp: 0.6, damage: 1.3 },
+    ether: { hp: 0.6, damage: 1.3 }, lilith: { hp: 1.1, damage: 1.3 }, daedra: { hp: 0.6, damage: 1.2 },
   };
   // Seul face au boss, les classes fragiles à distance sont désavantagées : vie et dégâts du joueur ajustés par classe.
   const BOSS_SOLO_CLASS = {
     guerrier: { hp: 1, damage: 1 }, archer: { hp: 2, damage: 1.5 }, mage: { hp: 1.6, damage: 1.3 },
     assassin: { hp: 1.3, damage: 1.15 }, pretre: { hp: 1, damage: 1, regen: 0.4 }, none: { hp: 1, damage: 1 },
   };
+  /*
+   * Difficultés du Défi des boss. Au-delà de Légendaire (défis ultimes) : bien plus de vie et de dégâts, et en plus
+   * special (attaques spéciales plus fréquentes), attackSpeed (coups plus rapides), enrageAt (la rage finale, dégâts ×3,
+   * arrive plus tôt : un vrai chrono) et healTaken (soins et vol de vie du héros réduits). Les créatures du boss n'y prennent
+   * que la racine carrée du multiplicateur de vie (et dégâts^0,7), sinon elles seraient indestructibles.
+   */
   const BOSS_CHALLENGE = {
     normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 450, gold: 375, chests: 2 } },
     heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 900, gold: 750, chests: 3 } },
     legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1500, gold: 1350, chests: 6 } },
+    fabuleux: { label: 'Fabuleux', icon: '🌟', ultimate: true, hp: 38, damage: 5.5, special: 1.6, attackSpeed: 1.35, enrageAt: 100, healTaken: 0.45, reward: { xp: 3000, gold: 3500, chests: 10, keys: 1 } },
+    mythique: { label: 'Mythique', icon: '🌟🌟', ultimate: true, hp: 65, damage: 8, special: 1.9, attackSpeed: 1.55, enrageAt: 85, healTaken: 0.25, reward: { xp: 5000, gold: 7000, chests: 16, keys: 2 } },
+    divin: { label: 'Divin', icon: '👑', ultimate: true, hp: 82, damage: 9.5, special: 2, attackSpeed: 1.65, enrageAt: 80, healTaken: 0.2, reward: { xp: 8000, gold: 15000, chests: 25, keys: 3 } },
   };
+  const BOSS_CHALLENGE_ORDER = ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin'];
+  // Rang d'une difficulté (0 = Normal) : « Héroïque ou plus », « Légendaire ou plus »…
+  function challengeRank(d) {
+    return Math.max(0, BOSS_CHALLENGE_ORDER.indexOf(d));
+  }
   const SOLO_MODES = {
     expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
     boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire. Coûte 1 Clé de boss (trouvée dans l\'Expédition).' },
@@ -1625,7 +1774,12 @@
     mimic: { name: 'Mini Grignotor', favorite: 'croquettes', find: 'chest', findLabel: 'un coffre de loot', color: '#d9a441' },
     liche: { name: 'Mini Givrenoire', favorite: 'eau', find: 'potion', findLabel: 'une potion (et parfois une Clé de boss)', color: '#7fd8ff' },
     maexxna: { name: 'Mini Maexxna', favorite: 'gigot', find: 'armure', findLabel: 'une pièce d\'armure ou un bijou', color: '#c0203a' },
+    ether: { name: 'Mini Ether', favorite: 'jus', find: 'emerald', findLabel: 'des émeraudes', color: '#b8c8ff' },
+    lilith: { name: 'Mini Lilith', favorite: 'croquettes', find: 'ticket', findLabel: 'un ticket de casino (une partie gratuite à 50 golds, hors caisse)', color: '#c8925a' },
+    daedra: { name: 'Mini Daedra', favorite: 'festin', find: 'random', findLabel: 'une surprise : potion, coffre, XP, équipement ou golds', color: '#ff3b5c' },
   };
+  // Mini Daedra : une trouvaille d'un autre familier, au hasard (même niveau)
+  const PET_RANDOM_FINDS = ['potion', 'chest', 'xp', 'arme', 'armure', 'gold'];
   function petXpToNext(level) {
     return 40 + 20 * Math.max(1, level);
   }
@@ -1695,12 +1849,13 @@
     return res;
   }
   // Valeur d'une trouvaille (golds / XP) selon l'espèce et le niveau.
-  function petFindValue(species, level, effects) {
+  function petFindValue(species, level, effects, as = null) {
     const L = Math.max(1, level);
     const r = effects ? effects.reward : 1;
-    const find = PETS[species] && PETS[species].find;
+    const find = as || (PETS[species] && PETS[species].find);
     if (find === 'gold') return Math.round((50 + 15 * L) * r);
     if (find === 'xp') return Math.round((80 + 25 * L) * r);
+    if (find === 'emerald') return Math.round((8 + 3 * L) * r);
     return 0;
   }
 
@@ -2775,6 +2930,9 @@
     peau_mimic: { slot: 'body', label: 'Gueule de mimic', price: 0, color: '#b9813f', unlock: { metric: 'heroMimic', goal: 1, desc: 'Vaincre le Mimic en Défi des boss, en Héroïque ou Légendaire' } },
     peau_liche: { slot: 'body', label: 'Liche glaciaire', price: 0, color: '#d6ebf3', unlock: { metric: 'heroLiche', goal: 1, desc: 'Vaincre la Liche de glace en Défi des boss, en Héroïque ou Légendaire' } },
     peau_maexxna: { slot: 'body', label: 'Carapace de veuve noire', price: 0, color: '#2a2433', unlock: { metric: 'heroMaexxna', goal: 1, desc: 'Vaincre Maexxna en Défi des boss, en Héroïque ou Légendaire' } },
+    peau_ether: { slot: 'body', label: 'Ectoplasme d\'Ether', price: 0, color: '#c9d4ff', unlock: { metric: 'heroEther', goal: 1, desc: 'Vaincre Ether le Fantôme en Défi des boss, en Héroïque ou plus' } },
+    peau_lilith: { slot: 'body', label: 'Pelage de Lilith', price: 0, color: '#a8743f', unlock: { metric: 'heroLilith', goal: 1, desc: 'Vaincre Lilith le Chat en Défi des boss, en Héroïque ou plus' } },
+    peau_daedra: { slot: 'body', label: 'Peau de succube', price: 0, color: '#c8303e', unlock: { metric: 'heroDaedra', goal: 1, desc: 'Vaincre Daedra la Succube en Défi des boss, en Héroïque ou plus' } },
     // Auras
     aura_feu: { slot: 'aura', label: 'Aura de feu', price: 1000, color: '#ff6b2a' },
     aura_glace: { slot: 'aura', label: 'Aura de glace', price: 1000, color: '#7fd8ff' },
@@ -2789,6 +2947,9 @@
     pattes_maexxna: { slot: 'cape', label: 'Pattes de Maexxna', price: 0, legend: true, color: '#241e2c', trim: '#c4122f', unlock: { metric: 'legendMaexxna', goal: 100, desc: 'Vaincre Maexxna 100 fois en Défi des boss Légendaire' } },
     armure_grignotor: { slot: 'chest', label: 'Armure-coffre de Grignotor', price: 0, legend: true, color: '#9a6a32', trim: '#ffd34a', unlock: { metric: 'legendMimic', goal: 100, desc: 'Vaincre Grignotor (Mimic) 100 fois en Défi des boss Légendaire' } },
     couronne_givre: { slot: 'hat', label: 'Couronne de Givrenoire', price: 0, legend: true, color: '#bfe8ff', trim: '#5ad8ff', unlock: { metric: 'legendLiche', goal: 100, desc: 'Vaincre Givrenoire (Liche) 100 fois en Défi des boss Légendaire' } },
+    aura_ether: { slot: 'aura', label: 'Brume d\'Ether', price: 0, legend: true, color: '#b8c8ff', unlock: { metric: 'legendEther', goal: 100, desc: 'Vaincre Ether (Fantôme) 100 fois en Défi des boss Légendaire ou plus' } },
+    sourire_lilith: { slot: 'face', label: 'Sourire de Lilith', price: 0, legend: true, color: '#fff6d8', trim: '#ff5fd2', unlock: { metric: 'legendLilith', goal: 100, desc: 'Vaincre Lilith (Chat) 100 fois en Défi des boss Légendaire ou plus' } },
+    ailes_daedra: { slot: 'cape', label: 'Ailes de Daedra', price: 0, legend: true, color: '#2a0a12', trim: '#ff4a2a', unlock: { metric: 'legendDaedra', goal: 100, desc: 'Vaincre Daedra (Succube) 100 fois en Défi des boss Légendaire ou plus' } },
     manteau_abysses: { slot: 'cape', label: 'Manteau des profondeurs', price: 0, legend: true, color: '#0e1a3a', trim: '#5ad8ff', unlock: { metric: 'expeditionBest', goal: 100, desc: 'Atteindre la salle 100 en Expédition (mode Solo)' } },
     aura_immortel: { slot: 'aura', label: 'Aura de l\'immortel', price: 0, legend: true, color: '#5dff9a', unlock: { metric: 'svBestWave', goal: 100, desc: 'Atteindre la vague 100 au Survivor' } },
     aura_or: { slot: 'aura', label: 'Pluie d\'or', price: 0, legend: true, color: '#ffd34a', unlock: { metric: 'goldPeak', goal: 1000000, desc: 'Posséder 1 000 000 de golds en même temps' } },
@@ -2999,14 +3160,14 @@
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
-    MIMIC, LICHE, MAEXXNA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
+    MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, SURVIVOR_EVOLUTIONS, survivorEvoReady, SURVIVOR_SECRETS, SURVIVOR_CHALLENGES, SURVIVOR_CHALLENGE_REWARD, survivorChallengesOf, survivorMetric, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,
     HISTORY, HISTORY_KINDS, PLAYER_STAT_KEYS, PLAYER_STAT_MAX,
-    PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
-    talentNodes, talentBlocker, talentBonus, talentExtraBlocker, TALENT_EXTRA_COST, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
+    PET, PET_FOODS, PET_FOOD_MAX, PET_ENCLOS, PETS, PET_RANDOM_FINDS, petXpToNext, petEnclosEffects, petSatisfaction, petFindEvery, petAdvance, petFindValue,
+    talentNodes, talentBlocker, talentBonus, talentExtraBlocker, TALENT_EXTRA_COST, talentBranch, ultOf, specOf, MARKET, marketTax, SOLO, energyState, EXPEDITION, expeditionRoom, expeditionMultipliers, expeditionReward, RELICS, BOSS_CHALLENGE, BOSS_CHALLENGE_ORDER, challengeRank, BOSS_SOLO_SCALE, BOSS_SOLO_CLASS, SOLO_MODES, COMBAT_AI, TACTICS, DEFAULT_TACTICS, tacticsKiteMax, TECH_SLOTS, TECHNIQUES, techSlots, techBlocker, TRAINING, DUNGEON_THEMES, dungeonTheme, DEFAULT_LOOK, COSMETIC_SLOTS, COSMETICS, DRAWING, cosmeticLocked,
   };
 });

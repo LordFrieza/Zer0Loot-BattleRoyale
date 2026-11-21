@@ -29,7 +29,7 @@ const tickFor = (b, seconds) => { for (let i = 0; i < Math.round(seconds / 0.05)
 const byCls = (b, cls) => b.players.find((p) => p.cls === cls);
 
 test('[BOSS-8] boss : choix du boss à l\'ouverture de la file, Troll par défaut', () => {
-  assert.deepStrictEqual(Object.keys(Rules.BOSSES), ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna']);
+  assert.deepStrictEqual(Object.keys(Rules.BOSSES), ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna', 'ether', 'lilith', 'daedra']);
   const b = new Battle();
   b.openQueue(60, 'boss');
   clearTimeout(b.queueTimer);
