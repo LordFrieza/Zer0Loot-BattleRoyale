@@ -1468,7 +1468,6 @@ class Battle extends EventEmitter {
     b.stage = { kind: 'inferno', until: this.time + B.inferno.duration, wallIn: 0.8, rainIn: 1.2 };
     for (const f of this.fighters) if (f.targetKey === b.key) f.targetKey = null;
     this.events.push({ t: 'bossPhase', phase: b.phase, label: 'DAEDRA EMBRASE L\'ARÈNE !', sub: 'Les colonnes de feu jaillissent de partout !' });
-    this.events.push({ t: 'bossFly', duration: B.inferno.duration });
   }
 
   addMonster(o) {

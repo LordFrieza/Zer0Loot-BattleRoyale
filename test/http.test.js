@@ -1133,7 +1133,7 @@ test('[CAS-1, CAS-4, CAS-6, CAS-8, LB-1] casino via l\'API : salle, parties en c
   assert.deepStrictEqual([room.crowd[0].id, room.crowd[0].me, room.crowd[0].name], [id, true, 'pl_casino']);
   assert.ok(room.crowd[0].look && room.crowd[0].app);
   assert.ok(Array.isArray(room.feed));
-  assert.deepStrictEqual(room.sessions, { blackjack: null, glace: null });
+  assert.deepStrictEqual(room.sessions, { blackjack: null, glace: null, heaven: null, chaton: null });
   // Pas assez de golds : refusé
   assert.match((await s.post('/api/casino/slots', { bet: 500 })).data.error, /Il te faut 500 golds/);
   await give(id, { gold: 2000 });

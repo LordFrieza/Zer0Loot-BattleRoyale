@@ -287,17 +287,37 @@ app.get('/api/casino', requirePlayer, (req, res) => {
   }));
   res.json({ crowd, feed: casino.feed(), sessions: casino.sessionsOf(req.user) });
 });
-app.post('/api/casino/slots', requirePlayer, casinoAction((req) => casino.slots(req.user, req.body.bet)));
-app.post('/api/casino/roulette', requirePlayer, casinoAction((req) => casino.roulette(req.user, req.body.bets)));
-app.post('/api/casino/gobelets', requirePlayer, casinoAction((req) => casino.gobelets(req.user, req.body.bet, req.body.cup)));
+app.post('/api/casino/slots', requirePlayer, casinoAction((req) => casino.slots(req.user, req.body.bet, !!req.body.ticket)));
+app.post('/api/casino/roulette', requirePlayer, casinoAction((req) => casino.roulette(req.user, req.body.bets, !!req.body.ticket)));
+app.post('/api/casino/gobelets', requirePlayer, casinoAction((req) => casino.gobelets(req.user, req.body.bet, req.body.cup, !!req.body.ticket)));
 app.post('/api/casino/caisse', requirePlayer, casinoAction((req) => casino.caisse(req.user)));
-app.post('/api/casino/blackjack/deal', requirePlayer, casinoAction((req) => casino.bjDeal(req.user, req.body.bet)));
+app.post('/api/casino/blackjack/deal', requirePlayer, casinoAction((req) => casino.bjDeal(req.user, req.body.bet, !!req.body.ticket)));
 app.post('/api/casino/blackjack/hit', requirePlayer, casinoAction((req) => casino.bjHit(req.user)));
 app.post('/api/casino/blackjack/stand', requirePlayer, casinoAction((req) => casino.bjStand(req.user)));
 app.post('/api/casino/blackjack/double', requirePlayer, casinoAction((req) => casino.bjDouble(req.user)));
-app.post('/api/casino/glace/start', requirePlayer, casinoAction((req) => casino.glaceStart(req.user, req.body.bet, req.body.mines)));
+app.post('/api/casino/glace/start', requirePlayer, casinoAction((req) => casino.glaceStart(req.user, req.body.bet, req.body.mines, !!req.body.ticket)));
 app.post('/api/casino/glace/pick', requirePlayer, casinoAction((req) => casino.glacePick(req.user, req.body.index)));
 app.post('/api/casino/glace/cash', requirePlayer, casinoAction((req) => casino.glaceCash(req.user)));
+app.post('/api/casino/heaven/start', requirePlayer, casinoAction((req) => casino.heavenStart(req.user, req.body.bet, req.body.auto, !!req.body.ticket)));
+// Interrogée plusieurs fois par seconde pendant la montée : on ne sauvegarde et ne renvoie le personnage qu'à la fin.
+app.post('/api/casino/heaven/check', requirePlayer, (req, res) => {
+  try {
+    const r = casino.heavenCheck(req.user);
+    if (r.outcome) {
+      db.save();
+      pushMe(req.user);
+      if (r.feed) io.emit('casino', { feed: casino.feed() });
+    }
+    res.json({ ok: true, ...r });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.post('/api/casino/heaven/cash', requirePlayer, casinoAction((req) => casino.heavenCash(req.user)));
+app.post('/api/casino/chaton/start', requirePlayer, casinoAction((req) => casino.chatonStart(req.user, req.body.bet, !!req.body.ticket)));
+app.post('/api/casino/chaton/jump', requirePlayer, casinoAction((req) => casino.chatonJump(req.user)));
+app.post('/api/casino/chaton/cash', requirePlayer, casinoAction((req) => casino.chatonCash(req.user)));
+app.post('/api/casino/course', requirePlayer, casinoAction((req) => casino.course(req.user, req.body.bet, req.body.demon, !!req.body.ticket)));
 
 // ---------- Survivor ----------
 // La partie tourne côté serveur (survivor.tickAll, branché dans start()) ; la position arrive par socket (`sv:pos`).
@@ -1636,4 +1656,4 @@ function start(port = PORT) {
 if (require.main === module) start();
 
 module.exports = {
-  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand };
+  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand, soloRewards };

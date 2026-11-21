@@ -13,6 +13,9 @@
     mimic: { bow: [-1, -4, 1], vest: null, hat: [4, -31.2, 0.85, -0.3] },
     liche: { bow: [0.5, -21.6, 0.7], vest: [0.5, -22.4, -11, 12, 15], hat: null },
     maexxna: { bow: [1.5, -11.5, 0.75], vest: null, hat: [8.5, -14.6, 0.66, 0.12] },
+    ether: { bow: [0, -13.5, 1.1], vest: null, hat: [0, -44.6, 0.95, -0.08] },
+    lilith: { bow: [7.5, -7.6, 0.9], vest: null, hat: [7, -31, 0.72, 0.12] },
+    daedra: { bow: [0, -26.4, 0.55], vest: [0, -26.6, -15.6, 11, 10], hat: [0, -40.2, 0.62, 0] },
   };
 
   function drawBow(ctx, x, y, s, wiggle) {

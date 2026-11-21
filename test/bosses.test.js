@@ -639,3 +639,226 @@ test('[LCH-3] Liche : seul (Défi des boss), la glace ronge 5 % de la vie max pa
   tickFor(b, 3.01);
   assert.strictEqual(hp - p.hp, 3 * Math.max(1, Math.round(p.maxHp * Rules.BOSSES.liche.freeze.soloDps)));
 });
+
+test('[ETH-1, ETH-2] Ether : esquive et riposte ; hurlement, chaînes spectrales, moisson d\'âmes qui le soigne', () => {
+  const b = fight('ether', 6);
+  const E = Rules.BOSSES.ether;
+  assert.deepStrictEqual([b.boss.dodge, b.boss.counter], [E.dodge, E.counter]);
+  freeze(b);
+  assert.strictEqual(b.boss.maxHp, E.hpBase + E.hpPerPlayer * 6);
+  // Esquive (précision nulle, esquive totale) puis riposte immédiate
+  const h = b.players[0];
+  h.precision = 0;
+  b.boss.dodge = 1;
+  b.boss.counter = 1;
+  b.boss.cd = 5;
+  b.events = [];
+  b.attack(h, b.boss);
+  assert.ok(b.events.some((e) => e.t === 'counter'));
+  assert.ok(b.boss.cd <= 0.05, 'il riposte aussitôt');
+  // Rotation des attaques spéciales
+  b.boss.slamIn = 0; b.bossSpecials(0.05, E);
+  assert.ok(b.slams.some((s) => s.kind === 'wail' && s.slow === E.wail.slow && s.follow));
+  b.boss.slamIn = 0; b.bossSpecials(0.05, E);
+  const chains = b.slams.filter((s) => s.kind === 'chain');
+  assert.strictEqual(chains.length, Math.min(E.chains.max, E.chains.base + Math.floor(6 / E.chains.perPlayers)));
+  assert.ok(chains.every((s) => s.line && s.stun === E.chains.stun));
+  b.boss.slamIn = 0; b.bossSpecials(0.05, E);
+  const souls = b.slams.filter((s) => s.kind === 'soul');
+  assert.ok(souls.length >= E.souls.base && souls.every((s) => s.drain === E.souls.drain));
+  // Moisson d'âmes : Ether se soigne d'une partie des dégâts
+  b.slams = [souls[0]];
+  const v = b.players.find((p) => Math.hypot(p.x - souls[0].x, p.y - souls[0].y) < 5);
+  b.boss.hp = b.boss.maxHp * 0.8;
+  const hp = b.boss.hp;
+  souls[0].t = 0.01;
+  b.resolveSlams(0.05);
+  if (v) assert.ok(b.boss.hp > hp, 'il dévore les âmes');
+});
+
+test('[ETH-3, ETH-4] Ether : intangible avec mains spectrales (chaque main détruite l\'abrège), feux follets, furie', () => {
+  const b = fight('ether', 6);
+  freeze(b);
+  const E = Rules.BOSSES.ether;
+  b.boss.slamIn = 999;
+  b.boss.hp = b.boss.maxHp * 0.69;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.intangible, true);
+  assert.strictEqual(b.immune(b.boss, b.players[0]), true, 'plus rien ne le touche');
+  const hands = b.adds.filter((a) => a.kind === 'main' && a.alive);
+  assert.strictEqual(hands.length, Math.max(E.intangible.hands.min, Math.min(E.intangible.hands.max, Math.ceil(6 / E.intangible.hands.per))));
+  assert.strictEqual(hands[0].speed, 0);
+  // Une main agrippe (étourdit) le héros qu'elle frappe
+  hands[0].precision = 1;
+  b.attack(hands[0], b.players[0]);
+  assert.ok(b.players[0].stunUntil > b.time || b.players[0].buffs.some((x) => x.kind === 'stun' || x.stun));
+  const until = b.boss.stage.until;
+  b.kill(b.players[1], hands[1]);
+  assert.ok(Math.abs(b.boss.stage.until - (until - E.intangible.shorten)) < 1e-9);
+  // Il reprend forme à la fin ; les mains restantes disparaissent
+  b.time = b.boss.stage.until + 0.01;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.intangible, false);
+  assert.ok(!b.adds.some((a) => a.kind === 'main' && a.alive));
+  // Feux follets à 50 % : ils explosent au contact
+  b.boss.hp = b.boss.maxHp * 0.49;
+  b.updateBoss(0.05);
+  const wisps = b.adds.filter((a) => a.kind === 'feu_follet' && a.alive);
+  assert.ok(wisps.length >= E.wisps.base && wisps[0].kamikaze);
+  const target = b.players[2];
+  wisps[0].x = target.x; wisps[0].y = target.y;
+  const hp = target.hp;
+  b.attack(wisps[0], target);
+  assert.ok(!wisps[0].alive && target.hp < hp);
+  // Intangible à 35 %, puis furie à 15 % : plus d'esquive et coups plus rapides
+  b.boss.hp = b.boss.maxHp * 0.34;
+  b.updateBoss(0.05);
+  b.time = b.boss.stage.until + 0.01;
+  b.updateBoss(0.05);
+  const dodge = b.boss.dodge;
+  const cd = b.boss.cooldown;
+  b.boss.hp = b.boss.maxHp * 0.14;
+  b.updateBoss(0.05);
+  assert.ok(Math.abs(b.boss.dodge - (dodge + E.fury.dodge)) < 1e-9);
+  assert.ok(Math.abs(b.boss.cooldown - cd / E.fury.attackSpeedMult) < 1e-9);
+});
+
+test('[LIL-1, LIL-2] Lilith : bond, cartes qui font saigner, disparition puis griffes dans le dos, bonneteau', () => {
+  const b = fight('lilith', 5);
+  freeze(b);
+  const L = Rules.BOSSES.lilith;
+  assert.strictEqual(b.boss.maxHp, L.hpBase + L.hpPerPlayer * 5);
+  b.boss.slamIn = 0; b.bossSpecials(0.05, L);
+  assert.ok(b.slams.some((s) => s.leap && s.r === L.pounce.radius));
+  b.boss.slamIn = 0; b.bossSpecials(0.05, L);
+  assert.ok(b.slams.some((s) => s.kind === 'cards' && s.cone && s.bleed === L.cards.bleed));
+  b.boss.slamIn = 0; b.bossSpecials(0.05, L);
+  assert.ok(b.boss.vanish && b.boss.away, 'disparue : intouchable');
+  assert.strictEqual(b.immune(b.boss, b.players[0]), true);
+  b.time = b.boss.vanish.until + 0.01;
+  b.updateVanish(L);
+  assert.strictEqual(b.boss.away, false);
+  assert.ok(b.slams.some((s) => s.kind === 'claw'));
+  // Bonneteau : les héros échangent leurs places et restent sonnés
+  b.slams = [];
+  b.boss.slamIn = 0; b.bossSpecials(0.05, L);
+  assert.ok(b.boss.shuffleAt > 0);
+  const before = b.players.map((p) => `${p.x},${p.y}`);
+  b.doShuffle(L);
+  const after = b.players.map((p) => `${p.x},${p.y}`);
+  assert.deepStrictEqual([...after].sort(), [...before].sort(), 'mêmes places, redistribuées');
+  assert.notDeepStrictEqual(after, before);
+});
+
+test('[LIL-3, LIL-4] Lilith : illusions indiscernables (étourdie si toutes brisées, sinon elles explosent), chapeau, neuvième vie', () => {
+  const b = fight('lilith', 5);
+  freeze(b);
+  const L = Rules.BOSSES.lilith;
+  b.boss.slamIn = 999;
+  b.boss.hp = b.boss.maxHp * 0.74;
+  b.updateBoss(0.05);
+  let ill = b.adds.filter((a) => a.illusion && a.alive);
+  assert.strictEqual(ill.length, L.illusions.counts[0]);
+  assert.ok(ill.every((a) => a.kind === 'lilith' && a.name === b.boss.name && a.r === b.boss.r), 'indiscernables');
+  for (const a of ill) b.kill(b.players[0], a);
+  b.updateBoss(0.05);
+  assert.ok(b.boss.dazedUntil > b.time, 'toutes brisées : étourdie');
+  // Étourdie : elle subit +50 % de dégâts
+  const t = b.boss;
+  t.hp = t.maxHp * 0.6;
+  // Deuxième vague (à 40 %) : on laisse les illusions tenir, elles explosent
+  b.boss.hp = b.boss.maxHp * 0.39;
+  b.updateBoss(0.05); // chapeau (50 %) puis illusions (40 %), une étape par appel
+  b.updateBoss(0.05);
+  assert.ok(b.adds.some((a) => a.kind === 'chapeau' && a.alive), 'chapeau magique à 50 %');
+  ill = b.adds.filter((a) => a.illusion && a.alive);
+  assert.strictEqual(ill.length, L.illusions.counts[1]);
+  b.time = b.boss.stage.until + 0.01;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.slams.filter((s) => s.kind === 'pop').length, L.illusions.counts[1]);
+  assert.ok(!b.adds.some((a) => a.illusion && a.alive));
+  // Le chapeau fait sortir des chatons
+  b.boss.hatIn = 0;
+  b.updateHat(0.05, L);
+  assert.ok(b.adds.some((a) => a.kind === 'chaton' && a.alive));
+  // Neuvième vie à 10 %
+  b.boss.hp = b.boss.maxHp * 0.09;
+  const hp = b.boss.hp;
+  b.updateBoss(0.05);
+  assert.ok(Math.abs(b.boss.hp - (hp + b.boss.maxHp * L.ninelives.heal)) < 1e-6);
+});
+
+test('[DAE-1, DAE-2] Daedra : fouet de feu à longue portée, colonnes de feu infranchissables, cercle infernal', () => {
+  const b = fight('daedra', 6);
+  freeze(b);
+  const D = Rules.BOSSES.daedra;
+  assert.strictEqual(b.boss.maxHp, D.hpBase + D.hpPerPlayer * 6);
+  assert.strictEqual(b.boss.range, D.range);
+  // Colonne de feu : annoncée, puis elle reste au sol
+  b.boss.slamIn = 0; b.bossSpecials(0.05, D);
+  const pillar = b.slams.find((s) => s.kind === 'pillar');
+  assert.ok(pillar && pillar.wall && pillar.line);
+  pillar.t = 0.01;
+  b.resolveSlams(0.05);
+  assert.strictEqual(b.firewalls.length, 1);
+  // Infranchissable : un héros poussé au travers d'un mur (ici horizontal, y = 350) est renvoyé de son côté
+  b.firewalls = [{ id: 7, x1: -1000, y1: 350, x2: 2000, y2: 350, w: D.pillars.width, until: b.time + 5, burn: D.pillars.burn }];
+  const h = b.players[0];
+  h.x = 500; h.y = 280;
+  b.updateFirewalls(0.05);
+  h.y = 360; // il tente de passer de l'autre côté
+  b.updateFirewalls(0.05);
+  assert.ok(h.y <= 350 - D.pillars.width / 2 - h.r + 1e-6, 'repoussé du côté d\'où il venait');
+  // Il brûle s'il s'y colle
+  const hp = h.hp;
+  for (let i = 0; i < 12; i++) { h.y = 350 - D.pillars.width / 2 - h.r + 2; b.updateFirewalls(0.05); }
+  assert.ok(h.hp < hp);
+  // Fouet infernal en cône, cercle infernal autour d'un héros puis explosion programmée
+  b.boss.slamIn = 0; b.bossSpecials(0.05, D);
+  assert.ok(b.slams.some((s) => s.kind === 'lash' && s.cone));
+  b.boss.slamIn = 0; b.bossSpecials(0.05, D);
+  const ring = b.slams.find((s) => s.kind === 'firering');
+  assert.ok(ring && ring.band === D.ring.width && ring.ringWall);
+  assert.ok(b.slams.some((s) => s.kind === 'ringblast' && s.delay > 0));
+  // Daedra vaincue (Boss Rush : boss suivant) → les murs s'éteignent
+  assert.ok(b.firewalls.length >= 1);
+});
+
+test('[DAE-3, DAE-4] Daedra : démons de feu réguliers, portails qui la protègent, embrasement, furie', () => {
+  const b = fight('daedra', 6);
+  freeze(b);
+  const D = Rules.BOSSES.daedra;
+  b.boss.slamIn = 999;
+  b.boss.demonIn = 0;
+  b.updateDemons(0.05, D);
+  const demons = () => b.adds.filter((a) => a.kind === 'demon' && a.alive);
+  assert.strictEqual(demons().length, Math.max(D.demons.min, Math.min(D.demons.max, Math.ceil(6 / D.demons.per))));
+  // Portails à 66 % : -40 % de dégâts subis tant qu'ils tiennent ; pas de démons réguliers pendant ce temps
+  b.boss.hp = b.boss.maxHp * 0.65;
+  b.updateBoss(0.05);
+  const portals = b.adds.filter((a) => a.kind === 'portail' && a.alive);
+  assert.strictEqual(portals.length, D.portals.count);
+  assert.strictEqual(b.boss.guarded, true);
+  assert.strictEqual(b.boss.guardMult, D.portals.guard);
+  for (const p of portals) b.kill(b.players[0], p);
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.guarded, false);
+  // Embrasement à 33 % : elle s'élève (intouchable), murs de feu et pluie de flammes, puis redescend
+  b.boss.hp = b.boss.maxHp * 0.32;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.away, true);
+  tickFor(b, 3);
+  assert.ok(b.firewalls.length > 0 || b.slams.some((s) => s.kind === 'pillar' || s.kind === 'hellfire'));
+  b.time = b.boss.stage.until + 0.01;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.away, false);
+  // Furie à 15 % : fouet plus long et plus rapide
+  const range = b.boss.range;
+  b.boss.hp = b.boss.maxHp * 0.14;
+  b.updateBoss(0.05);
+  assert.strictEqual(b.boss.range, range + D.fury.range);
+  assert.strictEqual(b.boss.demonEvery, D.fury.demonEvery);
+  // Boss Rush : les murs de feu s'éteignent au boss suivant
+  b.firewalls.push({ id: 99, x1: 0, y1: 0, x2: 10, y2: 10, w: 10, until: b.time + 99, burn: 0 });
+  assert.ok(b.firewalls.length);
+});

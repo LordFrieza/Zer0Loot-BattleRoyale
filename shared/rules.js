@@ -1712,7 +1712,7 @@
   }
   const SOLO_MODES = {
     expedition: { label: 'Expédition', icon: '🕳️', desc: 'Descends le plus profond possible, choisis tes reliques, rapporte le butin.' },
-    boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, en Normal, Héroïque ou Légendaire. Coûte 1 Clé de boss (trouvée dans l\'Expédition).' },
+    boss: { label: 'Défi des boss', icon: '👹', desc: 'Affronte seul un boss à ton niveau, de Normal à Divin. Coûte 1 Clé de boss (trouvée dans l\'Expédition).' },
   };
 
   // ---------- Familiers (onglet Familier) ----------
@@ -1874,6 +1874,28 @@
       caisse: { label: 'Caisse de Grignotor', icon: '🎁', croupier: 'mimic', color: '#d9a441', desc: 'Un défilé de lots, un seul gagnant : du petit lot au légendaire (1 % de lots incroyables).' },
       glace: { label: 'Lac gelé', icon: '🧊', croupier: 'liche', color: '#7fd4ff', desc: 'Brise la glace case par case : chaque case sûre fait monter le gain. Une fissure et tout est perdu !' },
       gobelets: { label: 'Gobelets du mage', icon: '🔮', croupier: 'sorcier', color: '#9b59ff', desc: 'Malvorath cache une bille sous un gobelet et les mélange. Trouve-la !' },
+      heaven: { label: 'Road to Heaven', icon: '🪽', croupier: 'ether', color: '#b8c8ff', desc: 'Une ligne monte des enfers vers le paradis, de plus en plus vite. Arrête-la avant qu\'elle ne s\'effondre : plus elle monte, plus ça rapporte !' },
+      chaton: { label: 'Chaton Fripon', icon: '🐈', croupier: 'lilith', color: '#c8925a', desc: 'Fais sauter le chaton de toit en toit : chaque saut fait grimper le gain… s\'il ne glisse pas sur un toit inconnu !' },
+      course: { label: 'Course de démons', icon: '😈', croupier: 'daedra', color: '#ff3b5c', desc: 'Six petits démons s\'élancent sur la piste de lave. Parie sur le vainqueur : plus il est outsider, plus il rapporte.' },
+    },
+    // Ticket de casino (rapporté par Mini Lilith) : une mise gratuite de 50 golds, dans tous les jeux sauf la caisse.
+    ticket: 50,
+    // Road to Heaven : le multiplicateur grandit en exp(speed × t) ; le point d'effondrement est tiré à l'avance
+    // (P(atteindre m) = edge / m : en moyenne la maison garde 3 %), au plus max. autoMin : encaissement auto minimal.
+    heaven: { edge: 0.97, speed: 0.16, max: 1000, autoMin: 1.1 },
+    // Chaton Fripon : 10 toits ; risque de glisser à chaque saut (de plus en plus haut), gain = edge / chance de survie.
+    chaton: { slip: [0.08, 0.1, 0.12, 0.15, 0.18, 0.22, 0.26, 0.3, 0.35, 0.4], edge: 0.97 },
+    // Course de démons : retour total (mise comprise) si le démon gagne ; ses chances sont proportionnelles à 1 / pays
+    // (retour moyen ≈ 95 %).
+    course: {
+      demons: [
+        { id: 'brasier', name: 'Brasier', color: '#ff5a2a', pays: 2.9 },
+        { id: 'fourche', name: 'Fourche', color: '#ffb02a', pays: 3.8 },
+        { id: 'soufre', name: 'Soufre', color: '#e6e23a', pays: 5.6 },
+        { id: 'cendre', name: 'Cendre', color: '#9a8a8a', pays: 7.6 },
+        { id: 'braise', name: 'Braise', color: '#c4122f', pays: 11 },
+        { id: 'lucifiot', name: 'Lucifiot', color: '#b04aff', pays: 24 },
+      ],
     },
     // Machine à sous : même tirage pondéré sur les trois rouleaux ; trois identiques → × mise ; deux cerises → ×2.
     slots: {
@@ -1919,6 +1941,31 @@
       ],
     },
   };
+  // Road to Heaven : multiplicateur au bout de t secondes, temps pour atteindre m, point d'effondrement pour un tirage u ∈ [0, 1[.
+  function heavenMult(t) {
+    const H = CASINO.heaven;
+    return Math.min(H.max, Math.floor(100 * Math.exp(H.speed * Math.max(0, t))) / 100);
+  }
+  function heavenTime(m) {
+    return Math.log(Math.max(1, m)) / CASINO.heaven.speed;
+  }
+  function heavenCrash(u) {
+    const H = CASINO.heaven;
+    return Math.min(H.max, Math.max(1, Math.floor((100 * H.edge) / (1 - Math.min(u, 0.999999))) / 100));
+  }
+  // Chaton Fripon : multiplicateur après k toits (k ≥ 1).
+  function chatonMult(k) {
+    const K = CASINO.chaton;
+    let alive = 1;
+    for (let i = 0; i < k; i++) alive *= 1 - K.slip[i];
+    return k ? Math.floor((100 * K.edge) / alive) / 100 : 1;
+  }
+  // Course de démons : chance de victoire de chaque démon.
+  function courseChances() {
+    const D = CASINO.course.demons;
+    const sum = D.reduce((a, d) => a + 1 / d.pays, 0);
+    return Object.fromEntries(D.map((d) => [d.id, 1 / d.pays / sum]));
+  }
   // Machine à sous : multiplicateur d'une combinaison de 3 symboles.
   function slotsPayout(reels) {
     const S = CASINO.slots.symbols;
@@ -3180,7 +3227,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
-    CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
+    CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, SURVIVOR_EVOLUTIONS, survivorEvoReady, SURVIVOR_SECRETS, SURVIVOR_CHALLENGES, SURVIVOR_CHALLENGE_REWARD, survivorChallengesOf, survivorMetric, survivorStats, survivorScore, survivorEmeralds, parisDay,

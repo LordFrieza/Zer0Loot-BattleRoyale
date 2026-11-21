@@ -1,5 +1,5 @@
 /*
- * Onglet Casino : la salle animée (joueurs qui se promènent entre les tables, croupiers en smoking), la fenêtre
+ * Onglet Casino (neuf jeux, trois rangées de tables) : la salle animée (joueurs qui se promènent entre les tables, croupiers en smoking), la fenêtre
  * de jeu commune (croupier qui parle, solde, mise, effets) et le fil des gros gains. Les six jeux sont dans
  * casino-games.js (window.CasinoGames). Tous les tirages sont faits par le serveur (/api/casino/*).
  * Utilise les globales de la page : me, api, toast, esc, opening, refresh (character.js), Sound, Rules.
@@ -7,7 +7,7 @@
 (function () {
   const C = Rules.CASINO;
   const W = 1100;
-  const H = 500;
+  const H = 700;
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
 
@@ -20,11 +20,14 @@
     caisse: { x: 185, y: 420, w: 220, h: 100, cx: 290, cy: 400 },
     glace: { x: 550, y: 420, w: 230, h: 100, cx: 680, cy: 398 },
     gobelets: { x: 915, y: 420, w: 220, h: 100, cx: 915, cy: 372 },
+    heaven: { x: 185, y: 600, w: 230, h: 100, cx: 305, cy: 572 },
+    chaton: { x: 550, y: 600, w: 240, h: 100, cx: 682, cy: 580 },
+    course: { x: 915, y: 600, w: 250, h: 100, cx: 915, cy: 548 },
   };
   // Allées (graphe de nœuds) : les promeneurs passent entre les tables et s'arrêtent parfois devant un jeu.
   const NODES = [];
   const COLS = [40, 368, 732, 1060];
-  const ROWS = [138, 312, 485];
+  const ROWS = [138, 312, 485, 668];
   for (const y of ROWS) for (const x of COLS) NODES.push({ x, y, links: [] });
   const node = (c, r) => NODES[r * COLS.length + c];
   for (let r = 0; r < ROWS.length; r++) {
@@ -70,6 +73,9 @@
     caisse: ['Allez la légendaire !', 'Encore une arme commune…', 'Grignotor m\'a mordu la main !', 'La prochaine, c\'est la bonne.', 'J\'ai vu passer le familier !'],
     glace: ['Juste une case de plus…', 'J\'aurais dû encaisser…', 'Ça craque, ça craque !', 'Brrr… même mes golds sont gelés.', 'Givrenoire rigole, c\'est mauvais signe.'],
     gobelets: ['Elle est sous celui du milieu !', 'Il a triché, je l\'ai vu !', 'Mes yeux… trop rapide…', 'Toujours le gobelet de gauche.', 'C\'est de la magie noire !'],
+    heaven: ['Encore un peu… ENCORE…', 'J\'ai encaissé à ×1,2. Elle est montée à ×80.', 'Le paradis, c\'était juste là !', 'Ether m\'a fait « bouh » au moment de cliquer !', 'Stop ! STOP ! … trop tard.'],
+    chaton: ['Saute, minou, saute !', 'Il a glissé sur le 2ᵉ toit…', 'Ce chat a neuf vies, pas moi.', 'Lilith sourit… c\'est louche.', 'Le 10ᵉ toit existe vraiment ?'],
+    course: ['Allez Lucifiot ! ALLEZ !', 'Brasier gagne toujours…', 'Mon démon s\'est arrêté pour bronzer dans la lave.', 'Daedra a fouetté le mien !', 'Photo-finish ! Non ?!'],
     meWin: ['YES ! Je suis riche !!!', 'Et ça, c\'est du talent.', 'La banque va sauter !', 'Je savais que c\'était mon jour !'],
     meLose: ['Allez, une dernière…', 'C\'était la partie de trop.', 'Bon… je rembourse demain.', 'Don Paolo ne doit pas savoir.'],
   };
@@ -281,6 +287,33 @@
   }
 
   const SLOT_ICONS = Object.values(C.slots.symbols).map((s) => s.icon);
+  // Petit démon de la course (vu de côté), réutilisé dans le jeu (casino-games.js)
+  function drawImp(ctx, x, y, color, t, s = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    const run = Math.sin(t / 60);
+    // jambes
+    ctx.strokeStyle = '#2a0505'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-2, -4); ctx.lineTo(-3 + run * 3, 2); ctx.moveTo(2, -4); ctx.lineTo(3 - run * 3, 2); ctx.stroke();
+    // queue
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-4, -6); ctx.quadraticCurveTo(-11, -6 + run * 2, -10, -12); ctx.stroke();
+    ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-10, -14); ctx.lineTo(-12, -10); ctx.lineTo(-8, -11); ctx.closePath(); ctx.fill();
+    // corps et tête
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(0, -8, 5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(2, -16, 5, 0, Math.PI * 2); ctx.fill();
+    // cornes
+    ctx.fillStyle = '#f4e6c8';
+    ctx.beginPath(); ctx.moveTo(-1, -20); ctx.lineTo(-2, -25); ctx.lineTo(1, -21); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4, -20); ctx.lineTo(6, -25); ctx.lineTo(6, -20); ctx.closePath(); ctx.fill();
+    // œil et sourire
+    ctx.fillStyle = '#ffe14a'; ctx.beginPath(); ctx.arc(4.2, -17, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2a0505'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(4, -14.5, 2, 0.2, 1.6); ctx.stroke();
+    ctx.restore();
+  }
+  window.drawImp = drawImp;
   function drawStation(ctx, id, t, hover) {
     const s = STATIONS[id];
     ctx.save();
@@ -402,6 +435,75 @@
         ctx.beginPath(); ctx.moveTo(s.x + 30, s.y - 10); ctx.lineTo(s.x + 44, s.y + 4); ctx.lineTo(s.x + 38, s.y + 16); ctx.stroke();
         break;
       }
+      case 'heaven': {
+        // Tableau qui monte des enfers (rouge) au paradis (doré), avec la ligne qui grimpe
+        const x0 = s.x - 105;
+        const y0 = s.y - 62;
+        const g = ctx.createLinearGradient(0, y0, 0, y0 + 104);
+        g.addColorStop(0, '#fff6d0'); g.addColorStop(0.35, '#9fb6ff'); g.addColorStop(0.7, '#5a2a6a'); g.addColorStop(1, '#a3120a');
+        ctx.fillStyle = '#2a1a3a'; roundRect(ctx, x0 - 6, y0 - 6, 222, 116, 12); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = g; roundRect(ctx, x0, y0, 210, 104, 8); ctx.fill();
+        const k = (t / 4000) % 1;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        for (let i = 0; i <= 40; i++) {
+          const u = (i / 40) * k;
+          const px = x0 + 6 + u * 196;
+          const py = y0 + 98 - (Math.exp(u * 3) - 1) / (Math.exp(3) - 1) * 92;
+          if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+        }
+        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 13px system-ui'; ctx.textAlign = 'right';
+        ctx.fillText(`×${(Math.exp(k * 3.4)).toFixed(2).replace('.', ',')}`, x0 + 204, y0 + 18);
+        // flammes en bas, nuages en haut
+        for (let i = 0; i < 9; i++) { ctx.fillStyle = `rgba(255, ${120 + (i % 3) * 40}, 30, .8)`; ctx.beginPath(); ctx.ellipse(x0 + 12 + i * 23, y0 + 104, 9, 6 + Math.sin(t / 120 + i) * 3, 0, Math.PI, 0); ctx.fill(); }
+        break;
+      }
+      case 'chaton': {
+        // Toits la nuit, sous la lune ; le chaton saute de l'un à l'autre
+        ctx.fillStyle = '#1a1030'; roundRect(ctx, s.x - 115, s.y - 62, 230, 112, 12); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#fff3c4'; ctx.beginPath(); ctx.arc(s.x + 80, s.y - 40, 11, 0, Math.PI * 2); ctx.fill();
+        const tops = [];
+        for (let i = 0; i < 5; i++) {
+          const x = s.x - 100 + i * 42;
+          const top = s.y - 6 - ((i * 37) % 3) * 9;
+          tops.push([x + 17, top]);
+          ctx.fillStyle = ['#3a2a4a', '#4a2a3a', '#2a3a4a'][i % 3];
+          ctx.fillRect(x, top, 34, s.y + 46 - top);
+          ctx.fillStyle = ['#a33', '#6a4a8a', '#3a6a8a'][i % 3];
+          ctx.beginPath(); ctx.moveTo(x - 4, top); ctx.lineTo(x + 17, top - 16); ctx.lineTo(x + 38, top); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = (Math.floor(t / 900) + i) % 3 ? '#ffd86a' : '#4a3a2a';
+          ctx.fillRect(x + 11, top + 12, 10, 10);
+        }
+        const hop = (t / 700) % tops.length;
+        const i0 = Math.floor(hop);
+        const f = hop - i0;
+        const [ax, ay] = tops[i0];
+        const [bx, by] = tops[(i0 + 1) % tops.length];
+        const cx = ax + (bx - ax) * f;
+        const cy = ay - 18 + (by - ay) * f - Math.sin(f * Math.PI) * 18;
+        if (i0 < tops.length - 1) window.drawPet(ctx, cx, cy, 'lilith', { t, size: 0.42 });
+        break;
+      }
+      case 'course': {
+        // Piste de lave ovale, petits démons qui tournent
+        ctx.fillStyle = '#3a1410'; ctx.beginPath(); ctx.ellipse(s.x, s.y - 6, 122, 50, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        const lava = ctx.createLinearGradient(s.x - 110, 0, s.x + 110, 0);
+        lava.addColorStop(0, '#ff5a1a'); lava.addColorStop(0.5, '#ffb02a'); lava.addColorStop(1, '#ff5a1a');
+        ctx.fillStyle = lava; ctx.beginPath(); ctx.ellipse(s.x, s.y - 6, 110, 42, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2a0f0c'; ctx.beginPath(); ctx.ellipse(s.x, s.y - 6, 74, 22, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(s.x, s.y + 16); ctx.lineTo(s.x, s.y + 36); ctx.stroke(); ctx.setLineDash([]);
+        C.course.demons.forEach((d, i) => {
+          const a = t / (1400 + i * 90) + i * 0.6;
+          drawImp(ctx, s.x + Math.cos(a) * 92, s.y - 2 + Math.sin(a) * 30, d.color, t + i * 70, 0.9);
+        });
+        break;
+      }
       case 'gobelets': {
         ctx.fillStyle = '#3a1a5a';
         ctx.beginPath(); ctx.ellipse(s.x, s.y, 100, 44, 0, 0, Math.PI * 2); ctx.fill();
@@ -452,7 +554,7 @@
         const m = scene.moods[id];
         const mood = m && m.until > now ? m.mood : null;
         const sp = C.games[id].croupier;
-        const facing = id === 'blackjack' || id === 'gobelets' ? -1 : 1;
+        const facing = id === 'blackjack' || id === 'gobelets' || id === 'course' ? -1 : 1;
         drawCroupier(ctx, s.cx, s.cy, sp, { t, size: 1.25, mood, facing });
       } });
       items.push({ y: s.y, draw: () => drawStation(ctx, id, t, scene.hover === id) });
@@ -590,6 +692,7 @@
         <div><span class="muted">Bilan</span><b class="${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : ''}${fmt(net)} 🪙</b></div>
         <div><span class="muted">Plus gros gain</span><b class="gold-text">${fmt(L.casinoBest || 0)} 🪙</b></div>
         <div><span class="muted">Jackpots</span><b>${fmt((me.character.counters || {}).jackpots || 0)}</b></div>
+        <div><span class="muted">Tickets de casino</span><b>🎟️ ${fmt(me.character.casinoTickets || 0)}</b></div>
       </div>
       <p class="muted" style="font-size:12px;margin:8px 0 0">Joue pour le plaisir : en moyenne, la maison garde quelques pourcents de chaque mise.</p>`;
   }
@@ -601,7 +704,7 @@
         <canvas width="110" height="96" data-ccroup="${g.croupier}"></canvas>
         <div class="cc-body"><div class="cc-title">${g.icon} ${g.label}</div>
         <div class="cc-desc">${g.desc}</div>
-        <div class="cc-price">${id === 'caisse' ? `${C.caisse.price} 🪙 la caisse` : `Mise ${C.bets[0]} à ${C.maxBet} 🪙`}</div></div>
+        <div class="cc-price">${id === 'caisse' ? `${C.caisse.price} 🪙 la caisse` : `Mise ${C.bets[0]} à ${C.maxBet} 🪙 · 🎟️ tickets acceptés`}</div></div>
       </button>`).join('');
     box.querySelectorAll('[data-cgame]').forEach((b) => { b.onclick = () => openGame(b.dataset.cgame); });
     box.querySelectorAll('canvas[data-ccroup]').forEach((cv) => {
@@ -616,6 +719,9 @@
     troll: { hello: ['GROKK FAIT TOURNER ROUE !', 'Toi miser. Grokk lancer.', 'Rouge ou noir ? Grokk aime rouge.'], win: ['GRRR ! Toi gagner ?!', 'Grokk pas content…', 'Grokk recompter… toi gagner.'], lose: ['HA HA ! Grokk garder sous !', 'Roue aimer Grokk !', 'Encore ! Encore !'] },
     mimic: { hello: ['Ouvre-moi… enfin, ouvre une caisse.', 'Je suis un coffre. Je connais les coffres.', 'Miam… je veux dire, bonne chance !'], win: ['Mais… c\'était MON lot préféré !', 'Bien joué, chasseur de trésor.', 'Gloups.'], lose: ['Croc croc ! Petit lot !', 'La prochaine sera la bonne… peut-être.', 'Encore une ? Elles sont toutes neuves !'] },
     liche: { hello: ['La glace est fine… très fine.', 'Brisez-la, si vous l\'osez.', 'Le froid ne pardonne pas.'], win: ['Vous avez le cœur bien accroché.', 'Le lac vous épargne… pour cette fois.', 'Glacial… pour moi.'], lose: ['Craaac ! Plouf.', 'Le lac garde tout.', 'Vous êtes gelé… et ruiné.'] },
+    ether: { hello: ['Montez… montez vers la lumière… hou hou…', 'Le paradis est tout près. Ou l\'enfer.', 'Bouh ! Pardon. Faites vos jeux.'], win: ['Vous vous êtes arrêté à temps… hou…', 'Je vais hanter la banque pour la peine.', 'Une âme bien inspirée !'], lose: ['Et retour aux enfers ! Hou hou hou !', 'Trop gourmand… comme les vivants.', 'Votre mise rejoint le monde des esprits.'] },
+    lilith: { hello: ['Miaou… tu crois qu\'il sautera loin ?', 'Mon chaton adore les toits glissants.', 'Un saut de plus ? Je te regarde…'], win: ['Pfff… chanceux.', 'Il a retrouvé ses pattes, ce coquin.', 'Tu as volé mon sourire !'], lose: ['Oups, il a glissé. Hi hi hi !', 'Neuf vies pour lui, une seule mise pour toi.', 'Le toit était savonné… quel dommage.'] },
+    daedra: { hello: ['Sur la piste de lave, mes petits démons !', 'Choisis ton démon, mortel. Vite.', 'Que la course commence… et brûle !'], win: ['Grrr… mon favori a calé.', 'Je vais fouetter ce démon ce soir.', 'Tu as du flair pour les démons.'], lose: ['Ton démon a fini en cendres !', 'Ha ! La lave a ses favoris.', 'Mes démons courent pour moi, pas pour toi.'] },
     sorcier: { hello: ['Regardez bien la bille…', 'Abracadabra ! Où est-elle ?', 'Mes mains sont plus rapides que vos yeux.'], win: ['Impossible ! Un sort de vision ?', 'Bien vu… trop bien vu.', 'Hmpf. Chance de débutant.'], lose: ['Pouf ! Disparue !', 'La magie, c\'est de l\'illusion.', 'Encore un tour de passe-passe ?'] },
   };
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -714,7 +820,7 @@
   // Fin d'un tour : la page reprend ses mises à jour (solde du bandeau, etc.).
   function finish() {
     opening = false;
-    if (typeof refresh === 'function') refresh().then(() => { if (cm.el && !cm.busy) { cm.gold = me.character.gold; showGold(); } renderStats(); }).catch(() => {});
+    if (typeof refresh === 'function') refresh().then(() => { if (cm.el && !cm.busy) { cm.gold = me.character.gold; showGold(); } renderStats(); syncTickets(); }).catch(() => {});
   }
 
   // Outils fournis aux jeux
@@ -730,6 +836,7 @@
         opening = true;
         const r = await api(url, body);
         cm.gold -= stake;
+        if (body && body.ticket && me.character.casinoTickets > 0) { me.character.casinoTickets -= 1; syncTickets(); }
         showGold();
         return r;
       } catch (err) {
@@ -769,6 +876,8 @@
     },
     // Fin d'un coup sans règlement (partie en plusieurs coups qui continue)
     idle() { cm.busy = false; opening = false; },
+    // Partie en cours qui ne doit pas être interrompue (Road to Heaven) : la fenêtre ne se ferme plus
+    hold() { cm.busy = true; opening = true; },
     say,
     banner,
     burst(x, y, color, n = 60, power = 1.2) { cm.fx.spawn(x, y, color, n, power); },
@@ -785,13 +894,45 @@
     setTimeout(() => cm.banner.classList.remove('show'), kind === 'jackpot' ? 3600 : 2400);
   }
 
-  // Sélecteur de mise (dernière mise retenue par jeu)
+  // Tickets de casino (Mini Lilith) : un bouton à côté de la mise, actif tant qu'il reste des tickets.
+  const ticketBoxes = new Set();
+  const ticketsLeft = () => (me && me.character.casinoTickets) || 0;
+  function ticketToggle(container, onChange) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'casino-chip casino-ticket';
+    btn.title = `Ticket de casino : une mise gratuite de ${C.ticket} golds (rapporté par Mini Lilith)`;
+    const box = { on: false, btn, onChange };
+    btn.onclick = () => { if (!ticketsLeft()) return; box.on = !box.on; Sound.play('chip'); paint(box); if (onChange) onChange(box.on); };
+    container.appendChild(btn);
+    ticketBoxes.add(box);
+    paint(box);
+    return { get on() { return box.on && ticketsLeft() > 0; } };
+  }
+  function paint(box) {
+    const n = ticketsLeft();
+    if (!n && box.on) { box.on = false; if (box.onChange) box.onChange(false); }
+    box.btn.style.display = n ? '' : 'none';
+    box.btn.classList.toggle('active', box.on);
+    box.btn.innerHTML = `🎟️ Ticket <small>×${n}</small>`;
+  }
+  function syncTickets() {
+    for (const box of ticketBoxes) { if (!box.btn.isConnected) ticketBoxes.delete(box); else paint(box); }
+  }
+  api_.ticketToggle = ticketToggle;
+
+  // Sélecteur de mise (dernière mise retenue par jeu). Avec un ticket, la mise est de 50 golds, payée par le ticket :
+  // value = mise jouée, stake = golds retirés, ticket = ticket utilisé.
   function betPicker(container, gameId, onChange) {
     let bet;
     try { bet = Number(localStorage.getItem('zl_bet_' + gameId)); } catch (e) { bet = 0; }
     if (!C.bets.includes(bet)) bet = C.bets[0];
     container.innerHTML = '<span class="muted">Mise :</span>' + C.bets.map((b) => `<button type="button" class="casino-chip chip-${b}" data-bet="${b}">${b}</button>`).join('');
-    const sync = () => container.querySelectorAll('[data-bet]').forEach((el) => el.classList.toggle('active', Number(el.dataset.bet) === bet));
+    let ticket = null;
+    const sync = () => container.querySelectorAll('[data-bet]').forEach((el) => {
+      el.classList.toggle('active', !(ticket && ticket.on) && Number(el.dataset.bet) === bet);
+      el.disabled = !!(ticket && ticket.on);
+    });
     container.querySelectorAll('[data-bet]').forEach((el) => {
       el.onclick = () => {
         bet = Number(el.dataset.bet);
@@ -801,8 +942,13 @@
         if (onChange) onChange(bet);
       };
     });
+    if (gameId !== 'caisse') ticket = ticketToggle(container, () => { sync(); if (onChange) onChange(ticket.on ? C.ticket : bet); });
     sync();
-    return { get value() { return bet; } };
+    return {
+      get value() { return ticket && ticket.on ? C.ticket : bet; },
+      get ticket() { return !!(ticket && ticket.on); },
+      get stake() { return ticket && ticket.on ? 0 : bet; },
+    };
   }
   api_.betPicker = betPicker;
 

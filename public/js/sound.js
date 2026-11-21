@@ -675,6 +675,34 @@
     cupShuffle() {
       noise(0.09, { freq: 700, vol: 0.12 });
     },
+    // Road to Heaven : petit « ding » qui monte avec le multiplicateur, effondrement, ailes
+    heavenTick(m = 1) {
+      tone(Math.min(2400, 440 * Math.pow(m, 0.35)), 0.06, { type: 'sine', vol: 0.035 });
+    },
+    heavenCrash() {
+      tone(700, 0.9, { type: 'sawtooth', vol: 0.1, to: 50 });
+      noise(0.9, { freq: 1800, sweep: 120, vol: 0.25 });
+    },
+    // Chaton Fripon : saut, atterrissage, glissade
+    catJump() {
+      tone(500, 0.18, { type: 'triangle', vol: 0.07, to: 1100 });
+    },
+    catLand(i = 0) {
+      noise(0.05, { freq: 1500, vol: 0.12 });
+      tone(midi(72 + i * 2), 0.1, { type: 'triangle', vol: 0.06 });
+    },
+    catSlip() {
+      tone(900, 0.5, { type: 'sine', vol: 0.09, to: 200 });
+      noise(0.4, { freq: 3500, filter: 'bandpass', vol: 0.14, delay: 0.1 });
+      [0, 0.12, 0.24].forEach((d) => noise(0.06, { freq: 1200, vol: 0.12, delay: 0.45 + d }));
+    },
+    // Course de démons : départ et trot des petits démons
+    raceStart() {
+      [0, 0.5, 1].forEach((d, i) => tone(i === 2 ? 880 : 440, i === 2 ? 0.4 : 0.15, { type: 'square', vol: 0.06, delay: d }));
+    },
+    raceStep() {
+      noise(0.03, { freq: 600 + Math.random() * 400, vol: 0.05 });
+    },
     casinoWin(mult = 2) {
       const big = mult >= 10;
       const notes = big ? [72, 76, 79, 84, 88, 91] : mult >= 3 ? [72, 76, 79, 84] : [76, 81];

@@ -1,5 +1,5 @@
 /*
- * Casino : six jeux tenus par les boss en smoking, mises, gains, parties en cours, fil des gros gains.
+ * Casino : neuf jeux tenus par les boss en smoking, mises, gains, parties en cours, fil des gros gains.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -29,7 +29,7 @@ test('[CAS-1] casino : mises autorisées, mise retirée avant le tirage, statist
   const C = Rules.CASINO;
   assert.deepStrictEqual(C.bets, [10, 25, 50, 100, 250, 500]);
   assert.deepStrictEqual(Object.fromEntries(Object.entries(C.games).map(([k, g]) => [k, g.croupier])),
-    { slots: 'dragon', blackjack: 'maexxna', roulette: 'troll', caisse: 'mimic', glace: 'liche', gobelets: 'sorcier' }, 'un boss croupier par jeu');
+    { slots: 'dragon', blackjack: 'maexxna', roulette: 'troll', caisse: 'mimic', glace: 'liche', gobelets: 'sorcier', heaven: 'ether', chaton: 'lilith', course: 'daedra' }, 'un boss croupier par jeu');
   const u = player(40);
   assert.throws(() => casino.slots(u, 30), /Mise possible/);
   assert.throws(() => casino.slots(u, 50), /Il te faut 50 golds/);
@@ -242,4 +242,122 @@ test('[CAS-7] gobelets de Malvorath : un gobelet sur trois, 2,85 × la mise', ()
   const lose = rigged([0], () => casino.gobelets(u, 100, 1));
   assert.deepStrictEqual([lose.win, lose.payout], [false, 0]);
   assert.strictEqual(u.character.gold, 1000 - 200 + 285);
+});
+
+// Remplace le tirage crypto.randomBytes (random() de casino.js) : valeurs imposées dans [0, 1[, dans l'ordre.
+function riggedRandom(values, fn) {
+  const real = crypto.randomBytes;
+  const queue = [...values];
+  crypto.randomBytes = (size) => {
+    if (size !== 6 || !queue.length) return real(size);
+    const b = Buffer.alloc(6);
+    b.writeUIntBE(Math.floor(queue.shift() * 2 ** 48), 0, 6);
+    return b;
+  };
+  try { return fn(); } finally { crypto.randomBytes = real; }
+}
+
+test('[CAS-10] Road to Heaven d\'Ether : la ligne monte en exp(0,16 t), effondrement secret, STOP, encaissement automatique', () => {
+  const H = Rules.CASINO.heaven;
+  assert.strictEqual(Rules.heavenMult(0), 1);
+  assert.ok(Math.abs(Rules.heavenMult(10) - Math.exp(1.6)) < 0.01);
+  assert.ok(Math.abs(Rules.heavenTime(2) - Math.log(2) / H.speed) < 1e-9);
+  assert.strictEqual(Rules.heavenCrash(0), 1, 'effondrement immédiat possible');
+  assert.strictEqual(Rules.heavenCrash(0.5), 1.94);
+  assert.strictEqual(Rules.heavenCrash(0.9999999), H.max);
+  // P(atteindre m) = 0,97 / m : la maison garde 3 %
+  for (const m of [1.5, 2, 10]) assert.ok(Math.abs((1 - (1 - H.edge / m)) * m - H.edge) < 1e-9);
+  const u = player(1000);
+  const t0 = 1_000_000;
+  const r = riggedRandom([0.5], () => casino.heavenStart(u, 100, null, false, t0));
+  assert.strictEqual(u.character.gold, 900);
+  assert.strictEqual(r.crash, null, 'le point d\'effondrement reste secret');
+  assert.throws(() => casino.heavenStart(u, 100, null, false, t0), /montée en cours/);
+  assert.strictEqual(casino.sessionsOf(u, t0 + 1000).heaven.crash, null);
+  // Encore en train de monter à 2 s (×1,37), on encaisse à 3 s (×1,61)
+  assert.strictEqual(casino.heavenCheck(u, t0 + 2000).outcome, null);
+  const c = casino.heavenCash(u, t0 + 3000);
+  assert.strictEqual(c.outcome, 'cash');
+  assert.strictEqual(c.mult, Rules.heavenMult(3));
+  assert.strictEqual(c.payout, Math.floor(100 * Rules.heavenMult(3)));
+  assert.strictEqual(c.crash, 1.94, 'révélé à la fin');
+  assert.strictEqual(u.character.gold, 900 + c.payout);
+  // Effondrée : trop tard pour encaisser
+  riggedRandom([0.5], () => casino.heavenStart(u, 100, null, false, t0));
+  const late = casino.heavenCash(u, t0 + Rules.heavenTime(1.94) * 1000 + 50);
+  assert.deepStrictEqual([late.outcome, late.payout], ['crash', 0]);
+  assert.throws(() => casino.heavenCheck(u), /Aucune montée/);
+  // Encaissement automatique à ×1,5 (sous l'effondrement à ×1,94) : réglé dès que la ligne l'atteint
+  assert.throws(() => casino.heavenStart(u, 100, 1.05, false, t0), /Encaissement auto/);
+  riggedRandom([0.5], () => casino.heavenStart(u, 100, 1.5, false, t0));
+  const auto = casino.heavenCheck(u, t0 + 10_000);
+  assert.deepStrictEqual([auto.outcome, auto.mult, auto.payout], ['cash', 1.5, 150]);
+  // … mais pas au-dessus de l'effondrement
+  riggedRandom([0.5], () => casino.heavenStart(u, 100, 3, false, t0));
+  assert.strictEqual(casino.heavenCheck(u, t0 + 10_000).outcome, 'crash');
+});
+
+test('[CAS-11] Chaton Fripon de Lilith : 10 toits, risque de glisser croissant, gain = 0,97 / chance de survie', () => {
+  const K = Rules.CASINO.chaton;
+  assert.strictEqual(K.slip.length, 10);
+  assert.ok(K.slip.every((s, i) => i === 0 || s > K.slip[i - 1]), 'de plus en plus glissant');
+  assert.strictEqual(Rules.chatonMult(1), 1.05);
+  assert.strictEqual(Rules.chatonMult(10), 12.12);
+  const u = player(1000);
+  const s = casino.chatonStart(u, 100);
+  assert.deepStrictEqual([s.roof, s.next, s.risk, s.cashable], [0, 1.05, K.slip[0], false]);
+  assert.throws(() => casino.chatonCash(u), /au moins une fois/);
+  // Deux sauts réussis puis encaisser
+  riggedRandom([0.99, 0.99], () => { casino.chatonJump(u); casino.chatonJump(u); });
+  const c = casino.chatonCash(u);
+  assert.deepStrictEqual([c.outcome, c.roof, c.payout], ['cash', 2, Math.floor(100 * Rules.chatonMult(2))]);
+  // Glissade sur le 2ᵉ toit : tout est perdu
+  casino.chatonStart(u, 100);
+  const slip = riggedRandom([0.99, 0.01], () => { casino.chatonJump(u); return casino.chatonJump(u); });
+  assert.deepStrictEqual([slip.outcome, slip.payout, slip.slipAt], ['slip', 0, 2]);
+  assert.throws(() => casino.chatonJump(u), /Aucune partie/);
+  // Les 10 toits : encaissé d'office
+  casino.chatonStart(u, 10);
+  const all = riggedRandom(Array(10).fill(0.999), () => { let r; for (let i = 0; i < 10; i++) r = casino.chatonJump(u); return r; });
+  assert.deepStrictEqual([all.outcome, all.roof, all.payout], ['cash', 10, 121]);
+});
+
+test('[CAS-12] course de démons de Daedra : six démons, chances ∝ 1 / cote (retour ≈ 95 %), ordre d\'arrivée', () => {
+  const D = Rules.CASINO.course.demons;
+  assert.strictEqual(D.length, 6);
+  const ch = Rules.courseChances();
+  assert.ok(Math.abs(Object.values(ch).reduce((a, x) => a + x, 0) - 1) < 1e-9);
+  for (const d of D) assert.ok(Math.abs(ch[d.id] * d.pays - 0.952) < 0.002, 'même retour pour chaque démon');
+  const u = player(1000);
+  assert.throws(() => casino.course(u, 100, 'inconnu'), /Choisis un démon/);
+  // Premier tirage ≈ 0 : le premier démon (Brasier) gagne
+  const r = riggedRandom([0, 0, 0, 0, 0, 0], () => casino.course(u, 100, 'brasier'));
+  assert.strictEqual(r.order.length, 6);
+  assert.strictEqual(new Set(r.order).size, 6);
+  assert.deepStrictEqual([r.winner, r.win, r.payout], ['brasier', true, 290]);
+  const lose = riggedRandom([0, 0, 0, 0, 0, 0], () => casino.course(u, 100, 'lucifiot'));
+  assert.deepStrictEqual([lose.win, lose.payout], [false, 0]);
+  assert.strictEqual(u.character.gold, 1000 - 200 + 290);
+});
+
+test('[CAS-13] tickets de casino : une mise gratuite de 50 golds dans tous les jeux sauf la caisse', () => {
+  const u = player(0);
+  const c = u.character;
+  assert.throws(() => casino.slots(u, 50, true), /plus de ticket/);
+  c.casinoTickets = 3;
+  const r = casino.gobelets(u, 500, 0, true);
+  assert.strictEqual(r.bet, 50, 'la mise d\'un ticket vaut 50 golds');
+  assert.strictEqual(c.casinoTickets, 2);
+  assert.strictEqual(c.gold, r.payout, 'aucun gold retiré');
+  assert.strictEqual(c.lifetime.casinoWagered, 0, 'un ticket ne compte pas comme une mise');
+  assert.strictEqual(c.counters.casinoTicketsUsed, 1);
+  // Roulette : le ticket paie les 50 premiers golds de jetons
+  c.gold = 100;
+  assert.throws(() => casino.roulette(u, [{ on: 'rouge', amount: 25 }], true), /au moins 50/);
+  rigged([0], () => casino.roulette(u, [{ on: 'rouge', amount: 50 }, { on: 'noir', amount: 25 }], true));
+  assert.strictEqual(c.gold, 75, 'seuls les 25 golds au-delà du ticket sont payés (le 0 sort)');
+  assert.strictEqual(c.casinoTickets, 1);
+  const k = casino.chatonStart(u, 10, true);
+  assert.strictEqual(k.bet, 50);
+  assert.strictEqual(c.casinoTickets, 0);
 });

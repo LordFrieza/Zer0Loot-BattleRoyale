@@ -280,3 +280,50 @@ test('[SOLO-8] défi du Magicien : un Prêtre seul ne se purifie pas lui-même (
   group.updateCurses(B);
   assert.ok(!gp.buffs.some((x) => x.curse), 'purifié');
 });
+
+test('[SOLO-10] défis ultimes Fabuleux, Mythique, Divin : boss bien plus coriace, attaques plus fréquentes, rage plus tôt, soins réduits', () => {
+  const U = ['fabuleux', 'mythique', 'divin'].map((d) => Rules.BOSS_CHALLENGE[d]);
+  assert.ok(U.every((D) => D.ultimate));
+  assert.deepStrictEqual(U.map((D) => [D.hp, D.damage, D.special, D.attackSpeed, D.enrageAt, D.healTaken]),
+    [[38, 5.5, 1.6, 1.35, 100, 0.45], [65, 8, 1.9, 1.55, 85, 0.25], [82, 9.5, 2, 1.65, 80, 0.2]]);
+  assert.deepStrictEqual(U.map((D) => D.reward.keys), [1, 2, 3]);
+  assert.deepStrictEqual(Rules.BOSS_CHALLENGE_ORDER, ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin']);
+  assert.deepStrictEqual(['normal', 'legendaire', 'divin', 'inconnu'].map(Rules.challengeRank), [0, 2, 5, 0]);
+  const st = Rules.bossStats(1, 'ether', 20);
+  const sc = Rules.BOSS_SOLO_SCALE.ether;
+  const leg = soloBattle('boss', { level: 20 }, { boss: 'ether', difficulty: 'legendaire', level: 20 });
+  const div = soloBattle('boss', { level: 20 }, { boss: 'ether', difficulty: 'divin', level: 20 });
+  const D = Rules.BOSS_CHALLENGE.divin;
+  assert.strictEqual(div.boss.maxHp, Math.round(st.maxHp * sc.hp * D.hp));
+  assert.ok(Math.abs(div.boss.cooldown - leg.boss.cooldown / D.attackSpeed) < 1e-9, 'coups plus rapides');
+  assert.ok(Math.abs(div.boss.slamEvery - leg.boss.slamEvery / D.special) < 1e-9, 'attaques spéciales plus fréquentes');
+  assert.strictEqual(div.boss.enrageAt, D.enrageAt);
+  assert.strictEqual(div.healTaken, D.healTaken);
+  // Soins et vol de vie du héros réduits
+  const h = div.players[0];
+  h.hp = 100;
+  div.heal(h, 100);
+  assert.strictEqual(h.hp, 100 + 100 * D.healTaken);
+  // Les créatures ne prennent que √(×vie) et (×dégâts)^0,7
+  assert.ok(Math.abs(div.boss.addScale.hp / leg.boss.addScale.hp - Math.sqrt(D.hp) / Rules.BOSS_CHALLENGE.legendaire.hp) < 1e-9);
+  assert.ok(Math.abs(div.boss.addScale.damage / leg.boss.addScale.damage - D.damage ** 0.7 / Rules.BOSS_CHALLENGE.legendaire.damage) < 1e-9);
+});
+
+test('[SOLO-11] défis ultimes réussis : Clés de boss en plus et compteurs par palier (chaque palier compte pour ceux du dessous)', () => {
+  const { soloRewards } = require('../server/index');
+  const c = game.newCharacter();
+  game.chooseClass(c, 'mage');
+  const user = { id: 'solo-ult', username: 'Ult', role: 'player', character: c };
+  const keys = c.bossKeys;
+  soloRewards(user, { solo: 'boss', victory: true, difficulty: 'mythique', boss: { id: 'lilith' }, reward: { ...Rules.BOSS_CHALLENGE.mythique.reward }, duration: 60 });
+  assert.strictEqual(c.bossKeys, keys + 2);
+  const k = c.counters;
+  assert.deepStrictEqual([k.heroWins, k.legendWins, k.fabuleuxWins, k.mythiqueWins, k.divinWins || 0], [1, 1, 1, 1, 0]);
+  assert.strictEqual(c.history[0].gains.keys, 2);
+  // Défaite : ni clé ni compteur
+  soloRewards(user, { solo: 'boss', victory: false, difficulty: 'divin', boss: { id: 'lilith' }, reward: null, duration: 60 });
+  assert.strictEqual(c.bossKeys, keys + 2);
+  assert.strictEqual(k.divinWins || 0, 0);
+  // Succès des paliers ultimes
+  assert.ok(['fabuleuxWins', 'mythiqueWins', 'divinWins'].every((m) => Rules.ACHIEVEMENTS.some((a) => a.metric === m)));
+});

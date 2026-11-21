@@ -186,14 +186,14 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Visage à dessiner** (1 500 golds) : le joueur dessine son visage (grille 12 × 12, 8 couleurs) dans l'onglet
     Personnage ; il remplace yeux, sourcils et bouche en bataille. L'arène ne reçoit qu'une référence et charge le dessin
     une fois ; l'admin peut effacer un dessin inapproprié (liste des joueurs).
-  - **Cosmétiques d'exploit** (11), visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
-    d'ogre / de dragon / spectrale / gueule de mimic / liche glaciaire / carapace de veuve noire (vaincre le Troll / le
-    Dragon / le Magicien / le Mimic / la Liche de glace / Maexxna en **Défi des boss, en Héroïque ou Légendaire**), couronne d'os (salle 30 du
+  - **Cosmétiques d'exploit**, visibles mais verrouillés 🔒 avec la progression, puis gratuits : peaux légendaires
+    d'ogre / de dragon / spectrale / gueule de mimic / liche glaciaire / carapace de veuve noire / ectoplasme d'Ether /
+    pelage de Lilith / peau de Daedra (vaincre le boss en **Défi des boss, en Héroïque ou plus**), couronne d'os (salle 30 du
     donjon), étendard des mille batailles (500 kills), bottes de légende (10 légendaires), masque des abysses
     (profondeur 25 en Expédition), aura du champion (100 victoires).
-  - **Légendes** (15 cosmétiques d'exploit très longs, mis en avant dans la boutique) : Casque du Seigneur Grokk, Ailes
-    de Pyrax, Runes de Malvorath, Pattes de Maexxna, Armure-coffre de Grignotor, Couronne de Givrenoire (chacun : vaincre
-    ce boss **100 fois en Défi des boss Légendaire**), Manteau des profondeurs (salle 100 en Expédition), Aura de
+  - **Légendes** (18 cosmétiques d'exploit très longs, mis en avant dans la boutique) : Casque du Seigneur Grokk, Ailes
+    de Pyrax, Runes de Malvorath, Pattes de Maexxna, Armure-coffre de Grignotor, Couronne de Givrenoire, et les légendes
+    d'Ether (Brume), de Lilith (Sourire) et de Daedra (Ailes) (chacun : vaincre ce boss **100 fois en Défi des boss Légendaire ou plus**), Manteau des profondeurs (salle 100 en Expédition), Aura de
     l'immortel (vague 100 au Survivor), Pluie d'or (posséder 1 000 000 de golds en même temps), Auréole céleste
     (niveau 100), Cape du conquérant (1 000 victoires), Gantelets du carnage (10 000 éliminations), Ceinture du chasseur
     de trésors (5 000 coffres ouverts), Lunettes du flambeur (25 jackpots), Chaussons du palais (décoration niveau 20).
@@ -281,15 +281,21 @@ de la file, confirme les `!join` et annonce le vainqueur.
     `n` profondeurs nettoyées : 2/3 × `(25n + 2n²)` XP, 2/3 × `(20n + 1,5n²)` golds, 1 coffre tous les 5 (ex. profondeur 10 : 300 XP,
     233 golds, 2 coffres). Vie et dégâts ajustés par classe pour que le corps à corps descende aussi loin que les
     classes à distance.
-  - **Défi des boss** : l'un des 6 boss (Troll, Dragon, Magicien, Mimic, Liche de glace, Maexxna), seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
-    2 coffres), Héroïque (900, 750, 3) ou Légendaire (1 500, 1 350, 6). Une victoire en Héroïque ou Légendaire débloque la peau légendaire du boss.
+  - **Défi des boss** : l'un des 9 boss (Troll, Dragon, Magicien, Mimic, Liche de glace, Maexxna, Ether, Lilith, Daedra), seul, calculé pour son niveau, en Normal (450 XP, 375 golds,
+    2 coffres), Héroïque (900, 750, 3) ou Légendaire (1 500, 1 350, 6). Une victoire en Héroïque ou plus débloque la peau légendaire du boss.
+    **Difficultés ultimes**, pour les héros entièrement légendaires : **Fabuleux** (vie ×38, dégâts ×5,5 ; 3 000 XP,
+    3 500 golds, 10 coffres, 1 Clé de boss), **Mythique** (×65, ×8 ; 5 000, 7 000, 16, 2 clés) et **Divin** (×82, ×9,5 ;
+    8 000, 15 000, 25, 3 clés) : en plus, attaques spéciales ×1,6 à ×2 plus fréquentes, coups ×1,35 à ×1,65 plus rapides,
+    rage à 100 / 85 / 80 s et soins du héros réduits (×0,45 / ×0,25 / ×0,2). Un palier réussi compte pour ceux du dessous
+    (succès Fabuleux, Mythique, Divin).
     Les boss sont nettement renforcés en solo (le Légendaire est réservé aux meilleurs builds) ; la vie et les dégâts du
     joueur sont ajustés par classe (Archer, Mage et Assassin renforcés, régénération du Prêtre réduite), et un Prêtre seul
     ne purifie pas sa propre malédiction face au Magicien.
 - **Modes de jeu** (choisis par l'admin avant d'ouvrir la file ; le Battle Royale reste le mode principal) :
   - **Combat de Boss** (coopératif, dès 1 joueur) : tout le monde contre un boss choisi par l'admin (boutons sous
     « Combat de Boss », avant d'ouvrir la file) : Grokk le Troll, Pyrax le Dragon, Malvorath le Magicien des ténèbres,
-    Grignotor le Mimic, Givrenoire la Liche de glace ou Maexxna la Veuve noire. Même récompense pour tous, même rage
+    Grignotor le Mimic, Givrenoire la Liche de glace, Maexxna la Veuve noire, Ether le Fantôme, Lilith le Chat ou Daedra
+    la Succube. Même récompense pour tous, même rage
     finale à 2 min 30. Chaque boss vaincu a 5 % de chance de laisser son **familier** à chaque héros (voir plus bas).
   - **Grokk le Troll** : vie et dégâts selon le nombre
     de combattants au lancement (200 PV + 300 PV par combattant, puis +6 % par niveau moyen des joueurs au-delà du 1, ×2,5 au plus). Coup de massue qui touche les voisins, attaques
@@ -322,6 +328,19 @@ de la file, confirme les `!join` et annonce le vainqueur.
     **toiles** partout (héros ralentis de 65 %), crache sa toile et son venin, appelle des **nuées d'araignées**. À
     **70 %** et **20 %**, elle enferme des héros dans des **cocons** à briser ; à **45 %**, elle remonte au **plafond**
     (pluie de toiles et de venin, grosse nuée) et redescend plus rapide ; **frénésie** sous 20 %.
+  - **Ether le Fantôme** (200 PV + 300 par combattant) : insaisissable, il **esquive 35 %** des coups et riposte. Hurlement
+    qui ralentit, **chaînes spectrales** qui étourdissent, **moisson d'âmes** qui le soigne. À **70 %** et **35 %**, il devient
+    **intangible** 14 s pendant que des **mains spectrales** agrippent les héros (chaque main détruite l'abrège) ; **feux
+    follets** explosifs à 50 %, **furie** sous 15 %.
+  - **Lilith le Chat** (200 PV + 290 par combattant) : chat de Cheshire aux tours de passe-passe : bond, **éventail de
+    cartes** (saignement), **disparition** (seul son sourire flotte) puis griffes dans le dos, **bonneteau** qui échange
+    les héros de place. À **75 %** et **40 %**, elle se cache parmi 3 puis 5 **illusions indiscernables** : toutes brisées
+    → elle est étourdie (+50 % de dégâts subis), sinon elles explosent. **Chapeau magique** à chatons à 50 %, **neuvième
+    vie** à 10 %.
+  - **Daedra la Succube** (220 PV + 280 par combattant) : **fouet de feu** à longue portée, **démons de feu** réguliers.
+    **Colonnes de feu** qui traversent l'arène et **séparent les héros** (infranchissables, elles brûlent), fouet infernal,
+    **cercle infernal** qui enferme puis explose. À **66 %**, 3 **portails** la protègent (−40 % de dégâts) en crachant des
+    démons ; à **33 %**, elle **embrase l'arène** 12 s ; **furie** sous 15 %.
   - **Boss Rush** (coopératif, dès 1 joueur) : les boss s'enchaînent au hasard (chacun une fois avant de revenir, jamais
     deux fois de suite), de plus en plus forts : +30 % de vie par boss passé, et des dégâts qui s'accélèrent (× (1 + 0,3 × (k − 1)) ×
     1,08^(k − 1), soit ×3 au 5e boss, ×7,4 au 10e, ×15,3 au 15e). Entre deux boss, le chat
@@ -399,7 +418,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   près), Zone rapide (déplacements ×5), Pluie de météores (impacts de 12 + 15 % de la vie max), ou Random.
 - **Casino** (onglet Casino, musique « Luigi's Casino ») : une salle animée où se promènent les personnages des autres
   joueurs (et le sien) en lançant des répliques au hasard (« Allez, une dernière… », « Encore une défaite et Don Paolo va
-  m'allumer ») — devant une table, ils parlent de ce jeu, et son propre personnage réagit à ses gains —, et six jeux tenus par les boss en smoking (mises de 10 à 500 golds, tirages côté serveur) :
+  m'allumer ») — devant une table, ils parlent de ce jeu, et son propre personnage réagit à ses gains —, et neuf jeux tenus par les boss en smoking (mises de 10 à 500 golds, tirages côté serveur, grande fenêtre de jeu) :
   - **Machine à sous de Pyrax** : 3 rouleaux, trois symboles identiques paient ×5 (cerises) à ×150 (trois 7 : JACKPOT),
     deux cerises ×2 (taux de retour ≈ 94,6 %).
   - **Blackjack de Maexxna** : tirer, rester, doubler ; la banque reste sur 17 ; blackjack payé 3 pour 2.
@@ -410,6 +429,14 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Lac gelé de Givrenoire** : 25 cases dont 3 / 5 / 10 / 15 fissures ; chaque case sûre fait monter le gain, on
     encaisse quand on veut, une fissure fait tout perdre.
   - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
+  - **Road to Heaven d'Ether** : une ligne monte des enfers vers le paradis, de plus en plus vite (×e^(0,16 t)) ; STOP
+    (ou Espace) encaisse la mise × le multiplicateur, encaissement automatique possible ; elle peut s'effondrer à tout
+    instant (atteindre ×m : 97 % / m de chances) et tout est perdu.
+  - **Chaton Fripon de Lilith** : le chaton saute de toit en toit (10 toits, ×1,05 → ×12,12) ; il peut glisser sur un toit
+    inconnu (8 % à 40 % de risque, de plus en plus haut) ; on encaisse quand on veut.
+  - **Course de démons de Daedra** : 6 petits démons sur une piste de lave, cotes ×2,9 à ×24 (chances ∝ 1 / cote,
+    retour ≈ 95 %) ; on parie sur le vainqueur.
+  - **Tickets de casino** (rapportés par Mini Lilith) : une mise gratuite de 50 golds dans tous les jeux sauf la caisse.
   Les gros gains (10× la mise ou plus, jackpots, lots incroyables) s'affichent pour tout le monde ; statistiques de
   casino dans l'onglet et dans Statistiques ; 3 succès (25 parties, jackpot, lot incroyable).
 - **Survivor** (onglet Survivor, 300 golds la partie) : jeu de survie par vagues sur une grande carte (10 800 × 10 800 px,
@@ -430,8 +457,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
     les 30 s, 4 au plus) et un **trésor gardé** à 90 s puis toutes les 150 s (une élite et 6 gardiens qui restent à leur
     poste ; 2 améliorations + 3 émeraudes). Mini-carte et flèches au bord de l'écran pour les trouver.
   - Vagues de 30 s (monstres du donjon, de plus en plus nombreux et costauds), un ennemi d'élite toutes les 50 s (coffre
-    d'une amélioration), un **boss toutes les 5 vagues** (la vague suivante attend qu'il soit vaincu ; ignoré 3 min, il s'enrage : vitesse et dégâts ×1,5) (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, puis le
-    cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
+    d'une amélioration), un **boss toutes les 5 vagues** (la vague suivante attend qu'il soit vaincu ; ignoré 3 min, il s'enrage : vitesse et dégâts ×1,5) (Grokk, Maexxna, Grignotor, Pyrax, Givrenoire, Malvorath, Ether,
+    Lilith, Daedra, puis le cycle reprend plus fort), avec son attaque spéciale ; vaincu, il laisse un coffre de 3 améliorations.
+    Les trois derniers enchaînent plusieurs attaques : Ether esquive 30 % des coups, devient intangible en invoquant des
+    mains spectrales, hurle et lance des âmes ; Lilith se cache parmi des illusions qui explosent, disparaît puis bondit,
+    lance des cartes ; Daedra enferme le joueur entre des **colonnes de feu infranchissables**, fouette de loin et invoque des
+    démons de feu.
   - Gemmes d'XP → montée de niveau (partie en pause) : choisir entre 3 (ou 4) améliorations. **8 armes** (Épée, Dagues,
     Baguette magique, Aura de feu, Hache, Foudre, Orbes gardiens, Fiole d'acide ; 8 niveaux chacune, 6 au plus) et
     **25 objets** cumulables (Cœur, Armure, Bottes, Gantelet, Grimoire, Cristal, Aimant, Trèfle, Couronne, Pomme dorée,
@@ -478,14 +509,15 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Dans un **enclos animé** (ciel selon l'heure, objets achetés, familier qui se promène et réagit), le familier
   **principal** a faim, soif et envie de jouer (besoins qui baissent avec le temps). Si sa satisfaction est d'au moins
   50 %, il ramène une **trouvaille** toutes les 4 h (plus souvent avec ses niveaux, 3 en attente au plus) : arme (Troll),
-  golds (Dragon), XP (Magicien), coffre (Mimic), potion et parfois une Clé de boss (Liche), armure ou bijou (Maexxna).
+  golds (Dragon), XP (Magicien), coffre (Mimic), potion et parfois une Clé de boss (Liche), armure ou bijou (Maexxna),
+  émeraudes (Ether), ticket de casino (Lilith) ou, au hasard, la trouvaille d'un autre boss (Daedra).
   On le caresse, on joue avec lui, on le nourrit (épicerie ; chaque espèce a son plat préféré) : il gagne de l'XP et
   des niveaux (20 au plus). Objets d'enclos à acheter une fois (fleurs, lanternes, gamelle, fontaine, coffre à jouets,
   mare, niche, statue). **3 jours d'affilée au-dessus de 80 %** : il devient **compagnon de combat** et suit son héros
   dans l'arène (cosmétique). Les autres familiers se reposent (leurs besoins ne baissent pas).
   Sous l'enclos, le **journal des trouvailles** liste les 40 dernières (quel familier, quoi, quand) avec le total de
-  tout ce que les familiers ont rapporté depuis le début (trouvailles, golds, XP, coffres, potions, clés, objets).
-- **Succès** : 82 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, casino, chaque boss,
+  tout ce que les familiers ont rapporté depuis le début (trouvailles, golds, XP, coffres, potions, clés, objets, émeraudes, tickets).
+- **Succès** : 88 succès (batailles, kills, victoires, niveaux, coffres, légendaires, recyclage, forge, paris, casino, chaque boss,
   donjon, Roi de la Colline, Guerre des clans et MVP, Golden Shower, Expédition, reliques, Défi des boss, alchimie,
   techniques, panoplies…) avec barre de progression. Terminé → bouton « Récupérer » (golds selon la difficulté) et possibilité de
   porter son nom comme titre, affiché sous le pseudo dans l'arène et dans les classements.

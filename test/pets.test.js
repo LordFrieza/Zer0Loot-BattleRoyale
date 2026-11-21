@@ -262,3 +262,46 @@ test('[PET-10] journal de l\'enclos : une ligne par trouvaille (40 au plus), tot
   assert.strictEqual(owner.character.pets.totals.finds, 48);
   assert.strictEqual(owner.character.pets.totals.items, 45);
 });
+
+test('[PET-11] familiers des nouveaux boss : émeraudes (Mini Ether), tickets de casino (Mini Lilith), surprise d\'un autre boss (Mini Daedra)', () => {
+  assert.deepStrictEqual(['ether', 'lilith', 'daedra'].map((s) => Rules.PETS[s].find), ['emerald', 'ticket', 'random']);
+  assert.deepStrictEqual(Rules.PET_RANDOM_FINDS, ['potion', 'chest', 'xp', 'arme', 'armure', 'gold']);
+  const fx = Rules.petEnclosEffects([]);
+  assert.strictEqual(Rules.petFindValue('ether', 1, fx), 11);
+  assert.strictEqual(Rules.petFindValue('ether', 10, fx), 38);
+  // Mini Ether : des émeraudes
+  const e = withPet('ether', 0);
+  e.pets.list[0].finds = 2;
+  e.pets.list[0].at = Date.now();
+  const em = e.emeralds;
+  const ge = game.collectFinds(e).gifts;
+  assert.ok(ge.every((g) => g.kind === 'emerald'));
+  assert.strictEqual(e.emeralds - em, 2 * Rules.petFindValue('ether', 1, fx));
+  assert.strictEqual(e.pets.totals.emeralds, 2 * Rules.petFindValue('ether', 1, fx));
+  // Mini Lilith : un ticket de casino (parfois deux)
+  const l = withPet('lilith', 0);
+  l.pets.list[0].finds = 3;
+  l.pets.list[0].at = Date.now();
+  const gl = game.collectFinds(l).gifts;
+  assert.ok(gl.every((g) => g.kind === 'ticket' && g.tickets >= 1));
+  assert.strictEqual(l.casinoTickets, gl.reduce((a, g) => a + g.tickets, 0));
+  assert.strictEqual(l.pets.totals.tickets, l.casinoTickets);
+  // Mini Daedra : la trouvaille d'un autre boss au même niveau, marquée « surprise »
+  const d = withPet('daedra', 0);
+  const kinds = new Set();
+  for (let i = 0; i < 40; i++) {
+    d.pets.list[0].finds = 1;
+    d.pets.list[0].at = Date.now();
+    const g = game.collectFinds(d).gifts[0];
+    assert.strictEqual(g.surprise, true);
+    kinds.add(g.kind === 'item' ? (g.item.slot === 'arme' ? 'arme' : 'armure') : g.kind);
+  }
+  assert.ok([...kinds].every((k) => ['potion', 'chest', 'xp', 'arme', 'armure', 'gold'].includes(k)));
+  assert.ok(kinds.size >= 3, 'des trouvailles variées');
+  assert.ok(d.pets.log[0].surprise);
+  // Tickets cumulés à la fusion d'un fantôme et conservés par upgrade()
+  const old = game.newCharacter();
+  delete old.casinoTickets;
+  game.upgrade(old);
+  assert.strictEqual(old.casinoTickets, 0);
+});
