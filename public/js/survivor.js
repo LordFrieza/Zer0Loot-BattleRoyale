@@ -10,7 +10,7 @@
   const KINDS = Rules.SURVIVOR_ENEMY_KINDS;
   const ZONES = Rules.SURVIVOR_ZONES;
   // Projectiles ennemis : [couleur, rayon] — os du squelette en rouge vif, boules de feu, glace, orbes
-  const ESHOT = [['#ff2a2a', 8], ['#ff7a1f', 13], ['#7fdcff', 10], ['#d05cff', 11]];
+  const ESHOT = [['#ff2a2a', 8], ['#ff7a1f', 13], ['#7fdcff', 10], ['#d05cff', 11], ['#c9d4ff', 11], ['#ff4fa8', 9]]; // os, feu, glace, orbe, âme (Ether), carte (Lilith)
   const W = 1280;
   const H = 720;
   const $ = (id) => document.getElementById(id);
@@ -714,8 +714,32 @@
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 220, t0: now, life: 700, color: '#ffd34a' });
         break;
       case 'boom':
-        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 420, color: e.act === 'leap' ? '#d9a441' : e.act === 'frost' ? '#9fe0ff' : '#ff6b3d' });
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: e.r, t0: now, life: 420, color: e.act === 'leap' ? '#d9a441' : e.act === 'frost' ? '#9fe0ff' : e.act === 'grab' ? '#c9d4ff' : e.act === 'decoy' ? '#ff9ae0' : '#ff6b3d' });
         Sound.play('slam');
+        break;
+      case 'ghost':
+        svToast('👻 Ether devient intangible ! Esquive les mains spectrales…', 2200, 'boss');
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 120, t0: now, life: 500, color: '#c9d4ff' });
+        Sound.play('blink');
+        break;
+      case 'wail':
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 200, t0: now, life: 600, color: '#c9d4ff' });
+        Sound.play('roar', true);
+        break;
+      case 'illusions':
+        svToast(`😼 Lilith se multiplie ! Brise ses ${e.n} illusions avant qu'elles n'explosent.`, 2600, 'boss');
+        Sound.play('blink');
+        break;
+      case 'vanish':
+        G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 80, t0: now, life: 400, color: '#ff9ae0' });
+        Sound.play('blink');
+        break;
+      case 'pillars':
+        svToast('🔥 Colonnes de feu ! Elles ne se traversent pas.', 2000, 'boss');
+        Sound.play('slam');
+        break;
+      case 'demons':
+        svToast(`😈 Daedra invoque ${e.n} démons de feu !`, 2000, 'boss');
         break;
       case 'blink':
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 70, t0: now, life: 350, color: '#b98cff' });
@@ -779,8 +803,11 @@
     if (G.me.moving) {
       // L'eau ralentit, les routes accélèrent (le serveur fait de même)
       const spd = ((f && f.spd) || SV.player.speed) * Rules.survivorGround(G.me.x, G.me.y);
-      G.me.x = Math.max(20, Math.min(SV.map.w - 20, G.me.x + d.x * spd * dt));
-      G.me.y = Math.max(20, Math.min(SV.map.h - 20, G.me.y + d.y * spd * dt));
+      const nx = Math.max(20, Math.min(SV.map.w - 20, G.me.x + d.x * spd * dt));
+      const ny = Math.max(20, Math.min(SV.map.h - 20, G.me.y + d.y * spd * dt));
+      // Colonnes de feu de Daedra : on ne les traverse pas (le serveur refuse aussi le pas)
+      const walls = f && f.ar ? f.ar.filter((a) => a.k === 'firewall') : null;
+      if (!walls || !walls.length || !Rules.survivorWallBlock(G.me.x, G.me.y, nx, ny, walls)) { G.me.x = nx; G.me.y = ny; }
       G.me.fx = d.x;
       G.me.fy = d.y;
     }
@@ -834,6 +861,36 @@
         ctx.lineWidth = 1.5;
         for (let i = 0; i < 8; i++) { const ang = (i / 8) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + Math.cos(ang) * a.r, a.y + Math.sin(ang) * a.r * 0.8); ctx.stroke(); }
         for (let r = a.r / 3; r <= a.r; r += a.r / 3) { ctx.beginPath(); ctx.ellipse(a.x, a.y, r, r * 0.8, 0, 0, Math.PI * 2); ctx.stroke(); }
+      } else if (a.k === 'firewall') {
+        // Colonne de feu de Daedra : un mur de flammes qu'on ne traverse pas
+        const len = Math.hypot(a.x2 - a.x, a.y2 - a.y) || 1;
+        const ang = Math.atan2(a.y2 - a.y, a.x2 - a.x);
+        const fade = Math.min(1, a.left / 0.6);
+        ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(ang); ctx.globalAlpha = fade;
+        const g = ctx.createLinearGradient(0, -a.r, 0, a.r);
+        g.addColorStop(0, 'rgba(255, 60, 20, 0)'); g.addColorStop(0.35, 'rgba(255, 90, 30, .75)'); g.addColorStop(0.5, 'rgba(255, 220, 120, .95)'); g.addColorStop(0.65, 'rgba(255, 90, 30, .75)'); g.addColorStop(1, 'rgba(255, 60, 20, 0)');
+        ctx.fillStyle = g; ctx.fillRect(0, -a.r, len, a.r * 2);
+        // flammes qui dansent le long du mur
+        for (let d = 10; d < len; d += 22) {
+          const h = 26 + Math.sin(t * 9 + d * 0.31) * 10;
+          const fl = ctx.createLinearGradient(0, 0, 0, -h);
+          fl.addColorStop(0, 'rgba(255, 120, 30, .9)'); fl.addColorStop(1, 'rgba(255, 230, 120, 0)');
+          ctx.fillStyle = fl;
+          ctx.beginPath(); ctx.moveTo(d - 9, 0); ctx.quadraticCurveTo(d + Math.sin(t * 7 + d) * 5, -h, d + 9, 0); ctx.fill();
+        }
+        ctx.restore();
+      } else if (a.k === 'warn' && a.act === 'grab') {
+        // Main spectrale qui va jaillir du sol
+        const k = Math.max(0, Math.min(1, 1 - (a.left - (now - G.frameAt) / 1000) / 0.9));
+        ctx.fillStyle = 'rgba(160, 180, 255, .16)';
+        ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(200, 215, 255, .9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.ellipse(a.x, a.y, a.r, a.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.save(); ctx.globalAlpha = 0.35 + k * 0.6; ctx.fillStyle = '#dfe6ff';
+        const hy = a.y + 10 - k * 34;
+        ctx.beginPath(); ctx.ellipse(a.x, hy, 13, 17, 0, 0, Math.PI * 2); ctx.fill();
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(a.x - 9 + i * 6, hy - 18 - (i === 1 || i === 2 ? 4 : 0), 3, 9, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
       } else if (a.k === 'warn') {
         const k = Math.max(0, Math.min(1, 1 - (a.left - (now - G.frameAt) / 1000) / 1));
         ctx.fillStyle = 'rgba(255, 50, 30, .16)';
@@ -1085,8 +1142,14 @@
     }
     if (f.b) {
       const b = f.b;
-      const BD = { troll: [1, 30], dragon: [0.9, 26], sorcier: [0.95, 20], mimic: [0.95, 18], liche: [0.95, 20], maexxna: [0.9, 6] }[b.kind];
+      const BD = { troll: [1, 30], dragon: [0.9, 26], sorcier: [0.95, 20], mimic: [0.95, 18], liche: [0.95, 20], maexxna: [0.9, 6], ether: [0.9, 24], lilith: [0.9, 14], daedra: [0.9, 18] }[b.kind];
       if (!meDrawn && b.y > G.me.y) drawMe();
+      // Illusions de Lilith : dessinées exactement comme elle (indiscernables)
+      for (const [x, y] of b.decoys || []) {
+        ctx.fillStyle = 'rgba(0,0,0,.3)';
+        ctx.beginPath(); ctx.ellipse(x, y + 6, 46, 14, 0, 0, Math.PI * 2); ctx.fill();
+        drawMonster(ctx, x, y - BD[1], { kind: b.kind, enraged: b.rage }, { scale: BD[0], t: now, facing: x > G.me.x ? -1 : 1, enraged: b.rage });
+      }
       ctx.fillStyle = 'rgba(0,0,0,.3)';
       ctx.beginPath(); ctx.ellipse(b.x, b.y + 6, 46, 14, 0, 0, Math.PI * 2); ctx.fill();
       if (b.rage) {
@@ -1095,7 +1158,7 @@
         rg.addColorStop(0, `rgba(255, 40, 20, ${0.35 + Math.sin(now / 150) * 0.15})`); rg.addColorStop(1, 'rgba(255, 40, 20, 0)');
         ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(b.x, b.y - 30, 110, 0, Math.PI * 2); ctx.fill();
       }
-      drawMonster(ctx, b.x, b.y - BD[1], { kind: b.kind, enraged: b.rage }, { scale: BD[0], t: now, facing: b.x > G.me.x ? -1 : 1, enraged: b.rage });
+      drawMonster(ctx, b.x, b.y - BD[1], { kind: b.kind, enraged: b.rage }, { scale: BD[0], t: now, facing: b.x > G.me.x ? -1 : 1, enraged: b.rage, intangible: !!b.ghost, vanish: !!b.hidden });
     }
     if (f.lb) {
       if (!meDrawn && f.lb.y > G.me.y) drawMe();
@@ -1398,8 +1461,8 @@
   }
 
   // Gardien légendaire : dessin d'un boss ou d'un monstre, grandi et teinté, avec une aura violette (éveillé) ou endormi
-  const LIFT = { troll: 30, dragon: 26, sorcier: 20, mimic: 18, liche: 20, maexxna: 6 };
-  const BOSS_SC = { troll: 1, dragon: 0.9, sorcier: 0.95, mimic: 0.95, liche: 0.95, maexxna: 0.9 };
+  const LIFT = { troll: 30, dragon: 26, sorcier: 20, mimic: 18, liche: 20, maexxna: 6, ether: 24, lilith: 14, daedra: 18 };
+  const BOSS_SC = { troll: 1, dragon: 0.9, sorcier: 0.95, mimic: 0.95, liche: 0.95, maexxna: 0.9, ether: 0.9, lilith: 0.9, daedra: 0.9 };
   function drawGuardian(zone, x, y, now, o = {}) {
     const D = Rules.SURVIVOR_GUARDIANS[zone];
     const sc = D.scale * (BOSS_SC[D.draw] || 1);

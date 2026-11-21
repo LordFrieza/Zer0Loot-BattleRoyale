@@ -2294,8 +2294,27 @@
     dragon: { hp: 640, speed: 96, damage: 17, radius: 34, every: 3.8, label: 'Pyrax' },
     liche: { hp: 720, speed: 87, damage: 17, radius: 28, every: 4.2, label: 'Givrenoire' },
     sorcier: { hp: 800, speed: 93, damage: 18, radius: 26, every: 5, label: 'Malvorath' },
+    // Les trois boss suivants (vagues 35, 40, 45) ont plusieurs attaques, jouées à tour de rôle (attacks).
+    // Ether : esquive une partie des coups (dodge), devient intangible en invoquant des mains spectrales.
+    ether: { hp: 900, speed: 96, damage: 18, radius: 30, every: 4.2, label: 'Ether', dodge: 0.3, attacks: ['hands', 'wail', 'chains'], ghost: 3.5 },
+    // Lilith : illusions indiscernables (decoys) qui explosent si on ne les brise pas, disparition puis bond, cartes.
+    lilith: { hp: 980, speed: 108, damage: 18, radius: 26, every: 4, label: 'Lilith', attacks: ['illusions', 'pounce', 'cards'], decoys: 3, decoyHp: 0.05, decoyLife: 8 },
+    // Daedra : colonnes de feu infranchissables (walls), fouet à longue portée, démons de feu.
+    daedra: { hp: 1060, speed: 90, damage: 19, radius: 28, every: 3.8, label: 'Daedra', attacks: ['pillars', 'whip', 'demons'], wallLife: 5, wallWidth: 34 },
   };
-  const SURVIVOR_BOSS_ORDER = ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier'];
+  const SURVIVOR_BOSS_ORDER = ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier', 'ether', 'lilith', 'daedra'];
+  // Colonnes de feu de Daedra : un pas de (x0, y0) à (x1, y1) qui traverse l'une d'elles est refusé (serveur et navigateur).
+  function survivorWallBlock(x0, y0, x1, y1, walls) {
+    const side = (ax, ay, bx, by, px, py) => (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+    for (const w of walls || []) {
+      const d1 = side(w.x, w.y, w.x2, w.y2, x0, y0);
+      const d2 = side(w.x, w.y, w.x2, w.y2, x1, y1);
+      const d3 = side(x0, y0, x1, y1, w.x, w.y);
+      const d4 = side(x0, y0, x1, y1, w.x2, w.y2);
+      if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+    }
+    return false;
+  }
   /*
    * Gardiens légendaires : un par lieu-dit (sauf le village), seuls 2 ou 3 d'entre eux (au hasard) dorment sur la
    * carte à chaque partie. On les réveille exprès en restant `wake` secondes sur leur sceau ; un seul éveillé à la fois.
@@ -3162,7 +3181,7 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CASINO, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
-    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
+    SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,
     SURVIVOR_UNLOCKS, SURVIVOR_EVOLUTIONS, survivorEvoReady, SURVIVOR_SECRETS, SURVIVOR_CHALLENGES, SURVIVOR_CHALLENGE_REWARD, survivorChallengesOf, survivorMetric, survivorStats, survivorScore, survivorEmeralds, parisDay,
     HOUSING, FURNITURE_CATS, FURNITURE, HOUSE_PARTS, houseDeco, houseLevelPoints, houseLevel, houseMailDue, houseMailContent, houseLayoutError,

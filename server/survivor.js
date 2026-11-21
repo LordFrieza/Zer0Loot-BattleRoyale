@@ -14,12 +14,19 @@ const SV = Rules.SURVIVOR;
 const TICK = 0.05;
 const CELL = 90;
 const KIND_INDEX = Object.fromEntries(Rules.SURVIVOR_ENEMY_KINDS.map((k, i) => [k, i]));
-const SHOT_KINDS = ['bone', 'fire', 'ice', 'orb'];
+const SHOT_KINDS = ['bone', 'fire', 'ice', 'orb', 'soul', 'card'];
 const PICKUPS = ['chicken', 'magnet', 'chest', 'watch', 'bomb'];
 const VIEW_W = SV.view.w / 2 + 80;
 const VIEW_H = SV.view.h / 2 + 80;
 
 const dist2 = (ax, ay, bx, by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
+// Distance d'un point au segment (x1, y1)-(x2, y2)
+const segDist = (px, py, x1, y1, x2, y2) => {
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const k = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / (vx * vx + vy * vy || 1)));
+  return Math.hypot(px - x1 - vx * k, py - y1 - vy * k);
+};
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 class SurvivorRun {
@@ -111,8 +118,10 @@ class SurvivorRun {
     let dy = y - this.p.y;
     const d = Math.hypot(dx, dy);
     if (d > max) { dx *= max / d; dy *= max / d; }
-    this.p.x = clamp(this.p.x + dx, 20, SV.map.w - 20);
-    this.p.y = clamp(this.p.y + dy, 20, SV.map.h - 20);
+    const nx = clamp(this.p.x + dx, 20, SV.map.w - 20);
+    const ny = clamp(this.p.y + dy, 20, SV.map.h - 20);
+    // Colonnes de feu de Daedra : on ne les traverse pas
+    if (!Rules.survivorWallBlock(this.p.x, this.p.y, nx, ny, this.areas.filter((a) => a.k === 'firewall'))) { this.p.x = nx; this.p.y = ny; }
     const fl = Math.hypot(fx, fy);
     if (Number.isFinite(fl) && fl > 0.1) { this.p.fx = fx / fl; this.p.fy = fy / fl; }
   }
@@ -289,7 +298,7 @@ class SurvivorRun {
     const boss = {
       id: this.nextId++, kind: spec.kind, boss: true, x: clamp(this.p.x + Math.cos(a) * 520, 60, SV.map.w - 60), y: clamp(this.p.y + Math.sin(a) * 520, 60, SV.map.h - 60),
       hp: spec.hp, maxHp: spec.hp, r: B.radius, speed: B.speed, damage: spec.damage, xp: 0, hitCd: 0, kx: 0, ky: 0, special: B.every * 0.7, hits: {}, phase: 0,
-      spawnT: this.t, rage: false,
+      spawnT: this.t, rage: false, dodge: B.dodge || 0, turn: 0,
     };
     this.enemies.push(boss);
     this.boss = boss;
@@ -339,6 +348,12 @@ class SurvivorRun {
   // Dégâts infligés par une arme.
   damage(e, base, weapon, kb = 0) {
     if (e.dead) return;
+    // Ether intangible, Lilith disparue : rien ne les touche. Ether esquive aussi une partie des coups.
+    if (e.boss && (e.ghostUntil > this.t || e.hiddenUntil > this.t)) return;
+    if (e.boss && e.dodge && this.rand() < e.dodge) {
+      if (this.dmgEvents < 28) { this.events.push({ k: 'd', x: Math.round(e.x), y: Math.round(e.y - e.r), v: 'Esquivé', c: 2 }); this.dmgEvents += 1; }
+      return;
+    }
     const S = this.stats;
     const crit = this.rand() < S.crit + (this.fx.crit || 0);
     const dmg = base * S.damage * (1 + (this.fx.damage || 0)) * (crit ? S.critMult : 1) * (e.boss || e.elite || e.legend ? 1 + S.bossDmg : 1);
@@ -379,9 +394,16 @@ class SurvivorRun {
       this.events.push({ k: 'legendDown', zone: e.zone, x: Math.round(e.x), y: Math.round(e.y), emeralds: GD.emeralds });
       return;
     }
+    if (e.decoy) {
+      // Illusion de Lilith brisée : un nuage de fumée, rien d'autre
+      this.events.push({ k: 'boom', x: Math.round(e.x), y: Math.round(e.y), r: 50, act: 'decoy' });
+      return;
+    }
     if (e.boss) {
       this.bosses += 1;
       this.boss = null;
+      for (const d of this.enemies) if (d.decoy) d.dead = true; // ses illusions disparaissent avec elle
+      this.areas = this.areas.filter((a) => a.k !== 'firewall');
       this.events.push({ k: 'bossDown', kind: e.kind, x: Math.round(e.x), y: Math.round(e.y) });
       this.pickups.push({ type: 'chest', x: e.x, y: e.y, count: 3 });
       for (let i = 0; i < 8; i++) this.dropGem(e.x + (this.rand() - 0.5) * 120, e.y + (this.rand() - 0.5) * 120, 25);
@@ -576,6 +598,12 @@ class SurvivorRun {
       b.damage *= R.damage;
       this.events.push({ k: 'bossRage', kind: b.kind });
     }
+    // Illusions de Lilith qui tiennent jusqu'au bout : elles explosent
+    for (const d of this.enemies) {
+      if (!d.decoy || d.dead || this.t < d.until) continue;
+      d.dead = true;
+      this.areas.push({ id: this.nextId++, k: 'warn', x: d.x, y: d.y, r: 120, at: this.t + 0.8, until: this.t + 0.8, act: 'slam', damage: b.damage * 1.1 });
+    }
     b.special -= dt * this.timeMult(b);
     if (b.special > 0) return;
     const B = Rules.SURVIVOR_BOSSES[b.kind];
@@ -607,12 +635,125 @@ class SurvivorRun {
           this.eshots.push({ x: b.x, y: b.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, r: 10, damage: b.damage * 0.6, life: 4, kind: 'ice', slow: 2 });
         }
         break;
+      case 'ether': case 'lilith': case 'daedra':
+        this.bossCombo(b, B, toward);
+        break;
       case 'sorcier': {
         const a = this.rand() * Math.PI * 2;
         b.x = clamp(P.x + Math.cos(a) * 320, 60, SV.map.w - 60);
         b.y = clamp(P.y + Math.sin(a) * 320, 60, SV.map.h - 60);
         this.events.push({ k: 'blink', x: Math.round(b.x), y: Math.round(b.y) });
         for (let i = -1; i <= 1; i++) this.eshots.push({ x: b.x, y: b.y, ...toward(170, i * 0.5), r: 12, damage: b.damage * 0.7, life: 4.5, kind: 'orb', homing: true });
+        break;
+      }
+      default:
+    }
+  }
+
+  // Ether, Lilith et Daedra : plusieurs attaques jouées à tour de rôle (plus vite une fois enragés).
+  bossCombo(b, B, toward) {
+    const P = this.p;
+    const atk = B.attacks[b.turn % B.attacks.length];
+    b.turn += 1;
+    const warn = (x, y, r, delay, act, d) => this.areas.push({ id: this.nextId++, k: 'warn', x, y, r, at: this.t + delay, until: this.t + delay, act, damage: d });
+    const ring = (n, spd, kind, d, extra = {}) => {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + this.t;
+        this.eshots.push({ x: b.x, y: b.y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, r: 11, damage: d, life: 4, kind, ...extra });
+      }
+    };
+    const aim = Math.atan2(P.y - b.y, P.x - b.x);
+    switch (atk) {
+      // ----- Ether -----
+      case 'hands':
+        // Intangible : plus rien ne le touche, et des mains spectrales jaillissent sous le joueur, l'une après l'autre
+        b.ghostUntil = this.t + B.ghost;
+        for (let i = 0; i < 4; i++) {
+          const a = this.rand() * Math.PI * 2;
+          const d = i ? 40 + this.rand() * 90 : 0;
+          warn(P.x + Math.cos(a) * d, P.y + Math.sin(a) * d, 70, 0.9 + i * 0.7, 'grab', b.damage * 0.9);
+        }
+        this.events.push({ k: 'ghost', x: Math.round(b.x), y: Math.round(b.y) });
+        break;
+      case 'wail':
+        // Hurlement : deux anneaux d'âmes qui ralentissent
+        ring(16, 200, 'soul', b.damage * 0.55, { slow: 1.5 });
+        ring(16, 140, 'soul', b.damage * 0.55, { slow: 1.5 });
+        this.events.push({ k: 'wail', x: Math.round(b.x), y: Math.round(b.y) });
+        break;
+      case 'chains':
+        // Chaînes spectrales : des âmes qui poursuivent le joueur
+        for (let i = -2; i <= 2; i++) this.eshots.push({ x: b.x, y: b.y, ...toward(165, i * 0.45), r: 12, damage: b.damage * 0.6, life: 5, kind: 'soul', homing: true, slow: 1 });
+        break;
+      // ----- Lilith -----
+      case 'illusions': {
+        // Des copies indiscernables qui foncent sur le joueur ; celles qui tiennent jusqu'au bout explosent.
+        // Lilith échange sa place avec l'une d'elles.
+        for (const d of this.enemies) if (d.decoy) d.dead = true;
+        const n = B.decoys + (b.rage ? 1 : 0);
+        const spots = [];
+        for (let i = 0; i <= n; i++) {
+          const a = aim + Math.PI + (i / (n + 1)) * Math.PI * 2;
+          spots.push([clamp(P.x + Math.cos(a) * 300, 60, SV.map.w - 60), clamp(P.y + Math.sin(a) * 300, 60, SV.map.h - 60)]);
+        }
+        const mine = Math.floor(this.rand() * spots.length);
+        for (let i = 0; i < spots.length; i++) {
+          const [x, y] = spots[i];
+          if (i === mine) { b.x = x; b.y = y; continue; }
+          const hp = b.maxHp * B.decoyHp;
+          this.enemies.push({ id: this.nextId++, kind: b.kind, decoy: true, x, y, hp, maxHp: hp, r: B.radius, speed: B.speed * 0.9, damage: b.damage * 0.5, xp: 0, hitCd: 0, kx: 0, ky: 0, hits: {}, phase: 0, until: this.t + B.decoyLife });
+        }
+        this.events.push({ k: 'illusions', n });
+        break;
+      }
+      case 'pounce':
+        // Elle disparaît (seul son sourire reste), puis bondit sur le joueur
+        b.hiddenUntil = this.t + 1.1;
+        warn(P.x, P.y, 115, 1.1, 'leap', b.damage * 1.3);
+        this.events.push({ k: 'vanish', x: Math.round(b.x), y: Math.round(b.y) });
+        break;
+      case 'cards':
+        // Éventail de cartes tranchantes, deux fois de suite
+        for (let i = -3; i <= 3; i++) this.eshots.push({ x: b.x, y: b.y, ...toward(300, i * 0.16), r: 10, damage: b.damage * 0.6, life: 3.5, kind: 'card' });
+        for (let i = -3; i <= 3; i++) this.eshots.push({ x: b.x, y: b.y, ...toward(220, i * 0.16 + 0.08), r: 10, damage: b.damage * 0.6, life: 4, kind: 'card' });
+        break;
+      // ----- Daedra -----
+      case 'pillars': {
+        // Deux colonnes de feu de part et d'autre du joueur (couloir), perpendiculaires à Daedra : on ne les traverse pas
+        const L = 520;
+        const px = -Math.sin(aim);
+        const py = Math.cos(aim);
+        for (const off of [-110, 110]) {
+          const cx = P.x + px * off;
+          const cy = P.y + py * off;
+          const x = clamp(cx - Math.cos(aim) * L / 2, 20, SV.map.w - 20);
+          const y = clamp(cy - Math.sin(aim) * L / 2, 20, SV.map.h - 20);
+          const x2 = clamp(cx + Math.cos(aim) * L / 2, 20, SV.map.w - 20);
+          const y2 = clamp(cy + Math.sin(aim) * L / 2, 20, SV.map.h - 20);
+          this.areas.push({ id: this.nextId++, k: 'firewall', x, y, x2, y2, r: B.wallWidth / 2, until: this.t + B.wallLife, damage: b.damage * 0.35, tickAt: this.t + 0.5 });
+        }
+        // … et une barrière en travers, au bout du couloir (côté opposé à Daedra) : il faut en sortir face à elle
+        const ex = P.x + Math.cos(aim) * 160;
+        const ey = P.y + Math.sin(aim) * 160;
+        this.areas.push({ id: this.nextId++, k: 'firewall', x: clamp(ex + px * 130, 20, SV.map.w - 20), y: clamp(ey + py * 130, 20, SV.map.h - 20), x2: clamp(ex - px * 130, 20, SV.map.w - 20), y2: clamp(ey - py * 130, 20, SV.map.h - 20), r: B.wallWidth / 2, until: this.t + B.wallLife, damage: b.damage * 0.35, tickAt: this.t + 0.5 });
+        this.events.push({ k: 'pillars' });
+        break;
+      }
+      case 'whip': {
+        // Fouet de feu : une longue ligne de flammes de Daedra vers le joueur (et au-delà)
+        const len = Math.min(700, Math.hypot(P.x - b.x, P.y - b.y) + 160);
+        for (let d = 50; d <= len; d += 60) warn(b.x + Math.cos(aim) * d, b.y + Math.sin(aim) * d, 42, 0.85, 'whip', b.damage * 1.2);
+        break;
+      }
+      case 'demons': {
+        // Démons de feu tout autour du joueur et pluie de flammes
+        const n = 6 + (b.rage ? 3 : 0);
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          this.spawnEnemy('flammeche', { x: clamp(P.x + Math.cos(a) * 300, 30, SV.map.w - 30), y: clamp(P.y + Math.sin(a) * 300, 30, SV.map.h - 30) });
+        }
+        ring(12, 230, 'fire', b.damage * 0.5);
+        this.events.push({ k: 'demons', n });
         break;
       }
       default:
@@ -873,9 +1014,14 @@ class SurvivorRun {
         a.tickAt = this.t + 0.5;
         if (dist2(a.x, a.y, P.x, P.y) < a.r * a.r) this.hurt(a.damage);
       }
+      if (a.k === 'firewall' && this.t >= a.tickAt) {
+        // Colonne de feu : brûle qui s'y tient (on ne peut pas la traverser)
+        a.tickAt = this.t + 0.5;
+        if (segDist(P.x, P.y, a.x, a.y, a.x2, a.y2) < a.r) this.hurt(a.damage);
+      }
       if (a.k === 'warn' && this.t >= a.at) {
         const inside = dist2(a.x, a.y, P.x, P.y) < a.r * a.r;
-        if (inside) this.hurt(a.damage);
+        if (inside && this.hurt(a.damage) && a.act === 'grab') P.slowUntil = this.t + 1.5; // main spectrale : elle agrippe
         const owner = a.owner || this.boss;
         if (a.act === 'leap' && owner && !owner.dead) { owner.x = a.x; owner.y = a.y; }
         this.events.push({ k: 'boom', x: Math.round(a.x), y: Math.round(a.y), r: a.r, act: a.act });
@@ -1276,7 +1422,7 @@ class SurvivorRun {
     const inView = (x, y) => Math.abs(x - P.x) < VIEW_W && Math.abs(y - P.y) < VIEW_H;
     const e = [];
     for (const m of this.enemies) {
-      if (m.boss || m.legend || m.cart || m.dead || !inView(m.x, m.y)) continue;
+      if (m.boss || m.legend || m.cart || m.decoy || m.dead || !inView(m.x, m.y)) continue;
       e.push(m.id, KIND_INDEX[m.kind], Math.round(m.x), Math.round(m.y), Math.round((m.hp / m.maxHp) * 100), m.elite ? 1 : 0);
     }
     const g = [];
@@ -1294,7 +1440,8 @@ class SurvivorRun {
     }
     const bo = [];
     for (const s of this.shots) if (s.homing && inView(s.x, s.y)) bo.push(s.id, Math.round(s.x), Math.round(s.y), Math.round(s.vx), Math.round(s.vy));
-    const ar = this.areas.filter((a) => inView(a.x, a.y)).map((a) => ({ k: a.k, x: Math.round(a.x), y: Math.round(a.y), r: Math.round(a.r), left: Math.round(((a.k === 'warn' || a.k === 'star' ? a.at : a.until) - this.t) * 100) / 100, s: a.slow ? 1 : undefined }));
+    const ar = this.areas.filter((a) => (a.k === 'firewall' ? inView(a.x, a.y) || inView(a.x2, a.y2) || inView((a.x + a.x2) / 2, (a.y + a.y2) / 2) : inView(a.x, a.y))).map((a) => ({ k: a.k, x: Math.round(a.x), y: Math.round(a.y), r: Math.round(a.r), left: Math.round(((a.k === 'warn' || a.k === 'star' ? a.at : a.until) - this.t) * 100) / 100, s: a.slow ? 1 : undefined,
+      x2: a.x2 != null ? Math.round(a.x2) : undefined, y2: a.y2 != null ? Math.round(a.y2) : undefined, act: a.act === 'grab' || a.act === 'whip' ? a.act : undefined }));
     const orb = this.weapons.find((w) => w.id === 'orbes' && w.on);
     const faux = this.weapons.find((w) => w.id === 'faux' && w.on);
     const aura = this.weapons.find((w) => w.id === 'aura');
@@ -1318,7 +1465,9 @@ class SurvivorRun {
       x: Math.round(P.x),
       y: Math.round(P.y),
       e, g, pk, es, bo, ar,
-      b: b ? { kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), hp: Math.max(0, Math.round(b.hp)), maxHp: Math.round(b.maxHp), rage: b.rage || undefined, rageIn: b.rage ? 0 : Math.ceil(SV.bossRage.after - (this.t - b.spawnT)) } : null,
+      b: b ? { kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), hp: Math.max(0, Math.round(b.hp)), maxHp: Math.round(b.maxHp), rage: b.rage || undefined, rageIn: b.rage ? 0 : Math.ceil(SV.bossRage.after - (this.t - b.spawnT)),
+        ghost: b.ghostUntil > this.t ? 1 : undefined, hidden: b.hiddenUntil > this.t ? 1 : undefined,
+        decoys: this.enemies.some((d) => d.decoy && !d.dead) ? this.enemies.filter((d) => d.decoy && !d.dead).map((d) => [Math.round(d.x), Math.round(d.y)]) : undefined } : null,
       orb: orb ? { rings: this.orbRings(orb, (orb.s.area || 1) * this.stats.area, (orb.s.amount || 1) + this.stats.amount).map(([n, r, spd]) => [n, Math.round(r), spd]), t0: orb.t0, size: Math.round(14 * (orb.s.area || 1) * this.stats.area), evo: orb.evo || undefined } : null,
       aura: aura ? Math.round(aura.s.range * (aura.s.area || 1) * this.stats.area) : 0,
       auraEvo: aura && aura.evo ? 1 : undefined,

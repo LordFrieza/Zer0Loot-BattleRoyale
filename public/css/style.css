@@ -1624,3 +1624,8 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .sv-over-extras { display: flex; flex-direction: column; gap: 4px; margin: 8px auto 0; font-size: 14px; text-align: center; }
 .sv-built span.evo { background: rgba(255, 211, 74, .18); border: 1px solid rgba(255, 211, 74, .6); color: #ffd34a; }
 .sv-meta-card.secret { border-style: dashed; border-color: rgba(176, 107, 255, .5); }
+/* Difficultés ultimes du Défi des boss (Fabuleux, Mythique, Divin) */
+.solo-diff.ultimate { border-color: #7a3b8f; background: linear-gradient(180deg, rgba(122, 59, 143, 0.18), var(--panel)); }
+.solo-diff.ultimate b { color: #e3a8ff; }
+.solo-diff small.down { color: #ff8a8a; }
+.pet-log-gain.emerald { color: #5dff9a; }

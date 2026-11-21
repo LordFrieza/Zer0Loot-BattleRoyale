@@ -123,11 +123,13 @@ test('[SV-3] survivor : vagues de 30 s, ennemis selon la vague et le lieu-dit, �
   assert.deepStrictEqual(Rules.survivorWave(1).hp, 1);
   assert.ok(Rules.survivorWave(20).hp > Rules.survivorWave(10).hp && Rules.survivorWave(20).target <= SV.maxEnemies);
   assert.strictEqual(Rules.survivorBoss(4), null);
-  assert.deepStrictEqual(Rules.SURVIVOR_BOSS_ORDER, ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier']);
+  assert.deepStrictEqual(Rules.SURVIVOR_BOSS_ORDER, ['troll', 'maexxna', 'mimic', 'dragon', 'liche', 'sorcier', 'ether', 'lilith', 'daedra']);
   assert.strictEqual(Rules.survivorBoss(5).kind, 'troll');
   assert.strictEqual(Rules.survivorBoss(30).kind, 'sorcier');
-  assert.strictEqual(Rules.survivorBoss(35).kind, 'troll');
-  assert.ok(Rules.survivorBoss(35).hp > Rules.survivorBoss(5).hp * 2, 'le cycle reprend plus fort');
+  assert.strictEqual(Rules.survivorBoss(35).kind, 'ether');
+  assert.strictEqual(Rules.survivorBoss(45).kind, 'daedra');
+  assert.strictEqual(Rules.survivorBoss(50).kind, 'troll');
+  assert.ok(Rules.survivorBoss(50).hp > Rules.survivorBoss(5).hp * 2, 'le cycle reprend plus fort');
   const run = new sv.SurvivorRun({ meta: { vitalite: 10, carapace: 5 } });
   run.hp = 1e9;
   tickFor(run, 2);
@@ -158,7 +160,7 @@ test('[SV-4] survivor : gemmes d\'XP, pause pendant le choix, armes jusqu\'au ni
   assert.strictEqual(Rules.survivorXpToNext(1), 4);
   assert.deepStrictEqual(Rules.survivorWeaponStats('epee', 2).amount, 2);
   assert.deepStrictEqual([Rules.survivorWeaponStats('dagues', 1).amount, Rules.survivorWeaponStats('dagues', 8).amount], [3, 10]);
-  assert.deepStrictEqual(Object.values(Rules.SURVIVOR_BOSSES).map((b) => b.speed), [87, 99, 93, 96, 87, 93], 'boss ×1,5 plus rapides');
+  assert.deepStrictEqual(Object.values(Rules.SURVIVOR_BOSSES).map((b) => b.speed), [87, 99, 93, 96, 87, 93, 96, 108, 90], 'boss ×1,5 plus rapides');
   // Dagues : une volée tout autour du joueur
   const dr = new sv.SurvivorRun({});
   dr.weapons = [];
@@ -928,4 +930,89 @@ test('[SV-20] survivor : 3 défis du jour, 10 émeraudes chacun, une fois par jo
   // Le lendemain : nouveaux défis
   const next = now + 86400000;
   assert.deepStrictEqual(sv.stateOf(u, next).challenges.map((c) => c.done), [false, false, false]);
+});
+
+test('[SV-22] survivor : Ether esquive et devient intangible en invoquant des mains spectrales', () => {
+  const run = new sv.SurvivorRun({});
+  run.hp = 1e9;
+  run.spawnBoss({ kind: 'ether', hp: 1e6, damage: 1 });
+  const b = run.boss;
+  assert.ok(b.dodge > 0);
+  // Esquive : une partie des coups ne fait rien
+  b.dodge = 1;
+  run.damage(b, 100, null);
+  assert.strictEqual(b.hp, 1e6);
+  b.dodge = 0;
+  // Mains spectrales : intangible, et des cercles annoncés sous le joueur qui l'agrippent
+  b.special = 0;
+  run.updateBoss(0.05);
+  assert.ok(b.ghostUntil > run.t);
+  run.damage(b, 100, null);
+  assert.strictEqual(b.hp, 1e6, 'intangible : rien ne le touche');
+  assert.ok(run.areas.filter((a) => a.act === 'grab').length >= 3);
+  assert.strictEqual(run.frame().b.ghost, 1);
+  // Hurlement puis chaînes : des âmes
+  b.special = 0; run.updateBoss(0.05);
+  b.special = 0; run.updateBoss(0.05);
+  assert.ok(run.eshots.filter((s) => s.kind === 'soul').length >= 30);
+});
+
+test('[SV-23] survivor : Lilith se cache parmi ses illusions, qui explosent si on ne les brise pas', () => {
+  const run = new sv.SurvivorRun({});
+  run.hp = 1e9;
+  run.spawnBoss({ kind: 'lilith', hp: 1e5, damage: 1 });
+  const b = run.boss;
+  b.special = 0;
+  run.updateBoss(0.05);
+  const decoys = run.enemies.filter((e) => e.decoy);
+  assert.strictEqual(decoys.length, Rules.SURVIVOR_BOSSES.lilith.decoys);
+  const f = run.frame();
+  assert.strictEqual(f.b.decoys.length, decoys.length, 'les illusions sont dessinées comme Lilith');
+  assert.ok(!f.e.includes(decoys[0].id), 'elles ne passent pas pour des monstres ordinaires');
+  run.damage(decoys[0], 1e6, null);
+  assert.ok(decoys[0].dead);
+  run.t = decoys[1].until + 0.1;
+  b.special = 99;
+  run.updateBoss(0.05);
+  assert.ok(decoys[1].dead && run.areas.some((a) => a.k === 'warn' && a.act === 'slam'), 'une illusion restée en vie explose');
+  // Disparition puis bond
+  b.special = 0; run.updateBoss(0.05);
+  assert.ok(b.hiddenUntil > run.t && run.areas.some((a) => a.act === 'leap'));
+  const hp = b.hp;
+  run.damage(b, 100, null);
+  assert.strictEqual(b.hp, hp);
+  b.special = 0; b.hiddenUntil = 0; run.updateBoss(0.05);
+  assert.ok(run.eshots.filter((s) => s.kind === 'card').length >= 14);
+});
+
+test('[SV-24] survivor : les colonnes de feu de Daedra ne se traversent pas ; fouet et démons de feu', () => {
+  assert.ok(Rules.survivorWallBlock(0, -10, 0, 10, [{ x: -50, y: 0, x2: 50, y2: 0 }]));
+  assert.ok(!Rules.survivorWallBlock(0, -10, 0, -5, [{ x: -50, y: 0, x2: 50, y2: 0 }]));
+  const run = new sv.SurvivorRun({});
+  run.hp = 1e9;
+  run.spawnBoss({ kind: 'daedra', hp: 1e5, damage: 1 });
+  const b = run.boss;
+  b.special = 0;
+  run.updateBoss(0.05);
+  const walls = run.areas.filter((a) => a.k === 'firewall');
+  assert.strictEqual(walls.length, 3);
+  const w = walls[0];
+  // Le joueur essaie de traverser la colonne : il reste de son côté
+  const mx = (w.x + w.x2) / 2;
+  const my = (w.y + w.y2) / 2;
+  const nx = -(w.y2 - w.y);
+  const ny = w.x2 - w.x;
+  const nl = Math.hypot(nx, ny);
+  Object.assign(run.p, { x: mx + (nx / nl) * 3, y: my + (ny / nl) * 3 });
+  run.setPos(mx - (nx / nl) * 3, my - (ny / nl) * 3, 1, 0, 0.1);
+  assert.ok(Math.hypot(run.p.x - (mx + (nx / nl) * 3), run.p.y - (my + (ny / nl) * 3)) < 0.01, 'bloqué par le feu');
+  assert.ok(run.frame().ar.some((a) => a.k === 'firewall' && a.x2 != null));
+  b.special = 0; run.updateBoss(0.05);
+  assert.ok(run.areas.filter((a) => a.act === 'whip').length >= 3, 'fouet : une ligne de flammes');
+  const before = run.enemies.filter((e) => e.kind === 'flammeche').length;
+  b.special = 0; run.updateBoss(0.05);
+  assert.ok(run.enemies.filter((e) => e.kind === 'flammeche').length >= before + 6, 'démons de feu');
+  // Daedra vaincue : ses colonnes s'éteignent
+  run.kill(b);
+  assert.ok(!run.areas.some((a) => a.k === 'firewall'));
 });

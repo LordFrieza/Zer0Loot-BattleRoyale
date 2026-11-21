@@ -936,9 +936,11 @@ function renderSolo() {
       <span class="ic">${B.icon}</span><b>${esc(B.name)}</b>${won ? '<span class="won" title="Vaincu en Héroïque ou Légendaire : peau légendaire débloquée">🏆</span>' : ''}</button>`;
   }).join('');
   $('solo-boss-pick').querySelectorAll('[data-sboss]').forEach((b) => { b.onclick = () => { soloBoss = b.dataset.sboss; renderSolo(); }; });
-  $('solo-diff-pick').innerHTML = Object.entries(Rules.BOSS_CHALLENGE).map(([id, D]) => `<button class="solo-diff ${soloDiff === id ? 'active' : ''}" data-sdiff="${id}">
-      <b>${D.icon} ${D.label}</b><small>Boss ×${String(D.hp).replace('.', ',')} vie · ×${String(D.damage).replace('.', ',')} dégâts</small>
-      <small class="up">${D.reward.gold} 🪙 · ${D.reward.xp} XP · ${D.reward.chests} 🎁</small></button>`).join('');
+  // Difficultés ultimes (Fabuleux, Mythique, Divin) : leurs effets en plus de la vie et des dégâts
+  const ultra = (D) => (D.ultimate ? `<small class="down">attaques spéciales ×${String(D.special).replace('.', ',')} · coups ×${String(D.attackSpeed).replace('.', ',')} · rage à ${D.enrageAt} s · soins −${Math.round((1 - D.healTaken) * 100)} %</small>` : '');
+  $('solo-diff-pick').innerHTML = Object.entries(Rules.BOSS_CHALLENGE).map(([id, D]) => `<button class="solo-diff ${D.ultimate ? 'ultimate' : ''} ${soloDiff === id ? 'active' : ''}" data-sdiff="${id}">
+      <b>${D.icon} ${D.label}</b><small>Boss ×${String(D.hp).replace('.', ',')} vie · ×${String(D.damage).replace('.', ',')} dégâts</small>${ultra(D)}
+      <small class="up">${D.reward.gold} 🪙 · ${D.reward.xp} XP · ${D.reward.chests} 🎁${D.reward.keys ? ` · ${D.reward.keys} 🗝️` : ''}</small></button>`).join('');
   $('solo-diff-pick').querySelectorAll('[data-sdiff]').forEach((b) => { b.onclick = () => { soloDiff = b.dataset.sdiff; renderSolo(); }; });
   renderSoloRun();
 }
@@ -1736,9 +1738,28 @@ function pityToast(r) {
     `À <b>70 %</b> et <b>20 %</b>, elle enferme des héros dans des <b>cocons</b> : brisez-les pour libérer vos alliés (sinon ils cèdent seuls au bout de ${Ma.cocoon.hold} s, après avoir bien souffert).`,
     `À <b>45 %</b>, elle remonte <b>au plafond</b> ${Ma.ceiling.duration} s : pluie de toiles et de venin, et une grosse nuée. Elle redescend plus rapide, et entre en <b>frénésie</b> sous 20 %.`,
   ]);
+  const Et = Rules.BOSSES.ether;
+  const Ll = Rules.BOSSES.lilith;
+  const Da = Rules.BOSSES.daedra;
+  $('boss-others').innerHTML += block(Et, [
+    `${Et.hpBase} PV + ${Et.hpPerPlayer} par combattant (10 → ${exOf('ether')} PV). Insaisissable : il <b>esquive ${pct(Et.dodge)}</b> des coups (la Précision aide beaucoup) et <b>riposte</b> aussitôt une fois sur trois.`,
+    `Toutes les ${String(Et.specialEvery).replace('.', ',')} s : <b>hurlement</b> autour de lui (dégâts et effroi qui ralentit), <b>chaînes spectrales</b> vers quelques héros (ils restent étourdis ${Et.chains.stun} s), puis <b>moisson d'âmes</b> sous leurs pieds (il se soigne de la moitié des dégâts).`,
+    `À <b>70 %</b> et <b>35 %</b>, il devient <b>intangible</b> ${Et.intangible.duration} s : plus rien ne le touche, et des <b>mains spectrales</b> jaillissent sous les héros pour les agripper. Chaque main détruite le fait revenir ${String(Et.intangible.shorten).replace('.', ',')} s plus tôt.`,
+    `À <b>50 %</b>, des <b>feux follets</b> errent dans l'arène et explosent au contact ; sous <b>15 %</b>, il entre en <b>furie</b> (encore plus d'esquive, coups plus rapides).`,
+  ]) + block(Ll, [
+    `${Ll.hpBase} PV + ${Ll.hpPerPlayer} par combattant (10 → ${exOf('lilith')} PV). Rapide, ses griffes touchent aussi les voisins de sa cible.`,
+    `Toutes les ${Ll.specialEvery} s, à tour de rôle : <b>bond</b> sur le héros le plus éloigné, <b>éventail de cartes</b> tranchantes (saignement), <b>disparition</b> (seul son sourire flotte… puis elle frappe dans le dos), et <b>bonneteau</b> : les héros <b>échangent leurs places</b> et restent sonnés un instant.`,
+    `À <b>75 %</b> et <b>40 %</b>, elle se <b>multiplie</b> (${Ll.illusions.counts.join(' puis ')} illusions <b>indiscernables</b>). Brisez-les toutes en ${Ll.illusions.duration} s : elle est <b>étourdie</b> (+${pct(Ll.illusions.dazedTaken - 1)} de dégâts subis). Sinon, elles <b>explosent</b> !`,
+    `À <b>50 %</b>, un <b>chapeau magique</b> fait sortir des chatons tant qu'il tient ; à <b>10 %</b>, sa <b>neuvième vie</b> la relève avec ${pct(Ll.ninelives.heal)} de vie, plus vive que jamais.`,
+  ]) + block(Da, [
+    `${Da.hpBase} PV + ${Da.hpPerPlayer} par combattant (10 → ${exOf('daedra')} PV). Son <b>fouet de feu</b> frappe de très loin et <b>brûle</b>. Des <b>démons de feu</b> arrivent toutes les ${Da.demons.every} s.`,
+    `Toutes les ${String(Da.specialEvery).replace('.', ',')} s : <b>colonnes de feu</b> qui traversent toute l'arène et <b>séparent les héros</b> (impossible de les franchir pendant ${Da.pillars.life} s, elles brûlent), <b>fouet infernal</b> en cône, puis <b>cercle infernal</b> qui enferme un héros avant d'<b>exploser</b>.`,
+    `À <b>66 %</b>, trois <b>portails infernaux</b> s'ouvrent autour d'elle : elle subit <b>${pct(1 - Da.portals.guard)} de dégâts en moins</b> tant qu'ils tiennent, et ils crachent des démons.`,
+    `À <b>33 %</b>, elle s'élève et <b>embrase l'arène</b> ${Da.inferno.duration} s (colonnes de feu partout, pluie de flammes) ; sous <b>15 %</b>, <b>furie</b> : fouet plus long et plus rapide, démons sans arrêt.`,
+  ]);
   $('boss-others').querySelectorAll('.boss-mini').forEach((cv) => {
     const kind = cv.dataset.kind;
-    const conf = { dragon: [66, 76, 0.48], mimic: [62, 90, 0.62], maexxna: [64, 96, 0.5] }[kind] || [60, 84, 0.8];
+    const conf = { dragon: [66, 76, 0.48], mimic: [62, 90, 0.62], maexxna: [64, 96, 0.5], ether: [60, 92, 0.62], lilith: [58, 86, 0.6], daedra: [60, 96, 0.62] }[kind] || [60, 84, 0.8];
     drawMonster(cv.getContext('2d'), conf[0], conf[1], { kind }, { scale: conf[2], t: 0 });
   });
   const RU = Rules.RUSH;

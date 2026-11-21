@@ -92,6 +92,11 @@
   // ---------- Journal des trouvailles ----------
   let logSig = null; // évite de reconstruire le journal (et ses dessins) quand rien n'a changé
   function findText(e) {
+    return findBody(e) + (e.surprise ? ' <span class="muted">(surprise !)</span>' : '');
+  }
+  function findBody(e) {
+    if (e.kind === 'emerald') return `<b class="pet-log-gain emerald">+${e.emeralds.toLocaleString('fr-FR')} <i class="ico-emerald"></i></b>`;
+    if (e.kind === 'ticket') return `<b class="pet-log-gain">+${e.tickets} 🎟️ ticket${e.tickets > 1 ? 's' : ''} de casino</b>`;
     if (e.kind === 'gold') return `<b class="pet-log-gain gold">+${e.gold.toLocaleString('fr-FR')} 🪙</b>`;
     if (e.kind === 'xp') return `<b class="pet-log-gain xp">+${e.xp.toLocaleString('fr-FR')} XP</b>`;
     if (e.kind === 'chest') return `<b class="pet-log-gain">+${e.chests} <i class="ico-chest"></i> coffre${e.chests > 1 ? 's' : ''}</b>`;
@@ -128,6 +133,8 @@
         ${chip(T.xp, `<b>${(T.xp || 0).toLocaleString('fr-FR')}</b> XP`, 'xp')}
         ${chip(T.chests, `<b>${T.chests}</b> <i class="ico-chest"></i>`)}
         ${chip(T.potions, `🧪 <b>${T.potions}</b> potion${T.potions > 1 ? 's' : ''}`)}
+        ${chip(T.emeralds, `<b>${(T.emeralds || 0).toLocaleString('fr-FR')}</b> <i class="ico-emerald"></i>`, 'emerald')}
+        ${chip(T.tickets, `🎟️ <b>${T.tickets}</b> ticket${T.tickets > 1 ? 's' : ''}`)}
         ${chip(T.keys, `🗝️ <b>${T.keys}</b> clé${T.keys > 1 ? 's' : ''}`, 'key')}
         ${chip(T.items, `⚔️ <b>${T.items}</b> objet${T.items > 1 ? 's' : ''}`)}</div>`
       : '';
@@ -166,7 +173,7 @@
     const followMs = Rules.PET.followDays * 24 * 3600 * 1000;
     const finds = P().list.reduce((a, p) => a + (live(p).finds || 0), 0);
     const findValue = Rules.petFindValue(pet.species, pet.level, fx);
-    const findText = S.find === 'gold' ? `${findValue} golds` : S.find === 'xp' ? `${findValue} XP` : S.findLabel;
+    const findText = S.find === 'gold' ? `${findValue} golds` : S.find === 'xp' ? `${findValue} XP` : S.find === 'emerald' ? `${findValue} émeraude${findValue > 1 ? 's' : ''}` : S.findLabel;
     $('pet-side').innerHTML = `
       <div class="pet-card" style="--c:${S.color}">
         <div class="pet-card-head">
@@ -323,6 +330,8 @@
       if (g.kind === 'chest') return `🎁 ${g.chests} coffre${g.chests > 1 ? 's' : ''}`;
       if (g.kind === 'potion') return `${Rules.CONSUMABLES[g.potion].icon} ${Rules.CONSUMABLES[g.potion].label}${g.key ? ' + 🗝️ une Clé de boss !' : ''}`;
       if (g.kind === 'item') return `${Rules.RARITY_INFO[g.item.rarity].label} : ${g.item.name}`;
+      if (g.kind === 'emerald') return `${g.emeralds} émeraude${g.emeralds > 1 ? 's' : ''}`;
+      if (g.kind === 'ticket') return `🎟️ ${g.tickets} ticket${g.tickets > 1 ? 's' : ''} de casino`;
       return '';
     });
     toast(`🐾 Trouvailles : ${lines.join(' · ')}`, 7000);

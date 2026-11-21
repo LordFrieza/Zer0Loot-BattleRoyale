@@ -1,6 +1,7 @@
 /*
  * Dessin des monstres du donjon (gobelin, slime, chauve-souris, squelette) et des boss (Troll, Dragon, Magicien des
- * ténèbres, Mimic, Liche de glace, Maexxna) avec leurs créatures (œufs, dragonnets, cristaux d'ombre, araignées, cocons).
+ * ténèbres, Mimic, Liche de glace, Maexxna, Ether, Lilith, Daedra) avec leurs créatures (œufs, dragonnets, cristaux d'ombre,
+ * araignées, cocons, mains spectrales, feux follets, chapeau et chatons, démons et portails).
  * Même repère que drawFighter : (x, y) au centre du corps, ombre au sol vers y + 18.
  * o = { scale, facing (1|-1), bob, flash (0..1), swing (0..1), t (ms, pour les animations), alpha }
  */
@@ -1072,15 +1073,433 @@
     ctx.restore();
   }
 
+  /*
+   * Ether le Fantôme : un grand drap spectral bleuté au bas qui ondule, yeux creux qui luisent, bouche béante,
+   * chaînes qui traînent. Intangible : il devient presque transparent.
+   */
+  function ether(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const float = Math.sin(t * 2 + (o.seed || 0)) * 6;
+    shadow(ctx, 34, 44);
+    ctx.save();
+    ctx.translate(0, float - 10);
+    if (o.intangible) ctx.globalAlpha *= 0.42 + Math.sin(t * 6) * 0.08;
+    const halo = ctx.createRadialGradient(0, -24, 10, 0, -24, 82);
+    halo.addColorStop(0, 'rgba(190,210,255,.38)');
+    halo.addColorStop(1, 'rgba(190,210,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(0, -24, 82, 0, Math.PI * 2); ctx.fill();
+    // chaînes qui traînent derrière lui
+    ctx.strokeStyle = 'rgba(120,130,165,.85)';
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 6; k++) {
+        const x = side * (18 + k * 7);
+        const y = 4 + k * 6 + Math.sin(t * 3 + k + side) * 2;
+        ctx.beginPath(); ctx.ellipse(x, y, 4, 2.6, side * 0.6 + k * 0.3, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+    // le drap
+    const body = ctx.createLinearGradient(0, -82, 0, 40);
+    body.addColorStop(0, '#f6f8ff');
+    body.addColorStop(0.55, '#cbd6ff');
+    body.addColorStop(1, 'rgba(150,170,240,0.25)');
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.moveTo(-35, 2);
+    ctx.bezierCurveTo(-40, -52, -22, -82, 0, -84);
+    ctx.bezierCurveTo(22, -82, 40, -52, 35, 2);
+    for (let i = 0; i <= 7; i++) {
+      const x = 35 - i * 10;
+      const y = 26 + Math.sin(t * 4 + i * 1.3) * 5 + (i % 2 ? -7 : 5);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,110,180,.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // bras spectraux (levés pour frapper)
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(side * 30, -34);
+      ctx.rotate(side * (0.5 + swing * 0.9));
+      ctx.fillStyle = '#dde5ff';
+      ctx.beginPath(); ctx.ellipse(side * 6, 12, 8, 19, side * 0.25, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#eef2ff';
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.ellipse(side * 6 + k * 4, 32, 2.2, 6, k * 0.25, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
+    // visage : orbites creuses, yeux qui luisent, bouche béante
+    ctx.fillStyle = '#121833';
+    ctx.beginPath(); ctx.ellipse(-12, -52, 8, 11, -0.1, 0, Math.PI * 2); ctx.ellipse(12, -52, 8, 11, 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -28, 9, 12 + swing * 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#7fb0ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#cfe6ff';
+    ctx.beginPath(); ctx.arc(-11, -51, 2.6, 0, Math.PI * 2); ctx.arc(13, -51, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -30, 36, 56, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  // Main spectrale (Ether) : elle jaillit du sol, doigts crochus, et tremble.
+  function main(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const wob = Math.sin(t * 7 + (o.seed || 0)) * 0.12;
+    ctx.fillStyle = 'rgba(40,50,90,.45)';
+    ctx.beginPath(); ctx.ellipse(0, 16, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(0, 14);
+    ctx.rotate(wob);
+    ctx.globalAlpha *= 0.85;
+    const g = ctx.createLinearGradient(0, 0, 0, -44);
+    g.addColorStop(0, 'rgba(150,170,240,.3)');
+    g.addColorStop(1, '#e6ecff');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-7, -26); ctx.lineTo(7, -26); ctx.lineTo(6, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -30, 10, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#eef2ff';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3.4;
+    for (let k = 0; k < 4; k++) {
+      const a = -1.9 + k * 0.42 + Math.sin(t * 6 + k) * 0.08;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 7, -32 + Math.sin(a) * 6);
+      ctx.quadraticCurveTo(Math.cos(a) * 14, -38 + Math.sin(a) * 10, Math.cos(a) * 16 + 2, -34 + Math.sin(a) * 15);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(8, -28); ctx.quadraticCurveTo(15, -27, 15, -21); ctx.stroke();
+    ctx.restore();
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -14, 12, 20, 0, 0, Math.PI * 2); ctx.fill(); });
+  }
+
+  // Feu follet (Ether) : petite flamme bleue qui erre, avec deux yeux.
+  function feuFollet(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const f = Math.sin(t * 9 + (o.seed || 0));
+    ctx.save();
+    ctx.translate(0, -6 + Math.sin(t * 3 + (o.seed || 0)) * 3);
+    ctx.shadowColor = '#6fd8ff';
+    ctx.shadowBlur = 16;
+    const g = ctx.createRadialGradient(0, 2, 1, 0, -2, 16);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.45, '#8fe8ff');
+    g.addColorStop(1, 'rgba(60,140,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(0, -20 - f * 3); ctx.quadraticCurveTo(12, -4, 8, 6); ctx.quadraticCurveTo(0, 14, -8, 6); ctx.quadraticCurveTo(-12, -4, 0, -20 - f * 3); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#123';
+    ctx.beginPath(); ctx.arc(-3, -4, 1.4, 0, Math.PI * 2); ctx.arc(3, -4, 1.4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Sourire du chat (Lilith) : grand croissant sombre bordé de dents blanches.
+  function grin(ctx, x, y, k = 1) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(k, k);
+    ctx.fillStyle = '#2a0a18';
+    ctx.beginPath(); ctx.moveTo(-24, -4); ctx.quadraticCurveTo(0, 18, 24, -4); ctx.quadraticCurveTo(0, 6, -24, -4); ctx.fill();
+    ctx.fillStyle = '#fffaf0';
+    for (let i = 0; i < 9; i++) {
+      const tx = -21 + i * 5.2;
+      const ty = -2.4 + Math.pow((tx / 24), 2) * -3 + 3.2;
+      ctx.beginPath(); ctx.moveTo(tx - 2.2, ty - 1.2); ctx.lineTo(tx, ty + 3.4); ctx.lineTo(tx + 2.2, ty - 1.2); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function catEyes(ctx, x, y, k = 1) {
+    ctx.save();
+    ctx.shadowColor = '#ffd34a';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffe14a';
+    ctx.beginPath(); ctx.ellipse(x - 11 * k, y, 7 * k, 5.5 * k, -0.15, 0, Math.PI * 2); ctx.ellipse(x + 11 * k, y, 7 * k, 5.5 * k, 0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#140808';
+    ctx.beginPath(); ctx.ellipse(x - 10 * k, y, 1.6 * k, 5 * k, 0, 0, Math.PI * 2); ctx.ellipse(x + 12 * k, y, 1.6 * k, 5 * k, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /*
+   * Lilith le Chat : grosse chatte tricolore (marron, noir et blanc) au sourire immense façon Cheshire, longue
+   * queue rayée qui ondule. Disparue : on ne voit plus que son sourire et ses yeux. Étourdie : des étoiles tournent.
+   */
+  function lilith(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const BR = '#8a5a2e';
+    const BK = '#221812';
+    const WH = '#f3ead8';
+    if (o.vanish) {
+      ctx.save();
+      ctx.globalAlpha *= 0.75 + Math.sin(t * 5) * 0.2;
+      ctx.translate(0, -40 + Math.sin(t * 2) * 4);
+      catEyes(ctx, 4, -14, 1);
+      grin(ctx, 4, 8, 1.15);
+      ctx.restore();
+      return;
+    }
+    if (!o.kitten) shadow(ctx, 38, 40);
+    ctx.save();
+    // queue rayée
+    ctx.lineCap = 'round';
+    const tw = Math.sin(t * 2.5) * 8;
+    ctx.strokeStyle = BK;
+    ctx.lineWidth = 11;
+    ctx.beginPath(); ctx.moveTo(-30, 14); ctx.bezierCurveTo(-60, 10, -58 + tw, -30, -40 + tw, -56); ctx.stroke();
+    ctx.strokeStyle = BR;
+    ctx.setLineDash([9, 9]);
+    ctx.beginPath(); ctx.moveTo(-30, 14); ctx.bezierCurveTo(-60, 10, -58 + tw, -30, -40 + tw, -56); ctx.stroke();
+    ctx.setLineDash([]);
+    // pattes arrière
+    ctx.fillStyle = BR;
+    ctx.beginPath(); ctx.ellipse(-22, 26, 12, 14, 0, 0, Math.PI * 2); ctx.fill();
+    // corps
+    ctx.fillStyle = BR;
+    ctx.beginPath(); ctx.ellipse(-2, 8, 36, 26, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = BK;
+    ctx.beginPath(); ctx.ellipse(-16, -2, 14, 11, 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = WH;
+    ctx.beginPath(); ctx.ellipse(6, 18, 20, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(30,20,12,.4)';
+    ctx.lineWidth = 2;
+    for (const x of [-26, -18, -10]) { ctx.beginPath(); ctx.moveTo(x, -12); ctx.lineTo(x + 3, 2); ctx.stroke(); }
+    // pattes avant (l'une se lève pour griffer)
+    ctx.fillStyle = WH;
+    ctx.beginPath(); ctx.ellipse(4, 34, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(20, 22);
+    ctx.rotate(-swing * 1.3);
+    ctx.fillStyle = BR;
+    ctx.beginPath(); ctx.ellipse(0, 4, 7, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = WH;
+    ctx.beginPath(); ctx.ellipse(0, 14, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (swing > 0.2) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 3, 18); ctx.lineTo(k * 4, 23); ctx.stroke(); } }
+    ctx.restore();
+    // tête
+    const hx = 16;
+    const hy = -30;
+    ctx.fillStyle = BR;
+    ctx.beginPath(); ctx.arc(hx, hy, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = BK;
+    ctx.beginPath(); ctx.ellipse(hx - 12, hy - 14, 15, 11, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = WH;
+    ctx.beginPath(); ctx.ellipse(hx + 2, hy + 12, 20, 13, 0, 0, Math.PI * 2); ctx.fill();
+    // oreilles
+    for (const [ex, dir, col] of [[hx - 16, -1, BK], [hx + 16, 1, BR]]) {
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(ex - 10, hy - 18); ctx.lineTo(ex + dir * 4, hy - 48); ctx.lineTo(ex + 10, hy - 20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e9a0b8';
+      ctx.beginPath(); ctx.moveTo(ex - 5, hy - 20); ctx.lineTo(ex + dir * 3, hy - 40); ctx.lineTo(ex + 5, hy - 21); ctx.closePath(); ctx.fill();
+    }
+    catEyes(ctx, hx, hy - 6, 1);
+    grin(ctx, hx + 1, hy + 10, 0.85);
+    ctx.fillStyle = '#e07a9a';
+    ctx.beginPath(); ctx.moveTo(hx - 3, hy + 2); ctx.lineTo(hx + 3, hy + 2); ctx.lineTo(hx, hy + 5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.8)';
+    ctx.lineWidth = 1;
+    for (const dy of [4, 8]) {
+      ctx.beginPath(); ctx.moveTo(hx + 18, hy + dy); ctx.lineTo(hx + 40, hy + dy - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx - 16, hy + dy); ctx.lineTo(hx - 38, hy + dy - 3); ctx.stroke();
+    }
+    if (o.dazed) {
+      ctx.fillStyle = '#ffe14a';
+      ctx.font = '14px "Segoe UI Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      for (let k = 0; k < 3; k++) { const a = t * 4 + (k / 3) * Math.PI * 2; ctx.fillText('⭐', hx + Math.cos(a) * 30, hy - 40 + Math.sin(a) * 8); }
+    }
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(-2, 8, 36, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(hx, hy, 30, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  // Chaton (chapeau de Lilith) : une Lilith miniature.
+  function chaton(ctx, o) {
+    shadow(ctx, 11, 14);
+    ctx.save();
+    ctx.translate(0, 8);
+    ctx.scale(0.3, 0.3);
+    lilith(ctx, Object.assign({}, o, { kitten: true, dazed: false, vanish: false }));
+    ctx.restore();
+  }
+
+  // Chapeau magique (Lilith) : haut-de-forme noir à ruban rose, d'où sortent les chatons.
+  function chapeau(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const hop = Math.abs(Math.sin(t * 3)) * 4;
+    shadow(ctx, 22, 16);
+    ctx.save();
+    ctx.translate(0, -hop);
+    ctx.fillStyle = '#16121c';
+    ctx.beginPath(); ctx.ellipse(0, 10, 26, 7, 0, 0, Math.PI * 2); ctx.fill();
+    rr(ctx, -16, -30, 32, 40, 4); ctx.fill();
+    ctx.fillStyle = '#ff5fd2';
+    ctx.fillRect(-16, 0, 32, 6);
+    ctx.fillStyle = 'rgba(255,255,255,.18)';
+    ctx.fillRect(-12, -28, 5, 26);
+    ctx.fillStyle = '#ffe680';
+    for (let k = 0; k < 4; k++) { const a = t * 2 + k * 1.6; const r = 22 + Math.sin(t * 3 + k) * 4; ctx.beginPath(); ctx.arc(Math.cos(a) * r, -18 + Math.sin(a) * 10, 1.8, 0, Math.PI * 2); ctx.fill(); }
+    flashOver(ctx, o.flash, () => { rr(ctx, -16, -30, 32, 40, 4); ctx.fill(); });
+    ctx.restore();
+  }
+
+  /*
+   * Daedra la Succube : peau rouge, longs cheveux noirs, cornes, ailes membraneuses et queue de démon, tenue de
+   * latex noir lustrée (corset et cuissardes), fouet de feu à la main.
+   */
+  function daedra(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const swing = o.swing || 0;
+    const float = Math.sin(t * 2) * 2;
+    const SKIN = '#c8303e';
+    const LATEX = '#0e0a12';
+    shadow(ctx, 28, 42);
+    ctx.save();
+    ctx.translate(0, float);
+    // ailes
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(side * 6, -50);
+      ctx.rotate(side * (0.3 + Math.sin(t * 3) * 0.12));
+      ctx.fillStyle = '#3a0a14';
+      ctx.strokeStyle = '#ff4a2a';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(side * 56, -36); ctx.lineTo(side * 64, -14);
+      ctx.quadraticCurveTo(side * 50, -10, side * 54, 6); ctx.quadraticCurveTo(side * 40, 0, side * 38, 16); ctx.quadraticCurveTo(side * 24, 6, side * 14, 18);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      for (const [x, y] of [[56, -36], [54, 6], [38, 16]]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(side * x, y); ctx.stroke(); }
+      ctx.restore();
+    }
+    // queue de démon
+    const tw = Math.sin(t * 3) * 6;
+    ctx.strokeStyle = SKIN;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-4, 0); ctx.bezierCurveTo(-30, 12, -44, 20 + tw, -40, -6 + tw); ctx.stroke();
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.moveTo(-40, -6 + tw); ctx.lineTo(-48, -14 + tw); ctx.lineTo(-34, -12 + tw); ctx.closePath(); ctx.fill();
+    // cheveux (derrière)
+    ctx.fillStyle = '#16080e';
+    ctx.beginPath(); ctx.moveTo(-14, -74); ctx.quadraticCurveTo(-24, -40, -16, -18); ctx.lineTo(16, -18); ctx.quadraticCurveTo(24, -40, 14, -74); ctx.closePath(); ctx.fill();
+    // cuissardes de latex
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = SKIN;
+      ctx.beginPath(); ctx.moveTo(side * 3, -4); ctx.lineTo(side * 13, -4); ctx.lineTo(side * 12, 8); ctx.lineTo(side * 4, 8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = LATEX;
+      ctx.beginPath(); ctx.moveTo(side * 4, 6); ctx.lineTo(side * 12, 6); ctx.lineTo(side * 11, 36); ctx.lineTo(side * 15, 40); ctx.lineTo(side * 3, 40); ctx.lineTo(side * 5, 36); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,200,230,.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(side * 8, 10); ctx.lineTo(side * 8, 32); ctx.stroke();
+    }
+    // corset et jupe de latex, laçage rouge
+    const lx = ctx.createLinearGradient(-14, 0, 14, 0);
+    lx.addColorStop(0, LATEX); lx.addColorStop(0.5, '#2a2434'); lx.addColorStop(1, LATEX);
+    ctx.fillStyle = lx;
+    ctx.beginPath(); ctx.moveTo(-12, -46); ctx.quadraticCurveTo(0, -42, 12, -46); ctx.lineTo(10, -22); ctx.lineTo(16, -2); ctx.lineTo(-16, -2); ctx.lineTo(-10, -22); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#ff4a5a';
+    ctx.lineWidth = 0.9;
+    for (let y = -40; y <= -24; y += 4) { ctx.beginPath(); ctx.moveTo(-3, y); ctx.lineTo(3, y + 2); ctx.moveTo(3, y); ctx.lineTo(-3, y + 2); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(220,220,255,.4)';
+    ctx.beginPath(); ctx.moveTo(-8, -44); ctx.quadraticCurveTo(-10, -30, -7, -22); ctx.stroke();
+    // épaules, bras (gauche sur la hanche, droit au fouet)
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.ellipse(-13, -46, 5, 4, 0, 0, Math.PI * 2); ctx.ellipse(13, -46, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = SKIN;
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-14, -44); ctx.quadraticCurveTo(-22, -32, -12, -22); ctx.stroke();
+    ctx.save();
+    ctx.translate(14, -44);
+    ctx.rotate(-0.4 - swing * 1.4);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(12, 18); ctx.stroke();
+    // fouet : enroulé au repos, déployé en frappant, braises au bout
+    ctx.translate(12, 18);
+    if (swing > 0.15) ctx.rotate(0.4 + swing * 1.4); // le fouet claque vers l'avant, à l'horizontale
+    ctx.strokeStyle = '#2a1408';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    if (swing > 0.15) { ctx.moveTo(0, 0); ctx.quadraticCurveTo(30, -10, 70 * swing + 20, 6 + Math.sin(t * 20) * 4); } else { ctx.moveTo(0, 0); ctx.bezierCurveTo(10, 12, -6, 22, 4, 26); ctx.arc(2, 22, 6, 0.5, Math.PI * 2.3); }
+    ctx.stroke();
+    if (swing > 0.15) {
+      ctx.save(); ctx.shadowColor = '#ff6a1f'; ctx.shadowBlur = 12; ctx.fillStyle = '#ffb347';
+      ctx.beginPath(); ctx.arc(70 * swing + 20, 6, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    ctx.restore();
+    // tête
+    ctx.fillStyle = SKIN;
+    ctx.fillRect(-3, -54, 6, 6);
+    ctx.beginPath(); ctx.ellipse(0, -64, 10, 12, 0, 0, Math.PI * 2); ctx.fill();
+    // cornes
+    ctx.fillStyle = '#120608';
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 5, -73); ctx.quadraticCurveTo(d * 16, -82, d * 12, -94); ctx.quadraticCurveTo(d * 10, -84, d * 1, -75); ctx.closePath(); ctx.fill(); }
+    // frange
+    ctx.fillStyle = '#16080e';
+    ctx.beginPath(); ctx.moveTo(-11, -66); ctx.quadraticCurveTo(-8, -80, 4, -76); ctx.quadraticCurveTo(12, -74, 11, -62); ctx.quadraticCurveTo(4, -70, -11, -66); ctx.fill();
+    // yeux dorés et lèvres sombres
+    ctx.save();
+    ctx.shadowColor = '#ffcf3a'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ffd84a';
+    ctx.beginPath(); ctx.ellipse(-4, -64, 2.4, 1.4, -0.2, 0, Math.PI * 2); ctx.ellipse(5, -64, 2.4, 1.4, 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#5a0810';
+    ctx.beginPath(); ctx.ellipse(1, -57, 3, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -30, 18, 50, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  // Démon de feu (Daedra) : petit diablotin rouge aux cornes, entouré de flammes.
+  function demon(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    const hop = Math.abs(Math.sin(t * 8 + (o.seed || 0))) * 3;
+    shadow(ctx, 12, 16);
+    ctx.save();
+    ctx.translate(0, -hop);
+    const fl = ctx.createRadialGradient(0, 0, 2, 0, -2, 22);
+    fl.addColorStop(0, 'rgba(255,200,80,.6)'); fl.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = fl;
+    ctx.beginPath(); ctx.arc(0, -2, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d42a2a';
+    ctx.beginPath(); ctx.ellipse(0, 4, 10, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -10, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a0606';
+    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(d * 4, -16); ctx.lineTo(d * 10, -24); ctx.lineTo(d * 7, -14); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = '#ffe14a';
+    ctx.beginPath(); ctx.arc(-3, -11, 1.8, 0, Math.PI * 2); ctx.arc(4, -11, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9a3d';
+    for (let k = 0; k < 3; k++) { const p = ((t * 2 + k / 3) % 1); ctx.globalAlpha = 1 - p; ctx.beginPath(); ctx.arc(Math.sin(k * 2 + t * 5) * 7, -18 - p * 14, 3 * (1 - p) + 1, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, -2, 11, 18, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  // Portail infernal (Daedra) : anneau de feu qui tourbillonne et crache des démons.
+  function portail(ctx, o) {
+    const t = (o.t || 0) / 1000;
+    ctx.save();
+    ctx.translate(0, -18);
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 34);
+    g.addColorStop(0, '#1a0004'); g.addColorStop(0.6, '#5a0812'); g.addColorStop(1, 'rgba(255,80,20,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, 28, 36, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 3;
+    for (let k = 0; k < 3; k++) {
+      ctx.strokeStyle = ['#ff4a2a', '#ff9a3d', '#ffd84a'][k];
+      ctx.beginPath(); ctx.ellipse(0, 0, 26 - k * 6, 34 - k * 8, 0, t * (2 + k) + k, t * (2 + k) + k + Math.PI * 1.3); ctx.stroke();
+    }
+    ctx.shadowColor = '#ff4a2a'; ctx.shadowBlur = 16;
+    ctx.strokeStyle = '#ff6a3a';
+    ctx.beginPath(); ctx.ellipse(0, 0, 28, 36, 0, 0, Math.PI * 2); ctx.stroke();
+    flashOver(ctx, o.flash, () => { ctx.beginPath(); ctx.ellipse(0, 0, 28, 36, 0, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
     const f = (c) => Math.max(0, Math.min(255, Math.round(k >= 0 ? c + (255 - c) * k : c * (1 + k))));
     return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => f(c).toString(16).padStart(2, '0')).join('');
   }
 
-  const DRAW = { gobelin, gobelin_violet: gobelinViolet, rat, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan, mimic, liche, maexxna, araignee, cocon };
+  const DRAW = { gobelin, gobelin_violet: gobelinViolet, rat, slime, chauve_souris: bat, squelette, troll, dragon, sorcier, dragonnet, oeuf, cristal, flammeche, cristal_clan: cristalClan, mimic, liche, maexxna, araignee, cocon, ether, main, feu_follet: feuFollet, lilith, chaton, chapeau, daedra, demon, portail };
   // Les boss ont leur propre échelle (dessin « taille réelle »), les autres suivent m.scale (chefs du donjon).
-  const BOSS_KINDS = ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna'];
+  const BOSS_KINDS = ['troll', 'dragon', 'sorcier', 'mimic', 'liche', 'maexxna', 'ether', 'lilith', 'daedra'];
 
   function drawMonster(ctx, x, y, m, o = {}) {
     const draw = DRAW[m.kind];
@@ -1103,6 +1522,7 @@
   const PET_DRAW = {
     troll: { scale: 0.42, lift: 24 }, dragon: { scale: 0.36, lift: 16 }, sorcier: { scale: 0.46, lift: 18 },
     mimic: { scale: 0.42, lift: 16 }, liche: { scale: 0.46, lift: 18 }, maexxna: { scale: 0.4, lift: 6 },
+    ether: { scale: 0.42, lift: 20 }, lilith: { scale: 0.42, lift: 14 }, daedra: { scale: 0.44, lift: 18 },
   };
   function drawPet(ctx, x, y, species, o = {}) {
     const P = PET_DRAW[species];

@@ -23,6 +23,7 @@
   const BOSS_DRAW = {
     troll: { scale: 1.35, lift: 40 }, dragon: { scale: 1.2, lift: 34 }, sorcier: { scale: 1.25, lift: 26 },
     mimic: { scale: 1.2, lift: 22 }, liche: { scale: 1.25, lift: 26 }, maexxna: { scale: 1.15, lift: 6 },
+    ether: { scale: 1.2, lift: 30 }, lilith: { scale: 1.15, lift: 18 }, daedra: { scale: 1.2, lift: 22 },
   };
   const FLY_HEIGHT = 150; // le Dragon en vol plane au-dessus de son ombre
   const isBossKind = (f) => !!BOSS_DRAW[f.kind];
@@ -42,8 +43,12 @@
   }
   const TINTS = { copie: 'sepia(0.7) saturate(1.8) hue-rotate(-12deg) brightness(1.08)', serviteur: 'grayscale(0.7) hue-rotate(170deg) saturate(2.2) brightness(1.15)' };
   // Couleur des zones d'impact selon l'attaque
-  const SLAM_RGB = { void: '170,80,255', rock: '255,150,40', leap: '255,170,60', spike: '120,220,255', nova: '120,220,255', lance: '140,230,255', frosttrap: '140,230,255', webshot: '235,235,245', webrain: '235,235,245', spray: '120,230,70' };
-  const CONE_KINDS = ['cone', 'vomit', 'spray'];
+  const SLAM_RGB = {
+    void: '170,80,255', rock: '255,150,40', leap: '255,170,60', spike: '120,220,255', nova: '120,220,255', lance: '140,230,255', frosttrap: '140,230,255', webshot: '235,235,245', webrain: '235,235,245', spray: '120,230,70',
+    wail: '170,190,255', chain: '190,205,255', soul: '120,255,200', claw: '255,120,200', cards: '255,90,170', pop: '255,130,230',
+    pillar: '255,90,30', lash: '255,60,50', firering: '255,110,30', ringblast: '255,70,20', hellfire: '255,80,20', hellland: '255,130,40',
+  };
+  const CONE_KINDS = ['cone', 'vomit', 'spray', 'cards', 'lash'];
 
   function hexRgb(hex) {
     const n = parseInt(hex.slice(1), 16);
@@ -445,7 +450,7 @@
         }
         // Projectiles (archer, mage) : purement visuels, les dégâts sont déjà calculés.
         if ((e.t === 'hit' || e.t === 'dodge') && e.proj && from && to) {
-          this.projectiles.push({ x0: from.x, y0: from.y - (from.kind === 'cristal_clan' ? 50 : 12), x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' || e.proj === 'shadow' || e.proj === 'ice' ? 0.3 : 0.16, kind: e.proj, color: from.clan && Rules.CLANS.teams[from.clan].color });
+          this.projectiles.push({ x0: from.x + (e.proj === 'whip' ? 30 * (to.x > from.x ? 1 : -1) : 0), y0: from.y - (from.kind === 'cristal_clan' ? 50 : e.proj === 'whip' ? 60 : 12), x1: to.x, y1: to.y - 12, t: 0, dur: e.proj === 'fire' || e.proj === 'shadow' || e.proj === 'ice' ? 0.3 : e.proj === 'whip' ? 0.22 : 0.16, kind: e.proj, color: from.clan && Rules.CLANS.teams[from.clan].color });
           const now = performance.now();
           if (window.Sound && now - this.lastShotSound > 110) { this.lastShotSound = now; Sound.play('shoot', e.proj); }
         }
@@ -484,6 +489,28 @@
           (this.gushes = this.gushes || []).push({ x: e.x, y: e.y, r: e.r, a: s.a || 0, half: s.half || 0.45, icon: L ? L.icon : '💥', color: L ? L.color : '#fff', life: 0.9, seed: Math.random() * 100, bile: e.kind === 'spray' || e.loot === 'bile' });
           this.shake = Math.max(this.shake || 0, 0.3);
           if (window.Sound) Sound.play(e.kind === 'spray' ? 'voidBlast' : 'slam');
+        } else if (e.t === 'slam' && ['wail', 'chain', 'soul', 'claw', 'pop', 'wispboom'].includes(e.kind)) {
+          // Attaques d'Ether et de Lilith
+          const col = { wail: '#c9d4ff', chain: '#dfe6ff', soul: '#8fffd0', claw: '#ff9ae0', pop: '#ffb8ea', wispboom: '#8fe8ff' }[e.kind];
+          if (e.kind === 'chain' && e.tx != null) this.beams.push({ path: [{ x: e.x, y: e.y - 40 }, { x: e.tx, y: e.ty - 20 }], width: 6, color: '#c9d4ff', t: 0, dur: 0.5 });
+          else this.blasts.push({ x: e.x, y: e.y, r: e.r, life: 0.5, color: e.kind === 'wail' || e.kind === 'soul' || e.kind === 'wispboom' ? 'void' : 'dust' });
+          this.spark(e.x, e.y - 10, col, e.kind === 'wail' ? 40 : 22);
+          this.shake = Math.max(this.shake || 0, e.kind === 'wail' ? 0.45 : 0.25);
+          if (window.Sound) Sound.play(e.kind === 'wail' ? 'roar' : e.kind === 'claw' || e.kind === 'pop' ? 'slam' : 'voidBlast', e.kind === 'wail');
+        } else if (e.t === 'slam' && ['cards', 'lash'].includes(e.kind)) {
+          // Éventail de cartes de Lilith, fouet infernal de Daedra : gerbe le long du cône
+          const s = (this.frame && this.frame.slams || []).find((x) => x.kind === e.kind) || {};
+          (this.gushes = this.gushes || []).push({ x: e.x, y: e.y, r: e.r, a: s.a || 0, half: s.half || 0.5, icon: e.kind === 'cards' ? '🃏' : '🔥', color: e.kind === 'cards' ? '#ff8fd8' : '#ff6a2a', life: 0.9, seed: Math.random() * 100 });
+          this.shake = Math.max(this.shake || 0, 0.3);
+          if (window.Sound) Sound.play(e.kind === 'cards' ? 'cardDeal' : 'fireBreath');
+        } else if (e.t === 'slam' && ['pillar', 'firering', 'ringblast', 'hellfire', 'hellland'].includes(e.kind)) {
+          // Feu de Daedra
+          if (e.kind === 'pillar' && e.tx != null) {
+            for (let k = 0; k <= 10; k++) { const x = e.x + (e.tx - e.x) * k / 10; const y = e.y + (e.ty - e.y) * k / 10; if (x > -40 && y > -40 && x < W + 40 && y < H + 40) this.spark(x, y - 20, '#ff8a3a', 10); }
+          } else this.blasts.push({ x: e.x, y: e.y, r: e.r * (e.kind === 'firering' ? 1.1 : 1), life: 0.55 });
+          this.spark(e.x, e.y - 10, '#ff6a2a', 30);
+          this.shake = Math.max(this.shake || 0, e.kind === 'hellland' || e.kind === 'ringblast' ? 0.7 : 0.4);
+          if (window.Sound) Sound.play(e.kind === 'pillar' ? 'fireBreath' : 'meteor');
         } else if (e.t === 'slam' && e.kind === 'lance') {
           const tx = e.tx != null ? e.tx : e.x + 600;
           const ty = e.ty != null ? e.ty : e.y;
@@ -651,10 +678,33 @@
           if (window.Sound) Sound.play('roar', true);
         } else if (e.t === 'clones') {
           this.announces.push({ text: '🪞 IL SE DÉDOUBLE !', sub: 'Trouvez le vrai Magicien parmi ses illusions !', subSize: 24, color: '#b06bff', life: 3, age: 0 });
+        } else if (e.t === 'hands') {
+          this.floaters.push({ x: W / 2, y: 150, text: `✋ ${e.count > 1 ? `${e.count} mains spectrales jaillissent` : 'Une main spectrale jaillit'} du sol !`, color: '#c9d4ff', life: 1.6, size: 18 });
+          if (window.Sound) Sound.play('curse');
+        } else if (e.t === 'handDown') {
+          this.spark(e.x, e.y - 20, '#dfe6ff', 20);
+          this.floaters.push({ x: e.x, y: e.y - 60, text: '−1,2 s', color: '#c9d4ff', life: 1, size: 13 });
+        } else if (e.t === 'counter' && from) {
+          this.floaters.push({ x: from.x, y: from.y - 120, text: '👻 Riposte !', color: '#c9d4ff', life: 1, size: 14 });
+        } else if (e.t === 'shuffleWarn') {
+          this.announces.push({ text: '🎩 BONNETEAU !', sub: 'Lilith va échanger vos places…', subSize: 22, color: '#ff8fd8', life: Math.max(1.4, e.duration), age: 0 });
+          if (window.Sound) Sound.play('cupShuffle');
+        } else if (e.t === 'shuffle') {
+          this.shake = Math.max(this.shake || 0, 0.4);
+          if (window.Sound) Sound.play('blink');
+        } else if (e.t === 'illusionPop') {
+          this.spark(e.x, e.y - 30, '#ff9ae0', 26);
+          this.floaters.push({ x: e.x, y: e.y - 80, text: '💨 Illusion !', color: '#ffb8ea', life: 1.2, size: 14 });
+        } else if (e.t === 'kittens') {
+          this.spark(e.x, e.y - 30, '#ffe680', 14);
+        } else if (e.t === 'demons') {
+          this.floaters.push({ x: W / 2, y: 150, text: `😈 ${e.count} démon${e.count > 1 ? 's' : ''} de feu surgi${e.count > 1 ? 'ssent' : 't'} !`, color: '#ff8a6a', life: 1.6, size: 18 });
         } else if (e.t === 'blink') {
           const dd = this.disp.get(e.to);
-          this.spark(e.fx, e.fy - 40, '#b06bff', 26);
-          this.spark(e.x, e.y - 40, '#e3c4ff', 26);
+          const col = e.shuffle ? '#ff9ae0' : '#b06bff';
+          this.spark(e.fx, e.fy - 40, col, 26);
+          this.spark(e.x, e.y - 40, e.shuffle ? '#ffd6f3' : '#e3c4ff', 26);
+          if (e.shuffle) this.beams.push({ path: [{ x: e.fx, y: e.fy - 20 }, { x: e.x, y: e.y - 20 }], width: 3, color: '#ff9ae0', t: 0, dur: 0.4 });
           if (dd) { dd.x = e.x; dd.y = e.y; }
           if (window.Sound) Sound.play('blink');
         } else if (e.t === 'curse' && to) {
@@ -937,6 +987,7 @@
         ctx.restore();
       }
 
+      this.drawFireWalls(f, t);
       // Attaques spéciales des boss : zone d'impact au sol qui se remplit (cercle, ou cône pour le souffle du Dragon)
       for (const s of f.slams || []) {
         const blink = 0.55 + Math.sin(t / 60) * 0.3;
@@ -947,8 +998,17 @@
         ctx.strokeStyle = `rgba(${rgb},${blink})`;
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 8]);
-        if (s.kind === 'lance' && s.tx != null) {
-          // Lance de givre : couloir annoncé au sol, qui se remplit
+        if (s.band) {
+          // Cercle infernal : anneau de feu annoncé autour du héros
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r + s.band / 2, (s.r + s.band / 2) * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r - s.band / 2, (s.r - s.band / 2) * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.strokeStyle = `rgba(${rgb},${0.15 + s.p * 0.45})`;
+          ctx.lineWidth = s.band * s.p;
+          ctx.beginPath(); ctx.ellipse(s.x, s.y + 10, s.r, s.r * 0.75, 0, 0, Math.PI * 2); ctx.stroke();
+        } else if (s.tx != null && s.w) {
+          // Couloir annoncé au sol (lance de givre, chaînes d'Ether, colonnes de feu de Daedra), qui se remplit
           const ang = Math.atan2(s.ty - s.y, s.tx - s.x);
           const len = Math.hypot(s.tx - s.x, s.ty - s.y);
           ctx.translate(s.x, s.y + 10);
@@ -1043,7 +1103,7 @@
         const d = this.disp.get(fi.key);
         if (!d) continue;
         if (fi.key === 'boss') { this.drawBossDeath(dt, t, d, fi); continue; }
-        if (fi.clone || fi.kind === 'oeuf' || fi.kind === 'cristal' || fi.kind === 'cocon') continue; // illusions, œufs, cristaux et cocons disparaissent
+        if (fi.clone || isBossKind(fi) || ['oeuf', 'cristal', 'cocon', 'main', 'feu_follet', 'chapeau', 'portail'].includes(fi.kind)) continue; // illusions, œufs, cristaux, cocons, mains, feux follets, chapeau et portails disparaissent
         d.deathT = Math.min(1, d.deathT + dt * 2);
         ctx.save();
         ctx.globalAlpha = 0.35;
@@ -1106,7 +1166,7 @@
 
       // Rochers lancés par le Troll, boules de feu crachées par le Dragon en vol
       for (const s of f.slams || []) {
-        if ((s.kind !== 'rock' && s.kind !== 'fireball' && s.kind !== 'webshot' && s.kind !== 'webrain') || s.fx == null) continue;
+        if ((s.kind !== 'rock' && s.kind !== 'fireball' && s.kind !== 'hellfire' && s.kind !== 'webshot' && s.kind !== 'webrain') || s.fx == null) continue;
         const p = Math.min(1, s.p + (performance.now() - this.frameAt) / 1000 / s.w);
         const rx = s.fx + (s.x - s.fx) * p;
         const ry = s.fy + (s.y - s.fy) * p - Math.sin(p * Math.PI) * (s.kind === 'rock' ? 220 : 60);
@@ -1124,7 +1184,7 @@
           ctx.lineWidth = 1;
           ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(11, 0); ctx.moveTo(0, -11); ctx.lineTo(0, 11); ctx.moveTo(-8, -8); ctx.lineTo(8, 8); ctx.moveTo(8, -8); ctx.lineTo(-8, 8); ctx.stroke();
-        } else if (s.kind === 'fireball') {
+        } else if (s.kind === 'fireball' || s.kind === 'hellfire') {
           ctx.globalCompositeOperation = 'lighter';
           const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
           g.addColorStop(0, '#fff3b0'); g.addColorStop(0.45, '#ff8a1f'); g.addColorStop(1, 'rgba(255,40,0,0)');
@@ -1283,6 +1343,19 @@
           ctx.shadowColor = '#7fe8ff';
           ctx.shadowBlur = 12;
           ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(0, -5); ctx.lineTo(-8, 0); ctx.lineTo(0, 5); ctx.closePath(); ctx.fill();
+        } else if (p.kind === 'whip') {
+          // fouet de feu de Daedra : la lanière claque de sa main jusqu'à la cible, braise au bout
+          ctx.strokeStyle = '#2a1408';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          const bx = p.x0 - x;
+          const by = p.y0 - y;
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx / 2 + Math.sin(k * 9) * 18, by / 2 - 30 * (1 - k), 0, 0); ctx.stroke();
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 12);
+          g.addColorStop(0, '#fff2b0'); g.addColorStop(0.5, '#ff6a1f'); g.addColorStop(1, 'rgba(255,40,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
         } else if (p.kind === 'shadow') {
           // trait d'ombre du Magicien : orbe violette avec une traînée
           ctx.globalCompositeOperation = 'lighter';
@@ -1938,7 +2011,7 @@
       const real = fi.key === 'boss';
       const state = real && boss ? boss : {};
       // Envol / atterrissage en douceur
-      const airborne = state.flying || state.away ? 1 : 0;
+      const airborne = (state.flying || state.away) && !state.vanish ? 1 : 0;
       d.air = (d.air || 0) + (airborne - (d.air || 0)) * Math.min(1, dt * 2.5);
       const ceiling = fi.kind === 'maexxna';
       let lift = BD.lift + d.air * (ceiling ? 330 : FLY_HEIGHT);
@@ -2000,6 +2073,7 @@
       drawMonster(ctx, dx, dy - lift, fi, {
         scale: BD.scale, facing: d.facing, flash: d.flash, swing: leap ? 0.6 : swing, t, seed: fi.x,
         phase: state.phase, enraged: state.enraged, flying: d.air > 0.3,
+        intangible: state.intangible, vanish: state.vanish, dazed: state.dazed,
       });
       if (state.shielded) {
         ctx.save();
@@ -2018,6 +2092,50 @@
     }
 
     // Toiles de Maexxna au sol : rayons et spirale de soie, qui s'effacent avant de disparaître.
+    // Murs de feu de Daedra : une rangée de colonnes de flammes (segments) ou un cercle de flammes, qui s'éteignent à la fin
+    drawFireWalls(f, t) {
+      if (!f.walls) return;
+      const ctx = this.ctx;
+      ctx.save();
+      for (const w of f.walls) {
+        const fade = Math.min(1, w.left / 0.8);
+        const pts = [];
+        if (w.ring) {
+          const n = Math.max(12, Math.round((w.r * 2 * Math.PI) / 26));
+          for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; pts.push([w.x + Math.cos(a) * w.r, w.y + Math.sin(a) * w.r * 0.75]); }
+        } else {
+          const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+          const n = Math.round(len / 26);
+          for (let i = 0; i <= n; i++) {
+            const x = w.x1 + ((w.x2 - w.x1) * i) / n;
+            const y = w.y1 + ((w.y2 - w.y1) * i) / n;
+            if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
+            pts.push([x, y]);
+          }
+        }
+        // braises au sol
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(60,10,0,${0.45 * fade})`;
+        for (const [x, y] of pts) { ctx.beginPath(); ctx.ellipse(x, y + 10, 16, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+        // flammes qui dansent
+        ctx.globalCompositeOperation = 'lighter';
+        pts.forEach(([x, y], i) => {
+          const h = (38 + Math.sin(t / 90 + i * 1.7) * 10) * fade;
+          const g = ctx.createLinearGradient(x, y + 10, x, y + 10 - h);
+          g.addColorStop(0, `rgba(255,220,120,${0.85 * fade})`);
+          g.addColorStop(0.5, `rgba(255,100,20,${0.7 * fade})`);
+          g.addColorStop(1, 'rgba(255,30,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y + 10);
+          ctx.quadraticCurveTo(x - 10 + Math.sin(t / 70 + i) * 4, y + 10 - h * 0.6, x + Math.sin(t / 110 + i * 2) * 5, y + 10 - h);
+          ctx.quadraticCurveTo(x + 10 + Math.sin(t / 80 + i) * 4, y + 10 - h * 0.6, x + 12, y + 10);
+          ctx.closePath(); ctx.fill();
+        });
+      }
+      ctx.restore();
+    }
+
     drawWebs(webs, t) {
       const ctx = this.ctx;
       ctx.save();
@@ -2180,7 +2298,13 @@
       let status = null;
       const left = boss.timer ? ` · ${Math.ceil(boss.timer.left)} s` : '';
       if (boss.away && boss.id === 'maexxna') status = { text: `🕸️ AU PLAFOND — toiles et venin pleuvent, tuez les araignées !${left}`, color: '#ff8fa3' };
+      else if (boss.vanish) status = { text: '😼 DISPARUE — seul son sourire flotte… elle va frapper dans le dos !', color: '#ff9ae0' };
+      else if (boss.away && boss.id === 'daedra') status = { text: `🔥 EMBRASEMENT — colonnes de feu et pluie de flammes !${left}`, color: '#ff7a3a' };
       else if (boss.away) status = { text: `🥚 AU NID — détruisez les œufs !${left}`, color: '#ffc21a' };
+      else if (boss.intangible) status = { text: `👻 INTANGIBLE — détruisez les mains spectrales !${left}`, color: '#c9d4ff' };
+      else if (boss.dazed) status = { text: `💫 ÉTOURDIE — dégâts subis +${Math.round((Rules.LILITH.illusions.dazedTaken - 1) * 100)} % !`, color: '#ffe14a' };
+      else if (boss.timer && boss.timer.kind === 'illusions') status = { text: `🪞 ILLUSIONS — brisez-les toutes avant qu'elles n'explosent !${left}`, color: '#ff9ae0' };
+      else if (boss.guarded && boss.id === 'daedra') status = { text: `🌀 PORTAILS INFERNAUX — dégâts subis −${Math.round((1 - Rules.DAEDRA.portals.guard) * 100)} % tant qu'ils tiennent`, color: '#ff8a6a' };
       else if (boss.guarded) status = { text: `🪞 PROTÉGÉ PAR SES COPIES — dégâts subis −${Math.round((1 - Rules.MIMIC.copies.guard) * 100)} %`, color: '#ffd98a' };
       else if (boss.freezeIn !== undefined && boss.freezeIn <= 5) status = { text: `❄️ GEL IMMINENT — dans ${Math.ceil(boss.freezeIn)} s`, color: '#9fe6ff' };
       else if (boss.flying) status = { text: `🪽 EN VOL — seuls les combattants à distance le touchent${left}`, color: '#ff9a1f' };
