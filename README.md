@@ -430,8 +430,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Lac gelé de Givrenoire** : 25 cases dont 3 / 5 / 10 / 15 fissures ; chaque case sûre fait monter le gain, on
     encaisse quand on veut, une fissure fait tout perdre.
   - **Gobelets du mage Malvorath** : la bille sous l'un des 3 gobelets mélangés, ×2,85.
-  - **Road to Heaven d'Ether** : une ligne monte des enfers vers le paradis, de plus en plus vite (×e^(0,16 t)) ; STOP
-    (ou Espace) encaisse la mise × le multiplicateur, encaissement automatique possible ; elle peut s'effondrer à tout
+  - **Road to Heaven d'Ether** : une ligne monte des enfers vers le paradis, de plus en plus vite (×e^(0,16 t)) ; un seul
+    bouton, toujours au même endroit, lance la montée puis devient STOP (ou Espace), qui encaisse la mise × le multiplicateur, encaissement automatique possible ; elle peut s'effondrer à tout
     instant (atteindre ×m : 97 % / m de chances) et tout est perdu.
   - **Chaton Fripon de Lilith** : le chaton saute de toit en toit (10 toits, ×1,05 → ×12,12) ; il peut glisser sur un toit
     inconnu (8 % à 40 % de risque, de plus en plus haut) ; on encaisse quand on veut.

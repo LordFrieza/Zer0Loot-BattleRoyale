@@ -760,11 +760,10 @@
           <div class="hv-stage"><canvas width="820" height="440"></canvas></div>
           <div class="hv-side">
             <div class="ice-mult"><span class="muted">Multiplicateur</span><b data-mult>×1,00</b><span data-win class="gold-text"></span></div>
-            <button class="gold big-btn hv-stop" data-stop disabled>✋ STOP</button>
+            <button class="gold big-btn hv-act" data-act>🪽 S'élever</button>
             <div class="hv-setup">
               <div class="casino-bets"></div>
               <div class="hv-auto"><span class="muted">Encaisser seul à :</span>${HV_AUTO.map((a) => `<button type="button" class="casino-chip" data-auto="${a}">${a ? `×${String(a).replace('.', ',')}` : 'non'}</button>`).join('')}</div>
-              <button class="gold big-btn" data-start>🪽 S'élever</button>
             </div>
             <div class="hv-hist" data-hist></div>
           </div>
@@ -775,9 +774,19 @@
       const ctx = cv.getContext('2d');
       const multEl = body.querySelector('[data-mult]');
       const winEl = body.querySelector('[data-win]');
-      const stopBtn = body.querySelector('[data-stop]');
-      const startBtn = body.querySelector('[data-start]');
+      // Un seul bouton, toujours au même endroit : « S'élever » au repos, « STOP » pendant la montée (pas besoin de
+      // bouger la souris). Les mises restent affichées en dessous, grisées pendant la montée.
+      const actBtn = body.querySelector('[data-act]');
       const setup = body.querySelector('.hv-setup');
+      let relaunchAt = 0; // petit délai après la fin pour ne pas relancer par un double-clic
+      const setMode = (mode) => {
+        actBtn.classList.toggle('hv-stop', mode === 'stop');
+        setup.classList.toggle('locked', mode === 'stop');
+        if (mode === 'stop') { actBtn.disabled = false; return; }
+        actBtn.textContent = run.phase === 'idle' ? '🪽 S\'élever' : '🪽 Remonter';
+        actBtn.disabled = performance.now() < relaunchAt;
+        if (actBtn.disabled) setTimeout(() => { if (token === alive && run.phase !== 'up') actBtn.disabled = false; }, relaunchAt - performance.now() + 20);
+      };
       const histEl = body.querySelector('[data-hist]');
       let auto;
       try { auto = Number(localStorage.getItem('zl_hv_auto')); } catch (e) { auto = 0; }
@@ -940,7 +949,7 @@
           run.m = Rules.heavenMult(run.t);
           multEl.textContent = multTxt(run.m);
           winEl.textContent = `${fmt(Math.floor(run.bet * run.m))} 🪙`;
-          stopBtn.textContent = `✋ STOP — ${fmt(Math.floor(run.bet * run.m))} 🪙`;
+          actBtn.textContent = `✋ STOP — ${fmt(Math.floor(run.bet * run.m))} 🪙`;
           // « ding » à chaque palier franchi
           const step = run.m < 2 ? 0.1 : run.m < 10 ? 0.5 : run.m < 100 ? 5 : 50;
           if (Math.floor(run.m / step) > Math.floor(run.lastTick / step)) Sound.play('heavenTick', run.m);
@@ -954,9 +963,7 @@
 
       function begin(r) {
         Object.assign(run, { phase: 'up', t0: performance.now() - r.t * 1000, t: r.t, m: r.mult, bet: r.bet, crash: null, cashAt: null, fall: 0, lastTick: r.mult, auto: r.auto || 0 });
-        setup.style.display = 'none';
-        stopBtn.style.display = '';
-        stopBtn.disabled = false;
+        setMode('stop');
         A.hold();
       }
       function end(r) {
@@ -980,10 +987,8 @@
         hist = hist.slice(0, 12);
         try { localStorage.setItem('zl_hv_hist', JSON.stringify(hist)); } catch (e) { /* ignore */ }
         renderHist();
-        stopBtn.disabled = true;
-        stopBtn.style.display = 'none';
-        setup.style.display = '';
-        startBtn.textContent = '🪽 Remonter';
+        relaunchAt = performance.now() + 1000;
+        setMode('start');
         A.setSession('heaven', null);
         A.settle(r.payout, r.bet, { win: r.payout > r.bet, banner: r.outcome === 'cash' && r.mult >= 10 ? `🪽 AU PARADIS ! ${multTxt(r.mult)} · +${fmt(r.payout)} 🪙` : null });
       }
@@ -995,29 +1000,31 @@
           if (r.outcome) end(r);
           else if (Math.abs(r.t - run.t) > 0.35) run.t0 = performance.now() - r.t * 1000; // recalage sur l'horloge du serveur
         } catch (err) {
-          if (/Aucune montée/.test(err.message)) { run.phase = 'idle'; A.idle(); setup.style.display = ''; stopBtn.style.display = 'none'; }
+          // Montée terminée ailleurs (autre onglet, redémarrage) ; ignoré si on vient d'encaisser (réponse en retard)
+          if (/Aucune montée/.test(err.message) && run.phase === 'up') { run.phase = 'idle'; A.idle(); setMode('start'); }
         } finally { polling = false; }
       }
       async function stop() {
-        if (run.phase !== 'up' || stopBtn.disabled) return;
-        stopBtn.disabled = true;
+        if (run.phase !== 'up' || actBtn.disabled) return;
+        actBtn.disabled = true;
         try {
           const r = await api('/api/casino/heaven/cash', {});
           if (token !== alive) return;
           end(r);
-        } catch (err) { stopBtn.disabled = false; toast('⚠️ ' + err.message); }
+        } catch (err) { actBtn.disabled = false; toast('⚠️ ' + err.message); }
       }
-      stopBtn.onclick = stop;
       this.key = (e) => { if (e.code === 'Space' && run.phase === 'up') { e.preventDefault(); stop(); } };
       document.addEventListener('keydown', this.key);
-      startBtn.onclick = async () => {
-        if (run.phase === 'up') return;
+      async function launch() {
+        if (run.phase === 'up' || actBtn.disabled) return;
+        actBtn.disabled = true;
         const r = await A.call('/api/casino/heaven/start', { bet: bet.value, ticket: bet.ticket, auto: auto || null }, bet.stake);
-        if (!r || token !== alive) return;
+        if (!r || token !== alive) { actBtn.disabled = false; return; }
         A.say(auto ? `Je t'arrête à ×${String(auto).replace('.', ',')}… si tu y arrives. Hou hou !` : 'Montez… montez… mais pas trop haut !');
         begin(r);
-      };
-      stopBtn.style.display = 'none';
+      }
+      actBtn.onclick = () => (run.phase === 'up' ? stop() : launch());
+      setMode('start');
       const resume = A.sessions().heaven;
       if (resume) { begin(resume); check(); }
     },

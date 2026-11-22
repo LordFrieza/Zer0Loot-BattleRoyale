@@ -1658,3 +1658,6 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .casino-tickets.has { color: var(--text); background: linear-gradient(90deg, rgba(255, 154, 224, .16), rgba(255, 154, 224, .04)); border: 1px solid rgba(255, 154, 224, .6); }
 .cm-tickets { margin-left: 8px; color: #ff9ae0; }
 .ticket-note { font-size: 12px; font-weight: 700; color: #ff9ae0; }
+.hv-act { font-size: 22px !important; padding: 16px !important; min-height: 64px; }
+.hv-setup.locked { opacity: .4; pointer-events: none; }
+.hv-side .ice-mult [data-win] { display: block; min-height: 1.35em; } /* pas de saut du bouton quand le gain apparaît */
