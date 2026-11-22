@@ -213,38 +213,38 @@
   };
 
   // ---------- Récompenses ----------
+  // Modes où l'on s'affronte (Battle Royale, Roi de la Colline, Guerre des clans) : ×3 depuis l'équilibrage par la
+  // puissance (plus de réduction des gains), participation 100 XP.
   const REWARDS = {
-    kill: { xp: 100, chests: 1, gold: 10 },
-    win: { xp: 300, chests: 1, gold: 30 },
-    participation: { xp: 25, chests: 0, gold: 0 }, // chaque combattant à la fin d'une bataille
-    firstblood: { xp: 0, chests: 1, gold: 0 }, // premier kill de la bataille
-    double: { xp: 0, chests: 1, gold: 0 }, // 2 kills d'affilée en moins de STREAK_WINDOW secondes
+    kill: { xp: 300, chests: 3, gold: 30 },
+    win: { xp: 900, chests: 3, gold: 90 },
+    participation: { xp: 100, chests: 0, gold: 0 }, // chaque combattant à la fin d'une bataille PvP
+    firstblood: { xp: 0, chests: 3, gold: 0 }, // premier kill de la bataille
+    double: { xp: 0, chests: 3, gold: 0 }, // 2 kills d'affilée en moins de STREAK_WINDOW secondes
     triple: { xp: 0, chests: 0, gold: 0 }, // annonce seulement
-    massacre: { xp: 0, chests: 2, gold: 0 }, // 5 kills dans la même bataille
+    massacre: { xp: 0, chests: 6, gold: 0 }, // 5 kills dans la même bataille
   };
+  // Participation des modes coopératifs (Boss, Boss Rush, Donjon) et du Golden Shower : inchangée.
+  const COOP_PARTICIPATION = { xp: 25, chests: 0, gold: 0 };
   const STREAK_WINDOW = 8;
   const MASSACRE_KILLS = 5;
 
   /*
-   * Récompenses équilibrées des modes où l'on s'affronte (Battle Royale, Roi de la Colline, Guerre des clans).
+   * Équilibrage par la puissance des modes où l'on s'affronte (Battle Royale, Roi de la Colline, Guerre des clans).
    * Puissance d'un combattant = niveau + (total des % de son équipement, bonus de classe compris) / 10.
-   * Les récompenses de victoire, de kill et de série sont multipliées par
-   *   (puissance des adversaires ÷ ta puissance), borné entre ×0,4 et ×2 :
-   * battre plus fort que soi rapporte plus, écraser plus faible rapporte moins. La participation ne change pas.
+   * Au lancement, le plus faible est renforcé (vie et dégâts) : × √(puissance adverse ÷ sa puissance), au plus
+   * ×1,75 (POWER.underdog) ; le plus fort n'est pas affaibli. Puissance adverse : moyenne de tous les autres
+   * combattants (Battle Royale, Roi de la Colline), puissance totale de l'équipe adverse (Guerre des clans).
+   * Les récompenses ne dépendent plus de la puissance.
    */
-  const POWER = { gearDivisor: 10, minMult: 0.4, maxMult: 2 };
+  const POWER = { gearDivisor: 10, underdog: 1.75 };
   function powerScore(level, gearTotal) {
     return Math.round(((level || 1) + (gearTotal || 0) / POWER.gearDivisor) * 10) / 10;
   }
-  function rewardMultiplier(mine, theirs) {
-    if (!(mine > 0) || !(theirs > 0)) return 1;
-    return Math.round(Math.min(POWER.maxMult, Math.max(POWER.minMult, theirs / mine)) * 100) / 100;
-  }
-  // Applique le multiplicateur : XP et golds arrondis, coffres arrondis au hasard (0,4 coffre = 40 % de chance d'en avoir 1).
-  function scaleReward(reward, mult, rnd = Math.random) {
-    const c = (reward.chests || 0) * mult;
-    const chests = Math.floor(c) + (rnd() < c - Math.floor(c) ? 1 : 0);
-    return { xp: Math.round((reward.xp || 0) * mult), gold: Math.round((reward.gold || 0) * mult), chests };
+  // Bonus du plus faible : `theirs` = puissance adverse, `mine` = la sienne (1 si on est le plus fort).
+  function powerUnderdog(theirs, mine) {
+    if (!(mine > 0) || !(theirs > 0) || mine >= theirs) return 1;
+    return Math.round(Math.min(POWER.underdog, Math.sqrt(theirs / mine)) * 100) / 100;
   }
   // Équipement estimé d'un bot à partir de l'apparence de ses pièces (rareté par emplacement) : valeur moyenne des lignes.
   function lookGearTotal(look) {
@@ -549,8 +549,8 @@
     underdog: 1.75, // bonus max (vie et dégâts) de l'équipe la plus faible : √(puissance forte / puissance faible)
     // Ciblage : un cristal « paraît » plus proche ; un ennemi près de notre cristal ou collé à nous passe avant.
     aggro: { crystal: 0.35, defendRadius: 260, defend: 0.5, selfDefense: 90, close: 0.3 },
-    reward: { xp: 200, gold: 40, chests: 1 }, // pour chaque humain de l'équipe gagnante
-    mvpChests: 1, // + 1 coffre pour le meilleur combattant (le plus de dégâts)
+    reward: { xp: 600, gold: 120, chests: 3 }, // pour chaque humain de l'équipe gagnante (×3)
+    mvpChests: 3, // + 3 coffres pour le meilleur combattant (le plus de dégâts)
   };
   // `big` / `small` : puissance totale (somme des puissances, PWR-1) de l'équipe forte et de l'équipe faible.
   function clanUnderdog(big, small) {
@@ -3214,7 +3214,7 @@
     STAT_DETAILS, statCapAt,
     STATS, STAT_INFO, CLASSES, CLASS_INFO, NO_CLASS, CLASS_CHANGE_PRICE, RARITIES, RARITY_INFO,
     SLOTS, SLOT_INFO, KINDS, KINDS_BY_SLOT, OWN_CLASS_KIND_CHANCE, STAT_SUFFIX, RARITY_PREFIX,
-    REWARDS, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, rewardMultiplier, scaleReward, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
+    REWARDS, COOP_PARTICIPATION, STREAK_WINDOW, MASSACRE_KILLS, POWER, powerScore, powerUnderdog, lookGearTotal, STREAK_INFO, CHEST_PRICE, ITEMS_PER_CHEST, RECYCLE_GOLD,
     FUSE_COUNT, FUSE_BATCH_MAX, FUSE_UPGRADE, FUSE_LUCK_BONUS, FUSE_LUCK_BONUS_CAP, FUSE_PITY, FUSE_PRICE, REROLL_PRICE, ALCHEMY, alchemyCap,
     LUCK_CAP, LOOT_BASE, LOOT_AT_CAP, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,

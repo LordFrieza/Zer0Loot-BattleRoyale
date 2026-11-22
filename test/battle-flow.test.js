@@ -4,7 +4,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const { Battle, testBattle, base } = require('./helpers');
+const { Battle, testBattle, base, Rules } = require('./helpers');
 
 // Rend les combattants immobiles et empêche toute attaque pendant le test.
 function still(b) {
@@ -71,7 +71,7 @@ test('[Q-8] lancement : les stats des humains sont rafraîchies, pas celles des 
   b.start(refresh); b.stopLoop();
   const [h, bot] = b.fighters;
   assert.deepStrictEqual([h.maxHp, h.hp, h.level], [777, 777, 9]);
-  assert.strictEqual(bot.maxHp, 100);
+  assert.strictEqual(bot.maxHp, Math.round(100 * (bot.boost || 1)), 'stats du bot inchangées (hors bonus du plus faible, PWR-2)');
 });
 
 test('[Q-12] file : l\'événement n\'est révélé qu\'à partir de la bataille', () => {
@@ -365,4 +365,29 @@ test('[B-25] fin : un seul survivant, ou 300 s écoulées (meilleur ratio PV / P
   assert.strictEqual(t.phase, 'ended');
   assert.strictEqual(t.result.winner.key, 'c','190/200 = 0,95 > 0,9');
   assert.strictEqual(t.result.duration, 300);
+});
+
+test('[PWR-2] Battle Royale et Roi de la Colline : chacun face à la moyenne des autres, le plus faible renforcé (pas en entraînement)', () => {
+  const make = (mode, balance) => {
+    const b = new Battle();
+    if (balance === false) b.balance = false;
+    b.openQueue(60, mode); clearTimeout(b.queueTimer);
+    b.join(player('fort', { power: 40, stats: base({ maxHp: 100, damage: 10 }) }));
+    b.join(player('moyen', { power: 20, stats: base({ maxHp: 100, damage: 10 }) }));
+    b.join(player('faible', { power: 5, stats: base({ maxHp: 100, damage: 10 }) }));
+    b.start(null, null); b.stopLoop();
+    return Object.fromEntries(b.players.map((p) => [p.key, p]));
+  };
+  for (const mode of ['br', 'koth']) {
+    const f = make(mode);
+    // fort : moyenne des autres 12,5 < 40 → rien ; moyen : (40 + 5) / 2 = 22,5 → √(22,5 / 20) ; faible : 30 / 5 → plafond 1,75
+    assert.strictEqual(f.fort.boost, undefined);
+    assert.strictEqual(f.moyen.boost, Rules.powerUnderdog(22.5, 20));
+    assert.strictEqual(f.moyen.boost, 1.06);
+    assert.strictEqual(f.faible.boost, 1.75);
+    assert.deepStrictEqual([f.fort.maxHp, f.faible.maxHp, f.faible.hp], [100, 175, 175]);
+    assert.ok(Math.abs(f.faible.damage - f.fort.damage * 1.75) < 1e-9);
+  }
+  const tr = make('br', false);
+  assert.ok(Object.values(tr).every((p) => !p.boost && p.maxHp === 100), 'duel d\'entraînement : aucun bonus');
 });

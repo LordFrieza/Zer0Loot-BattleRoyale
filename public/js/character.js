@@ -1660,28 +1660,26 @@ function pityToast(r) {
     + row('⚡ Double kill', R.double, `2 kills d'affilée en moins de ${Rules.STREAK_WINDOW} s`)
     + row('💀 Massacre', R.massacre, `${Rules.MASSACRE_KILLS} kills dans la même bataille`);
   $('streak-rules').innerHTML = `Les bonus de séries s'ajoutent aux récompenses normales du kill et sont annoncés en grand sur le stream
-    (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus). Ces montants sont ceux d'un combat entre joueurs de même puissance :
-    voir juste en dessous.`;
+    (un <b>TRIPLE KILL</b> est aussi annoncé, sans bonus). Ces montants sont les mêmes pour tout le monde, quelle que soit
+    la puissance : ce sont les combats qui sont équilibrés (voir juste en dessous).`;
   const P = Rules.POWER;
-  const ex = (mine, theirs) => `<tr><td>${mine}</td><td>${theirs}</td><td><b>×${String(Rules.rewardMultiplier(mine, theirs)).replace('.', ',')}</b></td>
-    <td>${Math.round(R.win.xp * Rules.rewardMultiplier(mine, theirs))} XP · ${Math.round(R.win.gold * Rules.rewardMultiplier(mine, theirs))} 🪙</td></tr>`;
+  const ex = (mine, theirs) => { const m = Rules.powerUnderdog(theirs, mine); return `<tr><td>${mine}</td><td>${theirs}</td><td><b>${m > 1 ? `×${String(m).replace('.', ',')}` : '—'}</b></td>
+    <td>${m > 1 ? `vie et dégâts ×${String(m).replace('.', ',')}` : 'aucun bonus'}</td></tr>`; };
   $('power-rules').innerHTML = `
-    <p>Pour que les plus forts ne creusent pas l'écart à chaque partie, les récompenses du <b>Battle Royale</b>, du
-      <b>Roi de la Colline</b> et de la <b>Guerre des clans</b> dépendent de la <b>puissance</b> des combattants :</p>
+    <p>Pour que tout le monde ait sa chance, les combats du <b>Battle Royale</b>, du <b>Roi de la Colline</b> et de la
+      <b>Guerre des clans</b> sont équilibrés selon la <b>puissance</b> des combattants :</p>
     <ul class="rules-list">
       <li><b>💪 Puissance</b> = ton niveau + le total des % de ton équipement ÷ ${P.gearDivisor} (bonus de classe compris).
         Elle est affichée sur ta fiche et recalculée au lancement de chaque partie.</li>
-      <li><b>Victoire et séries</b> : récompense × <b>puissance moyenne de tes adversaires ÷ ta puissance</b>
-        (en Guerre des clans : la puissance moyenne de l'équipe adverse).</li>
-      <li><b>Kill</b> : récompense × <b>puissance de ta victime ÷ ta puissance</b>.</li>
-      <li>Le multiplicateur va de <b>×${String(P.minMult).replace('.', ',')}</b> à <b>×${P.maxMult}</b>. Les coffres sont arrondis au hasard
-        (0,4 coffre = 40 % de chance d'en gagner un).</li>
-      <li>La <b>participation</b>, les modes coopératifs (Boss, Donjon), le Golden Shower et le mode Solo ne changent pas.
-        Le Loot double (×2) s'ajoute au multiplicateur.</li>
+      <li><b>Bonus du plus faible</b> : au lancement, si ta puissance est inférieure à la <b>puissance moyenne des autres
+        combattants</b>, ta vie et tes dégâts sont multipliés par <b>√(puissance adverse ÷ ta puissance)</b>, jusqu'à
+        <b>×${String(P.underdog).replace('.', ',')}</b>. Les plus forts ne sont jamais affaiblis.</li>
+      <li>En <b>Guerre des clans</b>, c'est l'équipe entière la plus faible (puissance totale) qui est renforcée.</li>
+      <li>Les <b>récompenses</b> sont les mêmes pour tous, quelle que soit la puissance (×2 avec le Loot double).</li>
     </ul>
-    <table class="loot-table"><tr><th>Ta puissance</th><th>Adversaires</th><th>Multiplicateur</th><th>Victoire</th></tr>
-      ${ex(20, 20)}${ex(20, 30)}${ex(15, 60)}${ex(60, 30)}${ex(80, 15)}</table>
-    <p>Battre plus fort que soi rapporte donc plus, et écraser des joueurs bien plus faibles rapporte beaucoup moins.</p>`;
+    <table class="loot-table"><tr><th>Ta puissance</th><th>Moyenne des autres</th><th>Bonus</th><th>Effet</th></tr>
+      ${ex(20, 20)}${ex(20, 30)}${ex(15, 30)}${ex(10, 60)}${ex(60, 30)}</table>
+    <p>Sur le stream, un combattant renforcé porte la mention <b>⬆️ ×…</b> sous son nom.</p>`;
   $('events-help').innerHTML = Object.values(Rules.BATTLE_EVENTS).map((ev) => `<div style="--c:${ev.color}"><b>${ev.icon} ${ev.label}</b><br>${ev.desc}</div>`).join('');
   $('class-summary').innerHTML = Rules.CLASSES.map((cls) => {
     const ci = Rules.CLASS_INFO[cls];
@@ -1780,7 +1778,7 @@ function pityToast(r) {
     <tr><td><b>🏆 Boss vaincu</b><div class="muted" style="font-size:12px">Pour TOUS les participants, morts ou vivants</div></td>
       <td>+${R.xp} XP</td><td>+${R.gold} 🪙</td><td>+${R.chests} <i class="ico-chest"></i></td></tr>
     <tr><td><b>💀 Tout le monde est tombé</b><div class="muted" style="font-size:12px">Seulement l'XP de participation</div></td>
-      <td>+${Rules.REWARDS.participation.xp} XP</td><td>—</td><td>—</td></tr>`;
+      <td>+${Rules.COOP_PARTICIPATION.xp} XP</td><td>—</td><td>—</td></tr>`;
 
   const M = Rules.MONSTERS;
   const monsters = Object.values(M).map((m) => `${m.icon} ${m.label}${m.poison ? ' (venimeux ☠️)' : ''}${m.from > 1 ? ` (dès la salle ${m.from})` : ''}`).join(', ');
@@ -1791,13 +1789,13 @@ function pityToast(r) {
     `<b>Pas de réapparition</b> : un aventurier tombé est éliminé du raid. Entre deux salles, les survivants récupèrent <b>${pct(D.healBetweenRooms)}</b> de leur vie.`,
     `Après ${D.enrageAt} s dans la même salle, les monstres s'énervent (+${pct(D.enrageRate)} de dégâts par seconde).`,
     `🗳️ <b>Sondage du chat</b> : après chaque salle de chef, le combat se met en pause ${Rules.DUNGEON_POLL.duration} s et <b>tout le monde</b> (même sans jouer) vote entre deux bonus tirés au hasard, avec leur commande dans le chat (ou <b>!1</b> / <b>!2</b>) ou avec les boutons de cette page. Une voix par personne, le dernier vote compte. Les bonus de combat durent jusqu'au sondage suivant.`,
-    `Le raid s'arrête quand tout le monde est tombé. <b>Tout le monde</b> reçoit la récompense de la salle atteinte, plus ${Rules.REWARDS.participation.xp} XP de participation.`,
+    `Le raid s'arrête quand tout le monde est tombé. <b>Tout le monde</b> reçoit la récompense de la salle atteinte, plus ${Rules.COOP_PARTICIPATION.xp} XP de participation.`,
   ].map((x) => `<li>${x}</li>`).join('');
   $('dungeon-boons').innerHTML = Object.values(Rules.DUNGEON_BOONS).map((b) =>
     `<tr><td style="color:${b.color};white-space:nowrap"><b>${b.icon} ${b.label}</b></td><td><code>${b.cmd}</code></td><td>${b.desc}</td></tr>`).join('');
   const tiers = [5, 10, 15, 20, 25, 30].map((room) => Rules.dungeonReward(room));
   $('dungeon-rewards').innerHTML = '<tr><th>Salle atteinte</th><th>XP</th><th>Golds</th><th>Coffres</th></tr>'
-    + `<tr><td><b>Salles 1 à 4</b></td><td>+${Rules.REWARDS.participation.xp} XP <span class="muted">(participation)</span></td><td>—</td><td>—</td></tr>`
+    + `<tr><td><b>Salles 1 à 4</b></td><td>+${Rules.COOP_PARTICIPATION.xp} XP <span class="muted">(participation)</span></td><td>—</td><td>—</td></tr>`
     + tiers.map((r) => `<tr><td><b>Salle ${r.tier}${r.tier === 30 ? ' et +' : ` à ${r.tier + 4}`}</b></td><td>+${r.xp} XP</td><td>+${r.gold} 🪙</td><td>${r.chests ? '+' + r.chests + ' <i class="ico-chest"></i>' : '—'}</td></tr>`).join('')
     + '<tr><td colspan="4" class="muted" style="font-size:12px">Puis +1 coffre et +250 XP / golds toutes les 5 salles.</td></tr>';
 

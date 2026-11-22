@@ -104,17 +104,18 @@ de la file, confirme les `!join` et annonce le vainqueur.
     niveau 15, parmi 14 techniques (Roulade, Charge, Second souffle, Frénésie, et 2 par classe : Cri de guerre, Coup de
     bouclier, Flèche repoussante, Tir rapide, Clignement, Nova de givre, Pas de l'ombre, Lame empoisonnée, Prière de
     soin, Lumière aveuglante). Détails : `TECHNIQUES` dans `shared/rules.js`.
-- **Récompenses** : kill = 100 XP + 1 coffre + 10 golds ; victoire = 300 XP + 1 coffre + 30 golds ;
-  participation = 25 XP pour chaque combattant à la fin de la bataille (gagnant compris, pas si l'admin annule).
-- **Récompenses équilibrées** (Battle Royale, Roi de la Colline, Guerre des clans) : chaque combattant a une
-  **💪 Puissance** = niveau + total des % de son équipement ÷ 10 (affichée sur la fiche). Les récompenses de victoire et
-  de série sont multipliées par *puissance moyenne des adversaires ÷ sa puissance* (en Guerre des clans : l'équipe
-  adverse), celles d'un kill par *puissance de la victime ÷ sa puissance*, entre ×0,4 et ×2. Les coffres sont arrondis au
-  hasard (0,4 coffre = 40 % de chance d'en avoir un). La participation, les modes coopératifs, le Golden Shower et le Solo
-  ne changent pas. Battre plus fort que soi rapporte plus ; écraser des joueurs bien plus faibles rapporte moins.
-- **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +1 coffre ;
-  double kill (2 kills d'affilée en moins de 8 s) = +1 coffre ; triple kill = annonce seulement ;
-  massacre (5 kills dans la bataille) = +2 coffres.
+- **Récompenses des modes PvP** (Battle Royale, Roi de la Colline, Guerre des clans) : kill = 300 XP + 3 coffres + 30 golds ;
+  victoire = 900 XP + 3 coffres + 90 golds ; participation = 100 XP pour chaque combattant à la fin de la bataille
+  (gagnant compris, pas si l'admin annule). Les mêmes pour tous, quelle que soit la puissance (×2 avec le Loot double).
+  Les modes coopératifs et le Golden Shower gardent 25 XP de participation.
+- **Combats équilibrés par la puissance** (Battle Royale, Roi de la Colline, Guerre des clans) : chaque combattant a une
+  **💪 Puissance** = niveau + total des % de son équipement ÷ 10 (affichée sur la fiche). Au lancement, un combattant
+  moins puissant que la moyenne des autres reçoit un bonus de vie et de dégâts de × √(puissance adverse ÷ sa puissance),
+  jusqu'à ×1,75 (mention ⬆️ ×… sous son nom sur le stream) ; les plus forts ne sont pas affaiblis. En Guerre des clans,
+  c'est l'équipe la plus faible qui est renforcée. Pas de bonus en duel d'entraînement.
+- **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +3 coffres ;
+  double kill (2 kills d'affilée en moins de 8 s) = +3 coffres ; triple kill = annonce seulement ;
+  massacre (5 kills dans la bataille) = +6 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
 - **Répartition des points** (onglet Personnage) : les boutons **+** (placer un point libre) et **−** (retirer un point
   pour le replacer ailleurs) ne changent rien tout de suite : la fiche montre l'effet en direct (ancienne valeur barrée →
@@ -362,7 +363,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     bout de 5 s, puis **5 s de plus à chaque mort** (30 s au plus). L'équipe la plus faible est renforcée selon la
     **puissance totale** de ses membres (pas leur nombre) : × √(puissance forte ÷ puissance faible), jusqu'à ×1,75 en vie
     et dégâts. À 1 min 30, **mort subite** : les cristaux prennent ×3 ; à 3 min, le cristal le moins entamé
-    gagne. Chaque membre de l'équipe gagnante reçoit 200 XP, 40 golds et 1 coffre, le **MVP** (le plus de dégâts) 1 coffre
+    gagne. Chaque membre de l'équipe gagnante reçoit 600 XP, 120 golds et 3 coffres, le **MVP** (le plus de dégâts) 3 coffres
     de plus. Les **paris** se font sur une équipe.
   - **Golden Shower** (mode bonus, dès 1 joueur, 75 s) : **pas de combat**. Les personnages se baladent au hasard et
     ramassent ce qui tombe du ciel : une pluie de pièces (1 gold chacune), des **coffres** en parachute (plus rares) et

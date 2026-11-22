@@ -1286,6 +1286,8 @@
         this.label((fi.kind === 'copie' ? '🪞 ' : fi.kind === 'serviteur' ? '💀 ' : icon) + fi.name + potion + (fi.kills ? ` ⚔${fi.kills}` : '') + pts, x, nameY, 12, nameColor);
         if (fi.ice !== undefined) this.label(`🧊 ${Math.ceil(fi.ice)} s`, x, y + 34, 13, '#bff6ff');
         if (fi.cocooned) this.label('🕸️ Brisez le cocon !', x, y + 34, 12, '#f0eaff');
+        // Bonus du plus faible (équilibrage par la puissance, Battle Royale et Roi de la Colline)
+        else if (fi.boost && fi.ice === undefined) this.label(`⬆️ ×${String(fi.boost).replace('.', ',')}`, x, y + 34, 11, '#9fffb0');
         if (fi.title) this.label(fi.title, x, y - 56, 10, '#ffcf5a');
       }
 
@@ -2789,16 +2791,11 @@
       if (a.life <= 0) this.announces.shift();
     }
 
-    // Récompense de victoire selon la puissance (puissance moyenne des adversaires ÷ celle du vainqueur, ×0,4 à ×2).
+    // Récompense de victoire (la même pour tous : les combats sont équilibrés au lancement, pas les gains).
     winRewardText(r) {
+      const m = this.queue && this.queue.event === 'double' ? 2 : 1;
       const W = Rules.REWARDS.win;
-      const ps = (this.queue && this.queue.participants) || [];
-      const me = ps.find((p) => p.key === r.winner.key);
-      const others = ps.filter((p) => p.key !== r.winner.key && p.power);
-      const avg = others.length ? others.reduce((a, p) => a + p.power, 0) / others.length : 0;
-      const m = me && me.power && avg ? Rules.rewardMultiplier(me.power, avg) : 1;
-      const txt = `+${Math.round(W.xp * m)} XP · +${Math.round(W.gold * m)} golds · coffre`;
-      return m === 1 ? txt : `${txt} (×${String(m).replace('.', ',')} selon la puissance)`;
+      return `+${W.xp * m} XP · +${W.gold * m} golds · ${W.chests * m} coffres`;
     }
 
     drawResult(t) {
@@ -2974,7 +2971,7 @@
       } else if (r.mode === 'dungeon') {
         this.title('Il faut atteindre la salle 5 pour décrocher une récompense.', 265, 24, '#cfc6ff', '#b83cff');
       }
-      this.title(`+${Rules.REWARDS.participation.xp} XP de participation pour chacun`, 312, 20, '#cfc6ff', '#29e7ff');
+      this.title(`+${Rules.COOP_PARTICIPATION.xp} XP de participation pour chacun`, 312, 20, '#cfc6ff', '#29e7ff');
 
       // Meilleurs combattants (dégâts infligés)
       this.title('⚔️ Meilleurs dégâts', 380, 24, '#ffc21a', '#ff9a00');

@@ -6,22 +6,19 @@ test('[PRG-1] courbe d\'XP : 300, 500, 700, 900…', () => {
   assert.deepStrictEqual([1, 2, 3, 4].map(Rules.xpToNext), [300, 500, 700, 900]);
 });
 
-test('[PRG-2, PRG-3] récompenses et niveaux', () => {
+test('[PRG-2, PRG-3, PRG-4, PRG-5] récompenses ×3 des modes PvP et niveaux', () => {
+  assert.deepStrictEqual(Rules.REWARDS.kill, { xp: 300, chests: 3, gold: 30 });
+  assert.deepStrictEqual(Rules.REWARDS.win, { xp: 900, chests: 3, gold: 90 });
+  assert.deepStrictEqual(Rules.REWARDS.participation, { xp: 100, chests: 0, gold: 0 });
+  assert.deepStrictEqual(['firstblood', 'double', 'triple', 'massacre'].map((k) => Rules.REWARDS[k].chests), [3, 3, 0, 6]);
+  assert.deepStrictEqual(Rules.COOP_PARTICIPATION, { xp: 25, chests: 0, gold: 0 }, 'coopération et Golden Shower : inchangé');
   const c = game.newCharacter();
-  game.grant(c, Rules.REWARDS.kill); // 100 / 300
-  assert.strictEqual(c.level, 1);
-  assert.strictEqual(c.xp, 100);
-  assert.strictEqual(c.gold, 10);
-  assert.strictEqual(c.chests, 1);
-  game.grant(c, Rules.REWARDS.win); // 400 XP : 300 pour le niv. 2, reste 100
-  assert.strictEqual(c.level, 2);
-  assert.strictEqual(c.xp, 100);
-  assert.strictEqual(c.skillPoints, 1);
-  assert.strictEqual(c.gold, 40);
-  game.addXp(c, 400 + 700); // niv. 3 (500) puis niv. 4 (700)
-  assert.strictEqual(c.level, 4);
-  assert.strictEqual(c.xp, 0);
-  assert.strictEqual(c.skillPoints, 3);
+  game.grant(c, Rules.REWARDS.kill); // 300 XP : niveau 2
+  assert.deepStrictEqual([c.level, c.xp, c.gold, c.chests, c.skillPoints], [2, 0, 30, 3, 1]);
+  game.grant(c, Rules.REWARDS.win); // 900 XP : 500 pour le niv. 3, reste 400
+  assert.deepStrictEqual([c.level, c.xp, c.gold, c.chests], [3, 400, 120, 6]);
+  game.addXp(c, 300 + 900); // niv. 4 (700) puis niv. 5 (900)
+  assert.deepStrictEqual([c.level, c.xp, c.skillPoints], [5, 0, 4]);
 });
 
 test('[PRG-8] admin : don de golds, coffres et XP', () => {
@@ -31,7 +28,7 @@ test('[PRG-8] admin : don de golds, coffres et XP', () => {
   assert.throws(() => game.adminGive(c, { gold: -5 }), /Rien/);
 });
 
-test('[PWR-1, PWR-2] récompenses équilibrées : puissance, multiplicateur borné, coffres arrondis au hasard', () => {
+test('[PWR-1, PWR-2] puissance et bonus du plus faible (vie et dégâts), plafonné', () => {
   assert.strictEqual(Rules.powerScore(10, 168), 26.8);
   assert.strictEqual(Rules.powerScore(1, 0), 1);
   const c = game.newCharacter();
@@ -43,14 +40,12 @@ test('[PWR-1, PWR-2] récompenses équilibrées : puissance, multiplicateur born
   game.equip(c, staff.id);
   assert.strictEqual(game.powerOf(c), 20 + (30 + 7) / 10, 'lignes + bonus de classe (+7 Force)');
   assert.strictEqual(Rules.lookGearTotal({ casque: 'rare', arme: 'commun' }), 3 * 7 + 1 * 2);
-  // Multiplicateur : adverse ÷ soi, entre ×0,4 et ×2
-  assert.strictEqual(Rules.rewardMultiplier(30, 30), 1);
-  assert.strictEqual(Rules.rewardMultiplier(20, 30), 1.5);
-  assert.strictEqual(Rules.rewardMultiplier(10, 90), 2, 'plafond ×2');
-  assert.strictEqual(Rules.rewardMultiplier(90, 10), 0.4, 'plancher ×0,4');
-  assert.strictEqual(Rules.rewardMultiplier(0, 10), 1);
-  // Application : XP et golds arrondis, coffres au hasard selon la partie décimale
-  assert.deepStrictEqual(Rules.scaleReward({ xp: 300, gold: 30, chests: 1 }, 0.4, () => 0.39), { xp: 120, gold: 12, chests: 1 });
-  assert.deepStrictEqual(Rules.scaleReward({ xp: 300, gold: 30, chests: 1 }, 0.4, () => 0.41), { xp: 120, gold: 12, chests: 0 });
-  assert.deepStrictEqual(Rules.scaleReward({ xp: 100, gold: 10, chests: 2 }, 1.5, () => 0.99), { xp: 150, gold: 15, chests: 3 });
+  // Bonus du plus faible : √(puissance adverse ÷ la sienne), plafonné à ×1,75 ; jamais de malus pour le plus fort
+  assert.strictEqual(Rules.POWER.underdog, 1.75);
+  assert.strictEqual(Rules.powerUnderdog(30, 30), 1);
+  assert.strictEqual(Rules.powerUnderdog(30, 20), 1.22);
+  assert.strictEqual(Rules.powerUnderdog(90, 10), 1.75, 'plafond ×1,75');
+  assert.strictEqual(Rules.powerUnderdog(10, 90), 1, 'le plus fort n\'est pas affaibli');
+  assert.strictEqual(Rules.powerUnderdog(10, 0), 1);
+  assert.strictEqual(Rules.rewardMultiplier, undefined, 'les récompenses ne dépendent plus de la puissance');
 });

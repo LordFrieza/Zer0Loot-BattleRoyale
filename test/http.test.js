@@ -295,13 +295,13 @@ test('[PRG-3, PRG-4, PRG-5, BET-1, BET-7, BET-10, B-26, LB-1] bataille complète
 
   const w = (await meOf(win)).character;
   assert.deepStrictEqual(w.record, { battles: 1, kills: 1, wins: 1 });
-  assert.strictEqual(w.chests, 3, 'kill + premier kill + victoire');
-  assert.strictEqual(w.gold, 40, 'kill 10 + victoire 30');
-  assert.deepStrictEqual([w.level, w.xp], [2, 125], '100 + 25 + 300 XP');
+  assert.strictEqual(w.chests, 9, 'kill + premier kill + victoire : 3 coffres chacun');
+  assert.strictEqual(w.gold, 120, 'kill 30 + victoire 90');
+  assert.deepStrictEqual([w.level, w.xp], [3, 500], '300 + 100 + 900 XP');
 
   const l = (await meOf(lose)).character;
   assert.deepStrictEqual(l.record, { battles: 1, kills: 0, wins: 0 });
-  assert.strictEqual(l.xp, 25, 'participation seule');
+  assert.strictEqual(l.xp, 100, 'participation seule (100 XP)');
 
   const bw = (await meOf(bettorWin)).character;
   assert.strictEqual(bw.gold, 100 - 30 + 80, 'mise + mises perdues');
@@ -920,7 +920,7 @@ test('[MKT-1, MKT-2, MKT-3, MKT-4, MKT-5] marché via l\'API : vendre, lister, a
   assert.ok(events.filter((e) => e === 'market').length >= 3, 'diffusion « market »');
 });
 
-test('[PWR-1, PWR-2] Battle Royale : récompenses selon la puissance (le fort gagne moins, le faible plus)', async () => {
+test('[PWR-1, PWR-2, PWR-3] Battle Royale : le plus faible est renforcé au lancement, mêmes récompenses pour tous', async () => {
   await admin.post('/api/admin/battle/reset');
   const strong = client();
   const weak = client();
@@ -936,25 +936,29 @@ test('[PWR-1, PWR-2] Battle Royale : récompenses selon la puissance (le fort ga
     await weak.post('/api/queue/join');
     await admin.post('/api/admin/battle/start');
     battle.stopLoop();
+    const S = battle.players.find((f) => f.userId === ids);
+    const W = battle.players.find((f) => f.userId === idw);
+    assert.deepStrictEqual([S.power, W.power], [20, 1]);
+    // Bonus du plus faible : √(20 / 1) plafonné à ×1,75 ; le fort n'est pas affaibli
+    assert.deepStrictEqual([S.boost, W.boost], [undefined, 1.75]);
+    assert.strictEqual(W.maxHp, Math.round(battle.participants.get('u' + idw).stats.maxHp * 1.75), 'vie ×1,75');
     const w = battle.players.find((f) => f.userId === winnerId);
     const l = battle.players.find((f) => f.userId === loserId);
-    assert.deepStrictEqual([battle.players.find((f) => f.userId === ids).power, battle.players.find((f) => f.userId === idw).power], [20, 1]);
     battle.kill(w, l);
     battle.tick(0.05);
   };
-  // Le fort écrase le faible : kill, premier kill et victoire ×0,4
+  // Le fort bat le faible, puis le faible bat le fort : mêmes gains (kill 30 + victoire 90, 3 coffres chacun)
   const goldS = (await meOf(strong)).character.gold;
   await play(ids, idw);
-  assert.strictEqual((await meOf(strong)).character.gold - goldS, Math.round(10 * 0.4) + Math.round(30 * 0.4), 'kill 4 + victoire 12');
-  // Le faible bat le fort : tout ×2 (plafond)
+  assert.strictEqual((await meOf(strong)).character.gold - goldS, 30 + 90);
   const before = (await meOf(weak)).character;
   await play(idw, ids);
   const after = (await meOf(weak)).character;
-  assert.strictEqual(after.gold - before.gold, 20 + 60, 'kill 20 + victoire 60');
-  assert.strictEqual(after.chests - before.chests, 2 + 2 + 2, 'kill, premier kill et victoire : 2 coffres chacun');
+  assert.strictEqual(after.gold - before.gold, 30 + 90);
+  assert.strictEqual(after.chests - before.chests, 3 + 3 + 3, 'kill, premier kill et victoire : 3 coffres chacun');
   io.to = sock;
-  assert.ok(events.some((e) => e.type === 'win' && e.mult === 2), 'le multiplicateur est envoyé au joueur');
-  assert.ok(events.some((e) => e.type === 'participation' && !e.mult), 'la participation ne change pas');
+  assert.ok(events.every((e) => e.mult === undefined), 'plus de multiplicateur de puissance');
+  assert.ok(events.some((e) => e.type === 'participation' && e.reward.xp === 100), 'participation : 100 XP');
   await admin.post('/api/admin/battle/reset');
 });
 
@@ -1068,7 +1072,7 @@ test('[HIST-1, HIST-4, LIFE-1, RUSH-5] historique et statistiques via l\'API, vu
   assert.deepStrictEqual([e.mode, e.outcome, e.rank, e.total, e.kills], ['br', 'win', 1, 2, 1]);
   assert.ok(e.taken >= 1 && e.dealt >= 1);
   const kill = Rules.REWARDS.kill;
-  assert.ok(e.gains.gold >= Rules.REWARDS.win.gold * 0.4 + kill.gold * 0.4, 'gains de la partie (participation, kill, victoire)');
+  assert.ok(e.gains.gold >= Rules.REWARDS.win.gold + kill.gold, 'gains de la partie (participation, kill, victoire)');
   assert.ok(e.gear && e.stats && e.level === ch.level);
   assert.deepStrictEqual(ch.lifetime.modes.br, { games: 1, wins: 1 });
   assert.ok(ch.lifetime.goldEarned >= e.gains.gold);

@@ -215,6 +215,17 @@ class Battle extends EventEmitter {
     if (this.mode === 'br' || this.mode === 'koth') {
       const positions = spawnPositions(this.players.length);
       this.players.forEach((f, i) => Object.assign(f, positions[i]));
+      // Équilibrage par la puissance (comme la Guerre des clans) : chacun face à la puissance moyenne des autres ;
+      // le plus faible est renforcé (vie et dégâts). Pas en entraînement (duel contre un mannequin : balance = false).
+      if (this.balance !== false && this.players.length > 1) {
+        const total = this.players.reduce((a, p) => a + (p.power || 1), 0);
+        for (const p of this.players) {
+          const others = (total - (p.power || 1)) / (this.players.length - 1);
+          const m = Rules.powerUnderdog(others, p.power || 1);
+          p.boost = m > 1 ? m : undefined;
+          if (m > 1) { p.maxHp = Math.round(p.maxHp * m); p.hp = p.maxHp; p.damage *= m; }
+        }
+      }
       if (this.mode === 'koth') {
         const K = Rules.KOTH;
         this.koth = { hill: { x: ARENA.w / 2, y: ARENA.h / 2, r: K.hill.radius }, next: null, moveAt: K.hill.moveEvery, king: null };
@@ -3293,7 +3304,7 @@ class Battle extends EventEmitter {
       })),
       fighters: shown.map((f) => ({
         key: f.key, name: f.name, title: f.title, cls: f.cls, look: f.look, app: f.app, level: f.level,
-        kind: f.kind, elite: f.elite || undefined, clone: f.clone || undefined, r: f.r, scale: f.scale, clan: f.clan || undefined,
+        kind: f.kind, elite: f.elite || undefined, clone: f.clone || undefined, r: f.r, scale: f.scale, clan: f.clan || undefined, boost: f.boost || undefined,
         hidden: this.event === 'fog' && f.alive && this.inFog(f),
         x: Math.round(f.x), y: Math.round(f.y),
         hp: Math.max(0, Math.round(f.hp)), maxHp: f.maxHp,

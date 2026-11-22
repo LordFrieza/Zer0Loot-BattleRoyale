@@ -862,28 +862,17 @@ function scaled(reward) {
   return { xp: reward.xp * m, gold: reward.gold * m, chests: reward.chests * m };
 }
 
-// Récompenses équilibrées (modes PvP) : puissance moyenne des adversaires d'un combattant.
-function opponentsPower(f, fighters) {
-  const foes = fighters.filter((o) => o !== f && o.kind === 'player' && (!f.clan || o.clan !== f.clan));
-  if (!foes.length) return f.power;
-  return foes.reduce((a, o) => a + (o.power || 1), 0) / foes.length;
-}
-// Récompense de base × événement (Loot double) × multiplicateur de puissance.
-function balanced(base, mult) {
-  return Rules.scaleReward(scaled(base), mult);
-}
 
 battle.on('kill', (killer, victim) => {
   const user = killer.userId && db.state.users[killer.userId];
   if (!user) return;
-  // Tuer plus fort que soi rapporte plus, tuer plus faible rapporte moins.
-  const mult = Rules.rewardMultiplier(killer.power, victim && victim.power);
-  const reward = balanced(Rules.REWARDS.kill, mult);
+  // Les combats sont équilibrés au lancement (bonus du plus faible) : la récompense ne dépend plus de la puissance.
+  const reward = scaled(Rules.REWARDS.kill);
   const levels = grantBattle(user, reward);
   user.character.record.kills += 1;
   db.save();
   pushMe(user);
-  io.to('user:' + user.id).emit('reward', { type: 'kill', reward, levels, mult });
+  io.to('user:' + user.id).emit('reward', { type: 'kill', reward, levels });
 });
 
 // Séries de kills : coffres bonus (premier kill, double kill, massacre).
@@ -891,13 +880,12 @@ battle.on('streak', (fighter, kind) => {
   const user = fighter.userId && db.state.users[fighter.userId];
   if (!user) return;
   if (kind !== 'triple') game.bump(user.character, kind);
-  const mult = Rules.rewardMultiplier(fighter.power, opponentsPower(fighter, battle.players));
-  const reward = Rules.REWARDS[kind] && balanced(Rules.REWARDS[kind], mult);
+  const reward = Rules.REWARDS[kind] && scaled(Rules.REWARDS[kind]);
   if (!reward || !(reward.chests || reward.gold || reward.xp)) { db.save(); pushMe(user); return; }
   const levels = grantBattle(user, reward);
   db.save();
   pushMe(user);
-  io.to('user:' + user.id).emit('reward', { type: kind, reward, levels, mult });
+  io.to('user:' + user.id).emit('reward', { type: kind, reward, levels });
 });
 
 battle.on('end', (winner, fighters) => {
@@ -909,12 +897,11 @@ battle.on('end', (winner, fighters) => {
     const participationLevels = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (f === winner) {
-      const mult = Rules.rewardMultiplier(f.power, opponentsPower(f, battle.players));
-      const win = balanced(Rules.REWARDS.win, mult);
+      const win = scaled(Rules.REWARDS.win);
       const levels = grantBattle(user, win);
       user.character.record.wins += 1;
       if (battle.mode === 'koth') game.bump(user.character, 'kothWins');
-      io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels, mult });
+      io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels });
     }
     recordBattle(f, user, f === winner ? 'win' : 'loss', battle.mode === 'koth' ? { score: Math.floor(f.score || 0), hillTime: Math.round(f.hillTime || 0) } : {});
     pushMe(user);
@@ -943,7 +930,7 @@ battle.on('coopEnd', (result, fighters) => {
     if (!user) continue;
     game.upgrade(user.character);
     user.character.record.battles += 1;
-    const participation = { ...Rules.REWARDS.participation };
+    const participation = { ...Rules.COOP_PARTICIPATION };
     const participationLevels = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: participationLevels });
     if (result.mode === 'boss' && result.victory) {
@@ -1018,7 +1005,7 @@ battle.on('goldEnd', (result, fighters) => {
     if (!user) continue;
     user.character.record.battles += 1;
     const best = result.best && result.best.key === f.key ? Rules.GOLD.bestChests : 0;
-    const reward = { xp: Rules.REWARDS.participation.xp, gold: f.goldGot, chests: f.chestsGot + best };
+    const reward = { xp: Rules.COOP_PARTICIPATION.xp, gold: f.goldGot, chests: f.chestsGot + best };
     game.upgrade(user.character);
     user.character.counters.goldBest = Math.max(user.character.counters.goldBest || 0, f.goldGot);
     const levels = grantBattle(user, reward);
@@ -1044,27 +1031,26 @@ battle.on('clansEnd', (result, fighters) => {
     const participation = { ...Rules.REWARDS.participation };
     const pl = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
-    // Récompenses équilibrées : puissance moyenne de l'équipe adverse ÷ la sienne.
-    const mult = Rules.rewardMultiplier(f.power, opponentsPower(f, fighters));
+    // L'équipe la plus faible est renforcée au lancement (CLAN-2) : les récompenses ne dépendent plus de la puissance.
     if (f.clan === result.winner) {
       user.character.record.wins += 1;
       game.bump(user.character, 'clansWins');
-      const reward = Rules.scaleReward(result.reward, mult);
+      const reward = { ...result.reward };
       const levels = grantBattle(user, reward);
-      io.to('user:' + user.id).emit('reward', { type: 'clans', reward, levels, clan: result.winner, mult });
+      io.to('user:' + user.id).emit('reward', { type: 'clans', reward, levels, clan: result.winner });
     }
     if (result.mvp && result.mvp.key === f.key) {
       game.bump(user.character, 'clansMvp');
-      const mvp = Rules.scaleReward({ xp: 0, gold: 0, chests: Rules.CLANS.mvpChests }, mult);
+      const mvp = { xp: 0, gold: 0, chests: Rules.CLANS.mvpChests };
       grantBattle(user, mvp);
-      io.to('user:' + user.id).emit('reward', { type: 'mvp', reward: mvp, levels: 0, mult });
+      io.to('user:' + user.id).emit('reward', { type: 'mvp', reward: mvp, levels: 0 });
     }
     recordBattle(f, user, f.clan === result.winner ? 'win' : 'loss', { clan: f.clan, mvp: !!(result.mvp && result.mvp.key === f.key) });
     pushMe(user);
   }
   db.save();
   const T = Rules.CLANS.teams[result.winner];
-  twitch.say(`${T.icon} Victoire des ${T.label} ! Chaque membre gagne ${result.reward.xp} XP, ${result.reward.gold} golds et ${result.reward.chests} coffre.${result.mvp ? ` MVP : ${result.mvp.name} (+1 coffre).` : ''}`);
+  twitch.say(`${T.icon} Victoire des ${T.label} ! Chaque membre gagne ${result.reward.xp} XP, ${result.reward.gold} golds et ${result.reward.chests} coffres.${result.mvp ? ` MVP : ${result.mvp.name} (+${Rules.CLANS.mvpChests} coffres).` : ''}`);
   notifyBets(bets.settle('clan:' + result.winner, `les ${T.label}`));
   const br = bets.summary().lastResult;
   if (br && !br.refund && br.winners) twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
@@ -1366,6 +1352,7 @@ app.post('/api/training/start', requirePlayer, (req, res) => {
       opponent.consumable = null;
     }
     const b = new Battle();
+    b.balance = false; // duel d'entraînement : pas de bonus du plus faible
     b.openQueue(60, 'br');
     clearTimeout(b.queueTimer);
     b.join(participantFromUser(user));

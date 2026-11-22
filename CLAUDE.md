@@ -50,7 +50,7 @@ Un viewer sans compte obtient, via `!join`, un personnage rattaché à son pseud
 
 ## Invariants et pièges
 
-- **Récompenses et événement `double`** : passe toujours par `scaled()` dans `index.js` ; ne crédite jamais directement `Rules.REWARDS`. Exception : les modes coopératifs (sans événement) créditent la récompense commune du résultat `coopEnd` à **tous** les participants humains, morts compris ; les kills de monstres ne rapportent rien et ne comptent pas dans le record.
+- **Récompenses et événement `double`** : passe toujours par `scaled()` dans `index.js` ; ne crédite jamais directement `Rules.REWARDS` (modes PvP : ×3 et participation 100 XP ; les modes coopératifs et le Golden Shower utilisent `Rules.COOP_PARTICIPATION`, 25 XP). Les récompenses PvP ne dépendent plus de la puissance : l'équilibrage se fait au lancement dans `start()` de `battle.js` (bonus du plus faible `Rules.powerUnderdog`, champ `boost`, désactivé par `battle.balance = false` pour le duel d'entraînement ; équipe faible via `clanUnderdog` en Guerre des clans). Exception : les modes coopératifs (sans événement) créditent la récompense commune du résultat `coopEnd` à **tous** les participants humains, morts compris ; les kills de monstres ne rapportent rien et ne comptent pas dans le record.
 - **Bots** (`bot: true`, clé `bot<n>`) et joueurs sans `userId` ne reçoivent rien et ne sont jamais sauvegardés ; on peut pourtant parier sur eux.
 - **Clés de combattants** : `u<id>` pour un humain, `bot<n>` pour un bot ; les paris, le ciblage et les classements s'appuient dessus.
 - **Zone et météores ne peuvent pas tuer le dernier survivant** ; si tous meurent le même tick, le dernier mort ressuscite à 1 PV et gagne. Les morts de zone/météore n'ont pas de tueur (pas de XP de kill).

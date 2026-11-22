@@ -200,7 +200,9 @@ test('[Q-8, B-5] lancement : stats rafraîchies depuis la base, événement alé
   await post('/api/admin/event', { event: 'random' });
   const started = await post('/api/admin/battle/start');
   battle.stopLoop();
-  assert.strictEqual(fighterOf(id).maxHp, before + 100);
+  // Vie recalculée, avant le bonus éventuel du plus faible (PWR-2)
+  const f = fighterOf(id);
+  assert.ok(Math.abs(f.maxHp - Math.round((before + 100) * (f.boost || 1))) <= 1);
   assert.ok(Object.keys(Rules.BATTLE_EVENTS).includes(started.data.event), `événement tiré : ${started.data.event}`);
   assert.strictEqual(battle.event, started.data.event);
   assert.strictEqual(started.data.pendingEvent, null);
@@ -228,20 +230,20 @@ test('[EVT-1, PRG-7, LB-2, RT-2, RT-3] Loot double : récompenses ×2, événeme
 
   const rewards = toUser(since(mark), winner.id, 'reward');
   assert.deepStrictEqual(rewards.map((r) => r.type), ['kill', 'firstblood', 'participation', 'win']);
-  assert.deepStrictEqual(rewards[0].reward, { xp: 200, gold: 20, chests: 2 });
-  assert.deepStrictEqual(rewards[1].reward, { xp: 0, gold: 0, chests: 2 });
-  assert.deepStrictEqual(rewards[2].reward, { xp: 50, gold: 0, chests: 0 });
-  assert.deepStrictEqual(rewards[3].reward, { xp: 600, gold: 60, chests: 2 });
-  assert.deepStrictEqual(rewards.map((r) => r.levels), [0, 0, 0, 2], 'niveaux gagnés : 300 XP puis 500 XP');
+  assert.deepStrictEqual(rewards[0].reward, { xp: 600, gold: 60, chests: 6 });
+  assert.deepStrictEqual(rewards[1].reward, { xp: 0, gold: 0, chests: 6 });
+  assert.deepStrictEqual(rewards[2].reward, { xp: 200, gold: 0, chests: 0 });
+  assert.deepStrictEqual(rewards[3].reward, { xp: 1800, gold: 180, chests: 6 });
+  assert.deepStrictEqual(rewards.map((r) => r.levels), [1, 0, 1, 2], 'niveaux gagnés : 300, 500, 700 puis 900 XP');
   const c = (await winner.c.get('/api/me')).data.character;
-  assert.deepStrictEqual([c.chests, c.gold, c.level, c.xp], [6, 80, 3, 50]);
+  assert.deepStrictEqual([c.chests, c.gold, c.level, c.xp], [18, 240, 5, 200]);
   assert.deepStrictEqual(c.record, { battles: 1, kills: 1, wins: 1 });
   const l = (await loser.c.get('/api/me')).data.character;
-  assert.deepStrictEqual([l.xp, l.gold, l.chests], [50, 0, 0], 'participation doublée seulement');
+  assert.deepStrictEqual([l.xp, l.gold, l.chests], [200, 0, 0], 'participation doublée seulement');
 
   // RT-3 : « me » poussé à chaque joueur ; RT-2 : « leaderboard » diffusé à tous en fin de bataille
   assert.ok(toUser(since(mark), winner.id, 'me').length >= 1);
-  assert.strictEqual(toUser(since(mark), winner.id, 'me').at(-1).character.level, 3);
+  assert.strictEqual(toUser(since(mark), winner.id, 'me').at(-1).character.level, 5);
   assert.strictEqual(broadcast(since(mark), 'leaderboard').length, 1);
   assert.ok(broadcast(since(mark), 'queue').length >= 1);
   await post('/api/admin/battle/reset');

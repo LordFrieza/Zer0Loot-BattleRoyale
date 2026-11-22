@@ -167,7 +167,7 @@ test('[CLAN-7] clans : cristal détruit, ou au temps le cristal le moins entamé
   assert.strictEqual(res.teams.bleu.crystal, 0);
   assert.strictEqual(res.teams.rouge.players, 2);
   assert.strictEqual(res.mvp.key, r1.key);
-  assert.deepStrictEqual(res.reward, { xp: 200, gold: 40, chests: 1 });
+  assert.deepStrictEqual(res.reward, { xp: 600, gold: 120, chests: 3 });
   assert.strictEqual(res.ranking[0].key, r1.key);
 
   // Au temps : le cristal qui a gardé la plus grande part de sa vie
