@@ -230,7 +230,8 @@
     ctx.fillStyle = 'rgba(0,20,40,.25)'; ctx.beginPath(); ctx.ellipse(BOAT.x, y + 30, 120, 12, 0, 0, Math.PI * 2); ctx.fill();
     // personnage debout dans la barque (on cache son arme habituelle : il tient la canne)
     // (pieds sous le bord de la coque : on ne voit que le haut du corps, il est vraiment DANS la barque)
-    drawFighter(ctx, BOAT.x - 10, y - 27, { name: '', cls: c.cls, look: lookOf(), app: { ...c.look, weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: S.phase === 'reel' ? Math.sin(t / 70) * 1.5 : 0 });
+    // (le pseudo donne la couleur de peau « automatique », comme partout ailleurs)
+    drawFighter(ctx, BOAT.x - 10, y - 27, { name: me.twitchDisplayName || me.username, cls: c.cls, look: lookOf(), app: { ...c.look, weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: S.phase === 'reel' ? Math.sin(t / 70) * 1.5 : 0 });
     // familier principal à la proue
     const P = c.pets;
     const pet = P && P.list && P.list.find((p) => p.id === P.active);
