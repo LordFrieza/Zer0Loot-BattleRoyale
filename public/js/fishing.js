@@ -174,7 +174,7 @@
     '🧊 Givrenoire & Fils : la pêche sur glace, même en été',
     '📏 Ton poisson était PLUS GRAND. On te croit.',
     '🎰 Casino Zer0Loot : ici aussi, on se fait plumer',
-    '🐸 Le Roi des marais décline toute responsabilité',
+    '👻 Ether des brumes décline toute responsabilité',
     '🌊 Pêche du Léviathan interdite sans permis (et sans courage)',
     '😴 La pêche : 90 % d\'attente, 10 % de panique',
     '🐈 Mini Lilith a mangé ta prise ? C\'est normal.',

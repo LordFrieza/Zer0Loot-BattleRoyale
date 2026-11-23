@@ -470,7 +470,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Duplicateur, Cape d'ombre, Armure d'épines, Croc de vampire, Sablier, Plume du vent, Œil de faucon, Bouclier runique,
     Bourse de gemmes, Boussole, Cor de guerre, Gourde de soin, Talisman du vent, Rune de givre, Tome des possibles ;
     6 au plus).
-  - **Eau** : la rivière, le lac gelé et la mare divisent la vitesse par deux (joueur et monstres) ; les ponts restent au sec.
+  - **Eau** : la rivière, le lac gelé et la mare divisent la vitesse par deux (joueur et monstres) ; les ponts restent au sec, et un ponton de planches porte la route là où elle longe l'eau (au marais).
   - **Bonus au sol** : poulet (soin), aimant, **Montre** ⏱️ (10 s de temps ralenti pour les monstres et leurs projectiles,
     pas pour le joueur) et **Bombe** 💣 (plus rare : tous les monstres normaux à l'écran explosent ; élites à moitié, boss épargnés).
   - **Évolutions d'armes** : une arme au niveau 8 + son objet → le prochain coffre la transforme (cinématique) : Lame du
@@ -479,6 +479,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Sablier), Marée d'acide (Fiole + Cristal). Recettes et découvertes dans le camp.
   - **Gardiens légendaires** : 2 ou 3 (au hasard parmi 8, un par lieu-dit) dorment dans leur antre ; on en réveille un en
     restant 3 s sur son sceau (un seul à la fois, il se rendort si on s'éloigne). Vaincu : +15 émeraudes et un coffre de 3.
+    Au marais, Ether des brumes (mains spectrales, intangible) ; à la prairie, Lilith des prés (cartes, disparition et bond).
   - **Sanctuaires maudits** (6 au hasard, cumulables) : monstres +10 % de dégâts et de vitesse, émeraudes +10 % chacun.
     **Encerclement** toutes les 4 vagues, **chariot doré** qui fuit (gemmes et 3 émeraudes), **jour et nuit** (cycle de
     5 min, 1 min de nuit à la vision réduite, soir doré et aube rose).

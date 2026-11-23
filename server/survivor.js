@@ -348,9 +348,9 @@ class SurvivorRun {
   // Dégâts infligés par une arme.
   damage(e, base, weapon, kb = 0) {
     if (e.dead) return;
-    // Ether intangible, Lilith disparue : rien ne les touche. Ether esquive aussi une partie des coups.
-    if (e.boss && (e.ghostUntil > this.t || e.hiddenUntil > this.t)) return;
-    if (e.boss && e.dodge && this.rand() < e.dodge) {
+    // Ether intangible, Lilith disparue (boss ou gardiens) : rien ne les touche. Ether esquive aussi une partie des coups.
+    if ((e.boss || e.legend) && (e.ghostUntil > this.t || e.hiddenUntil > this.t)) return;
+    if ((e.boss || e.legend) && e.dodge && this.rand() < e.dodge) {
       if (this.dmgEvents < 28) { this.events.push({ k: 'd', x: Math.round(e.x), y: Math.round(e.y - e.r), v: 'Esquivé', c: 2 }); this.dmgEvents += 1; }
       return;
     }
@@ -651,11 +651,12 @@ class SurvivorRun {
   }
 
   // Ether, Lilith et Daedra : plusieurs attaques jouées à tour de rôle (plus vite une fois enragés).
-  bossCombo(b, B, toward) {
+  // Aussi utilisé par les gardiens Ether et Lilith (legend : pas d'annonce « Ether devient intangible » du boss).
+  bossCombo(b, B, toward, legend = false) {
     const P = this.p;
-    const atk = B.attacks[b.turn % B.attacks.length];
-    b.turn += 1;
-    const warn = (x, y, r, delay, act, d) => this.areas.push({ id: this.nextId++, k: 'warn', x, y, r, at: this.t + delay, until: this.t + delay, act, damage: d });
+    const atk = B.attacks[(b.turn || 0) % B.attacks.length];
+    b.turn = (b.turn || 0) + 1;
+    const warn = (x, y, r, delay, act, d) => this.areas.push({ id: this.nextId++, k: 'warn', x, y, r, at: this.t + delay, until: this.t + delay, act, damage: d, owner: act === 'leap' ? b : undefined });
     const ring = (n, spd, kind, d, extra = {}) => {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * Math.PI * 2 + this.t;
@@ -673,7 +674,7 @@ class SurvivorRun {
           const d = i ? 40 + this.rand() * 90 : 0;
           warn(P.x + Math.cos(a) * d, P.y + Math.sin(a) * d, 70, 0.9 + i * 0.7, 'grab', b.damage * 0.9);
         }
-        this.events.push({ k: 'ghost', x: Math.round(b.x), y: Math.round(b.y) });
+        this.events.push({ k: 'ghost', x: Math.round(b.x), y: Math.round(b.y), legend: legend || undefined });
         break;
       case 'wail':
         // Hurlement : deux anneaux d'âmes qui ralentissent
@@ -765,7 +766,7 @@ class SurvivorRun {
     const S = this.stats;
     for (const w of this.weapons) {
       const s = w.s;
-      const area = (s.area || 1) * S.area * (1 + (this.fx.area || 0));
+      const area = this.areaOf(w);
       const amount = (s.amount || 1) + S.amount;
       const life = s.duration * S.duration; // Sablier
       const spd = s.speed * S.shotSpeed; // Plume du vent
@@ -940,6 +941,12 @@ class SurvivorRun {
   }
 
   // Orbes : [nombre, rayon, vitesse] de chaque anneau (Anneau éternel : un second anneau, plus large, à contre-sens)
+  // Zone d'effet d'une arme : la sienne × l'objet « Zone » (stats.area) × le lieu-dit ou l'autel (fx.area, ex. Marais +25 %).
+  // Utilisée pour les dégâts ET pour ce que le navigateur dessine (aura, orbes, faux), pour qu'ils correspondent.
+  areaOf(w) {
+    return (w.s.area || 1) * this.stats.area * (1 + (this.fx.area || 0));
+  }
+
   orbRings(w, area, amount) {
     const r = w.s.range * area;
     const rings = [[amount, r, w.s.speed]];
@@ -1242,7 +1249,7 @@ class SurvivorRun {
     const W = Rules.survivorWave(this.wave);
     const hp = Math.round(GD.hp * W.hp);
     const e = { id: this.nextId++, kind: D.draw, legend: true, zone: l.zone, x: l.x, y: l.y, hp, maxHp: hp, r: D.radius, speed: D.speed, damage: GD.damage * W.damage,
-      xp: 0, hitCd: 0, kx: 0, ky: 0, special: 2, atk: 0, hits: {}, phase: 0 };
+      xp: 0, hitCd: 0, kx: 0, ky: 0, special: 2, atk: 0, hits: {}, phase: 0, dodge: D.dodge || 0, turn: 0 };
     this.enemies.push(e);
     l.e = e;
     l.state = 'awake';
@@ -1315,6 +1322,10 @@ class SurvivorRun {
         for (let i = 0; i < 4; i++) { const a = this.rand() * Math.PI * 2; const d = i ? 120 + this.rand() * 120 : 0; this.areas.push({ id: this.nextId++, k: 'bog', x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d, r: 90, until: this.t + 6, damage: dmg * 0.35, tickAt: this.t + 0.6 }); }
         break;
       case 'summon': around('gobelin', 6, 80); around('gobelin_violet', 2, 120); break;
+      // Ether et Lilith : mêmes attaques que leur boss (bossCombo joue l'attaque demandée)
+      case 'hands': case 'wail': case 'chains': case 'cards': case 'pounce':
+        this.bossCombo(e, { ...D, attacks: [atk] }, toward, true);
+        break;
       default:
     }
     this.events.push({ k: 'legendAtk', zone: e.zone, atk });
@@ -1468,10 +1479,10 @@ class SurvivorRun {
       b: b ? { kind: b.kind, x: Math.round(b.x), y: Math.round(b.y), hp: Math.max(0, Math.round(b.hp)), maxHp: Math.round(b.maxHp), rage: b.rage || undefined, rageIn: b.rage ? 0 : Math.ceil(SV.bossRage.after - (this.t - b.spawnT)),
         ghost: b.ghostUntil > this.t ? 1 : undefined, hidden: b.hiddenUntil > this.t ? 1 : undefined,
         decoys: this.enemies.some((d) => d.decoy && !d.dead) ? this.enemies.filter((d) => d.decoy && !d.dead).map((d) => [Math.round(d.x), Math.round(d.y)]) : undefined } : null,
-      orb: orb ? { rings: this.orbRings(orb, (orb.s.area || 1) * this.stats.area, (orb.s.amount || 1) + this.stats.amount).map(([n, r, spd]) => [n, Math.round(r), spd]), t0: orb.t0, size: Math.round(14 * (orb.s.area || 1) * this.stats.area), evo: orb.evo || undefined } : null,
-      aura: aura ? Math.round(aura.s.range * (aura.s.area || 1) * this.stats.area) : 0,
+      orb: orb ? { rings: this.orbRings(orb, this.areaOf(orb), (orb.s.amount || 1) + this.stats.amount).map(([n, r, spd]) => [n, Math.round(r), spd]), t0: orb.t0, size: Math.round(14 * this.areaOf(orb)), evo: orb.evo || undefined } : null,
+      aura: aura ? Math.round(aura.s.range * this.areaOf(aura)) : 0,
       auraEvo: aura && aura.evo ? 1 : undefined,
-      faux: faux ? { n: (faux.s.amount || 1) + this.stats.amount, r: Math.round(faux.s.range * (faux.s.area || 1) * this.stats.area), spd: faux.s.speed, t0: faux.t0, size: Math.round(34 * (faux.s.area || 1) * this.stats.area) } : null,
+      faux: faux ? { n: (faux.s.amount || 1) + this.stats.amount, r: Math.round(faux.s.range * this.areaOf(faux)), spd: faux.s.speed, t0: faux.t0, size: Math.round(34 * this.areaOf(faux)) } : null,
       weapons: this.weapons.map((w) => [w.id, w.level, w.evo ? 1 : 0]),
       passives: Object.entries(this.passives),
       cine: this.cine > 0 ? { id: this.cineId, left: Math.round(this.cine * 100) / 100 } : null,
@@ -1487,7 +1498,11 @@ class SurvivorRun {
       ct: this.cart ? { x: Math.round(this.cart.x), y: Math.round(this.cart.y), hp: Math.round((this.cart.hp / this.cart.maxHp) * 100), left: Math.round(this.cart.until - this.t), fx: Math.round(this.cart.fx * 100) / 100 } : null,
       // Gardiens : antres (0 endormi, 1 éveillé, 2 vaincu), charge du sceau, et le gardien éveillé
       lg: this.lairs.map((l) => ({ z: l.zone, x: Math.round(l.x), y: Math.round(l.y), st: l.state === 'sleep' ? 0 : l.state === 'awake' ? 1 : 2, c: Math.round(l.charge * 100) })),
-      lb: (() => { const l = this.lairs.find((x) => x.state === 'awake' && x.e); return l ? { z: l.zone, x: Math.round(l.e.x), y: Math.round(l.e.y), hp: Math.max(0, Math.round(l.e.hp)), maxHp: Math.round(l.e.maxHp) } : null; })(),
+      lb: (() => {
+        const l = this.lairs.find((x) => x.state === 'awake' && x.e);
+        return l ? { z: l.zone, x: Math.round(l.e.x), y: Math.round(l.e.y), hp: Math.max(0, Math.round(l.e.hp)), maxHp: Math.round(l.e.maxHp),
+          ghost: l.e.ghostUntil > this.t ? 1 : undefined, hidden: l.e.hiddenUntil > this.t ? 1 : undefined } : null;
+      })(),
       em: this.bonusEmeralds,
       slow: this.t < this.slowUntil ? Math.round((this.slowUntil - this.t) * 10) / 10 : 0, // Montre : secondes restantes
       paused: this.paused,

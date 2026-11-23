@@ -434,6 +434,32 @@
       for (const sx of [-L / 2, L / 2]) for (const sy of [-Wd / 2 - 3, Wd / 2 + 3]) { g.fillStyle = '#4e3018'; g.beginPath(); g.arc(sx, sy, 5, 0, Math.PI * 2); g.fill(); }
       g.restore();
     }
+    // Pontons de planches là où une route longe l'eau (on y marche à la vitesse de la route)
+    for (const w of MAP.walks || []) {
+      if (!w.some(([x, y]) => inChunk(x, y, 160))) continue;
+      const W = RD + 10 * K;
+      g.save();
+      g.lineCap = 'butt'; g.lineJoin = 'round';
+      g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = W + 6; g.translate(2, 4); strokePath(g, w); g.stroke(); g.translate(-2, -4);
+      g.strokeStyle = '#6b4322'; g.lineWidth = W + 8; strokePath(g, w); g.stroke();
+      g.strokeStyle = '#8a5a30'; g.lineWidth = W - 6; strokePath(g, w); g.stroke();
+      // Planches en travers, puis pilotis le long des bords
+      g.strokeStyle = '#5e3b1c'; g.lineWidth = 2;
+      for (let i = 0; i < w.length - 1; i++) {
+        const [ax, ay] = w[i]; const [bx, by] = w[i + 1];
+        const L = Math.hypot(bx - ax, by - ay); if (!L) continue;
+        const ux = (bx - ax) / L; const uy = (by - ay) / L; const nx = -uy; const ny = ux;
+        for (let d = 0; d < L; d += 10) {
+          const x = ax + ux * d; const y = ay + uy * d;
+          g.beginPath(); g.moveTo(x + nx * (W / 2 - 3), y + ny * (W / 2 - 3)); g.lineTo(x - nx * (W / 2 - 3), y - ny * (W / 2 - 3)); g.stroke();
+        }
+        for (let d = 0; d < L; d += 46) {
+          const x = ax + ux * d; const y = ay + uy * d;
+          for (const sd of [1, -1]) { g.fillStyle = '#4e3018'; g.beginPath(); g.arc(x + nx * sd * (W / 2 + 2), y + ny * sd * (W / 2 + 2), 5, 0, Math.PI * 2); g.fill(); }
+        }
+      }
+      g.restore();
+    }
     // 6) Décor (une graine par case de 64 px, y compris celles qui débordent sur ce morceau), triés par profondeur
     const items = [];
     for (let gy = Math.floor(y0 / TILE) - 1; gy <= Math.floor((y0 + CHUNK) / TILE) + 1; gy++) {
@@ -591,7 +617,7 @@
         break;
       case 'legendWake': {
         const D = Rules.SURVIVOR_GUARDIANS[e.zone];
-        svToast(`${D.icon} ${D.label} se réveille ! Éloigne-toi de son antre pour qu'il se rendorme.`, 3600, 'boss');
+        svToast(`${D.icon} ${D.label} se réveille ! Éloigne-toi de son antre pour le rendormir.`, 3600, 'boss');
         Sound.play('roar', true);
         G.shakeUntil = now + 600; G.shakeAmp = 12;
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 300, t0: now, life: 900, color: '#c77dff' });
@@ -718,7 +744,7 @@
         Sound.play('slam');
         break;
       case 'ghost':
-        svToast('👻 Ether devient intangible ! Esquive les mains spectrales…', 2200, 'boss');
+        svToast(`👻 ${e.legend ? Rules.SURVIVOR_GUARDIANS.marais.label : 'Ether'} devient intangible ! Esquive les mains spectrales…`, 2200, 'boss');
         G.fx.push({ k: 'ring', x: e.x, y: e.y, r: 120, t0: now, life: 500, color: '#c9d4ff' });
         Sound.play('blink');
         break;
@@ -1162,7 +1188,7 @@
     }
     if (f.lb) {
       if (!meDrawn && f.lb.y > G.me.y) drawMe();
-      drawGuardian(f.lb.z, f.lb.x, f.lb.y, now, { facing: f.lb.x > G.me.x ? -1 : 1, awake: true });
+      drawGuardian(f.lb.z, f.lb.x, f.lb.y, now, { facing: f.lb.x > G.me.x ? -1 : 1, awake: true, ghost: !!f.lb.ghost, hidden: !!f.lb.hidden });
     }
     if (!meDrawn) drawMe();
     // Orbes gardiens
@@ -1485,7 +1511,7 @@
     if (!o.awake) filters.push('brightness(0.62) saturate(0.7)');
     if (filters.length) ctx.filter = filters.join(' ');
     const breathe = o.awake ? 1 : 1 + Math.sin(now / 700) * 0.03;
-    drawMonster(ctx, x, y - lift, { kind: D.draw }, { scale: sc * breathe, t: o.awake ? now : 0, facing: o.facing || 1 });
+    drawMonster(ctx, x, y - lift, { kind: D.draw }, { scale: sc * breathe, t: o.awake ? now : 0, facing: o.facing || 1, intangible: !!o.ghost, vanish: !!o.hidden });
     ctx.restore();
   }
   function drawLair(l, now, t, anyAwake) {

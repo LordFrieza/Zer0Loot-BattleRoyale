@@ -552,6 +552,19 @@ test('[SV-11, SV-2] survivor : carte de 10 800 px, 16 routes au sec, +10 % de vi
   assert.strictEqual(Rules.survivorRoad(onRoad[0], onRoad[1]), true);
   assert.strictEqual(Rules.survivorGround(onRoad[0], onRoad[1]), 1.1);
   for (const b of M.bridges) assert.strictEqual(Rules.survivorRoad(b.x, b.y), true, 'les ponts comptent comme la route');
+  // Aucun point d'une route n'est dans l'eau (au centre comme sur les bords) : là où elle longe l'eau, un ponton
+  for (const r of M.roads) {
+    for (let i = 0; i < r.length - 1; i++) {
+      const [ax, ay] = r[i]; const [bx, by] = r[i + 1];
+      const L = Math.hypot(bx - ax, by - ay); const nx = -(by - ay) / L; const ny = (bx - ax) / L;
+      for (let d = 0; d <= L; d += 8) for (const off of [-M.width.road / 2, 0, M.width.road / 2]) {
+        const x = ax + ((bx - ax) * d) / L + nx * off; const y = ay + ((by - ay) * d) / L + ny * off;
+        assert.strictEqual(Rules.survivorWater(x, y), false, `route au sec en ${Math.round(x)}, ${Math.round(y)}`);
+      }
+    }
+  }
+  assert.ok(M.walks.length >= 1 && M.walks.some((w) => w.some(([x, y]) => Rules.survivorZone(x, y) === 'marais')), 'un ponton au marais');
+  for (const w of M.walks) for (const [x, y] of w) assert.strictEqual(Rules.survivorGround(x, y), 1.1, 'on marche sur le ponton à la vitesse de la route');
   const run = fresh();
   Object.assign(run.p, { x: onRoad[0], y: onRoad[1] });
   assert.ok(Math.abs(run.speedNow() - run.baseSpeed() * 1.1) < 1e-9);
@@ -1017,4 +1030,70 @@ test('[SV-24] survivor : les colonnes de feu de Daedra ne se traversent pas ; fo
   // Daedra vaincue : ses colonnes s'éteignent
   run.kill(b);
   assert.ok(!run.areas.some((a) => a.k === 'firewall'));
+});
+
+test('[SV-2] survivor : la zone d\'une arme (objet « Zone », Marais) agrandit aussi ce que l\'image dessine (aura, faux, orbes)', () => {
+  const run = fresh();
+  for (const id of ['aura', 'faux', 'orbes']) if (!run.weapons.some((w) => w.id === id)) run.addWeapon(id);
+  for (const w of run.weapons) w.on = true;
+  const f0 = run.frame();
+  run.stats.area *= 1.2;
+  run.fx = { area: 0.25 };
+  const f1 = run.frame();
+  const k = 1.2 * 1.25;
+  const aura = run.weapons.find((w) => w.id === 'aura');
+  assert.strictEqual(f1.aura, Math.round(aura.s.range * run.areaOf(aura)));
+  assert.ok(Math.abs(f1.aura / f0.aura - k) < 0.02, 'Aura de feu');
+  assert.ok(Math.abs(f1.faux.r / f0.faux.r - k) < 0.02 && f1.faux.size > f0.faux.size, 'Faux lunaire');
+  assert.ok(Math.abs(f1.orb.size / f0.orb.size - k) < 0.1, 'Orbes');
+});
+
+test('[SV-16] survivor : Ether au marais et Lilith à la prairie, avec les attaques de leur boss', () => {
+  assert.deepStrictEqual([Rules.SURVIVOR_GUARDIANS.marais.draw, Rules.SURVIVOR_GUARDIANS.prairie.draw], ['ether', 'lilith']);
+  const wake = (zone) => {
+    const run = fresh();
+    run.hurt = () => false;
+    const Z = Rules.SURVIVOR_ZONES[zone];
+    const l = { zone, x: Z.x, y: Z.y, sx: Z.x, sy: Z.y + 130, state: 'sleep', charge: 0, e: null };
+    run.lairs = [l];
+    const e = run.wakeLegend(l);
+    Object.assign(run.p, { x: e.x + 250, y: e.y });
+    return { run, e };
+  };
+  // Ether : mains spectrales et intangibilité (rien ne le touche), puis hurlement et chaînes ; il esquive parfois
+  {
+    const { run, e } = wake('marais');
+    assert.strictEqual(e.dodge, 0.2);
+    run.legendAttack(e);
+    assert.ok(e.ghostUntil > run.t && run.areas.some((a) => a.act === 'grab'));
+    assert.ok(run.events.some((ev) => ev.k === 'ghost' && ev.legend));
+    assert.strictEqual(run.frame().lb.ghost, 1);
+    const hp = e.hp;
+    run.damage(e, 500, null);
+    assert.strictEqual(e.hp, hp, 'intangible');
+    run.eshots = [];
+    run.legendAttack(e);
+    assert.ok(run.eshots.length >= 32 && run.eshots.every((s) => s.kind === 'soul'), 'hurlement');
+    run.eshots = [];
+    run.legendAttack(e);
+    assert.ok(run.eshots.length === 5 && run.eshots.every((s) => s.homing), 'chaînes');
+  }
+  // Lilith : cartes, puis disparition (rien ne la touche) et bond : c'est elle qui atterrit, pas le boss
+  {
+    const { run, e } = wake('prairie');
+    run.spawnBoss({ kind: 'troll', hp: 1e6, damage: 1 });
+    const bx = run.boss.x;
+    run.legendAttack(e);
+    assert.ok(run.eshots.some((s) => s.kind === 'card'));
+    run.legendAttack(e);
+    assert.ok(e.hiddenUntil > run.t && run.frame().lb.hidden === 1);
+    const hp = e.hp;
+    run.damage(e, 500, null);
+    assert.strictEqual(e.hp, hp, 'disparue');
+    const leap = run.areas.find((a) => a.act === 'leap');
+    assert.strictEqual(leap.owner, e);
+    for (let i = 0; i < 30; i++) run.tick(0.05);
+    assert.ok(Math.hypot(e.x - leap.x, e.y - leap.y) < 60, 'elle a bondi');
+    assert.ok(Math.abs(run.boss.x - bx) < 200, 'le boss n\'a pas bondi à sa place');
+  }
 });

@@ -2453,15 +2453,8 @@
         for (let gx = Math.max(0, Math.floor(x0 / C)); gx <= Math.min(cols - 1, Math.floor(x1 / C)); gx++) if (test(gx * C + C / 2, gy * C + C / 2)) grid[gy * cols + gx] = v;
       }
     };
-    // Routes (2), puis l'eau par-dessus (1), puis les ponts (2 : on y va aussi vite que sur la route)
-    const rh = width.road / 2 + 4;
-    for (const road of roads) {
-      for (let i = 0; i < road.length - 1; i++) {
-        const [ax, ay] = road[i];
-        const [bx, by] = road[i + 1];
-        mark(Math.min(ax, bx) - rh, Math.min(ay, by) - rh, Math.max(ax, bx) + rh, Math.max(ay, by) + rh, (x, y) => svSegDist(x, y, ax, ay, bx, by) <= rh, 2);
-      }
-    }
+    // L'eau (1), puis les routes PAR-DESSUS (2 : là où une route longe ou traverse l'eau, on marche sur un ponton en planches
+    // dessiné par le navigateur, à la vitesse de la route), puis les ponts (2)
     const half = width.river / 2;
     for (let i = 0; i < river.length - 1; i++) {
       const [ax, ay] = river[i];
@@ -2473,6 +2466,27 @@
       const ys = poly.map((p) => p[1]);
       mark(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), (x, y) => svInPoly(x, y, poly), 1);
     }
+    // Pontons : les morceaux de route qui passent sur l'eau (rivière ou mare), pour les dessiner en planches
+    const rh = width.road / 2 + C * 0.75; // jusqu'au bord des cases de 16 px que touche la route
+    const walks = [];
+    const riverNear = (x, y) => { for (let i = 0; i < river.length - 1; i++) if (svSegDist(x, y, river[i][0], river[i][1], river[i + 1][0], river[i + 1][1]) <= half + width.road * 0.25) return true; return false; };
+    for (const road of roads) {
+      let run = null;
+      road.forEach(([x, y], i) => {
+        const wet = riverNear(x, y) || svInPoly(x, y, pond) || svInPoly(x, y, lake);
+        if (wet) { if (!run) { run = i > 0 ? [road[i - 1]] : []; walks.push(run); } run.push([x, y]); } else if (run) { run.push([x, y]); run = null; }
+      });
+    }
+    // Un simple croisement est déjà couvert par son pont : on ne garde que les portions qui longent vraiment l'eau
+    const offBridge = (w) => w.some(([x, y]) => bridges.every((b) => Math.hypot(x - b.x, y - b.y) > width.bridge[0]));
+    for (let i = walks.length - 1; i >= 0; i--) if (!offBridge(walks[i])) walks.splice(i, 1);
+    for (const road of roads) {
+      for (let i = 0; i < road.length - 1; i++) {
+        const [ax, ay] = road[i];
+        const [bx, by] = road[i + 1];
+        mark(Math.min(ax, bx) - rh, Math.min(ay, by) - rh, Math.max(ax, bx) + rh, Math.max(ay, by) + rh, (x, y) => svSegDist(x, y, ax, ay, bx, by) <= rh, 2);
+      }
+    }
     for (const b of bridges) {
       const [L, Wd] = width.bridge;
       const c = Math.cos(b.a);
@@ -2480,7 +2494,7 @@
       const R = Math.hypot(L, Wd) / 2;
       mark(b.x - R, b.y - R, b.x + R, b.y + R, (x, y) => { const dx = x - b.x; const dy = y - b.y; return Math.abs(dx * c + dy * s) <= L / 2 && Math.abs(-dx * s + dy * c) <= Wd / 2; }, 2);
     }
-    svMapCache = { roads, river, lake, pond, crater, lava, bridges, width, grid, cell: C, cols, rows };
+    svMapCache = { roads, river, lake, pond, crater, lava, bridges, walks, width, grid, cell: C, cols, rows };
     return svMapCache;
   }
   // Ce point est-il dans l'eau (hors des ponts) ?
@@ -2579,8 +2593,10 @@
     champs: { label: 'Grignotor doré', icon: '💰', draw: 'mimic', scale: 1.4, hue: 15, speed: 96, radius: 40, attacks: ['leap', 'coins', 'leap'] },
     volcan: { label: 'Pyrax l\'Ancien', icon: '🔥', draw: 'dragon', scale: 1.2, hue: -25, speed: 92, radius: 44, attacks: ['fan', 'meteor'] },
     ruines: { label: 'Colosse des ruines', icon: '🗿', draw: 'troll', scale: 1.4, hue: 0, gray: true, speed: 78, radius: 46, attacks: ['quake', 'rocks'] },
-    marais: { label: 'Roi des marais', icon: '🐸', draw: 'slime', scale: 3.4, hue: 0, speed: 70, radius: 50, attacks: ['split', 'bog'] },
-    prairie: { label: 'Roi gobelin', icon: '👑', draw: 'gobelin_violet', scale: 2.8, hue: 0, speed: 98, radius: 40, attacks: ['charge', 'summon', 'charge'] },
+    // Ether et Lilith reprennent les attaques de leur boss du Survivor (mains spectrales et intangibilité, hurlement,
+    // chaînes ; cartes, disparition puis bond) ; Ether esquive aussi une partie des coups (dodge).
+    marais: { label: 'Ether des brumes', icon: '👻', draw: 'ether', scale: 1.3, hue: 0, speed: 90, radius: 38, attacks: ['hands', 'wail', 'chains'], ghost: 3, dodge: 0.2 },
+    prairie: { label: 'Lilith des prés', icon: '😼', draw: 'lilith', scale: 1.35, hue: 0, speed: 104, radius: 34, attacks: ['cards', 'pounce', 'cards', 'pounce'] },
   };
   // Difficulté de la vague n (1, 2, …) : vie et dégâts des ennemis, nombre d'ennemis à l'écran.
   function survivorWave(n) {
