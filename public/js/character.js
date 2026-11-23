@@ -37,6 +37,7 @@ function render() {
   if (document.querySelector('.tab.active[data-tab="casino"]')) { if (!Casino.active) Casino.enter(); else Casino.renderStats(); }
   if (document.querySelector('.tab.active[data-tab="survivor"]')) { if (!Survivor.active) Survivor.enter(); else Survivor.refreshLobby(); }
   if (document.querySelector('.tab.active[data-tab="maison"]')) { if (!Housing.active) Housing.enter(); else Housing.refresh(); }
+  if (document.querySelector('.tab.active[data-tab="peche"]')) { if (!Fishing.active) Fishing.enter(); else Fishing.renderSide(); }
   const ci = c.cls && Rules.CLASS_INFO[c.cls];
   $('class-badge').innerHTML = c.spec
     ? `<span style="color:${c.spec.color}">${c.spec.icon} ${esc(c.spec.spec)}</span> <span class="muted" style="font-size:12px">(${ci.label})</span>`
@@ -1854,7 +1855,7 @@ function pityToast(r) {
 })();
 
 // ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'survivor', 'maison', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
+const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'survivor', 'peche', 'maison', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
 
 function showTab(name) {
   if (!TABS.includes(name)) name = 'perso';
@@ -1868,6 +1869,7 @@ function showTab(name) {
   if (name === 'casino') Casino.enter(); else Casino.leave();
   if (name === 'survivor') Survivor.enter(); else Survivor.leave();
   if (name === 'maison') Housing.enter(); else Housing.leave();
+  if (name === 'peche') Fishing.enter(); else Fishing.leave();
 }
 
 document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => {

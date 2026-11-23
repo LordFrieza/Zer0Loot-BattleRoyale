@@ -675,6 +675,22 @@
     cupShuffle() {
       noise(0.09, { freq: 700, vol: 0.12 });
     },
+    // Pêche : lancer, bouchon, touches, ferrage, moulinet, prise, fuite, trésor ; ambiance (oiseaux le jour, grillons la nuit)
+    fishCast() { noise(0.35, { freq: 2500, sweep: 600, filter: 'bandpass', vol: 0.12 }); },
+    fishPlop(v = 1) { tone(520, 0.12, { type: 'sine', vol: 0.09 * v, to: 180 }); noise(0.12, { freq: 900, vol: 0.08 * v }); },
+    fishNibble() { tone(700, 0.05, { type: 'sine', vol: 0.06, to: 420 }); },
+    fishSink() { tone(320, 0.3, { type: 'sine', vol: 0.12, to: 90 }); noise(0.35, { freq: 1200, sweep: 300, vol: 0.18 }); },
+    fishHook() { noise(0.2, { freq: 3000, filter: 'highpass', vol: 0.12 }); tone(880, 0.1, { type: 'triangle', vol: 0.06 }); },
+    fishReel() { tone(1500 + Math.random() * 300, 0.025, { type: 'square', vol: 0.02 }); },
+    fishCatch(rarity = 'commun') {
+      const idx = ['commun', 'peu_commun', 'rare', 'epique', 'legendaire'].indexOf(rarity);
+      const notes = [72, 76, 79, 84, 88, 91].slice(0, 3 + Math.max(0, idx));
+      notes.forEach((n, i) => tone(midi(n), 0.22, { type: 'triangle', vol: 0.07, delay: i * 0.09 }));
+    },
+    fishEscape() { [64, 60].forEach((n, i) => tone(midi(n), 0.25, { type: 'sine', vol: 0.06, delay: i * 0.18 })); },
+    fishTreasure() { [72, 79, 84, 88, 91, 96].forEach((n, i) => tone(midi(n), 0.2, { type: 'triangle', vol: 0.07, delay: i * 0.08 })); },
+    birdChirp() { const f = 2400 + Math.random() * 1200; for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) tone(f, 0.06, { type: 'sine', vol: 0.025, to: f * 1.3, delay: i * 0.12 }); },
+    cricket() { for (let i = 0; i < 6; i++) tone(4200, 0.02, { type: 'square', vol: 0.012, delay: i * 0.05 }); },
     // Road to Heaven : petit « ding » qui monte avec le multiplicateur, effondrement, ailes
     heavenTick(m = 1) {
       tone(Math.min(2400, 440 * Math.pow(m, 0.35)), 0.06, { type: 'sine', vol: 0.035 });

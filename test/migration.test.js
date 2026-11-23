@@ -58,6 +58,7 @@ test('[DB-8] migration V1 → V2 : toute la progression est conservée, les nouv
     // 2.0 : émeraudes, Survivor et Maison tout neufs
     assert.strictEqual(c.emeralds, 0);
     assert.strictEqual(c.casinoTickets, 0, 'tickets de casino');
+    assert.deepStrictEqual(c.fishing, { dex: {} }, 'Pêchédex vide');
     assert.deepStrictEqual(c.forgePity, {}, 'forge : aucun échec compté');
     assert.deepStrictEqual(c.survivor, { meta: {}, unlocks: [], starters: [], starter: 'epee', best: null, dailyDate: '', runs: 0, evos: [], secrets: { legends: [], legendKills: 0, carts: 0, curses: 0 }, challenges: { day: '', done: [] } });
     assert.strictEqual(c.survivorActive, null);

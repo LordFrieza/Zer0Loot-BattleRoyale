@@ -444,6 +444,17 @@
     { id: 'deco5', metric: 'decoLevel', goal: 5, name: 'Petit nid douillet', desc: 'Atteindre le niveau de décoration 5', gold: 300 },
     { id: 'deco15', metric: 'decoLevel', goal: 15, name: 'Palais des merveilles', desc: 'Atteindre le niveau de décoration 15', gold: 2000 },
     { id: 'casinoLegend1', metric: 'casinoLegend', goal: 1, name: 'Coup de chance incroyable', desc: 'Gagner un lot incroyable dans la caisse de Grignotor', gold: 500 },
+    // Pêche
+    { id: 'fish1', metric: 'fishCaught', goal: 1, name: 'Première prise', desc: 'Pêcher un poisson', gold: 50 },
+    { id: 'fish10', metric: 'fishCaught', goal: 10, name: 'Pêcheur du dimanche', desc: 'Pêcher 10 poissons', gold: 150 },
+    { id: 'fish100', metric: 'fishCaught', goal: 100, name: 'Pêcheur aguerri', desc: 'Pêcher 100 poissons', gold: 600 },
+    { id: 'fish500', metric: 'fishCaught', goal: 500, name: 'Loup de mer', desc: 'Pêcher 500 poissons', gold: 2000 },
+    { id: 'species25', metric: 'fishSpecies', goal: 25, name: 'Naturaliste', desc: 'Inscrire 25 espèces au Pêchédex', gold: 300 },
+    { id: 'species50', metric: 'fishSpecies', goal: 50, name: 'Ichtyologue', desc: 'Inscrire 50 espèces au Pêchédex', gold: 1000 },
+    { id: 'species100', metric: 'fishSpecies', goal: 100, name: 'Pêchédex complet', desc: 'Inscrire les 100 espèces au Pêchédex', gold: 5000 },
+    { id: 'fishLegend1', metric: 'fishLegend', goal: 1, name: 'Prise légendaire', desc: 'Pêcher un poisson légendaire', gold: 1500 },
+    { id: 'treasure1', metric: 'fishTreasures', goal: 1, name: 'Chasseur de trésor', desc: 'Pêcher un trésor', gold: 200 },
+    { id: 'treasure10', metric: 'fishTreasures', goal: 10, name: 'Trésors engloutis', desc: 'Pêcher 10 trésors', gold: 1000 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
@@ -452,9 +463,10 @@
     'casinoPlays', 'jackpots', 'casinoLegend', 'svBestWave', 'svBosses', 'decoLevel',
     'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak',
     'etherWins', 'lilithWins', 'daedraWins', 'soloEther', 'soloLilith', 'soloDaedra', 'heroEther', 'heroLilith', 'heroDaedra',
-    'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins'];
+    'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins',
+    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna', ether: 'soloEther', lilith: 'soloLilith', daedra: 'soloDaedra' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
@@ -1859,6 +1871,197 @@
     return 0;
   }
 
+  // ---------- Pêche (onglet Pêche, mode actif et « cozy ») ----------
+  /*
+   * On attend dans sa barque : une forme approche du bouchon (poisson 95 %, trésor 5 %), tapote une ou plusieurs fois,
+   * puis le bouchon coule : il faut cliquer à ce moment (fenêtre `window`, en s) pour ferrer. Ensuite, la barre de
+   * remontée : garder la zone verte (soumise à la gravité) sur le poisson jusqu'à remplir la jauge. La rareté règle
+   * la fenêtre de ferrage, la taille de la zone (fraction de la barre), la vitesse et les à-coups du poisson et le temps
+   * de remplissage (`fill`, en s, à 100 % dans la zone). Un poisson ne rapporte rien d'autre que sa place au Pêchédex.
+   */
+  const FISHING = {
+    treasureChance: 0.05,
+    wait: [3, 15], // attente avant qu'une forme n'apparaisse (s), au hasard
+    approach: 2.2, // la forme nage jusqu'au bouchon (s)
+    nibbleGap: [0.7, 1.6], // entre deux touches (s)
+    latency: 0.35, // marge réseau acceptée pour le ferrage (s)
+    reelStart: 0.3, // jauge de départ de la remontée
+    drainRatio: 0.85, // la jauge descend à 85 % de sa vitesse de montée quand le poisson sort de la zone
+    minLandRatio: 0.85, // une prise plus rapide que 85 % du temps minimal est refusée (triche)
+    maxReel: 180, // une remontée dure 3 min au plus
+    // vmax : vitesse de nage (fraction de la barre par seconde), dart : vitesse d'un départ soudain (0,35 s ; la zone
+    // verte va jusqu'à 1,6), changes : changements de cap par seconde. Réglé par simulation (robot qui réagit en
+    // 0,15 / 0,25 / 0,35 s) : légendaire ≈ 76 % / 52 % / 28 % de réussite, presque 100 % pour un commun.
+    rarities: {
+      commun: { weight: 52, window: 1.1, zone: 0.34, vmax: 0.3, dart: 0.7, changes: 0.8, fill: 3.5, nibbles: [0, 2] },
+      peu_commun: { weight: 27, window: 0.95, zone: 0.3, vmax: 0.38, dart: 0.85, changes: 1.1, fill: 4.5, nibbles: [0, 2] },
+      rare: { weight: 13, window: 0.8, zone: 0.26, vmax: 0.48, dart: 1, changes: 1.4, fill: 6, nibbles: [1, 3] },
+      epique: { weight: 6, window: 0.65, zone: 0.23, vmax: 0.58, dart: 1.12, changes: 1.8, fill: 7.5, nibbles: [1, 3] },
+      legendaire: { weight: 2, window: 0.5, zone: 0.2, vmax: 0.68, dart: 1.18, changes: 2.2, fill: 9, nibbles: [2, 4] },
+    },
+    // Un trésor se remonte comme un objet lourd (« coulant »), à peu près comme un poisson rare.
+    treasure: { window: 0.9, zone: 0.28, vmax: 0.42, dart: 0.9, changes: 1.2, fill: 5, nibbles: [0, 1], move: 'coulant' },
+    // Caractère de la nage : multiplicateurs de vitesse (v) et de changements de cap (c), chance qu'un changement soit un
+    // départ soudain, zone visée (lo – hi) ; « calme » vise autour de sa position (rel).
+    swim: {
+      calme: { v: 0.9, c: 0.9, dart: 0.3, lo: 0, hi: 1, rel: 0.9 },
+      mixte: { v: 1, c: 1, dart: 0.35, lo: 0, hi: 1 },
+      vif: { v: 1, c: 1.1, dart: 0.55, lo: 0, hi: 1 },
+      flotteur: { v: 1.05, c: 1.15, dart: 0.5, lo: 0.25, hi: 1 },
+      coulant: { v: 1.05, c: 1.15, dart: 0.5, lo: 0, hi: 0.75 },
+    },
+    // Lots d'un trésor (poids sur 100). La canne légendaire déjà possédée devient un coffre de golds.
+    treasures: [
+      { id: 'coffres', weight: 70, label: '2 coffres', icon: '🎁', chests: 2 },
+      { id: 'golds', weight: 10, label: 'Coffre de golds', icon: '🪙', gold: 1000 },
+      { id: 'emeraudes', weight: 9, label: 'Coffre d\'émeraudes', icon: '💎', emeralds: 500 },
+      { id: 'cle', weight: 9, label: 'Clé de boss', icon: '🗝️', keys: 1 },
+      { id: 'canne', weight: 2, label: 'Canne à pêche légendaire', icon: '🎣', cosmetic: 'canne_legendaire' },
+    ],
+    moves: {
+      calme: 'Calme : de longues glissades tranquilles',
+      vif: 'Vif : des départs soudains',
+      mixte: 'Imprévisible : un peu de tout',
+      flotteur: 'Flotteur : remonte sans cesse vers la surface',
+      coulant: 'Coulant : file vers le fond',
+    },
+    shapes: ['poisson', 'long', 'plat', 'raie', 'anguille', 'meduse', 'poulpe', 'calmar', 'crabe', 'crevette', 'tortue', 'hippocampe', 'globe', 'requin', 'etoile', 'axolotl', 'lune', 'ange'],
+  };
+  // Les 100 espèces du Pêchédex : [id, nom, rareté, forme, couleur, couleur secondaire, motif, taille min, max (cm), nage, moment]
+  // Moment : null (toujours), 'jour' ou 'nuit' (heure de Paris : nuit de 20 h 30 à 6 h).
+  const FISH_TABLE = [
+    // Communs (40)
+    ['gardon', 'Gardon', 'commun', 'poisson', '#b8c4cc', '#e8eef0', 'ecailles', 10, 25, 'calme', null],
+    ['ablette', 'Ablette', 'commun', 'poisson', '#d8e2ea', '#9fb2c4', 'uni', 8, 15, 'vif', null],
+    ['perche', 'Perche', 'commun', 'poisson', '#9fb34a', '#e88a3a', 'rayures', 15, 40, 'mixte', null],
+    ['rotengle', 'Rotengle', 'commun', 'poisson', '#c8b46a', '#e8603a', 'uni', 12, 30, 'calme', null],
+    ['goujon', 'Goujon', 'commun', 'long', '#a89878', '#e8dcc0', 'points', 8, 14, 'coulant', null],
+    ['chevesne', 'Chevesne', 'commun', 'poisson', '#8a9aa4', '#d8dde0', 'ecailles', 20, 50, 'mixte', null],
+    ['tanche', 'Tanche', 'commun', 'poisson', '#6a7a3a', '#c8b44a', 'uni', 20, 45, 'coulant', null],
+    ['breme', 'Brème', 'commun', 'lune', '#b0a890', '#e0d8c0', 'uni', 25, 55, 'calme', null],
+    ['carassin', 'Carassin', 'commun', 'poisson', '#c8a04a', '#f0d890', 'uni', 10, 25, 'calme', null],
+    ['vairon', 'Vairon', 'commun', 'poisson', '#7a8a5a', '#e84a3a', 'rayures', 5, 10, 'vif', 'jour'],
+    ['epinoche', 'Épinoche', 'commun', 'poisson', '#8a9a6a', '#d84a3a', 'points', 4, 8, 'vif', null],
+    ['loche', 'Loche', 'commun', 'long', '#a8885a', '#5a4a2a', 'points', 8, 14, 'coulant', null],
+    ['poisson_chat', 'Poisson-chat', 'commun', 'poisson', '#5a5248', '#a8a090', 'uni', 20, 40, 'coulant', 'nuit'],
+    ['eperlan', 'Éperlan', 'commun', 'long', '#c8d8e0', '#8ab0c8', 'degrade', 12, 20, 'vif', null],
+    ['sardinelle', 'Sardinelle', 'commun', 'poisson', '#a8c0d8', '#e0e8f0', 'degrade', 10, 18, 'vif', null],
+    ['crevette_grise', 'Crevette grise', 'commun', 'crevette', '#b8b0a0', '#e8ddd0', 'uni', 4, 7, 'flotteur', null],
+    ['ecrevisse', 'Écrevisse', 'commun', 'crabe', '#8a3a2a', '#c86a4a', 'uni', 8, 14, 'coulant', null],
+    ['crabe_riviere', 'Crabe de rivière', 'commun', 'crabe', '#9a6a4a', '#d8a878', 'uni', 5, 10, 'coulant', null],
+    ['meduse_lune', 'Méduse lunaire', 'commun', 'meduse', '#c8d8ff', '#ffffff', 'uni', 8, 20, 'flotteur', 'nuit'],
+    ['petite_etoile', 'Petite étoile', 'commun', 'etoile', '#e88a5a', '#f8c890', 'points', 6, 12, 'coulant', null],
+    ['hotu', 'Hotu', 'commun', 'poisson', '#a0a8a8', '#d8d8d0', 'uni', 20, 40, 'mixte', null],
+    ['barbeau', 'Barbeau', 'commun', 'poisson', '#b0985a', '#e8d8a0', 'points', 25, 60, 'coulant', null],
+    ['ide', 'Ide mélanote', 'commun', 'poisson', '#c8b8a0', '#f0a050', 'uni', 25, 50, 'calme', null],
+    ['spirlin', 'Spirlin', 'commun', 'poisson', '#b8c0b0', '#3a4a3a', 'rayures', 8, 12, 'vif', 'jour'],
+    ['bouviere', 'Bouvière', 'commun', 'lune', '#c8b8d8', '#e86a9a', 'degrade', 5, 9, 'vif', null],
+    ['lamproie', 'Lamproie de Planer', 'commun', 'anguille', '#7a6a5a', '#b8a890', 'uni', 12, 18, 'coulant', null],
+    ['anguillette', 'Anguillette', 'commun', 'anguille', '#6a6a4a', '#c8c08a', 'uni', 20, 40, 'mixte', 'nuit'],
+    ['crevette_verre', 'Crevette de verre', 'commun', 'crevette', '#e8f0ff', '#a8c8e8', 'uni', 2, 4, 'flotteur', null],
+    ['lune_naine', 'Poisson-lune nain', 'commun', 'lune', '#d8c8a0', '#f8f0d8', 'points', 6, 12, 'calme', null],
+    ['gobie', 'Gobie', 'commun', 'poisson', '#8a7a6a', '#d8c8a8', 'points', 5, 10, 'coulant', null],
+    ['blennie', 'Blennie', 'commun', 'long', '#8a9a7a', '#e8d870', 'points', 6, 12, 'vif', null],
+    ['rascasse', 'Rascasse des lacs', 'commun', 'poisson', '#c86a4a', '#f0b090', 'points', 12, 25, 'coulant', null],
+    ['mulet', 'Mulet', 'commun', 'poisson', '#9aa8b0', '#d8e0e8', 'rayures', 25, 50, 'calme', null],
+    ['sole', 'Sole d\'étang', 'commun', 'plat', '#a89878', '#d8c8a8', 'points', 15, 30, 'coulant', null],
+    ['petite_raie', 'Petite raie', 'commun', 'raie', '#8a8478', '#c8c0b0', 'points', 20, 40, 'coulant', null],
+    ['meduse_ambre', 'Méduse ambrée', 'commun', 'meduse', '#f8c870', '#fff0c8', 'uni', 10, 25, 'flotteur', 'jour'],
+    ['poulpe_roseaux', 'Poulpe des roseaux', 'commun', 'poulpe', '#b86a5a', '#e8a890', 'points', 15, 30, 'mixte', null],
+    ['calmar_nain', 'Calmar nain', 'commun', 'calmar', '#e8b8a8', '#fff0e8', 'uni', 8, 15, 'vif', null],
+    ['hippocampe_brun', 'Hippocampe brun', 'commun', 'hippocampe', '#a8784a', '#e8c890', 'rayures', 6, 12, 'calme', null],
+    ['tortue_marais', 'Tortue des marais', 'commun', 'tortue', '#6a7a4a', '#a8b878', 'ecailles', 15, 30, 'coulant', 'jour'],
+    // Peu communs (28)
+    ['truite_arc', 'Truite arc-en-ciel', 'peu_commun', 'poisson', '#8ab0a8', '#e86a8a', 'points', 30, 60, 'mixte', null],
+    ['truite_fario', 'Truite fario', 'peu_commun', 'poisson', '#a8984a', '#d84a3a', 'points', 25, 55, 'vif', 'jour'],
+    ['saumon', 'Saumon', 'peu_commun', 'poisson', '#a8b8c0', '#f0906a', 'degrade', 50, 90, 'vif', null],
+    ['brochet', 'Brochet', 'peu_commun', 'long', '#6a8a4a', '#d8d890', 'points', 50, 110, 'vif', null],
+    ['sandre', 'Sandre', 'peu_commun', 'long', '#9aa080', '#d8d8c0', 'rayures', 40, 80, 'mixte', 'nuit'],
+    ['black_bass', 'Black-bass', 'peu_commun', 'poisson', '#6a8a3a', '#d8e0a8', 'rayures', 30, 55, 'mixte', null],
+    ['carpe', 'Carpe commune', 'peu_commun', 'poisson', '#b8903a', '#f0d890', 'ecailles', 40, 90, 'calme', null],
+    ['koi', 'Carpe koï', 'peu_commun', 'poisson', '#f8f0e8', '#f06a3a', 'points', 40, 80, 'calme', 'jour'],
+    ['silure', 'Silure', 'peu_commun', 'long', '#4a4a42', '#9a9a88', 'uni', 80, 200, 'coulant', 'nuit'],
+    ['lote', 'Lote de rivière', 'peu_commun', 'long', '#8a7a4a', '#c8b878', 'points', 30, 60, 'coulant', 'nuit'],
+    ['esturgeon', 'Esturgeon', 'peu_commun', 'long', '#8a8a80', '#d8d8d0', 'ecailles', 90, 180, 'coulant', null],
+    ['ombre', 'Ombre commun', 'peu_commun', 'poisson', '#9aa0a8', '#a86ac8', 'points', 30, 50, 'vif', null],
+    ['coregone', 'Corégone', 'peu_commun', 'poisson', '#c8d0d8', '#f0f4f8', 'uni', 30, 55, 'calme', null],
+    ['anguille_argent', 'Anguille argentée', 'peu_commun', 'anguille', '#8a98a0', '#e0e8f0', 'degrade', 50, 100, 'mixte', 'nuit'],
+    ['globe', 'Poisson-globe', 'peu_commun', 'globe', '#e8d070', '#f8f0c0', 'points', 10, 25, 'flotteur', null],
+    ['ange', 'Poisson-ange', 'peu_commun', 'ange', '#f0d040', '#3a6ac8', 'rayures', 12, 25, 'calme', 'jour'],
+    ['clown', 'Poisson-clown', 'peu_commun', 'poisson', '#f08a2a', '#ffffff', 'rayures', 6, 11, 'vif', null],
+    ['crabe_bleu', 'Crabe bleu', 'peu_commun', 'crabe', '#3a6ab8', '#e0e8f8', 'uni', 12, 20, 'coulant', null],
+    ['homard', 'Homard d\'eau douce', 'peu_commun', 'crabe', '#2a4a8a', '#c84a3a', 'uni', 25, 45, 'coulant', null],
+    ['meduse_rose', 'Méduse rose', 'peu_commun', 'meduse', '#f8a8d8', '#fff0f8', 'uni', 15, 35, 'flotteur', 'nuit'],
+    ['calmar_luciole', 'Calmar luciole', 'peu_commun', 'calmar', '#5ad8ff', '#e8fcff', 'points', 10, 20, 'vif', 'nuit'],
+    ['poulpe_tachete', 'Poulpe tacheté', 'peu_commun', 'poulpe', '#c8784a', '#f8d8b0', 'points', 30, 60, 'mixte', null],
+    ['pastenague', 'Raie pastenague', 'peu_commun', 'raie', '#7a6a5a', '#e8d8c0', 'uni', 40, 90, 'coulant', null],
+    ['hippocampe_dore', 'Hippocampe doré', 'peu_commun', 'hippocampe', '#f0c040', '#fff0b0', 'rayures', 8, 15, 'calme', null],
+    ['tortue_ecaille', 'Tortue à écailles', 'peu_commun', 'tortue', '#4a5a6a', '#a8b8c8', 'points', 40, 80, 'coulant', null],
+    ['axolotl', 'Axolotl', 'peu_commun', 'axolotl', '#f8b8c8', '#ff7a9a', 'uni', 15, 25, 'calme', null],
+    ['etoile_pourpre', 'Étoile pourpre', 'peu_commun', 'etoile', '#a84ac8', '#e8a8f8', 'points', 12, 25, 'coulant', null],
+    ['perroquet', 'Poisson-perroquet', 'peu_commun', 'poisson', '#4ac8a8', '#f8d040', 'degrade', 30, 60, 'mixte', 'jour'],
+    // Rares (18)
+    ['mole', 'Poisson-lune géant', 'rare', 'lune', '#a8b0b8', '#e0e4e8', 'uni', 100, 250, 'calme', null],
+    ['requin_lacs', 'Requin des lacs', 'rare', 'requin', '#7a8a98', '#e8ecf0', 'uni', 120, 250, 'mixte', null],
+    ['lanterne', 'Poisson-lanterne', 'rare', 'poisson', '#2a2a4a', '#ffe06a', 'points', 10, 20, 'vif', 'nuit'],
+    ['espadon', 'Espadon', 'rare', 'long', '#3a5a8a', '#c8d8e8', 'degrade', 150, 300, 'vif', null],
+    ['thon', 'Thon rouge', 'rare', 'poisson', '#2a3a6a', '#c8d0d8', 'degrade', 100, 200, 'vif', 'jour'],
+    ['merou', 'Mérou', 'rare', 'poisson', '#7a6a4a', '#c8a878', 'points', 60, 150, 'coulant', null],
+    ['barracuda', 'Barracuda', 'rare', 'long', '#8a98a8', '#e0e8f0', 'rayures', 60, 150, 'vif', null],
+    ['manta', 'Raie manta', 'rare', 'raie', '#2a2a3a', '#f0f0f0', 'uni', 200, 500, 'flotteur', null],
+    ['meduse_cristal', 'Méduse cristalline', 'rare', 'meduse', '#b8f8ff', '#ffffff', 'uni', 20, 50, 'flotteur', 'nuit'],
+    ['poulpe_abysses', 'Poulpe des abysses', 'rare', 'poulpe', '#6a2a8a', '#e86ac8', 'points', 60, 120, 'mixte', 'nuit'],
+    ['calmar_geant', 'Calmar géant', 'rare', 'calmar', '#c84a3a', '#f8b8a8', 'points', 150, 400, 'mixte', null],
+    ['tortue_emeraude', 'Tortue d\'émeraude', 'rare', 'tortue', '#2ab86a', '#a8f8c8', 'ecailles', 50, 100, 'coulant', null],
+    ['crabe_royal', 'Crabe royal', 'rare', 'crabe', '#c83a2a', '#f8d8c8', 'points', 30, 60, 'coulant', null],
+    ['anguille_elec', 'Anguille électrique', 'rare', 'anguille', '#3a4a6a', '#ffe03a', 'points', 100, 200, 'vif', null],
+    ['axolotl_dore', 'Axolotl doré', 'rare', 'axolotl', '#f8d060', '#fff0b0', 'points', 20, 30, 'calme', 'jour'],
+    ['poisson_scie', 'Poisson-scie', 'rare', 'long', '#8a8070', '#d8d0c0', 'uni', 150, 400, 'mixte', null],
+    ['hippocampe_glace', 'Hippocampe des glaces', 'rare', 'hippocampe', '#a8e8ff', '#ffffff', 'points', 12, 20, 'calme', null],
+    ['etoile_filante', 'Étoile filante des mers', 'rare', 'etoile', '#f8e070', '#fffff0', 'points', 20, 35, 'flotteur', 'nuit'],
+    // Épiques (10) — dont quelques clins d'œil aux boss
+    ['carpe_pyrax', 'Carpe de Pyrax', 'epique', 'poisson', '#ff5a2a', '#ffd040', 'ecailles', 60, 120, 'vif', null],
+    ['spectre_ether', 'Poisson spectral d\'Ether', 'epique', 'poisson', '#c8d4ff', '#ffffff', 'degrade', 30, 60, 'mixte', 'nuit'],
+    ['chat_lilith', 'Chat-poisson de Lilith', 'epique', 'poisson', '#a8743f', '#2a1a10', 'points', 40, 80, 'vif', null],
+    ['anguille_daedra', 'Anguille infernale de Daedra', 'epique', 'anguille', '#c4122f', '#ff8a2a', 'degrade', 150, 300, 'vif', null],
+    ['meduse_givre', 'Méduse de Givrenoire', 'epique', 'meduse', '#7fd8ff', '#e8fcff', 'points', 40, 80, 'flotteur', null],
+    ['poulpe_maexxna', 'Poulpe de Maexxna', 'epique', 'poulpe', '#1a1a24', '#c4122f', 'points', 80, 160, 'mixte', 'nuit'],
+    ['marteau', 'Requin-marteau', 'epique', 'requin', '#6a7a8a', '#d8dde0', 'uni', 250, 450, 'mixte', null],
+    ['coelacanthe', 'Cœlacanthe', 'epique', 'poisson', '#3a4a6a', '#e8e8f0', 'points', 120, 200, 'coulant', null],
+    ['arc_en_ciel', 'Poisson arc-en-ciel', 'epique', 'poisson', '#ff6ad8', '#6af0ff', 'degrade', 20, 40, 'vif', 'jour'],
+    ['nautile', 'Nautile ancien', 'epique', 'calmar', '#e8d8c0', '#a85a3a', 'rayures', 15, 30, 'coulant', null],
+    // Légendaires (4)
+    ['leviathan', 'Léviathan', 'legendaire', 'requin', '#2a6a7a', '#8af0e0', 'ecailles', 800, 1500, 'vif', null],
+    ['kraken', 'Kraken', 'legendaire', 'poulpe', '#6a1a4a', '#ff7ac8', 'points', 600, 1200, 'mixte', 'nuit'],
+    ['carpe_imperiale', 'Carpe d\'or impériale', 'legendaire', 'poisson', '#ffcc33', '#fff4b0', 'ecailles', 100, 180, 'vif', 'jour'],
+    ['esprit_lac', 'Esprit du lac', 'legendaire', 'meduse', '#e8fff8', '#8affd8', 'degrade', 50, 100, 'flotteur', 'nuit'],
+  ];
+  const FISH = {};
+  for (const [id, name, rarity, shape, color, accent, pattern, min, max, move, when] of FISH_TABLE) FISH[id] = { id, name, rarity, shape, color, accent, pattern, min, max, move, when };
+  const FISH_IDS = Object.keys(FISH);
+  // Moment de la journée pour la pêche (heure de Paris, mêmes horaires que le ciel du jeu) : 'jour' ou 'nuit'.
+  function fishTime(ts) {
+    const p = parisParts(ts);
+    const h = p.h + p.min / 60;
+    return h < 6 || h >= 20.5 ? 'nuit' : 'jour';
+  }
+  // Espèces qui peuvent mordre à ce moment-là, rangées par rareté.
+  function fishPool(time) {
+    const pool = {};
+    for (const f of Object.values(FISH)) if (!f.when || f.when === time) (pool[f.rarity] = pool[f.rarity] || []).push(f.id);
+    return pool;
+  }
+  // Paramètres du mini-jeu pour une prise (rareté du poisson ou trésor).
+  function fishDifficulty(target) {
+    if (target && target.kind === 'treasure') return { ...FISHING.treasure };
+    const f = FISH[target && target.id];
+    return f ? { ...FISHING.rarities[f.rarity], move: f.move } : null;
+  }
+  // Temps minimal d'une remontée (jauge de départ → pleine, poisson toujours dans la zone).
+  function fishMinReel(diff) {
+    return diff.fill * (1 - FISHING.reelStart);
+  }
+
   // ---------- Casino ----------
   // Neuf jeux, chacun tenu par un boss en smoking (croupier = identifiant du boss). Tous les tirages se font côté serveur.
   const CASINO = {
@@ -3023,6 +3226,12 @@
     cape_conquerant: { slot: 'cape', label: 'Cape du conquérant', price: 0, legend: true, color: '#4a1a7a', trim: '#ffd34a', unlock: { metric: 'wins', goal: 1000, desc: 'Gagner 1 000 parties' } },
     gants_massacre: { slot: 'gloves', label: 'Gantelets du carnage', price: 0, legend: true, color: '#3a0d10', trim: '#ff3b3b', unlock: { metric: 'kills', goal: 10000, desc: 'Éliminer 10 000 adversaires' } },
     ceinture_tresor: { slot: 'belt', label: 'Ceinture du chasseur de trésors', price: 0, legend: true, color: '#8a5a1e', trim: '#ffd34a', unlock: { metric: 'chests', goal: 5000, desc: 'Ouvrir 5 000 coffres' } },
+    // Pêche : la canne légendaire se pêche dans un trésor (2 % des trésors) ; la panoplie du pêcheur s'achète une fois le Pêchédex complet.
+    canne_legendaire: { slot: 'weapon', label: 'Canne à pêche légendaire', price: 0, legend: true, color: '#ffd34a', trim: '#7fe8ff', unlock: { metric: 'fishRod', goal: 1, desc: 'Pêcher la Canne légendaire dans un trésor (très rare)' } },
+    chapeau_pecheur: { slot: 'hat', label: 'Bob du pêcheur', price: 2500, color: '#c8b06a', trim: '#5a7a3a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
+    gilet_pecheur: { slot: 'chest', label: 'Gilet du pêcheur', price: 2500, color: '#5a7a3a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
+    salopette_pecheur: { slot: 'pants', label: 'Salopette du pêcheur', price: 2500, color: '#3a5a8a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
+    bottes_pecheur: { slot: 'shoes', label: 'Bottes du pêcheur', price: 2500, color: '#e8c030', trim: '#7a5a10', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
     lunettes_flambeur: { slot: 'face', label: 'Lunettes du flambeur', price: 0, legend: true, color: '#ffd34a', unlock: { metric: 'jackpots', goal: 25, desc: 'Décrocher 25 jackpots au casino' } },
     chaussons_palais: { slot: 'shoes', label: 'Chaussons du palais', price: 0, legend: true, color: '#7a1f6a', trim: '#ffd34a', unlock: { metric: 'decoLevel', goal: 20, desc: 'Atteindre le niveau de décoration 20 (le maximum) dans sa maison' } },
   };
@@ -3227,6 +3436,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
+    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishDifficulty, fishMinReel,
     CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,

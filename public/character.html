@@ -71,6 +71,7 @@
         <button data-tab="familier" class="act-tab" title="Familier"><span class="act-ico">🐾</span><span class="act-label">Familier</span><span class="tab-badge" data-badge="familier"></span></button>
         <button data-tab="casino" class="act-tab" title="Casino"><span class="act-ico">🎰</span><span class="act-label">Casino</span></button>
         <button data-tab="survivor" class="act-tab" title="Survivor"><span class="act-ico">🧟</span><span class="act-label">Survivor</span></button>
+        <button data-tab="peche" class="act-tab" title="Pêche"><span class="act-ico">🎣</span><span class="act-label">Pêche</span></button>
         <button data-tab="maison" class="act-tab" title="Maison"><span class="act-ico">🏠</span><span class="act-label">Maison</span><span class="tab-badge" data-badge="maison"></span></button>
         <button data-tab="entrainement" class="act-tab" title="Entraînement"><span class="act-ico">🏋️</span><span class="act-label">Entraînement</span></button>
       </span>
@@ -480,6 +481,22 @@
     </div>
     </section>
 
+    <section class="tab" data-tab="peche">
+    <div class="panel fish-panel">
+      <h2>🎣 Pêche <span class="sub">Un petit coin de paradis, ta barque et ton familier</span><button class="help-btn" type="button">?</button></h2>
+      <p class="muted help">Clique (ou appuie sur <b>Espace</b>) pour lancer ta ligne. Une forme approche du bouchon et le tapote… attends
+        qu'il <b>coule</b> pour cliquer et ferrer : trop tôt ou trop tard, la prise file. Ensuite, <b>maintiens le clic</b> pour faire monter
+        la zone verte (relâche pour la laisser retomber : elle a de l'élan) et garde-la sur le poisson jusqu'à remplir la jauge.
+        Plus le poisson est rare, plus il est vif et long à remonter. Les poissons rejoignent ton <b>Pêchédex</b> (100 espèces, certaines
+        seulement le jour ou la nuit, heure de Paris) ; 1 fois sur 20, c'est un <b>trésor</b> : coffres, golds, émeraudes, Clé de boss…
+        ou, très rarement, la Canne à pêche légendaire.</p>
+      <div class="fish-wrap">
+        <div class="fish-scene"><canvas id="fish-canvas" width="960" height="460"></canvas></div>
+        <div class="fish-side" id="fish-side"></div>
+      </div>
+    </div>
+    </section>
+
     <section class="tab" data-tab="survivor">
     <div class="panel sv-panel">
       <h2>🧟 Survivor <span class="sub">Survis aux vagues de monstres sur la grande carte</span><button class="help-btn" type="button">?</button></h2>
@@ -727,6 +744,8 @@
   <script src="/js/casino.js"></script>
   <script src="/js/casino-games.js"></script>
   <script src="/js/survivor.js"></script>
+  <script src="/js/fishing-draw.js"></script>
+  <script src="/js/fishing.js"></script>
   <script src="/js/housing-draw.js"></script>
   <script src="/js/housing-life.js"></script>
   <script src="/js/housing.js"></script>

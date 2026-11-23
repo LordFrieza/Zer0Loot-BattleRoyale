@@ -71,6 +71,9 @@ function upgrade(character) {
   if (!Number.isFinite(character.emeralds)) character.emeralds = 0;
   // 2.3 : tickets de casino (familier de Lilith)
   if (!Number.isFinite(character.casinoTickets)) character.casinoTickets = 0;
+  // Pêche : Pêchédex (espèce → { n prises, best plus grande taille en cm, first date de la première prise })
+  if (!character.fishing || typeof character.fishing !== 'object') character.fishing = { dex: {} };
+  if (!character.fishing.dex || typeof character.fishing.dex !== 'object') character.fishing.dex = {};
   // 2.1 : forge, +1 % de réussite par échec d'affilée, par rareté
   if (!character.forgePity || typeof character.forgePity !== 'object') character.forgePity = {};
   if (!character.survivor) character.survivor = newSurvivor();
@@ -145,6 +148,7 @@ function newCharacter() {
     pets: newPets(), // familiers (onglet Familier)
     emeralds: 0, // émeraudes (Survivor → méta-progression et Maison)
     casinoTickets: 0, // tickets de casino (Mini Lilith) : une partie gratuite à 50 golds
+    fishing: { dex: {} }, // Pêchédex
     forgePity: {}, // forge : échecs d'affilée par rareté ({ commun: 2 } = +2 % à la prochaine fusion commune)
     survivor: newSurvivor(), // Survivor : méta-progression, déblocages, record, récompense du jour
     survivorActive: null, // partie de Survivor en cours (golds rendus si le serveur redémarre)
@@ -1319,6 +1323,12 @@ function absorbGhost(user, ghost) {
     // record de salle : on garde le meilleur des deux, les autres compteurs s'additionnent
     c.counters[k] = Rules.MAX_COUNTERS.includes(k) ? Math.max(c.counters[k], g.counters[k] || 0) : c.counters[k] + (g.counters[k] || 0);
   }
+  // Pêchédex du fantôme : prises additionnées, record de taille et première prise conservés
+  for (const [id, e] of Object.entries((g.fishing && g.fishing.dex) || {})) {
+    const mine = c.fishing.dex[id];
+    c.fishing.dex[id] = mine ? { n: mine.n + (e.n || 0), best: Math.max(mine.best || 0, e.best || 0), first: Math.min(mine.first || Infinity, e.first || Infinity) } : { ...e };
+  }
+  c.counters.fishSpecies = Object.keys(c.fishing.dex).length;
   delete db.state.users[ghost.id];
 }
 

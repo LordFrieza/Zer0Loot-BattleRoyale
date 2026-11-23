@@ -367,6 +367,14 @@
       ctx.fillRect(-9, 17.5, 9, 1.4);
       ctx.fillRect(0.5, 17.5, 9.5, 1.4);
     }
+    if (id === 'bottes_pecheur') {
+      // Bottes de pluie montantes, semelle crantée
+      ctx.fillStyle = c.color;
+      roundRect(ctx, -8.5, 13.5, 8, 6, 2); ctx.fill();
+      roundRect(ctx, 0.5, 13.5, 8.5, 6, 2); ctx.fill();
+      ctx.fillStyle = shade(c.color, 0.35); ctx.fillRect(-8.5, 13.5, 8, 1.4); ctx.fillRect(0.5, 13.5, 8.5, 1.4);
+      ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(-6.8, 15.2, 1.2, 2.8); ctx.fillRect(2.2, 15.2, 1.2, 2.8);
+    }
     if (id === 'chaussons_palais') {
       // pompons dorés
       ctx.fillStyle = c.trim;
@@ -631,6 +639,15 @@
         ctx.fillStyle = '#ffd23f';
         ctx.fillRect(-7.5, -27.5, 15.5, 2.5);
         break;
+      case 'chapeau_pecheur': {
+        // Bob du pêcheur : bord tombant, ruban et une mouche de pêche piquée dessus
+        ctx.beginPath(); ctx.moveTo(-15, -20); ctx.quadraticCurveTo(0, -25, 15, -20); ctx.quadraticCurveTo(0, -18, -15, -20); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-10, -21.5); ctx.quadraticCurveTo(-10, -33, 0, -33); ctx.quadraticCurveTo(10, -33, 10, -21.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = c.trim; ctx.fillRect(-10, -25, 20, 2.6);
+        ctx.fillStyle = '#e8343a'; ctx.beginPath(); ctx.arc(6, -27.5, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ffd34a'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(6, -27.5); ctx.quadraticCurveTo(9, -29, 8, -31); ctx.stroke();
+        break;
+      }
       case 'pirate':
         ctx.beginPath(); ctx.moveTo(-15, -22); ctx.quadraticCurveTo(0, -38, 15, -22); ctx.quadraticCurveTo(0, -27, -15, -22); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffd23f';
@@ -820,6 +837,17 @@
         for (let x = -7; x <= 5; x += 3) { ctx.beginPath(); ctx.moveTo(x, -8); ctx.lineTo(x + 1.5, -5); ctx.lineTo(x + 3, -8); ctx.closePath(); ctx.fill(); }
         break;
       }
+      case 'gilet_pecheur':
+        // Gilet de pêche sans manches sur une chemise claire : poches, fermeture, leurre accroché
+        ctx.fillStyle = '#efe6d0'; ctx.fillRect(-2.5, -8, 5, 18);
+        ctx.fillStyle = c.trim;
+        for (const [x, y] of [[-8.5, -4], [3.5, -4], [-8.5, 2.5], [3.5, 2.5]]) { roundRect(ctx, x, y, 5, 4.5, 1); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.7;
+        for (const [x, y] of [[-8.5, -4], [3.5, -4], [-8.5, 2.5], [3.5, 2.5]]) { ctx.beginPath(); ctx.moveTo(x, y + 1.6); ctx.lineTo(x + 5, y + 1.6); ctx.stroke(); }
+        ctx.strokeStyle = '#3a3a3a'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-2.5, -8); ctx.lineTo(-2.5, 10); ctx.moveTo(2.5, -8); ctx.lineTo(2.5, 10); ctx.stroke();
+        ctx.fillStyle = '#e8343a'; ctx.beginPath(); ctx.arc(-6, -6, 1.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.moveTo(-6, -4.8); ctx.lineTo(-5, -2.5); ctx.lineTo(-7, -2.5); ctx.closePath(); ctx.fill();
+        break;
       default:
     }
     ctx.restore();
@@ -828,6 +856,17 @@
   // Pantalon (jambes)
   function drawPantsSkin(ctx, id, c, skin) {
     switch (id) {
+      case 'salopette_pecheur':
+        // Salopette imperméable : jambes larges, genouillères et boucles dorées
+        ctx.fillStyle = c.color;
+        roundRect(ctx, -9, 6, 9, 12, 2); ctx.fill();
+        roundRect(ctx, 0, 6, 9, 12, 2); ctx.fill();
+        ctx.fillStyle = shade(c.color, -0.2);
+        roundRect(ctx, -7.5, 11, 6, 3.5, 1.2); ctx.fill();
+        roundRect(ctx, 1.5, 11, 6, 3.5, 1.2); ctx.fill();
+        ctx.fillStyle = c.trim; ctx.fillRect(-9, 6, 18, 1.6);
+        ctx.beginPath(); ctx.arc(-5, 7.2, 1.1, 0, Math.PI * 2); ctx.arc(5, 7.2, 1.1, 0, Math.PI * 2); ctx.fill();
+        break;
       case 'kilt':
         ctx.fillStyle = skin;
         roundRect(ctx, -7, 12, 5, 6, 2); ctx.fill();
@@ -985,6 +1024,24 @@
         ctx.lineWidth = 0.8;
         ctx.beginPath(); ctx.moveTo(-1, -24); ctx.lineTo(-1, 7); ctx.stroke();
         break;
+      case 'canne_legendaire': {
+        // Canne à pêche légendaire : scion doré, moulinet, anneaux, fil et leurre lumineux qui se balance
+        ctx.strokeStyle = c.color; ctx.lineCap = 'round';
+        ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, -12); ctx.stroke();
+        ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -12); ctx.quadraticCurveTo(1.5, -26, 4, -38); ctx.stroke();
+        ctx.fillStyle = '#3a2a1a'; ctx.fillRect(-1.6, 0, 3.2, 6);
+        ctx.fillStyle = '#d8d8e0'; ctx.strokeStyle = INK; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(-3, -2, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = c.trim; ctx.lineWidth = 0.8;
+        for (const [x, y] of [[0.3, -18], [1.4, -27], [3, -34]]) { ctx.beginPath(); ctx.arc(x + 1.2, y, 1, 0, Math.PI * 2); ctx.stroke(); }
+        const sw = Math.sin(performance.now() / 420) * 3;
+        ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(4, -38); ctx.quadraticCurveTo(6 + sw, -28, 6 + sw, -20); ctx.stroke();
+        ctx.save(); ctx.shadowColor = c.trim; ctx.shadowBlur = 10;
+        ctx.fillStyle = c.trim; ctx.beginPath(); ctx.ellipse(6 + sw, -18.5, 1.8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        break;
+      }
       case 'baton_lune':
         ctx.fillStyle = '#e8e0f8'; ctx.fillRect(-1.5, -27, 3, 32);
         ctx.save();

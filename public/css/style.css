@@ -1661,3 +1661,39 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .hv-act { font-size: 22px !important; padding: 16px !important; min-height: 64px; }
 .hv-setup.locked { opacity: .4; pointer-events: none; }
 .hv-side .ice-mult [data-win] { display: block; min-height: 1.35em; } /* pas de saut du bouton quand le gain apparaît */
+/* ---------- Pêche ---------- */
+.fish-wrap { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.fish-scene { flex: 1 1 640px; border-radius: 14px; overflow: hidden; border: 2px solid #7a5a32; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); user-select: none; }
+.fish-scene canvas { display: block; width: 100%; height: auto; cursor: pointer; touch-action: none; }
+.fish-side { flex: 0 1 270px; min-width: 230px; display: flex; flex-direction: column; gap: 10px; }
+.fish-side > div, .fish-auto { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.fish-progress-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.fish-progress button { width: 100%; margin-top: 8px; }
+.fish-bar { height: 10px; border-radius: 6px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.fish-bar span { display: block; height: 100%; background: linear-gradient(90deg, #4ac8e8, #3ddc5a); border-radius: 6px; }
+.fish-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+.fish-stats div { display: flex; flex-direction: column; font-size: 12px; }
+.fish-stats b { font-size: 18px; }
+.fish-time { font-size: 13px; }
+.fish-auto { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
+.fish-session { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.fish-new { color: #ffd34a; font-size: 11px; }
+.fish-reward { font-size: 12px; }
+.fish-dex { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(6, 10, 24, .82); }
+.fish-dex.open { display: flex; }
+.fish-book { width: min(1100px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; border-radius: 18px; padding: 16px 18px; background: linear-gradient(180deg, #f6ecd2, #e8d8b0); color: #3a2a18; border: 4px solid #7a5a32; box-shadow: 0 0 40px rgba(0, 0, 0, .5), inset 0 0 40px rgba(122, 90, 50, .25); }
+.fish-book .muted { color: #7a6a50; }
+.fish-book-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.fish-book-head h2 { margin: 0; color: #4a2a10; }
+.fish-book-count { margin-left: auto; font-weight: 900; }
+.fish-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.fish-filters button { background: #fff8e8; color: #4a3018; border: 2px solid var(--rc, #c8a878); border-radius: 999px; padding: 4px 12px; font-weight: 800; box-shadow: none; }
+.fish-filters button.active { background: var(--rc, #c8a878); color: #fff; }
+.fish-filters small { opacity: .75; }
+.fish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fish-card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; border-radius: 12px; background: rgba(255, 252, 240, .8); border: 2px solid var(--rc); text-align: center; font-size: 13px; }
+.fish-card.unknown { background: rgba(200, 185, 150, .45); }
+.fish-card canvas { width: 120px; height: 80px; background: radial-gradient(ellipse at center, rgba(120, 190, 230, .35), rgba(120, 190, 230, 0) 70%); border-radius: 10px; }
+.fish-card small { font-size: 11px; }
+.fish-book-foot { font-size: 12px; margin-top: 12px; }
+.fish-auto input { width: auto; margin: 0; }

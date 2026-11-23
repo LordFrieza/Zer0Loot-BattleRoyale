@@ -13,6 +13,7 @@ const twitch = require('./twitch');
 const { Battle } = require('./battle');
 const market = require('./market');
 const casino = require('./casino');
+const fishing = require('./fishing');
 const survivor = require('./survivor');
 const housing = require('./housing');
 const schedule = require('./schedule');
@@ -317,6 +318,17 @@ app.post('/api/casino/heaven/cash', requirePlayer, casinoAction((req) => casino.
 app.post('/api/casino/chaton/start', requirePlayer, casinoAction((req) => casino.chatonStart(req.user, req.body.bet, !!req.body.ticket)));
 app.post('/api/casino/chaton/jump', requirePlayer, casinoAction((req) => casino.chatonJump(req.user)));
 app.post('/api/casino/chaton/cash', requirePlayer, casinoAction((req) => casino.chatonCash(req.user)));
+// ---------- Pêche ----------
+// Lancer et ferrer ne changent pas le personnage (pas de sauvegarde) ; la prise passe par action() (sauvegarde + « me »).
+function light(fn) {
+  return (req, res) => {
+    try { res.json({ ok: true, ...fn(req) }); } catch (err) { res.status(400).json({ error: err.message }); }
+  };
+}
+app.post('/api/fishing/cast', requirePlayer, light((req) => fishing.cast(req.user)));
+app.post('/api/fishing/hook', requirePlayer, light((req) => fishing.hook(req.user, req.body.id)));
+app.post('/api/fishing/stop', requirePlayer, light((req) => fishing.stop(req.user)));
+app.post('/api/fishing/land', requirePlayer, action((req) => fishing.land(req.user, req.body.id, !!req.body.success)));
 app.post('/api/casino/course', requirePlayer, casinoAction((req) => casino.course(req.user, req.body.bet, req.body.demon, !!req.body.ticket)));
 
 // ---------- Survivor ----------

@@ -490,6 +490,19 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,
     Carapace, Hâte, Célérité, Envergure, Attraction, Croissance, Récupération, Fortune, Avidité, Relance, Seconde vie),
     déblocage des armes et objets dans les tirages, armes de départ (l'Épée est la seule au début).
+- **Pêche** (onglet Pêche, gratuit) : un petit mode tranquille. Le personnage et son familier sont dans une barque sur un
+  lac (ciel selon l'heure réelle, chalet, nénuphars, libellules le jour, lucioles et lanterne la nuit). Un seul bouton
+  (clic ou Espace) : lancer la ligne ; une silhouette approche du bouchon et le tapote — il faut cliquer quand il **coule**
+  (trop tôt ou trop tard : raté) ; puis, dans la barre de remontée, **maintenir** le clic fait monter la zone verte, qui
+  retombe avec de l'élan quand on relâche : la garder sur le poisson remplit la jauge, sinon elle se vide. Plus le poisson
+  est rare (commun gris, peu commun vert, rare bleu, épique violet, légendaire orange), plus la fenêtre de ferrage est
+  courte, la zone petite, la nage vive et la jauge longue à remplir. Un poisson ne rapporte rien d'autre que sa place au
+  **Pêchédex** : 100 espèces (poissons, anguilles, méduses, poulpes, calmars, crabes, crevettes, tortues, hippocampes,
+  raies, requins, étoiles de mer, axolotls… et quelques clins d'œil aux boss), certaines seulement le jour ou la nuit
+  (heure de Paris), avec le nombre de prises et le record de taille ; les espèces manquantes y sont en ombre noire.
+  1 fois sur 20, c'est un **trésor** : 2 coffres (70 %), 1 000 golds (10 %), 500 émeraudes (9 %), une Clé de boss (9 %) ou
+  la **Canne à pêche légendaire** (2 %, skin d'arme pour toutes les classes). Pêchédex complet : la **panoplie du pêcheur**
+  (bob, gilet, salopette, bottes, 2 500 golds pièce) s'achète à la boutique. 10 succès de pêche.
 - **Maison** (onglet Maison) : sa propre maison, achetée et décorée en émeraudes. **47 meubles** (assises, tables, lits,
   rangements, lumières, plantes, tapis, décoration murale, loisirs, prestige ; de 250 à 75 000 émeraudes) à placer soi-même
   dans la pièce (glisser-déposer, clic droit pour retourner, double-clic pour ranger), façade (murs, toit, fenêtres, porte,
