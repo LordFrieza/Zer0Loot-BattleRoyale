@@ -505,6 +505,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   1 fois sur 20, c'est un **trésor** : 2 coffres (70 %), 1 000 golds (10 %), 500 émeraudes (9 %), une Clé de boss (9 %) ou
   la **Canne à pêche légendaire** (2 %, skin d'arme pour toutes les classes). Pêchédex complet : la **panoplie du pêcheur**
   (bob, gilet, salopette, bottes, 2 500 golds pièce) s'achète à la boutique. 10 succès de pêche.
+  Anti-triche : le serveur n'annonce rien d'avance (silhouette, touches et bouchon qui coule arrivent en direct par le
+  socket), rejoue la remontée à partir des appuis du joueur pour décider de la prise, et une prise vue puis laissée
+  (ligne rentrée ou relancée, ferrage raté) fait attendre 8 s avant de relancer.
 - **Maison** (onglet Maison) : sa propre maison, achetée et décorée en émeraudes. **47 meubles** (assises, tables, lits,
   rangements, lumières, plantes, tapis, décoration murale, loisirs, prestige ; de 250 à 75 000 émeraudes) à placer soi-même
   dans la pièce (glisser-déposer, clic droit pour retourner, double-clic pour ranger), façade (murs, toit, fenêtres, porte,

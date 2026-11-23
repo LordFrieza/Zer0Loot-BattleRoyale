@@ -2613,6 +2613,7 @@ socket.on('bet', (r) => {
 socket.on('pet', (e) => { if (window.onPetEvent) onPetEvent(e); });
 socket.on('casino', (d) => Casino.onFeed(d.feed));
 socket.on('svFrame', (f) => Survivor.onFrame(f));
+socket.on('fishing', (e) => Fishing.onEvent(e)); // étapes du lancer de pêche, en direct
 socket.on('svEnd', (r) => Survivor.onEnd(r));
 socket.on('svBoard', () => Survivor.onBoard());
 socket.on('reward', (r) => {

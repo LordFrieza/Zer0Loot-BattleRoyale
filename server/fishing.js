@@ -1,11 +1,16 @@
 /*
- * Pêche (onglet Pêche) : un mode actif et tranquille, sans mise. Le serveur décide de tout ce qui compte :
+ * Pêche (onglet Pêche) : un mode actif et tranquille, sans mise. Le serveur décide de tout ce qui compte, et le
+ * navigateur n'apprend chaque chose qu'au moment où elle arrive :
  *  - au lancer (`cast`) : ce qui va mordre (poisson 95 % — espèce selon la rareté et l'heure de Paris, taille —
- *    ou trésor 5 %), quand la forme apparaît, les touches et le moment où le bouchon coule ;
+ *    ou trésor 5 %), quand la forme apparaît, les touches et le moment où le bouchon coule. Le lancer ne renvoie que
+ *    son identifiant ; chaque étape (`appear` avec la silhouette, `nibble`, `sink`, `miss`) est envoyée en direct par
+ *    le socket (événement `fishing`, via `setNotify`) ;
  *  - au ferrage (`hook`) : le clic doit tomber après que le bouchon a coulé, dans la fenêtre de la rareté ;
- *  - à la fin de la remontée (`land`) : une prise plus rapide que le minimum possible est refusée ; le poisson rejoint le
- *    Pêchédex (character.fishing.dex), le trésor est tiré avec crypto et crédité.
- * Le navigateur anime la scène et le mini-jeu de la barre (physique de la zone verte, nage du poisson).
+ *  - à la fin de la remontée (`land`) : le navigateur envoie ses appuis (numéros de pas) et le serveur rejoue la
+ *    remontée avec la même physique et la même graine (`Rules.fishReelReplay`) : c'est ce rejeu qui décide de la prise.
+ *    Le poisson rejoint le Pêchédex (character.fishing.dex), le trésor est tiré avec crypto et crédité.
+ * Une prise vue puis laissée (ligne rentrée ou relancée, ferrage trop tôt ou raté) effraie les poissons : il faut
+ * attendre `FISHING.scare` s avant de relancer (sinon on relancerait en boucle jusqu'à voir passer un trésor).
  * Les parties en cours restent en mémoire (rien n'est misé : un redémarrage les oublie simplement).
  */
 const crypto = require('crypto');
@@ -14,6 +19,7 @@ const game = require('./game');
 
 const F = Rules.FISHING;
 const sessions = new Map(); // userId → partie en cours
+const calm = new Map(); // userId → instant (ms) à partir duquel on peut relancer
 
 const random = () => crypto.randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
 const between = (a, b) => a + random() * (b - a);
@@ -25,6 +31,10 @@ function weighted(entries) {
   return entries[entries.length - 1];
 }
 const round2 = (x) => Math.round(x * 100) / 100;
+
+// Envoi des étapes en direct (branché par index.js sur la room socket du joueur). Sans lui (tests), rien n'est planifié.
+let notify = null;
+function setNotify(fn) { notify = fn; }
 
 // Ce qui mord : un trésor (5 %) ou un poisson qui peut mordre à cette heure-là (rareté pondérée, puis espèce au hasard).
 // La taille penche vers le bas de la fourchette (les grands spécimens sont plus rares).
@@ -45,7 +55,47 @@ function sizeClass(target) {
   return target.size < 20 ? 'petit' : target.size < 60 ? 'moyen' : target.size < 160 ? 'grand' : 'enorme';
 }
 
+function clearTimers(s) {
+  for (const t of s.timers || []) clearTimeout(t);
+  s.timers = [];
+}
+// Fin d'une partie sans prise : si la silhouette était déjà visible, les poissons se méfient un moment.
+function endSession(user, s, now) {
+  clearTimers(s);
+  if (sessions.get(user.id) === s) sessions.delete(user.id);
+  if (!s.hookedAt && now >= s.castAt + s.appear * 1000) {
+    calm.set(user.id, now + F.scare * 1000);
+    return F.scare;
+  }
+  return 0;
+}
+// Étapes envoyées au navigateur au moment où elles arrivent ; la dernière (`miss`) clôt une touche non ferrée.
+function schedule(user, s) {
+  if (!notify) return;
+  const at = (sec, fn) => {
+    const t = module.exports.timer(fn, Math.max(0, s.castAt + sec * 1000 - Date.now()));
+    if (t && t.unref) t.unref();
+    s.timers.push(t);
+  };
+  const send = (ev) => () => { if (sessions.get(user.id) === s && !s.hookedAt) notify(user.id, { id: s.id, ...ev }); };
+  at(s.appear, send({ k: 'appear', shape: s.shape, big: s.big }));
+  for (const n of s.nibbles) at(n, send({ k: 'nibble' }));
+  at(s.sink, send({ k: 'sink' }));
+  at(s.sink + s.window + F.latency, () => {
+    if (sessions.get(user.id) !== s || s.hookedAt) return;
+    const wait = endSession(user, s, s.castAt + (s.sink + s.window + F.latency) * 1000); // instant prévu de la fin de la touche
+    notify(user.id, { id: s.id, k: 'miss', wait });
+  });
+}
+
 function cast(user, now = Date.now()) {
+  const until = calm.get(user.id) || 0;
+  if (now < until) throw new Error(`Les poissons se méfient encore… relance dans ${Math.ceil((until - now) / 1000)} s`);
+  const prev = sessions.get(user.id);
+  if (prev) {
+    // Un nouveau lancer remplace le précédent : laisser filer une prise déjà vue effraie les poissons
+    if (endSession(user, prev, now)) throw new Error(`Les poissons se méfient encore… relance dans ${F.scare} s`);
+  }
   game.upgrade(user.character);
   const target = module.exports.rollTarget(now); // remplaçable dans les tests
   const diff = Rules.fishDifficulty(target);
@@ -57,13 +107,14 @@ function cast(user, now = Date.now()) {
     t += between(F.nibbleGap[0], F.nibbleGap[1]);
   }
   const sink = round2(t);
-  const s = { id: crypto.randomBytes(6).toString('hex'), castAt: now, appear, nibbles, sink, window: diff.window, target, diff, hookedAt: null };
-  sessions.set(user.id, s); // un nouveau lancer remplace le précédent
-  return {
-    id: s.id, appear, approach: F.approach, nibbles, sink, window: diff.window,
-    shape: target.kind === 'treasure' ? 'tresor' : Rules.FISH[target.id].shape,
-    big: sizeClass(target),
+  const s = {
+    id: crypto.randomBytes(6).toString('hex'), castAt: now, appear, nibbles, sink, window: diff.window, target, diff, hookedAt: null, timers: [],
+    shape: target.kind === 'treasure' ? 'tresor' : Rules.FISH[target.id].shape, big: sizeClass(target),
   };
+  sessions.set(user.id, s);
+  schedule(user, s);
+  // Rien de ce qui va se passer n'est révélé : ni les temps, ni la fenêtre (qui trahirait la rareté), ni la silhouette
+  return { id: s.id, approach: F.approach };
 }
 
 function current(user, id) {
@@ -73,16 +124,18 @@ function current(user, id) {
 }
 
 // Ferrer : seulement une fois le bouchon coulé, dans la fenêtre de la rareté (+ marge réseau). Trop tôt ou trop tard :
-// la prise s'échappe.
+// la prise s'échappe. La remontée reçoit une graine neuve (nage du poisson) que le serveur garde pour la rejouer.
 function hook(user, id, now = Date.now()) {
   const s = current(user, id);
   if (s.hookedAt) throw new Error('Déjà ferré');
   const t = (now - s.castAt) / 1000;
-  if (t < s.sink - 0.05) { sessions.delete(user.id); return { escaped: true, reason: 'tot' }; }
-  if (t > s.sink + s.window + F.latency) { sessions.delete(user.id); return { escaped: true, reason: 'tard' }; }
+  if (t < s.sink - 0.05) return { escaped: true, reason: 'tot', wait: endSession(user, s, now) };
+  if (t > s.sink + s.window + F.latency) return { escaped: true, reason: 'tard', wait: endSession(user, s, now) };
+  clearTimers(s);
   s.hookedAt = now;
   const d = s.diff;
-  return { hooked: true, reel: { zone: d.zone, vmax: d.vmax, dart: d.dart, changes: d.changes, fill: d.fill, move: d.move, start: F.reelStart, drain: F.drainRatio } };
+  s.reel = { zone: d.zone, vmax: d.vmax, dart: d.dart, changes: d.changes, fill: d.fill, move: d.move, start: F.reelStart, drain: F.drainRatio, seed: crypto.randomInt(0, 2 ** 31) };
+  return { hooked: true, reel: { ...s.reel } };
 }
 
 // Lot d'un trésor (la canne déjà possédée devient un coffre de golds).
@@ -99,15 +152,29 @@ function rollTreasure(c) {
   return { id: lot.id, label: lot.label, icon: lot.icon, chests: lot.chests, gold: lot.gold, emeralds: lot.emeralds, keys: lot.keys, cosmetic: lot.cosmetic, replaced };
 }
 
-// Fin de la remontée : la jauge est pleine (success) ou le poisson s'est échappé.
-function land(user, id, success, now = Date.now()) {
+// Appuis d'une remontée : numéros de pas entiers, croissants, en nombre limité.
+function checkToggles(toggles) {
+  if (!Array.isArray(toggles) || toggles.length > F.maxToggles) throw new Error('Remontée invalide');
+  let last = -1;
+  for (const x of toggles) {
+    if (!Number.isInteger(x) || x < last || x < 0) throw new Error('Remontée invalide');
+    last = x;
+  }
+  return toggles;
+}
+
+// Fin de la remontée : le serveur rejoue les appuis du joueur et décide. Une remontée qui aurait duré plus longtemps
+// que le temps réellement écoulé depuis le ferrage est refusée (appuis calculés d'avance puis envoyés trop tôt).
+function land(user, id, toggles, now = Date.now()) {
   const s = current(user, id);
   if (!s.hookedAt) throw new Error('Ferre d\'abord le poisson');
+  checkToggles(toggles);
   sessions.delete(user.id);
-  if (!success) return { escaped: true, reason: 'ligne' };
+  const R = Rules.fishReelReplay(s.reel, toggles);
+  const simulated = R.step * F.reelDt;
   const elapsed = (now - s.hookedAt) / 1000;
-  if (elapsed < Rules.fishMinReel(s.diff) * F.minLandRatio) throw new Error('Remontée trop rapide');
-  if (elapsed > F.maxReel) return { escaped: true, reason: 'ligne' };
+  if (elapsed < simulated * F.realTimeRatio - 0.25) throw new Error('Remontée trop rapide');
+  if (!R.won) return { escaped: true, reason: 'ligne' };
   const c = user.character;
   game.upgrade(c);
   if (s.target.kind === 'treasure') return { caught: true, kind: 'treasure', lot: rollTreasure(c) };
@@ -125,10 +192,11 @@ function land(user, id, success, now = Date.now()) {
   return { caught: true, kind: 'fish', id: fish.id, size: s.target.size, isNew: !before, record, n: entry.n, best: entry.best, species: c.counters.fishSpecies };
 }
 
-// Quitter l'onglet : la ligne est remontée (rien à rendre).
-function stop(user) {
-  sessions.delete(user.id);
-  return { stopped: true };
+// Quitter l'onglet ou rentrer la ligne. Si la silhouette était déjà visible, les poissons se méfient (`wait` s).
+function stop(user, now = Date.now()) {
+  const s = sessions.get(user.id);
+  const wait = s ? endSession(user, s, now) : 0;
+  return { stopped: true, wait };
 }
 
-module.exports = { cast, hook, land, stop, sessions, rollTarget };
+module.exports = { cast, hook, land, stop, sessions, calm, rollTarget, setNotify, timer: (fn, ms) => setTimeout(fn, ms) };

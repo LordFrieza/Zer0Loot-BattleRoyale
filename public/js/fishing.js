@@ -26,7 +26,7 @@
     active: false, canvas: null, ctx: null, raf: 0, last: 0,
     phase: 'idle', // idle | casting | wait | bite | reel | result | escape
     cast: null, t0: 0, busy: false, holding: false,
-    reel: null, result: null, msg: null, auto: false, nextAt: 0,
+    reel: null, reelAcc: 0, reelHold: false, toggles: [], calmUntil: 0, result: null, msg: null, auto: false, nextAt: 0,
     ripples: [], splashes: [], hearts: [], jumps: [], jumpAt: 0, petHop: 0,
     session: [], // dernières prises de la séance
   };
@@ -330,42 +330,19 @@
 
   // ---------- Remontée : la barre ----------
   const BAR = { x: 812, y: 34, w: 58, h: 392 };
-  function newReel(r) {
-    return { ...r, pos: 0, vel: 0, fy: 0.25, ft: 0.4, progress: r.start, dartT: 0, t: 0, done: false };
-  }
-  // Nage du poisson dans la barre (Rules.FISHING.swim) : il change de cap `changes` fois par seconde, nage à `vmax`,
-  // et certains changements sont des départs soudains (vitesse `dart` pendant 0,35 s), selon son caractère et sa rareté.
-  function moveFish(R, dt) {
-    const M = F.swim[R.move] || F.swim.mixte;
-    if (Math.random() < dt * R.changes * M.c) {
-      const target = M.rel ? R.fy + (Math.random() - 0.5) * M.rel : M.lo + Math.random() * (M.hi - M.lo);
-      if (Math.random() < M.dart) R.dartT = 0.35;
-      R.ft = Math.max(0.02, Math.min(0.98, target));
-    }
-    const v = R.dartT > 0 ? R.dart : R.vmax * M.v;
-    R.dartT = Math.max(0, R.dartT - dt);
-    const d = R.ft - R.fy;
-    R.fy += Math.sign(d) * Math.min(Math.abs(d), v * dt);
-    R.fy = Math.max(0.02, Math.min(0.98, R.fy));
-  }
+  // La physique (zone verte, nage du poisson) est Rules.fishReelStep, à pas fixe et avec la graine reçue au ferrage :
+  // le navigateur l'anime et note à quels pas le joueur appuie ou relâche ; le serveur rejoue ces appuis pour décider.
   function stepReel(dt) {
     const R = S.reel;
     if (!R || R.done) return;
-    R.t += dt;
-    // Zone verte : poussée vers le haut quand on tient le clic, gravité sinon ; rebond amorti en bas
-    R.vel += (S.holding ? 3.1 : -2.5) * dt;
-    R.vel = Math.max(-1.6, Math.min(1.6, R.vel));
-    R.pos += R.vel * dt;
-    const top = 1 - R.zone;
-    if (R.pos < 0) { R.pos = 0; R.vel = -R.vel * 0.35; if (Math.abs(R.vel) < 0.05) R.vel = 0; }
-    if (R.pos > top) { R.pos = top; R.vel = Math.min(0, R.vel) * 0.2; }
-    moveFish(R, dt);
-    const inside = R.fy >= R.pos && R.fy <= R.pos + R.zone;
-    R.inside = inside;
-    R.progress += (inside ? 1 : -R.drain) * dt / R.fill;
-    if (inside && Math.random() < dt * 9) Sound.play('fishReel');
-    if (R.progress >= 1) { R.progress = 1; R.done = true; land(true); }
-    else if (R.progress <= 0) { R.progress = 0; R.done = true; land(false); }
+    S.reelAcc += dt;
+    while (S.reelAcc >= F.reelDt && !R.done) {
+      S.reelAcc -= F.reelDt;
+      if (S.holding !== S.reelHold) { S.toggles.push(R.step); S.reelHold = S.holding; }
+      Rules.fishReelStep(R, S.reelHold);
+    }
+    if (R.inside && Math.random() < dt * 9) Sound.play('fishReel');
+    if (R.done) land();
   }
   function drawReel(ctx, t) {
     const R = S.reel;
@@ -465,9 +442,10 @@
 
   function drawHint(ctx, t) {
     let text = null;
-    if (S.phase === 'idle') text = '🎣 Clique (ou Espace) pour lancer ta ligne';
+    if (S.phase === 'idle' && performance.now() >= S.calmUntil) text = '🎣 Clique (ou Espace) pour lancer ta ligne';
     else if (S.phase === 'wait') text = S.cast && castT() >= S.cast.appear ? 'Quelque chose approche… attends que le bouchon coule !' : 'Le bouchon flotte… tout est calme.';
     else if (S.phase === 'bite') text = 'IL A MORDU ! Clique vite !';
+    else if ((S.phase === 'result' || S.phase === 'escape' || S.phase === 'idle') && performance.now() < S.calmUntil) text = `🐟 Les poissons se méfient… relance dans ${Math.ceil((S.calmUntil - performance.now()) / 1000)} s`;
     else if (S.phase === 'result' || S.phase === 'escape') text = S.auto ? 'La ligne repart toute seule…' : 'Clique pour relancer';
     if (!text) return;
     ctx.font = '800 15px system-ui'; ctx.textAlign = 'center';
@@ -522,34 +500,54 @@
     S.ripples.push({ x, y: y + 4, r: 4, life: 1 });
   }
 
-  // Étapes pilotées par le temps du lancer (touches, bouchon qui coule, fenêtre ratée)
+  // Étapes du lancer : le serveur les envoie au moment où elles arrivent (socket `fishing`), rien n'est connu d'avance.
+  // On les note en temps du lancer (castT) pour l'animation : silhouette, touches, bouchon qui coule, prise ratée.
+  function onEvent(e) {
+    const c = S.cast;
+    if (!S.active || !c || e.id !== c.id) return;
+    const ct = castT();
+    if (e.k === 'appear') { c.appear = ct; c.shape = e.shape; c.big = e.big; }
+    else if (e.k === 'nibble') { c.nibbles.push(ct); Sound.play('fishNibble'); S.ripples.push({ x: BOBBER.x, y: BOBBER.y + 2, r: 4, life: 0.8 }); }
+    else if (e.k === 'sink') c.sink = ct;
+    else if (e.k === 'miss' && (S.phase === 'wait' || S.phase === 'bite' || S.phase === 'casting')) {
+      S.phase = 'escape';
+      say('Trop tard…', 'Il a filé avec l\'appât.', '#a8c8ff');
+      Sound.play('fishEscape');
+      scared(e.wait);
+      S.nextAt = Math.max(performance.now() + 1800, S.calmUntil);
+    }
+  }
+  // Une prise vue puis laissée effraie les poissons : il faut attendre avant de relancer
+  function scared(wait) {
+    if (wait > 0) S.calmUntil = performance.now() + wait * 1000;
+  }
   function tickPhase(now) {
     const c = S.cast;
     if (S.phase === 'casting' && castT() >= 0.6) { S.phase = 'wait'; Sound.play('fishPlop'); splash(BOBBER.x, BOBBER.y, 6); }
-    if ((S.phase === 'wait' || S.phase === 'bite') && c) {
-      const ct = castT();
-      for (const n of c.nibbles) if (!c.done[n] && ct >= n) { c.done[n] = true; Sound.play('fishNibble'); S.ripples.push({ x: BOBBER.x, y: BOBBER.y + 2, r: 4, life: 0.8 }); }
-      if (S.phase === 'wait' && ct >= c.sink) { S.phase = 'bite'; Sound.play('fishSink'); splash(BOBBER.x, BOBBER.y); }
-      if (S.phase === 'bite' && ct > c.sink + c.window + 0.25 && !S.busy) {
-        S.phase = 'escape';
-        say('Trop tard…', 'Il a filé avec l\'appât.', '#a8c8ff');
-        Sound.play('fishEscape');
-        api('/api/fishing/stop', {}).catch(() => {});
-        S.nextAt = now + 1800;
-      }
+    if (S.phase === 'wait' && c && castT() >= c.sink) { S.phase = 'bite'; Sound.play('fishSink'); splash(BOBBER.x, BOBBER.y); }
+    // Sans nouvelles du serveur (connexion perdue), on finit par rentrer la ligne
+    if (S.phase === 'bite' && c && castT() > c.sink + 4 && !S.busy) {
+      S.phase = 'escape';
+      say('Trop tard…', 'Il a filé avec l\'appât.', '#a8c8ff');
+      api('/api/fishing/stop', {}).then((r) => scared(r.wait)).catch(() => {});
+      S.nextAt = now + 1800;
     }
-    if ((S.phase === 'result' || S.phase === 'escape') && S.auto && S.nextAt && now >= S.nextAt) { S.nextAt = 0; castLine(); }
+    if ((S.phase === 'result' || S.phase === 'escape') && S.auto && S.nextAt && now >= S.nextAt && now >= S.calmUntil) { S.nextAt = 0; castLine(); }
   }
 
   // ---------- Actions ----------
   async function castLine() {
     if (S.busy) return;
+    if (performance.now() < S.calmUntil) {
+      say('Les poissons se méfient…', `Patiente encore ${Math.ceil((S.calmUntil - performance.now()) / 1000)} s avant de relancer.`, '#a8c8ff');
+      return;
+    }
     S.busy = true;
     S.result = null;
     S.reel = null;
     try {
       const r = await api('/api/fishing/cast', {});
-      S.cast = { ...r, done: {} };
+      S.cast = { id: r.id, approach: r.approach, appear: Infinity, sink: Infinity, nibbles: [] };
       S.t0 = performance.now();
       S.phase = 'casting';
       Sound.play('fishCast');
@@ -564,24 +562,28 @@
       const r = await api('/api/fishing/hook', { id: S.cast.id });
       if (r.escaped) {
         S.phase = 'escape';
-        S.nextAt = performance.now() + 1800;
+        scared(r.wait);
+        S.nextAt = Math.max(performance.now() + 1800, S.calmUntil);
         Sound.play('fishEscape');
         if (r.reason === 'tot' || early) say('Trop tôt !', 'Attends que le bouchon coule vraiment.', '#ffb0b0');
         else say('Trop tard…', 'Il a filé avec l\'appât.', '#a8c8ff');
         return;
       }
       S.phase = 'reel';
-      S.reel = newReel(r.reel);
+      S.reel = Rules.fishReelNew(r.reel);
+      S.reelAcc = 0;
+      S.reelHold = false;
+      S.toggles = [];
       S.holding = false;
       Sound.play('fishHook');
       splash(BOBBER.x, BOBBER.y, 18);
     } catch (err) { toast('⚠️ ' + err.message); S.phase = 'idle'; } finally { S.busy = false; }
   }
 
-  async function land(success) {
+  async function land() {
     S.busy = true;
     try {
-      const r = await api('/api/fishing/land', { id: S.cast.id, success });
+      const r = await api('/api/fishing/land', { id: S.cast.id, toggles: S.toggles });
       S.reel = null;
       S.holding = false;
       if (!r.caught) {
@@ -732,7 +734,7 @@
     S.active = false;
     cancelAnimationFrame(S.raf);
     if (Sound.music.state && /peche/.test(Sound.music.state.src || '')) Sound.music.stop();
-    if (S.phase !== 'idle') api('/api/fishing/stop', {}).catch(() => {});
+    if (S.phase !== 'idle') api('/api/fishing/stop', {}).then((r) => scared(r.wait)).catch(() => {});
     S.phase = 'idle';
     S.cast = null;
     S.reel = null;
@@ -742,6 +744,6 @@
   }
 
   // peek() : état en lecture seule (étape, barre de remontée), pour les tests automatiques du navigateur
-  const peek = () => ({ phase: S.phase, sink: S.cast && S.cast.sink, t: S.cast ? castT() : 0, reel: S.reel && { pos: S.reel.pos, zone: S.reel.zone, fy: S.reel.fy, progress: S.reel.progress } });
-  window.Fishing = { enter, leave, renderSide, openDex, peek, get active() { return S.active; } };
+  const peek = () => ({ phase: S.phase, sink: S.cast && S.cast.sink, appear: S.cast && S.cast.appear, t: S.cast ? castT() : 0, calm: Math.max(0, S.calmUntil - performance.now()), reel: S.reel && { pos: S.reel.pos, vel: S.reel.vel, zone: S.reel.zone, fy: S.reel.fy, progress: S.reel.progress } });
+  window.Fishing = { enter, leave, renderSide, openDex, peek, onEvent, get active() { return S.active; } };
 })();

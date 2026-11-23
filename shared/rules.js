@@ -1884,10 +1884,13 @@
     wait: [3, 15], // attente avant qu'une forme n'apparaisse (s), au hasard
     approach: 2.2, // la forme nage jusqu'au bouchon (s)
     nibbleGap: [0.7, 1.6], // entre deux touches (s)
-    latency: 0.35, // marge réseau acceptée pour le ferrage (s)
+    latency: 0.45, // marge réseau acceptée pour le ferrage (s) : l'annonce « ça coule » arrive en direct, puis le clic repart
     reelStart: 0.3, // jauge de départ de la remontée
     drainRatio: 0.85, // la jauge descend à 85 % de sa vitesse de montée quand le poisson sort de la zone
-    minLandRatio: 0.85, // une prise plus rapide que 85 % du temps minimal est refusée (triche)
+    reelDt: 1 / 60, // pas fixe de la simulation de la remontée (rejouée à l'identique par le serveur)
+    realTimeRatio: 0.9, // une remontée rejouée doit avoir duré (temps réel) au moins 90 % de son temps simulé
+    maxToggles: 6000, // appuis + relâchements acceptés pour une remontée
+    scare: 8, // une prise vue puis laissée (ligne rentrée, relancée, ferrage trop tôt ou raté) : 8 s avant de relancer
     maxReel: 180, // une remontée dure 3 min au plus
     // vmax : vitesse de nage (fraction de la barre par seconde), dart : vitesse d'un départ soudain (0,35 s ; la zone
     // verte va jusqu'à 1,6), changes : changements de cap par seconde. Réglé par simulation (robot qui réagit en
@@ -2060,6 +2063,62 @@
   // Temps minimal d'une remontée (jauge de départ → pleine, poisson toujours dans la zone).
   function fishMinReel(diff) {
     return diff.fill * (1 - FISHING.reelStart);
+  }
+  // Tirages à graine (mulberry32) : la nage du poisson est la même dans le navigateur et quand le serveur rejoue.
+  function fishRng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Remontée : état de départ (paramètres renvoyés au ferrage, dont la graine `seed`).
+  function fishReelNew(p) {
+    return { ...p, pos: 0, vel: 0, fy: 0.25, ft: 0.4, progress: p.start, dartT: 0, step: 0, inside: false, done: false, won: false, rng: fishRng(p.seed) };
+  }
+  // Un pas fixe (FISHING.reelDt) : zone verte poussée vers le haut quand on tient le clic, gravité sinon (rebond amorti
+  // en bas) ; nage du poisson (FISHING.swim : changements de cap, départs soudains) ; la jauge monte dans la zone, descend
+  // dehors. Partagé par le navigateur (affichage) et le serveur (rejeu des appuis : c'est lui qui décide de la prise).
+  function fishReelStep(R, holding) {
+    if (R.done) return R;
+    const dt = FISHING.reelDt;
+    R.step += 1;
+    R.vel += (holding ? 3.1 : -2.5) * dt;
+    R.vel = Math.max(-1.6, Math.min(1.6, R.vel));
+    R.pos += R.vel * dt;
+    const top = 1 - R.zone;
+    if (R.pos < 0) { R.pos = 0; R.vel = -R.vel * 0.35; if (Math.abs(R.vel) < 0.05) R.vel = 0; }
+    if (R.pos > top) { R.pos = top; R.vel = Math.min(0, R.vel) * 0.2; }
+    const M = FISHING.swim[R.move] || FISHING.swim.mixte;
+    if (R.rng() < dt * R.changes * M.c) {
+      const target = M.rel ? R.fy + (R.rng() - 0.5) * M.rel : M.lo + R.rng() * (M.hi - M.lo);
+      if (R.rng() < M.dart) R.dartT = 0.35;
+      R.ft = Math.max(0.02, Math.min(0.98, target));
+    }
+    const v = R.dartT > 0 ? R.dart : R.vmax * M.v;
+    R.dartT = Math.max(0, R.dartT - dt);
+    const d = R.ft - R.fy;
+    R.fy += Math.sign(d) * Math.min(Math.abs(d), v * dt);
+    R.fy = Math.max(0.02, Math.min(0.98, R.fy));
+    R.inside = R.fy >= R.pos && R.fy <= R.pos + R.zone;
+    R.progress += ((R.inside ? 1 : -R.drain) * dt) / R.fill;
+    if (R.progress >= 1) { R.progress = 1; R.done = true; R.won = true; } else if (R.progress <= 0) { R.progress = 0; R.done = true; }
+    return R;
+  }
+  // Rejoue une remontée : `toggles` = numéros des pas où le joueur appuie puis relâche (alternés, en commençant
+  // relâché). Au-delà du dernier, l'état reste le même jusqu'à la fin (prise ou fuite) ou la limite de temps.
+  function fishReelReplay(p, toggles, maxSteps = Math.round(FISHING.maxReel / FISHING.reelDt)) {
+    const R = fishReelNew(p);
+    let holding = false;
+    let k = 0;
+    while (!R.done && R.step < maxSteps) {
+      while (k < toggles.length && toggles[k] <= R.step) { holding = !holding; k += 1; }
+      fishReelStep(R, holding);
+    }
+    return R;
   }
 
   // ---------- Casino ----------
@@ -3452,7 +3511,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
-    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishDifficulty, fishMinReel,
+    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
     CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,

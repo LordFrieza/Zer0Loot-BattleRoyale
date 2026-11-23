@@ -325,6 +325,8 @@ function light(fn) {
     try { res.json({ ok: true, ...fn(req) }); } catch (err) { res.status(400).json({ error: err.message }); }
   };
 }
+// Étapes du lancer (silhouette, touches, bouchon qui coule, prise ratée) envoyées en direct, jamais à l'avance.
+fishing.setNotify((userId, ev) => io.to('user:' + userId).emit('fishing', ev));
 app.post('/api/fishing/cast', requirePlayer, light((req) => fishing.cast(req.user)));
 app.post('/api/fishing/hook', requirePlayer, light((req) => fishing.hook(req.user, req.body.id)));
 app.post('/api/fishing/stop', requirePlayer, light((req) => fishing.stop(req.user)));
@@ -338,7 +340,7 @@ function fishBoard() {
   if (fishBoardTimer.unref) fishBoardTimer.unref();
 }
 app.post('/api/fishing/land', requirePlayer, action((req) => {
-  const r = fishing.land(req.user, req.body.id, !!req.body.success);
+  const r = fishing.land(req.user, req.body.id, req.body.toggles);
   if (r.caught && r.kind === 'fish') fishBoard();
   return r;
 }));
