@@ -328,7 +328,20 @@ function light(fn) {
 app.post('/api/fishing/cast', requirePlayer, light((req) => fishing.cast(req.user)));
 app.post('/api/fishing/hook', requirePlayer, light((req) => fishing.hook(req.user, req.body.id)));
 app.post('/api/fishing/stop', requirePlayer, light((req) => fishing.stop(req.user)));
-app.post('/api/fishing/land', requirePlayer, action((req) => fishing.land(req.user, req.body.id, !!req.body.success)));
+// Une prise peut changer le classement des pêcheurs : diffusion au plus toutes les 10 s.
+let fishBoardAt = 0;
+let fishBoardTimer = null;
+function fishBoard() {
+  if (fishBoardTimer) return;
+  const wait = Math.max(0, fishBoardAt + 10000 - Date.now());
+  fishBoardTimer = setTimeout(() => { fishBoardTimer = null; fishBoardAt = Date.now(); io.emit('leaderboard', leaderboard()); }, wait);
+  if (fishBoardTimer.unref) fishBoardTimer.unref();
+}
+app.post('/api/fishing/land', requirePlayer, action((req) => {
+  const r = fishing.land(req.user, req.body.id, !!req.body.success);
+  if (r.caught && r.kind === 'fish') fishBoard();
+  return r;
+}));
 app.post('/api/casino/course', requirePlayer, casinoAction((req) => casino.course(req.user, req.body.bet, req.body.demon, !!req.body.ticket)));
 
 // ---------- Survivor ----------
@@ -1123,6 +1136,7 @@ function leaderboard() {
     chests: (u.character.counters && u.character.counters.chests) || 0, // coffres ouverts
     legendary: (u.character.lootStats && u.character.lootStats.legendaire) || 0, // légendaires sortis des coffres
     survivor: (u.character.counters && u.character.counters.svBestWave) || 0, // vague record au Survivor
+    fish: (u.character.counters && u.character.counters.fishCaught) || 0, // poissons pêchés
     jackpots: (u.character.counters && u.character.counters.jackpots) || 0, // jackpots au casino
     casino: u.character.lifetime ? (u.character.lifetime.casinoWon || 0) - (u.character.lifetime.casinoWagered || 0) : 0, // bilan du casino
     casinoLoss: u.character.lifetime ? (u.character.lifetime.casinoWagered || 0) - (u.character.lifetime.casinoWon || 0) : 0, // pertes nettes au casino
@@ -1132,7 +1146,7 @@ function leaderboard() {
     .map((p) => ({ ...p, value: p[key] }));
   return {
     wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon'),
-    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), jackpots: top('jackpots'), casino: top('casino'), casinoLoss: top('casinoLoss'), gold: top('gold'),
+    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), fish: top('fish'), jackpots: top('jackpots'), casino: top('casino'), casinoLoss: top('casinoLoss'), gold: top('gold'),
   };
 }
 

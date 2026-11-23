@@ -490,8 +490,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,
     Carapace, Hâte, Célérité, Envergure, Attraction, Croissance, Récupération, Fortune, Avidité, Relance, Seconde vie),
     déblocage des armes et objets dans les tirages, armes de départ (l'Épée est la seule au début).
-- **Pêche** (onglet Pêche, gratuit) : un petit mode tranquille. Le personnage et son familier sont dans une barque sur un
-  lac (ciel selon l'heure réelle, chalet, nénuphars, libellules le jour, lucioles et lanterne la nuit). Un seul bouton
+- **Pêche** (onglet Pêche, gratuit) : un petit mode tranquille, en musique lo-fi (4 morceaux qui s'enchaînent en boucle). Le
+  personnage et son familier sont dans une barque sur un lac (ciel selon l'heure réelle, chalet sur pilotis, nénuphars, famille
+  de canards, avion et montgolfière aux banderoles drôles, libellules le jour, lucioles et lanterne la nuit). Un seul bouton
   (clic ou Espace) : lancer la ligne ; une silhouette approche du bouchon et le tapote — il faut cliquer quand il **coule**
   (trop tôt ou trop tard : raté) ; puis, dans la barre de remontée, **maintenir** le clic fait monter la zone verte, qui
   retombe avec de l'élan quand on relâche : la garder sur le poisson remplit la jauge, sinon elle se vide. Plus le poisson

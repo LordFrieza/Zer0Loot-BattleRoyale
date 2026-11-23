@@ -745,6 +745,10 @@
     casino: '/audio/casino.mp3', // Luigi's Casino (onglet Casino)
     survivor: '/audio/survivor.mp3', // Last Battle — Cave Story (Survivor)
   };
+  // Listes de lecture : les morceaux s'enchaînent dans l'ordre, puis la liste recommence (onglet Pêche, lo-fi).
+  const PLAYLISTS = {
+    peche: ['/audio/peche-1.mp3', '/audio/peche-2.mp3', '/audio/peche-3.mp3', '/audio/peche-4.mp3'], // Best Friend · Faces · Call me · first kiss
+  };
 
   const music = (function () {
     const els = {};
@@ -754,6 +758,7 @@
     let previewTimer = null;
 
     function track(mode) {
+      if (PLAYLISTS[mode]) return listTrack(mode);
       const src = TRACKS[mode] || TRACKS.br;
       if (!els[src]) {
         const a = new Audio(src);
@@ -762,6 +767,25 @@
         els[src] = a;
       }
       return els[src];
+    }
+    // Morceau courant d'une liste de lecture ; à sa fin, le suivant prend la relève (la liste tourne en boucle).
+    const listIndex = {};
+    function listTrack(mode) {
+      const list = PLAYLISTS[mode];
+      const i = listIndex[mode] || 0;
+      const src = list[i];
+      if (!els[src]) { const a = new Audio(src); a.loop = false; a.preload = 'auto'; els[src] = a; }
+      const a = els[src];
+      a.onended = () => {
+        if (current !== a) return;
+        listIndex[mode] = (i + 1) % list.length;
+        const b = listTrack(mode);
+        current = b;
+        b.currentTime = 0;
+        b.volume = level();
+        tryPlay(b);
+      };
+      return a;
     }
     const level = () => vol.music * MUSIC_LEVEL;
 

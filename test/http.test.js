@@ -310,7 +310,12 @@ test('[PRG-3, PRG-4, PRG-5, BET-1, BET-7, BET-10, B-26, LB-1] bataille complète
 
   const board = (await alice.get('/api/leaderboard')).data;
   assert.strictEqual(board.wins[0].name, 'pl_win');
-  assert.deepStrictEqual(Object.keys(board), ['wins', 'kills', 'battles', 'expedition', 'dungeon', 'chests', 'legendary', 'survivor', 'jackpots', 'casino', 'casinoLoss', 'gold']);
+  assert.deepStrictEqual(Object.keys(board), ['wins', 'kills', 'battles', 'expedition', 'dungeon', 'chests', 'legendary', 'survivor', 'fish', 'jackpots', 'casino', 'casinoLoss', 'gold']);
+  // Pêcheurs : nombre de poissons pêchés (fishCaught)
+  const fisher = Object.values(db.state.users).find((u) => u.username === 'pl_win');
+  fisher.character.counters.fishCaught = 7;
+  const fishBoard = (await alice.get('/api/leaderboard')).data.fish;
+  assert.deepStrictEqual([fishBoard[0].name, fishBoard[0].value], ['pl_win', 7]);
   // Les plus riches : golds possédés en ce moment ; les autres classements suivent leurs compteurs
   const richest = board.gold[0];
   const all = Object.values(db.state.users).filter((u) => u.role === 'player' && u.character && !u.banned);

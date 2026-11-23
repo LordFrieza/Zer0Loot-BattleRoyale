@@ -8,6 +8,7 @@
     { key: 'expedition', label: 'Expédition', icon: '🕳️', unit: 'profondeur', fmt: (n) => `profondeur ${n}`, note: 'Record de profondeur en mode Solo' },
     { key: 'dungeon', label: 'Raid de Donjon', icon: '🏰', unit: 'salle', fmt: (n) => `salle ${n}`, note: 'Salle la plus lointaine atteinte' },
     { key: 'survivor', label: 'Survivor', icon: '🧟', unit: 'vague', fmt: (n) => `vague ${n}`, note: 'Vague la plus lointaine atteinte' },
+    { key: 'fish', label: 'Pêcheurs', icon: '🎣', unit: 'poisson', fmt: (n) => `${fmtN(n)} poisson${n > 1 ? 's' : ''}`, note: 'Nombre de poissons pêchés' },
     { key: 'chests', label: 'Coffres ouverts', icon: '🎁', unit: 'coffre', fmt: (n) => `${fmtN(n)} coffre${n > 1 ? 's' : ''}`, note: 'Depuis la création du personnage' },
     { key: 'legendary', label: 'Légendaires', icon: '🌟', unit: 'légendaire', fmt: (n) => `${fmtN(n)} légendaire${n > 1 ? 's' : ''}`, note: 'Objets légendaires sortis des coffres' },
     { key: 'jackpots', label: 'Chanceux du casino', icon: '🎰', unit: 'jackpot', fmt: (n) => `${fmtN(n)} jackpot${n > 1 ? 's' : ''}`, note: 'Jackpots décrochés au casino' },

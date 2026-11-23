@@ -50,11 +50,8 @@
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
   let people = []; // [{ name, cls, look, app }] : vrais joueurs (liste des maisons)
-  let sky = null; // ce qui passe dans le ciel
-  let skyAt = 0; // prochain passage
   let walkers = [];
   let walkAt = 0;
-  let last = 0;
 
   function setPeople(list) {
     people = (list || []).filter((p) => p && p.name);
@@ -66,14 +63,14 @@
   }
 
   // ---------- Ciel ----------
-  function newSky(now, cw, night) {
+  function newSky(now, cw, night, ads = ADS, signs = SIGNS) {
     const dir = Math.random() < 0.5 ? 1 : -1;
     // La nuit (heure réelle du joueur) : chauves-souris et Pyrax, plus rarement un avion ; ni oiseaux ni montgolfière
     const kind = pick(night ? ['chauves', 'chauves', 'chauves', 'pyrax', 'avion'] : ['avion', 'avion', 'pyrax', 'pyrax', 'ballon', 'chauves', 'oiseaux']);
     const speed = { avion: 70, pyrax: 85, ballon: 22, chauves: 60, oiseaux: 45 }[kind];
     const pad = kind === 'avion' ? 420 : 160;
     // Haut dans le ciel, au-dessus du toit
-    return { kind, dir, speed, x: dir > 0 ? -pad : cw + pad, y: 18 + Math.random() * (kind === 'ballon' ? 10 : 26), t0: now, text: kind === 'ballon' ? pick(SIGNS) : pick(ADS), pad };
+    return { kind, dir, speed, x: dir > 0 ? -pad : cw + pad, y: 18 + Math.random() * (kind === 'ballon' ? 10 : 26), t0: now, text: kind === 'ballon' ? pick(signs) : pick(ads), pad };
   }
   function drawPlane(g, s, t) {
     const d = s.dir;
@@ -139,21 +136,32 @@
       }
     }
   }
-  function drawSky(g, cw, ch, t, ph) {
-    const dt = last ? Math.min(0.1, (t - last) / 1000) : 0;
-    last = t;
-    if (!sky && t >= skyAt) sky = newSky(t, cw, !!(ph && ph.night));
-    if (sky) {
-      sky.x += sky.dir * sky.speed * dt;
-      if (sky.kind === 'avion') drawPlane(g, sky, t);
-      else if (sky.kind === 'ballon') drawBalloon(g, sky, t);
-      else if (sky.kind === 'pyrax' && window.drawMonster) drawMonster(g, sky.x, sky.y + 18 + Math.sin(t / 400) * 6, { kind: 'dragon' }, { t, flying: true, scale: 0.3, facing: sky.dir });
-      else drawFlock(g, sky, t, sky.kind === 'chauves');
-      if ((sky.dir > 0 && sky.x > cw + sky.pad + 40) || (sky.dir < 0 && sky.x < -sky.pad - 40)) {
-        sky = null;
-        skyAt = t + 4000 + Math.random() * 9000;
+  // Un ciel animé avec ses propres banderoles (la façade de la Maison, le lac de la Pêche…).
+  // o = { ads, signs, scale (taille des engins), top (hauteur dans le ciel) }
+  function makeSky(o = {}) {
+    const st = { sky: null, at: 0, last: 0 };
+    return function drawOwnSky(g, cw, ch, t, ph) {
+      const dt = st.last ? Math.min(0.1, (t - st.last) / 1000) : 0;
+      st.last = t;
+      if (!st.sky && t >= st.at) { st.sky = newSky(t, cw, !!(ph && ph.night), o.ads || ADS, o.signs || SIGNS); if (o.top) st.sky.y += o.top; }
+      const s = st.sky;
+      if (s) {
+        s.x += s.dir * s.speed * dt;
+        if (s.kind === 'avion') drawPlane(g, s, t);
+        else if (s.kind === 'ballon') drawBalloon(g, s, t);
+        else if (s.kind === 'pyrax' && window.drawMonster) drawMonster(g, s.x, s.y + 18 + Math.sin(t / 400) * 6, { kind: 'dragon' }, { t, flying: true, scale: o.scale || 0.3, facing: s.dir });
+        else drawFlock(g, s, t, s.kind === 'chauves');
+        if ((s.dir > 0 && s.x > cw + s.pad + 40) || (s.dir < 0 && s.x < -s.pad - 40)) {
+          st.sky = null;
+          st.at = t + (o.gap ? o.gap[0] + Math.random() * o.gap[1] : 4000 + Math.random() * 9000);
+        }
       }
-    }
+      return dt;
+    };
+  }
+  const houseSky = makeSky();
+  function drawSky(g, cw, ch, t, ph) {
+    const dt = houseSky(g, cw, ch, t, ph);
     updateWalkers(cw, ch, t, dt);
   }
 
@@ -198,5 +206,5 @@
     g.textBaseline = 'alphabetic';
   }
 
-  window.HouseLife = { setPeople, sky: drawSky, front: drawFront };
+  window.HouseLife = { setPeople, sky: drawSky, front: drawFront, makeSky };
 })();

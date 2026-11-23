@@ -86,6 +86,20 @@
     else if (ph.dusk) { g.addColorStop(0, '#d89a8a'); g.addColorStop(0.3, '#6a6aa8'); g.addColorStop(1, '#2a3a6a'); }
     else { g.addColorStop(0, '#9fd8ef'); g.addColorStop(0.35, '#4aa8d0'); g.addColorStop(1, '#1f6a9a'); }
     ctx.fillStyle = g; ctx.fillRect(0, WATER, W, H - WATER);
+    // Pilotis du chalet : les piliers plongent dans l'eau et s'y effacent ; petit ponton et échelle, remous au pied
+    for (const x of [72, 86, 100, 113]) {
+      const pg = ctx.createLinearGradient(0, WATER - 6, 0, WATER + 26);
+      pg.addColorStop(0, ph.night ? 'rgba(58,40,30,1)' : 'rgba(110,72,40,1)'); pg.addColorStop(0.35, ph.night ? 'rgba(58,40,30,.8)' : 'rgba(110,72,40,.75)'); pg.addColorStop(1, 'rgba(110,72,40,0)');
+      ctx.fillStyle = pg; ctx.fillRect(x, WATER - 6, 4, 32);
+      ctx.strokeStyle = ph.night ? 'rgba(160,190,255,.25)' : 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(x + 2, WATER + 2 + Math.sin(t / 600 + x) * 0.8, 5 + Math.sin(t / 400 + x) * 1, 1.6, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = ph.night ? '#3a2a20' : '#8a5a32'; ctx.fillRect(66, WATER - 6, 56, 3); // plancher
+    ctx.fillRect(116, WATER - 5, 22, 2.5); // ponton
+    for (const x of [120, 134]) { const pg = ctx.createLinearGradient(0, WATER - 3, 0, WATER + 16); pg.addColorStop(0, ph.night ? 'rgba(58,40,30,1)' : 'rgba(110,72,40,1)'); pg.addColorStop(1, 'rgba(110,72,40,0)'); ctx.fillStyle = pg; ctx.fillRect(x, WATER - 3, 3, 19); }
+    // reflet tremblant du chalet
+    ctx.fillStyle = ph.night ? 'rgba(255,210,120,.12)' : 'rgba(138,90,58,.18)';
+    for (let i = 0; i < 6; i++) ctx.fillRect(70 + Math.sin(t / 500 + i) * 2, WATER + 6 + i * 4, 46 - i * 3, 2);
     // reflet du soleil ou de la lune
     const rx = ph.night ? 780 : 80 + ph.sun * 800;
     ctx.fillStyle = ph.night ? 'rgba(255,246,208,.35)' : 'rgba(255,250,220,.45)';
@@ -149,13 +163,64 @@
     S.jumps = S.jumps.filter((j) => j.p < 1.2);
   }
 
+  // ---------- Ce qui passe dans le ciel (comme à la Maison) : banderoles sur le thème de la pêche ----------
+  const SKY_ADS = [
+    '🎣 Pêchédex : attrapez-les tous (sauf le Kraken)',
+    '🐟 Poissonnerie Zer0Loot : fermée, le poissonnier est à la pêche',
+    '🦑 Kraken cherche âme sœur. Bras ouverts (les huit).',
+    '🪱 Vers de terre bio, élevés en plein air !',
+    '🛶 Barques d\'occasion : quelques fuites, beaucoup de charme',
+    '🐉 Pyrax vend du poisson grillé (involontairement)',
+    '🧊 Givrenoire & Fils : la pêche sur glace, même en été',
+    '📏 Ton poisson était PLUS GRAND. On te croit.',
+    '🎰 Casino Zer0Loot : ici aussi, on se fait plumer',
+    '🐸 Le Roi des marais décline toute responsabilité',
+    '🌊 Pêche du Léviathan interdite sans permis (et sans courage)',
+    '😴 La pêche : 90 % d\'attente, 10 % de panique',
+    '🐈 Mini Lilith a mangé ta prise ? C\'est normal.',
+    '👻 Ether ne mord pas. Il traverse le filet.',
+    '🧘 Respire. Le poisson aussi (enfin, par les ouïes).',
+  ];
+  const SKY_SIGNS = ['Ça mord ?', 'Chut, ça pêche !', 'Pêchédex 100 % !', 'Coucou les poissons !', '!join', 'Bonne pêche !'];
+
+  // ---------- Une famille de canards traverse le lac de temps en temps ----------
+  function drawDucks(ctx, t, dt, ph) {
+    if (!S.ducks && t > (S.duckAt || 0)) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      S.ducks = { dir, x: dir > 0 ? -60 : W + 60, y: WATER + 26 + Math.random() * 26, n: 2 + Math.floor(Math.random() * 3) };
+    }
+    const D = S.ducks;
+    if (!D) return;
+    D.x += D.dir * 16 * dt;
+    for (let i = 0; i <= D.n; i++) {
+      const big = i === 0;
+      const x = D.x - D.dir * i * (big ? 0 : 20) - (i ? D.dir * 14 : 0);
+      const y = D.y + Math.sin(t / 380 + i * 1.3) * 1.5;
+      const s = big ? 1 : 0.6;
+      ctx.save(); ctx.translate(x, y); if (D.dir < 0) ctx.scale(-1, 1); ctx.scale(s, s);
+      // sillage
+      ctx.strokeStyle = ph.night ? 'rgba(160,190,255,.2)' : 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-14, 4); ctx.quadraticCurveTo(-26, 7, -36, 5); ctx.stroke();
+      // corps, tête, bec
+      ctx.fillStyle = big ? (ph.night ? '#8a7a5a' : '#c8a46a') : (ph.night ? '#b8a860' : '#ffe066');
+      ctx.beginPath(); ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-10, -2); ctx.lineTo(-17, -6); ctx.lineTo(-12, 1); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = big ? (ph.night ? '#2a4a3a' : '#2f7a4a') : ctx.fillStyle;
+      ctx.beginPath(); ctx.arc(9, -8, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff9a2a'; ctx.beginPath(); ctx.moveTo(13, -8); ctx.lineTo(19, -7); ctx.lineTo(13, -5.5); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1d1a26'; ctx.beginPath(); ctx.arc(10.5, -9.5, 1.1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if ((D.dir > 0 && D.x > W + 140) || (D.dir < 0 && D.x < -140)) { S.ducks = null; S.duckAt = t + 40000 + Math.random() * 50000; }
+  }
+
   // ---------- Barque, personnage, familier, canne ----------
   function lookOf() {
     const look = {};
     for (const [slot, item] of Object.entries(me.character.equipment || {})) if (item) look[slot] = item.rarity;
     return look;
   }
-  const rodTip = (t) => ({ x: BOAT.x + 110 + (S.phase === 'reel' ? Math.sin(t / 60) * 4 - 8 : 0), y: BOAT.y - 128 + (S.phase === 'reel' ? 14 : 0) });
+  const rodTip = (t) => ({ x: BOAT.x + 110 + (S.phase === 'reel' ? Math.sin(t / 60) * 4 - 8 : 0), y: BOAT.y - 112 + (S.phase === 'reel' ? 14 : 0) });
 
   function drawBoat(ctx, t, ph) {
     const bob = Math.sin(t / 800) * 3;
@@ -164,13 +229,14 @@
     // reflet sombre
     ctx.fillStyle = 'rgba(0,20,40,.25)'; ctx.beginPath(); ctx.ellipse(BOAT.x, y + 30, 120, 12, 0, 0, Math.PI * 2); ctx.fill();
     // personnage debout dans la barque (on cache son arme habituelle : il tient la canne)
-    drawFighter(ctx, BOAT.x - 10, y - 46, { name: '', cls: c.cls, look: lookOf(), app: { ...c.look, weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: S.phase === 'reel' ? Math.sin(t / 70) * 1.5 : 0 });
+    // (pieds sous le bord de la coque : on ne voit que le haut du corps, il est vraiment DANS la barque)
+    drawFighter(ctx, BOAT.x - 10, y - 27, { name: '', cls: c.cls, look: lookOf(), app: { ...c.look, weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: S.phase === 'reel' ? Math.sin(t / 70) * 1.5 : 0 });
     // familier principal à la proue
     const P = c.pets;
     const pet = P && P.list && P.list.find((p) => p.id === P.active);
     if (pet && window.drawPet) {
       const hop = S.petHop > 0 ? -Math.abs(Math.sin(S.petHop * 12)) * 14 : 0;
-      drawPet(ctx, BOAT.x + 64, y - 4 + hop, pet.species, { t, size: 0.95, facing: 1 });
+      drawPet(ctx, BOAT.x + 64, y + 6 + hop, pet.species, { t, size: 0.95, facing: 1 });
     }
     // coque
     const hull = ctx.createLinearGradient(0, y - 4, 0, y + 30);
@@ -188,7 +254,7 @@
     ctx.fillRect(BOAT.x - 101, y - 44, 10, 12); ctx.strokeRect(BOAT.x - 101, y - 44, 10, 12);
     // canne (dorée avec la canne légendaire)
     const legend = c.look && c.look.weapon === 'canne_legendaire';
-    const hand = { x: BOAT.x + 8, y: y - 62 };
+    const hand = { x: BOAT.x + 8, y: y - 43 };
     const tip = rodTip(t);
     ctx.strokeStyle = legend ? '#ffd34a' : '#8a5a2a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(hand.x - 10, hand.y + 10); ctx.quadraticCurveTo((hand.x + tip.x) / 2, Math.min(hand.y, tip.y) - 10, tip.x, tip.y + bob); ctx.stroke();
@@ -426,7 +492,10 @@
     if (Math.random() < dt * 0.12) Sound.play(ph.night ? 'cricket' : 'birdChirp');
     S.petHop = Math.max(0, S.petHop - dt);
     drawSky(ctx, t, ph);
+    if (!S.sky && window.HouseLife && HouseLife.makeSky) S.sky = HouseLife.makeSky({ ads: SKY_ADS, signs: SKY_SIGNS, scale: 0.34, gap: [6000, 14000] });
+    if (S.sky) S.sky(ctx, W, H, t, ph);
     drawWater(ctx, t, ph);
+    drawDucks(ctx, t, dt, ph);
     drawJumps(ctx, dt);
     drawShadow(ctx, t);
     // ronds dans l'eau
@@ -650,13 +719,18 @@
     S.active = true;
     S.last = 0;
     S.phase = 'idle';
+    S.duckAt = performance.now() + 12000;
     S.raf = requestAnimationFrame(frame);
+    // Musique chill : les 4 morceaux lo-fi s'enchaînent en boucle
+    Sound.music.stop(0.2);
+    setTimeout(() => { if (S.active) Sound.music.start(0, 'peche'); }, 250);
   }
 
   function leave() {
     if (!S.active) return;
     S.active = false;
     cancelAnimationFrame(S.raf);
+    if (Sound.music.state && /peche/.test(Sound.music.state.src || '')) Sound.music.stop();
     if (S.phase !== 'idle') api('/api/fishing/stop', {}).catch(() => {});
     S.phase = 'idle';
     S.cast = null;
