@@ -785,9 +785,11 @@ test('[SV-17] survivor : sanctuaires maudits cumulables, encerclement, chariot d
   run.enemies = [];
   const rat = run.spawnEnemy('rat', { x: run.p.x + 400, y: run.p.y });
   const x0 = rat.x;
+  const wet = Rules.survivorWater(rat.x, rat.y); // l'eau se mesure là où il part
+  run.fx = {}; // sans l'effet du lieu-dit où se trouve le sanctuaire (certains ralentissent les monstres)
   run.buildGrid();
   run.updateEnemies(0.1);
-  assert.ok(Math.abs((x0 - rat.x) - rat.speed * 1.2 * 0.1 * (Rules.survivorWater(rat.x, rat.y) ? SV.waterSlow : 1)) < 0.5);
+  assert.ok(Math.abs((x0 - rat.x) - rat.speed * 1.2 * 0.1 * (wet ? SV.waterSlow : 1)) < 0.5);
   const hp = run.hp;
   run.hurt(10);
   assert.strictEqual(run.hp, hp - 12);
