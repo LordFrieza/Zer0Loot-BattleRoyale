@@ -1271,3 +1271,62 @@ test('[TCH-6] tchat par HTTP : lecture publique, écriture des joueurs, diffusio
   assert.strictEqual((await admin.post('/api/admin/chat/clear', {})).status, 200);
   assert.deepStrictEqual((await anon.get('/api/chat')).data.messages, []);
 });
+
+test('[ACC-17, ACC-18, ACC-19, ACC-20, ACC-21] compte : e-mail confirmé par lien, mot de passe oublié, lien admin, changement de mot de passe, Twitch', async () => {
+  const mailer = require('../server/mailer');
+  const { twitchAccount } = require('../server/index');
+  const p = client();
+  const me = await register(p, 'pl_mail');
+  assert.strictEqual((await client().get('/api/config')).data.mail, true, 'hors production : mode log');
+  // Lier une adresse : mot de passe demandé, puis lien reçu
+  assert.match((await p.post('/api/account/email', { email: 'pl@mail.fr', password: 'faux' })).data.error, /Mot de passe incorrect/);
+  const set = await p.post('/api/account/email', { email: 'PL@mail.fr', password: 'secret1' });
+  assert.deepStrictEqual([set.status, set.data.pending], [200, 'pl@mail.fr']);
+  let mail = mailer.outbox.at(-1);
+  assert.strictEqual(mail.to, 'pl@mail.fr');
+  const verify = mail.text.match(/\/account\/verify\?token=([0-9a-f]{64})/);
+  assert.ok(verify, mail.text);
+  assert.strictEqual((await p.get('/api/me')).data.emailVerified, false);
+  const r = await fetch(base + '/account/verify?token=' + verify[1], { redirect: 'manual' });
+  assert.match(r.headers.get('location'), /email=ok/);
+  const after = (await p.get('/api/me')).data;
+  assert.deepStrictEqual([after.email, after.emailVerified, after.emailPending], ['pl@mail.fr', true, null]);
+  // Mot de passe oublié : même réponse pour un compte inconnu ; lien d'1 h à l'adresse confirmée
+  const anon = client();
+  const unknown = await anon.post('/api/password/forgot', { login: 'personne_ici' });
+  const known = await anon.post('/api/password/forgot', { login: 'pl@mail.fr' });
+  assert.strictEqual(unknown.data.message, known.data.message);
+  mail = mailer.outbox.at(-1);
+  assert.strictEqual(mail.to, 'pl@mail.fr');
+  const reset = mail.text.match(/\?reset=([0-9a-f]{64})/)[1];
+  assert.match((await anon.post('/api/password/reset', { token: reset, password: '123' })).data.error, /trop court/);
+  const done = await anon.post('/api/password/reset', { token: reset, password: 'nouveau1' });
+  assert.deepStrictEqual([done.status, done.data.me.id], [200, me.id]);
+  assert.strictEqual((await p.get('/api/me')).status, 401, 'les anciennes sessions sont fermées');
+  assert.strictEqual((await anon.get('/api/me')).data.id, me.id, 'connecté avec le lien');
+  assert.match((await anon.post('/api/password/reset', { token: reset, password: 'encore12' })).data.error, /expiré ou déjà utilisé/);
+  assert.strictEqual((await client().post('/api/login', { username: 'pl_mail', password: 'nouveau1' })).status, 200);
+  // Lien donné par l'admin (sans e-mail), adresse masquée dans la liste
+  const link = await admin.post(`/api/admin/players/${me.id}/reset-link`, {});
+  assert.strictEqual(link.data.hours, 48);
+  const adminToken = link.data.url.match(/\?reset=([0-9a-f]{64})/)[1];
+  assert.strictEqual((await anon.post(`/api/admin/players/${me.id}/reset-link`, {})).status, 403);
+  assert.strictEqual((await client().post('/api/password/reset', { token: adminToken, password: 'parlAdmin' })).status, 200);
+  const row = (await players()).find((x) => x.id === me.id);
+  assert.deepStrictEqual([row.email, row.emailVerified], ['p*@m***l.fr', true]);
+  // Changer son mot de passe une fois connecté
+  const q = client();
+  await q.post('/api/login', { username: 'pl_mail', password: 'parlAdmin' });
+  assert.match((await q.post('/api/account/password', { current: 'faux', password: 'abcdef' })).data.error, /actuel incorrect/);
+  assert.strictEqual((await q.post('/api/account/password', { current: 'parlAdmin', password: 'final123' })).status, 200);
+  assert.strictEqual((await q.get('/api/me')).status, 200, 'la session courante reste ouverte');
+  // Retirer l'adresse
+  assert.strictEqual((await q.post('/api/account/email', { email: '', password: 'final123' })).data.removed, true);
+  assert.strictEqual((await q.get('/api/me')).data.email, null);
+  // Connexion avec Twitch : seulement un vrai compte dont le Twitch est lié
+  const u = db.state.users[me.id];
+  u.twitchLogin = 'pl_twitch'; u.twitchId = 't-42';
+  assert.strictEqual(twitchAccount({ id: 't-42', login: 'PL_Twitch' }), u);
+  assert.strictEqual(twitchAccount({ id: 'autre', login: 'pl_twitch' }), u, 'par pseudo Twitch aussi');
+  assert.strictEqual(twitchAccount({ id: 'zzz', login: 'inconnu' }), null);
+});

@@ -44,6 +44,8 @@ Dans la page admin, la section « Tests » permet :
 | `TWITCH_BOT_USERNAME` / `TWITCH_BOT_OAUTH` | — | Optionnel : compte bot qui répond dans le chat |
 | `ALLOW_DEV_LINK` | — | `1` pour garder la liaison « par pseudo » même avec l'OAuth configuré |
 | `TWITCH_CHAT_DISABLED` | — | `1` pour ne pas se connecter au chat (tests hors ligne) |
+| `MAIL_PROVIDER` / `MAIL_API_KEY` | — | Envoi des e-mails (adresse du compte, mot de passe oublié) : `brevo` ou `resend` et sa clé d'API ; sans eux, hors production les e-mails sont seulement écrits dans les logs |
+| `MAIL_FROM` / `MAIL_FROM_NAME` | — / `Minilooteur` | Adresse et nom de l'expéditeur des e-mails |
 | `DATA_DIR` | `./data` | Dossier de sauvegarde (`db.json`) |
 | `NODE_ENV` | — | `production` en ligne (déjà réglé dans le `Dockerfile`) : cookies sécurisés, pas de mot de passe admin par défaut, liaison par pseudo désactivée |
 
@@ -209,6 +211,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Compétences ; Combat), Place du marché (Boutique, Marché) et Hall des héros (Classements, Succès, Stats, Historique). Les
   pastilles (points à répartir, coffres, succès, courrier…) s'affichent sur les lieux de la carte et du menu. Les anciennes
   adresses (`#solo`, `#casino`…) marchent toujours.
+- **Compte et sécurité** (fiche du personnage) : lier une **adresse e-mail** (confirmée par un lien) pour pouvoir
+  récupérer son compte, et changer de mot de passe. Sur la page d'accueil, **« Mot de passe oublié ? »** envoie un lien
+  (1 h, une seule fois) à l'adresse confirmée ; **« Se connecter avec Twitch »** marche pour les comptes dont le Twitch
+  est lié. Sans e-mail, l'admin peut créer un **lien de nouveau mot de passe** (48 h) depuis la liste des joueurs.
 - **Tchat (la Taverne)** : un salon commun à tous les joueurs, sur la carte (la Taverne) et dans une **bulle 💬** flottante
   pour discuter sans quitter son activité. Le pseudo prend la couleur du personnage, avec l'icône de sa classe et son titre.
   **Émotes** des boss dessinées dans le style du jeu (`:pyrax:` en colère, `:ether:` timide, `:snif:` en larmes, `:daedra:`

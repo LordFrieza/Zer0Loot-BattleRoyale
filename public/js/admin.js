@@ -165,6 +165,8 @@ function renderPlayers() {
       return `<tr class="${p.banned ? 'banned' : ''}" data-id="${p.id}">
         <td><b>${esc(p.name)}</b>${p.twitch ? ` <span class="muted">@${esc(p.twitch)}</span>` : ''}${p.ghost ? '<span class="tag">sans compte</span>' : ''}${p.banned ? '<span class="tag red">banni</span>' : ''}
           ${p.title ? `<div class="muted" style="font-size:11px">« ${esc(p.title)} »</div>` : ''}
+          ${p.ghost ? '' : `<div class="row" style="gap:6px;margin-top:4px;font-size:11px"><span class="muted" title="Adresse e-mail du compte (masquée)">✉️ ${p.email ? `${esc(p.email)} ${p.emailVerified ? '✅' : '(non confirmée)'}` : 'aucune adresse'}</span>
+            <button class="small secondary" data-resetlink title="Créer un lien (48 h, une seule fois) pour que ce joueur choisisse un nouveau mot de passe">🔑 Lien mot de passe</button></div>`}
           ${p.drawing ? `<div class="row" style="gap:6px;margin-top:4px"><canvas width="36" height="36" class="drawing-thumb" data-pixels="${p.drawing}" title="Visage dessiné"></canvas>
             <button class="small secondary" data-cleardraw title="Effacer ce dessin (modération)">🧽 Effacer le dessin</button></div>` : ''}</td>
         <td>${ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '—'}</td>
@@ -209,6 +211,18 @@ function renderPlayers() {
       if (!await confirmBox(`Effacer le visage dessiné de ${p.name} ?`)) return;
       const r = await run(`/api/admin/players/${row.dataset.id}/drawing/clear`, {});
       if (r) { toast(`🧽 Dessin de ${p.name} effacé`); loadPlayers(); }
+    };
+  });
+  // Joueur qui a perdu son mot de passe : un lien à lui transmettre (Discord, message privé…)
+  $('players').querySelectorAll('[data-resetlink]').forEach((b) => {
+    b.onclick = async () => {
+      const row = b.closest('tr');
+      const p = playersList.find((x) => x.id === row.dataset.id);
+      if (!await confirmBox(`Créer un lien de nouveau mot de passe pour ${p.name} ? Transmets-le-lui en privé : il permet de prendre le contrôle du compte.`)) return;
+      const r = await run(`/api/admin/players/${row.dataset.id}/reset-link`, {});
+      if (!r) return;
+      try { await navigator.clipboard.writeText(r.url); } catch (e) { /* pas de presse-papiers */ }
+      await alertBox(`Lien pour ${r.name} (valable ${r.hours} h, une seule fois) — copié dans le presse-papiers si possible :\n\n${r.url}`, { title: '🔑 Lien de nouveau mot de passe' });
     };
   });
   $('players').querySelectorAll('[data-ban]').forEach((b) => {

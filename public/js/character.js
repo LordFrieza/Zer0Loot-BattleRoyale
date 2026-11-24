@@ -61,6 +61,7 @@ function render() {
   renderEquipment();
   renderInventory();
   renderTwitch();
+  renderSecurity();
   renderQueue();
   renderBets();
   renderLoot();
@@ -2392,6 +2393,59 @@ $('recycle-toggle').onclick = () => {
   renderInventory();
 };
 
+// Compte et sécurité : adresse e-mail (pour récupérer son compte si on oublie son mot de passe) et mot de passe
+let securitySig = '';
+function renderSecurity() {
+  const mailOn = config && config.mail;
+  const sig = [me.email, me.emailVerified, me.emailPending, mailOn].join('|');
+  if (sig === securitySig) return; // on ne réécrit pas le panneau (et les champs en cours de saisie) à chaque mise à jour
+  securitySig = sig;
+  const status = me.email && me.emailVerified
+    ? `<div class="sec-status ok">✅ Adresse liée : <b>${esc(me.email)}</b></div>`
+    : '<div class="sec-status warn">⚠️ Aucune adresse liée : si tu oublies ton mot de passe, tu ne pourras pas récupérer ton compte seul.</div>';
+  const pending = me.emailPending ? `<div class="sec-status pending">📨 En attente de confirmation : <b>${esc(me.emailPending)}</b> — clique sur le lien reçu par e-mail (regarde aussi dans les indésirables).
+      <button type="button" class="small secondary" id="sec-resend">Renvoyer l'e-mail</button></div>` : '';
+  $('security-content').innerHTML = `${status}${pending}
+    <p class="muted" style="font-size:13px">Ton adresse sert seulement à te renvoyer un lien si tu oublies ton mot de passe. Elle n'est montrée à personne.${me.twitchLogin && config && config.twitchLogin ? ' Ton Twitch étant lié, tu peux aussi te connecter avec Twitch.' : ''}</p>
+    ${mailOn ? `<form class="sec-form" id="sec-email-form" autocomplete="off">
+      <input type="email" id="sec-email" placeholder="ton.adresse@exemple.fr" value="${esc(me.emailPending || me.email || '')}" maxlength="254">
+      <input type="password" id="sec-email-pw" placeholder="Ton mot de passe actuel" autocomplete="current-password">
+      <button type="submit" class="small">${me.email ? 'Changer d\'adresse' : 'Lier cette adresse'}</button>
+      ${me.email || me.emailPending ? '<button type="button" class="small secondary" id="sec-email-remove">Retirer</button>' : ''}
+    </form>` : '<p class="muted" style="font-size:13px">📭 L\'envoi d\'e-mails n\'est pas encore activé sur le serveur. En attendant, si tu perds ton mot de passe, le streamer peut te donner un lien pour en choisir un nouveau.</p>'}
+    <details class="sec-pw"><summary>🔑 Changer de mot de passe</summary>
+      <form class="sec-form" id="sec-pw-form" autocomplete="off">
+        <input type="password" id="sec-pw-current" placeholder="Mot de passe actuel" autocomplete="current-password">
+        <input type="password" id="sec-pw-new" placeholder="Nouveau (6 caractères minimum)" autocomplete="new-password">
+        <button type="submit" class="small">Changer</button>
+      </form></details>`;
+  if ($('sec-email-form')) {
+    $('sec-email-form').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const r = await api('/api/account/email', { email: $('sec-email').value.trim(), password: $('sec-email-pw').value });
+        toast(r.removed ? 'Adresse retirée' : `📨 E-mail envoyé à ${r.pending} : clique sur le lien pour confirmer`, 6000);
+      } catch (err) { toast('⚠️ ' + err.message); }
+    };
+  }
+  if ($('sec-email-remove')) {
+    $('sec-email-remove').onclick = async () => {
+      const pw = await promptBox('Ton mot de passe, pour retirer l\'adresse :', '', { title: 'Retirer l\'adresse e-mail', ok: 'Retirer' });
+      if (pw == null) return;
+      try { await api('/api/account/email', { email: '', password: pw }); toast('Adresse retirée'); } catch (err) { toast('⚠️ ' + err.message); }
+    };
+  }
+  if ($('sec-resend')) $('sec-resend').onclick = () => api('/api/account/email/resend', {}).then(() => toast('📨 E-mail renvoyé')).catch((err) => toast('⚠️ ' + err.message));
+  $('sec-pw-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api('/api/account/password', { current: $('sec-pw-current').value, password: $('sec-pw-new').value });
+      $('sec-pw-current').value = ''; $('sec-pw-new').value = '';
+      toast('🔑 Mot de passe changé (tes autres appareils sont déconnectés)', 5000);
+    } catch (err) { toast('⚠️ ' + err.message); }
+  };
+}
+
 function renderTwitch() {
   const el = $('twitch-content');
   if (me.twitchLogin) {
@@ -2816,5 +2870,7 @@ socket.on('reward', (r) => {
   const params = new URLSearchParams(location.search);
   if (params.get('twitch') === 'ok') toast('✅ Compte Twitch lié !');
   if (params.get('twitch') === 'error') toast('⚠️ Liaison Twitch échouée' + (params.get('msg') ? ' : ' + params.get('msg') : ''));
-  if (params.has('twitch')) history.replaceState(null, '', '/character.html');
+  if (params.get('email') === 'ok') toast('✅ Adresse e-mail confirmée : ton compte est récupérable', 6000);
+  if (params.get('email') === 'expired') toast('⚠️ Lien de confirmation expiré ou déjà utilisé : renvoie l\'e-mail depuis « Compte et sécurité »', 7000);
+  if (params.has('twitch') || params.has('email')) history.replaceState(null, '', '/character.html' + location.hash);
 })();

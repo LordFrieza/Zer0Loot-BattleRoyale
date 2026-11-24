@@ -36,6 +36,30 @@
       <input id="password" type="password" autocomplete="current-password" required>
       <div class="error" id="error"></div>
       <button type="submit" id="submit" style="width:100%;justify-content:center">Se connecter</button>
+      <a href="#" class="auth-link" id="forgot-link">Mot de passe oublié ?</a>
+    </form>
+    <a class="btn twitch-login" id="twitch-login" href="/auth/twitch/login" style="display:none">📺 Se connecter avec Twitch</a>
+    <!-- Mot de passe oublié : lien envoyé à l'adresse confirmée du compte -->
+    <form id="forgot-form" style="display:none">
+      <h3>🔑 Mot de passe oublié</h3>
+      <p class="muted">Entre ton pseudo ou l'adresse e-mail liée à ton compte : tu recevras un lien pour choisir un nouveau mot de passe.</p>
+      <label for="forgot-login">Pseudo ou e-mail</label>
+      <input id="forgot-login" autocomplete="username" required>
+      <div class="error" id="forgot-error"></div>
+      <div class="ok-msg" id="forgot-ok"></div>
+      <button type="submit" style="width:100%;justify-content:center">Envoyer le lien</button>
+      <p class="muted auth-help">Pas d'adresse liée ? Si ton Twitch est lié à ton compte, utilise « Se connecter avec Twitch ». Sinon, demande au streamer un lien de nouveau mot de passe.</p>
+      <a href="#" class="auth-link" id="forgot-back">← Retour à la connexion</a>
+    </form>
+    <!-- Nouveau mot de passe (lien reçu par e-mail ou donné par le streamer) -->
+    <form id="reset-form" style="display:none">
+      <h3>🔑 Choisis un nouveau mot de passe</h3>
+      <label for="reset-pw">Nouveau mot de passe</label>
+      <input id="reset-pw" type="password" autocomplete="new-password" required minlength="6">
+      <label for="reset-pw2">Encore une fois</label>
+      <input id="reset-pw2" type="password" autocomplete="new-password" required minlength="6">
+      <div class="error" id="reset-error"></div>
+      <button type="submit" style="width:100%;justify-content:center">Enregistrer et me connecter</button>
     </form>
   </div>
 
@@ -75,7 +99,30 @@
       }
     };
 
-    api('/api/me').then(go).catch(() => {});
+    // Mot de passe oublié, nouveau mot de passe par lien, connexion avec Twitch
+    const show = (id) => { for (const f of ['auth-form', 'forgot-form', 'reset-form']) $(f).style.display = f === id ? '' : 'none'; document.querySelector('.auth-box .tabs').style.display = id === 'auth-form' ? '' : 'none'; };
+    $('forgot-link').onclick = (e) => { e.preventDefault(); $('forgot-login').value = $('username').value.trim(); show('forgot-form'); };
+    $('forgot-back').onclick = (e) => { e.preventDefault(); show('auth-form'); };
+    $('forgot-form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('forgot-error').textContent = ''; $('forgot-ok').textContent = '';
+      try { $('forgot-ok').textContent = (await api('/api/password/forgot', { login: $('forgot-login').value.trim() })).message; }
+      catch (err) { $('forgot-error').textContent = err.message; }
+    };
+    const params = new URLSearchParams(location.search);
+    const resetToken = params.get('reset');
+    if (resetToken) show('reset-form');
+    $('reset-form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('reset-error').textContent = '';
+      if ($('reset-pw').value !== $('reset-pw2').value) { $('reset-error').textContent = 'Les deux mots de passe sont différents'; return; }
+      try { const r = await api('/api/password/reset', { token: resetToken, password: $('reset-pw').value }); go(r.me); }
+      catch (err) { $('reset-error').textContent = err.message; }
+    };
+    api('/api/config').then((c) => { if (c.twitchLogin) $('twitch-login').style.display = ''; }).catch(() => {});
+    const tw = params.get('twitch');
+    if (tw) $('error').textContent = { nouser: 'Ce compte Twitch n\'est lié à aucun compte : connecte-toi avec ton pseudo, puis lie ton Twitch depuis ta fiche.', banned: 'Ce compte a été banni', disabled: 'La connexion avec Twitch n\'est pas activée', error: 'La connexion avec Twitch a échoué' }[tw] || '';
+    if (!resetToken) api('/api/me').then(go).catch(() => {});
   </script>
 </body>
 </html>

@@ -131,6 +131,32 @@ Fly redémarre le site tout seul ; le bouton **« Se connecter avec Twitch »** 
 > En attendant cette étape, les viewers peuvent quand même jouer avec `!join` : leur loot est gardé de côté et
 > récupéré dès qu'ils lient leur compte.
 
+## Étape 7 bis : activer les e-mails (mot de passe oublié)
+
+Les joueurs peuvent lier une adresse e-mail à leur compte (fiche → **Compte et sécurité**) pour recevoir un lien s'ils
+oublient leur mot de passe. Pour que le site envoie ces e-mails, il lui faut un service d'envoi. **Brevo** est gratuit
+(300 e-mails par jour, largement assez) et accepte une simple adresse Gmail comme expéditeur :
+
+1. Crée un compte sur <https://www.brevo.com> (offre gratuite).
+2. **Expéditeur** : menu *Senders, Domains & Dedicated IPs* → *Senders* → **Add a sender** : mets l'adresse qui
+   enverra les e-mails (par exemple une adresse Gmail créée pour le jeu, `minilooteur@gmail.com`) et le nom
+   `Minilooteur`. Brevo envoie un e-mail de confirmation à cette adresse : clique sur le lien.
+3. **Clé d'API** : menu (en haut à droite) → *SMTP & API* → onglet **API Keys** → **Generate a new API key** ; copie-la
+   (elle commence par `xkeysib-`).
+4. Donne-les au serveur :
+   ```bash
+   fly secrets set MAIL_PROVIDER="brevo" MAIL_API_KEY="xkeysib-…" MAIL_FROM="minilooteur@gmail.com" MAIL_FROM_NAME="Minilooteur"
+   ```
+   (`PUBLIC_URL` doit aussi être réglé, étape 5 : c'est l'adresse mise dans les liens des e-mails.)
+
+Fly redémarre le site ; le formulaire d'adresse apparaît dans **Compte et sécurité** et « Mot de passe oublié ? »
+envoie le lien. Tu peux aussi utiliser **Resend** (`MAIL_PROVIDER="resend"`), mais il demande de vérifier un nom de
+domaine.
+
+> Même sans e-mails, un joueur qui a perdu son mot de passe n'est pas bloqué : dans la page admin, liste des joueurs,
+> le bouton **🔑 Lien mot de passe** crée un lien (valable 48 h, une seule fois) à lui envoyer en privé (Discord…). Et
+> s'il a lié son Twitch, il peut se connecter avec le bouton **« Se connecter avec Twitch »** de la page d'accueil.
+
 ## Étape 8 : OBS
 
 Dans OBS : **Sources** → **+** → **Navigateur** :

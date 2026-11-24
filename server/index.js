@@ -15,6 +15,8 @@ const market = require('./market');
 const casino = require('./casino');
 const fishing = require('./fishing');
 const chat = require('./chat');
+const mailer = require('./mailer');
+const account = require('./account');
 const survivor = require('./survivor');
 const housing = require('./housing');
 const schedule = require('./schedule');
@@ -182,6 +184,10 @@ function meView(user) {
     role: user.role,
     twitchLogin: user.twitchLogin || null,
     twitchDisplayName: user.twitchDisplayName || null,
+    // Sécurité du compte (visible par le joueur seulement) : adresse liée, vérifiée ou en attente de vérification
+    email: user.email || null,
+    emailVerified: !!user.emailVerified,
+    emailPending: user.emailPending || null,
   };
   if (user.role === 'player') {
     base.character = game.publicCharacter(user);
@@ -242,7 +248,98 @@ function devLinkAllowed() {
 }
 
 app.get('/api/config', (req, res) => {
-  res.json({ twitch: twitch.status(), devLink: devLinkAllowed() });
+  res.json({ twitch: twitch.status(), devLink: devLinkAllowed(), mail: mailer.configured(), twitchLogin: twitch.oauthEnabled() });
+});
+
+// ---------- Sécurité du compte : e-mail, mot de passe oublié ----------
+const siteUrl = (req) => (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+const bad = (res, err, status = 400) => res.status(status).json({ error: err.message || String(err) });
+function sendVerifyMail(req, user, token) {
+  const url = `${siteUrl(req)}/account/verify?token=${token}`;
+  const m = mailer.layout('Confirme ton adresse e-mail', [
+    `Bonjour ${user.twitchDisplayName || user.username} !`,
+    'Clique sur le bouton pour lier cette adresse à ton compte Minilooteur. Elle servira à récupérer ton compte si tu oublies ton mot de passe.',
+    'Le lien est valable 24 h. Si tu n\'as rien demandé, ignore simplement cet e-mail.',
+  ], { label: 'Confirmer mon adresse', url });
+  return mailer.send({ to: user.emailPending, subject: 'Minilooteur : confirme ton adresse e-mail', ...m });
+}
+// Lier (ou changer) son adresse : mot de passe demandé ; elle n'est liée qu'après le clic sur le lien reçu
+app.post('/api/account/email', requirePlayer, async (req, res) => {
+  const user = req.user;
+  if (!checkPassword(String(req.body.password || ''), user.passwordHash)) return bad(res, new Error('Mot de passe incorrect'));
+  try {
+    if (!req.body.email) { account.removeEmail(user); pushMe(user); return res.json({ ok: true, removed: true }); }
+    if (!mailer.configured()) throw new Error('L\'envoi d\'e-mails n\'est pas encore activé sur le serveur');
+    const token = account.startEmailChange(user, req.body.email);
+    await sendVerifyMail(req, user, token);
+    pushMe(user);
+    res.json({ ok: true, pending: user.emailPending });
+  } catch (err) { bad(res, err); }
+});
+app.post('/api/account/email/resend', requirePlayer, async (req, res) => {
+  const user = req.user;
+  try {
+    if (!user.emailPending) throw new Error('Aucune adresse en attente de confirmation');
+    if (user.emailToken && Date.now() - (user.emailToken.exp - account.EMAIL_TTL) < 60 * 1000) throw new Error('Patiente une minute avant de renvoyer l\'e-mail');
+    await sendVerifyMail(req, user, account.startEmailChange(user, user.emailPending));
+    res.json({ ok: true });
+  } catch (err) { bad(res, err); }
+});
+app.get('/account/verify', (req, res) => {
+  try {
+    const user = account.verifyEmail(String(req.query.token || ''));
+    pushMe(user);
+    res.redirect('/character.html?email=ok#perso');
+  } catch (err) { res.redirect('/character.html?email=expired#perso'); }
+});
+// Changer son mot de passe (connecté) : les autres sessions sont fermées
+app.post('/api/account/password', requirePlayer, (req, res) => {
+  const user = req.user;
+  if (!checkPassword(String(req.body.current || ''), user.passwordHash)) return bad(res, new Error('Mot de passe actuel incorrect'));
+  const pw = String(req.body.password || '');
+  if (pw.length < 6) return bad(res, new Error('Mot de passe trop court (6 caractères minimum)'));
+  user.passwordHash = hashPassword(pw);
+  const mine = parseCookies(req.headers.cookie)[COOKIE];
+  for (const [token, s] of Object.entries(db.state.sessions)) if (s.userId === user.id && token !== mine) delete db.state.sessions[token];
+  db.save();
+  res.json({ ok: true });
+});
+// Mot de passe oublié : même réponse que le compte existe ou non (on ne révèle rien) ; e-mail seulement à une adresse
+// vérifiée, au plus un toutes les 5 min par compte ; 5 demandes par quart d'heure et par adresse IP.
+const forgotHits = new Map();
+app.post('/api/password/forgot', async (req, res) => {
+  const now = Date.now();
+  const ip = req.ip || 'x';
+  const hits = (forgotHits.get(ip) || []).filter((t) => now - t < 15 * 60 * 1000);
+  if (hits.length >= 5) return bad(res, new Error('Trop de demandes, réessaie dans un quart d\'heure'), 429);
+  hits.push(now);
+  forgotHits.set(ip, hits);
+  const answer = { ok: true, message: 'Si un compte avec une adresse e-mail confirmée correspond, un lien vient d\'y être envoyé (pense à regarder dans les indésirables).' };
+  const user = account.findForForgot(req.body.login);
+  if (!user || !user.emailVerified || !user.email || user.banned || !mailer.configured()) return res.json(answer);
+  const token = account.startReset(user, now);
+  if (!token) return res.json(answer);
+  const url = `${siteUrl(req)}/?reset=${token}`;
+  const m = mailer.layout('Mot de passe oublié', [
+    `Bonjour ${user.twitchDisplayName || user.username} !`,
+    `Quelqu'un (sans doute toi) a demandé à changer le mot de passe du compte « ${user.username} ».`,
+    'Clique sur le bouton pour en choisir un nouveau. Le lien est valable 1 h et ne sert qu\'une fois. Si tu n\'as rien demandé, ignore cet e-mail : ton mot de passe ne change pas.',
+  ], { label: 'Choisir un nouveau mot de passe', url });
+  try { await mailer.send({ to: user.email, subject: 'Minilooteur : réinitialise ton mot de passe', ...m }); } catch (err) { /* même réponse */ }
+  res.json(answer);
+});
+// Nouveau mot de passe avec un lien (e-mail ou admin) : toutes les sessions sont fermées, puis le joueur est connecté
+app.post('/api/password/reset', (req, res) => {
+  const user = account.findByReset(String(req.body.token || ''));
+  if (!user) return bad(res, new Error('Lien expiré ou déjà utilisé : refais une demande'));
+  if (user.banned) return bad(res, new Error('Ce compte a été banni'), 403);
+  const pw = String(req.body.password || '');
+  if (pw.length < 6) return bad(res, new Error('Mot de passe trop court (6 caractères minimum)'));
+  user.passwordHash = hashPassword(pw);
+  account.clearReset(user);
+  for (const [token, s] of Object.entries(db.state.sessions)) if (s.userId === user.id) delete db.state.sessions[token];
+  createSession(res, user);
+  res.json({ ok: true, me: meView(user) });
 });
 
 // ---------- Personnage ----------
@@ -539,9 +636,28 @@ app.get('/auth/twitch', (req, res) => {
   res.redirect(twitch.authorizeUrl(redirectUri(req), state));
 });
 
+// Se connecter avec Twitch (sans mot de passe) : pour les comptes dont le Twitch est déjà lié
+app.get('/auth/twitch/login', (req, res) => {
+  if (!twitch.oauthEnabled()) return res.redirect('/?twitch=disabled');
+  const state = crypto.randomBytes(16).toString('hex');
+  oauthStates.set(state, { login: true, expires: Date.now() + 10 * 60 * 1000 });
+  res.redirect(twitch.authorizeUrl(redirectUri(req), state));
+});
+
 app.get('/auth/twitch/callback', async (req, res) => {
   const entry = oauthStates.get(req.query.state);
   oauthStates.delete(req.query.state);
+  if (entry && entry.login) {
+    if (entry.expires < Date.now() || !req.query.code) return res.redirect('/?twitch=error');
+    try {
+      const profile = await twitch.exchangeCode(req.query.code, redirectUri(req));
+      const user = twitchAccount(profile);
+      if (!user) return res.redirect('/?twitch=nouser');
+      if (user.banned) return res.redirect('/?twitch=banned');
+      createSession(res, user);
+      return res.redirect('/character.html');
+    } catch (err) { return res.redirect('/?twitch=error'); }
+  }
   if (!entry || entry.expires < Date.now() || !req.query.code) return res.redirect('/character.html?twitch=error');
   const user = db.state.users[entry.userId];
   if (!user) return res.redirect('/');
@@ -554,6 +670,12 @@ app.get('/auth/twitch/callback', async (req, res) => {
     res.redirect('/character.html?twitch=error&msg=' + encodeURIComponent(err.message));
   }
 });
+
+// Compte (avec mot de passe, pas un fantôme) dont ce Twitch est lié
+function twitchAccount(profile) {
+  return Object.values(db.state.users).find((u) => u.role === 'player' && !u.ghost && u.passwordHash
+    && ((profile.id && u.twitchId === profile.id) || (u.twitchLogin && u.twitchLogin === String(profile.login).toLowerCase()))) || null;
+}
 
 // Mode développement : liaison en tapant son pseudo (si l'OAuth Twitch n'est pas configuré).
 app.post('/api/twitch/link-dev', requirePlayer, action((req) => {
@@ -1225,6 +1347,8 @@ app.get('/api/admin/players', requireAdmin, (req, res) => {
       record: u.character.record,
       title: game.titleOf(u.character),
       drawing: u.character.drawing || null, // visage dessiné (modération)
+      email: account.maskEmail(u.email), // adresse masquée (aide à la récupération de compte)
+      emailVerified: !!u.emailVerified,
     };
   }));
 });
@@ -1294,6 +1418,13 @@ app.post('/api/admin/players/:id/give', requireAdmin, action((req) => {
   return r;
 }));
 
+// Lien de réinitialisation du mot de passe (48 h, une seule fois) que l'admin transmet au joueur qui a perdu l'accès
+app.post('/api/admin/players/:id/reset-link', requireAdmin, (req, res) => {
+  const user = db.state.users[req.params.id];
+  if (!user || user.role !== 'player' || user.ghost) return bad(res, new Error('Joueur introuvable'), 404);
+  const token = account.startReset(user, Date.now(), { admin: true });
+  res.json({ ok: true, url: `${siteUrl(req)}/?reset=${token}`, hours: account.ADMIN_RESET_TTL / 3600000, name: user.username });
+});
 app.post('/api/admin/players/:id/ban', requireAdmin, action((req) => {
   const user = adminTarget(req);
   user.banned = !!req.body.banned;
@@ -1721,4 +1852,4 @@ function start(port = PORT) {
 if (require.main === module) start();
 
 module.exports = {
-  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand, soloRewards };
+  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand, soloRewards, twitchAccount };
