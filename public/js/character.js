@@ -1108,6 +1108,9 @@ document.querySelectorAll('#solo-run [data-speed]').forEach((b) => {
     try { await api('/api/solo/speed', { speed: soloSpeed }); } catch (err) { toast('⚠️ ' + err.message); }
   };
 });
+// Plein écran de l'arène du mode Solo et de l'entraînement (en paysage sur téléphone) : les reliques s'y choisissent aussi
+$('solo-full').onclick = () => GameScreen.toggle($('solo-screen'), $('solo-arena'));
+$('training-full').onclick = () => GameScreen.toggle($('training-screen'), $('training-arena'));
 $('solo-abandon').onclick = async () => {
   const exp = soloQueue && soloQueue.solo && soloQueue.solo.kind === 'expedition';
   if (!await confirmBox(exp ? 'Remonter à la surface ? Tu gardes le butin des étages déjà nettoyés.' : 'Abandonner le défi ? Tu ne gagneras rien.')) return;
@@ -1998,6 +2001,8 @@ function showTab(name) {
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   renderPlaceBar();
   if (name === 'carte') WorldMap.enter(); else WorldMap.leave();
+  if (name !== 'solo') GameScreen.exit($('solo-screen'));
+  if (name !== 'entrainement') GameScreen.exit($('training-screen'));
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
   if (name === 'marche' && me) loadMarket();
   if (name === 'familier' && me) renderPets();

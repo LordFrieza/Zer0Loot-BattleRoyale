@@ -342,7 +342,8 @@
           <span class="muted" id="training-status"></span>
         </div>
       </div>
-      <div class="arena-wrap training-arena"><canvas id="training-arena"></canvas><div class="relic-choice" id="training-relic"></div></div>
+      <div class="arena-wrap training-arena" id="training-screen"><canvas id="training-arena" class="fs-canvas"></canvas><div class="relic-choice" id="training-relic"></div>
+        <button type="button" class="fs-btn" id="training-full" title="Plein écran (en paysage sur téléphone)">⛶</button></div>
     </div>
     </section>
 
@@ -430,9 +431,10 @@
           <button class="secondary small" data-speed="2">×2</button>
           <button class="secondary small danger" id="solo-abandon">🏳️ Abandonner</button>
         </div>
-        <div class="arena-wrap solo-arena">
-          <canvas id="solo-arena"></canvas>
+        <div class="arena-wrap solo-arena" id="solo-screen">
+          <canvas id="solo-arena" class="fs-canvas"></canvas>
           <div class="relic-choice" id="relic-choice"></div>
+          <button type="button" class="fs-btn" id="solo-full" title="Plein écran (en paysage sur téléphone)">⛶</button>
         </div>
       </div>
     </div>

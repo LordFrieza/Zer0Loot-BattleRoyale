@@ -211,7 +211,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   adresses (`#solo`, `#casino`…) marchent toujours.
 - **Sur téléphone** : toutes les pages tiennent dans la largeur de l'écran (même avec le texte agrandi) ; le bandeau tient
   sur deux lignes (le son et la déconnexion sont dans le menu ⚙️), les filtres défilent au doigt, l'arbre de compétences
-  se dresse à la verticale, la Pêche et le Survivor ont un bouton **⛶ plein écran** qui passe en paysage, et l'arène en
+  se dresse à la verticale, la Pêche, le Survivor, l'arène du mode Solo (Expédition, Défi des boss) et celle de l'Entraînement ont un bouton **⛶ plein écran** qui passe en paysage, et l'arène en
   direct garde son format 16/9 (tourner le téléphone pour la voir en grand). Sur PC, rien ne change.
 - **Historique** (onglet Historique) : les 50 dernières parties (stream et solo, pas l'entraînement) avec le résultat,
   le rang, les kills, les morts, les dégâts infligés et subis, les dégâts sur les boss, la durée, les gains de la partie et

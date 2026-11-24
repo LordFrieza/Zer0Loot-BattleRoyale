@@ -172,7 +172,7 @@ const GameScreen = {
   },
   exit(el) {
     el = el || GameScreen.active;
-    if (!el) return;
+    if (!el || (el !== GameScreen.active && !el.classList.contains('fs-on'))) return; // pas en plein écran : rien à faire
     el.classList.remove('pseudo-fs', 'fs-on');
     document.body.classList.remove('fs-lock');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
