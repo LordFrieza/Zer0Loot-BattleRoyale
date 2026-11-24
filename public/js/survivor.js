@@ -2140,7 +2140,7 @@
     cancelAnimationFrame(G.raf);
     $('sv-game').style.display = 'none';
     $('sv-lobby').style.display = '';
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    GameScreen.exit($('sv-game'));
     Sound.music.stop();
   }
 
@@ -2169,10 +2169,8 @@
       e.preventDefault();
     }, { passive: false });
     cv.addEventListener('touchend', () => { G.touch = null; });
-    $('sv-full').onclick = () => {
-      const el = $('sv-game');
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    };
+    // Plein écran (en paysage sur téléphone ; sur iPhone, le jeu couvre la page)
+    $('sv-full').onclick = () => GameScreen.toggle($('sv-game'), $('sv-canvas'));
     $('sv-pause-btn').onclick = () => setPause(!G.paused);
   }
 
@@ -2211,7 +2209,9 @@
           <button class="gold big-btn sv-play" id="sv-play" ${c.gold < SV.price ? 'disabled' : ''}>▶ Jouer — ${SV.price} 🪙</button>
           <div class="sv-daily-status ${state.dailyDone ? 'done' : ''}">${state.dailyDone ? '✅ Récompense de la vague 30 déjà obtenue aujourd\'hui (revient demain)' : `🎁 Récompense du jour : atteins la vague ${SV.dailyWave} → +${SV.daily.chests} coffres et +${SV.daily.keys} Clés de boss`}</div>
           <div class="muted" style="font-size:13px">${b ? `Ton record : <b>${fmt(b.score)}</b> points (vague ${b.wave}, ${mmss(b.time)}, ${fmt(b.kills)} monstres, ${b.bosses} boss) · ${state.runs} partie(s)` : 'Pas encore de record : à toi de jouer !'}</div>
-          <div class="muted" style="font-size:12px">⌨️ ZQSD ou flèches pour bouger · tes armes tirent seules · Échap : pause · 1-4 : choisir</div>
+          <div class="muted" style="font-size:12px">${matchMedia('(pointer: coarse)').matches
+            ? '👆 Glisse le doigt sur le jeu pour bouger · tes armes tirent seules · ⛶ : plein écran en paysage · ⏸ : pause'
+            : '⌨️ ZQSD ou flèches pour bouger · tes armes tirent seules · Échap : pause · 1-4 : choisir'}</div>
         </div>
       </div>
       ${lobbyExtras()}

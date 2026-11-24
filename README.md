@@ -20,7 +20,7 @@ Ouvre ensuite <http://localhost:3000>.
 | Page | Rôle |
 |---|---|
 | `/` | Connexion / création de compte |
-| `/character.html` | Page du joueur : stats, équipement, coffres, inventaire, explication de la chance |
+| `/character.html` | Page du joueur : carte du monde et ses lieux (personnage, maison, familiers, marché, donjon, casino, pêche, Survivor…) |
 | `/admin.html` | Écran de combat + contrôle de la file (compte admin) |
 | `/arena.html` | Arène seule, plein écran : à ajouter dans OBS comme **Source navigateur** (1280×720 ou 1920×1080) |
 
@@ -198,15 +198,21 @@ de la file, confirme les `!join` et annonce le vainqueur.
     l'immortel (vague 100 au Survivor), Pluie d'or (posséder 1 000 000 de golds en même temps), Auréole céleste
     (niveau 100), Cape du conquérant (1 000 victoires), Gantelets du carnage (10 000 éliminations), Ceinture du chasseur
     de trésors (5 000 coffres ouverts), Lunettes du flambeur (25 jackpots), Chaussons du palais (décoration niveau 20).
-- **Page perso en onglets** : Personnage (fiche, case de potion, caractéristiques, apparence et visage dessiné),
-  Inventaire (coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel paginé par 20 objets
-  avec filtres par emplacement / stat / panoplie et badge « Nouveau ! » sur les objets sortis d'un coffre ou de la fusion
-  jusqu'au survol, forge et alchimie), Arbre de
-  compétences, Style de combat, Boutique (potions puis cosmétiques), Marché, Solo, puis les activités en icônes (Familier,
-  Casino, Survivor, Maison, Entraînement ; l'onglet ouvert montre son nom) — une seule ligne d'onglets, qui défile
-  horizontalement sur petit écran. Les onglets d'infos — Historique, Statistiques, Succès
-  (avec sa pastille), Classements, Règles — sont dans le bandeau du haut, avec leur nom sur grand écran et en icônes
-  sinon ; le lien vers l'arène et la déconnexion passent aussi en icônes pour garder le bandeau sur une ligne.
+- **Page perso : la carte du monde et ses lieux** : au lieu d'une dizaine d'onglets, une **carte du monde** dessinée
+  (jour ou nuit selon l'heure réelle) où l'on clique sur un lieu : la maison du joueur au centre (couleurs de ses murs et de
+  son toit) et la **niche** avec son familier, son personnage sur la place, le **Hall des héros**, le **donjon**, les
+  **Terres sauvages**, l'**arène** en direct, le **gymnase**, le **casino**, le **ponton de pêche**, la **place du marché**
+  et le **guide**. Pour aller droit au but, le menu **▾** (en haut, à côté du bouton 🗺️ Carte) liste tous les lieux d'un
+  coup d'œil. Un lieu peut avoir des **sous-onglets** : Personnage (Fiche — case de potion, caractéristiques, apparence et
+  visage dessiné ; Équipement — coffres, équipement avec boutons 🔓 verrou et « ✕ Retirer », presets, coffre personnel
+  paginé par 20 objets avec filtres par emplacement / rareté / stat / panoplie et badge « Nouveau ! », forge et alchimie ;
+  Compétences ; Combat), Place du marché (Boutique, Marché) et Hall des héros (Classements, Succès, Stats, Historique). Les
+  pastilles (points à répartir, coffres, succès, courrier…) s'affichent sur les lieux de la carte et du menu. Les anciennes
+  adresses (`#solo`, `#casino`…) marchent toujours.
+- **Sur téléphone** : toutes les pages tiennent dans la largeur de l'écran (même avec le texte agrandi) ; le bandeau tient
+  sur deux lignes (le son et la déconnexion sont dans le menu ⚙️), les filtres défilent au doigt, l'arbre de compétences
+  se dresse à la verticale, la Pêche et le Survivor ont un bouton **⛶ plein écran** qui passe en paysage, et l'arène en
+  direct garde son format 16/9 (tourner le téléphone pour la voir en grand). Sur PC, rien ne change.
 - **Historique** (onglet Historique) : les 50 dernières parties (stream et solo, pas l'entraînement) avec le résultat,
   le rang, les kills, les morts, les dégâts infligés et subis, les dégâts sur les boss, la durée, les gains de la partie et
   un détail propre au mode (points et temps sur la colline, équipe et MVP, golds ramassés, % de vie restant du boss, salle,
@@ -219,8 +225,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   L'énergie du mode Solo (⚡) et les Clés de boss (🗝️) s'affichent aussi en haut de la page. Lien direct possible (`/character.html#boutique`).
 - **Coffre personnel** : case « Afficher les objets des autres classes » (mémorisée) et filtre **🚫 Hors classe** qui
   n'affiche que les armes / objets secondaires des autres classes (pratique pour les recycler en masse). Filtre **par
-  stat** (seulement les objets qui ont la Vie, la Force…, triés par la valeur de cette stat), combinable avec
-  l'emplacement, et bouton **🏪 Vendre** sur chaque objet. Les golds restent affichés en haut de la page, sur tous les onglets.
+  stat** (seulement les objets qui ont la Vie, la Force…, triés par la valeur de cette stat) et **par rareté**, combinables
+  avec l'emplacement, et bouton **🏪 Vendre** sur chaque objet. Les golds restent affichés en haut de la page, sur tous les onglets.
 - **Marché** (onglet Marché) : chaque joueur peut mettre en vente jusqu'à **5 objets** de son coffre personnel (ni équipés,
   ni protégés par un preset), au prix de son choix (5 à 1 000 000 golds). Pour placer la vente, il paie une **taxe de 20 %**
   du prix (jamais remboursée). Une vente dure **96 h** ; sans acheteur, l'objet revient dans son coffre. Acheter ne coûte

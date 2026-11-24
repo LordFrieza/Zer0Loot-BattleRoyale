@@ -148,3 +148,40 @@ function initHelp(root = document) {
   });
 }
 document.addEventListener('DOMContentLoaded', () => initHelp());
+
+
+// Plein écran d'un jeu (Pêche, Survivor…) : vrai plein écran quand le navigateur le permet, en paysage sur téléphone
+// (Android), sinon (iPhone) l'élément couvre simplement toute la page. Le canvas `canvas` garde ses proportions.
+const GameScreen = {
+  active: null,
+  supported: () => !!(document.fullscreenEnabled && document.documentElement.requestFullscreen),
+  isOn: (el) => document.fullscreenElement === el || el.classList.contains('pseudo-fs'),
+  async enter(el, canvas) {
+    if (canvas) el.style.setProperty('--ar', String(canvas.width / canvas.height));
+    el.classList.add('fs-on');
+    GameScreen.active = el;
+    if (GameScreen.supported()) {
+      try {
+        await el.requestFullscreen({ navigationUI: 'hide' });
+        if (screen.orientation && screen.orientation.lock && matchMedia('(pointer: coarse)').matches) screen.orientation.lock('landscape').catch(() => {});
+        return;
+      } catch (e) { /* refusé : repli ci-dessous */ }
+    }
+    el.classList.add('pseudo-fs');
+    document.body.classList.add('fs-lock');
+  },
+  exit(el) {
+    el = el || GameScreen.active;
+    if (!el) return;
+    el.classList.remove('pseudo-fs', 'fs-on');
+    document.body.classList.remove('fs-lock');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch (e) { /* ignore */ } }
+    GameScreen.active = null;
+  },
+  toggle(el, canvas) { if (GameScreen.isOn(el)) GameScreen.exit(el); else GameScreen.enter(el, canvas); },
+};
+document.addEventListener('fullscreenchange', () => {
+  // Sortie par la touche Échap ou le geste « retour » : on remet tout en place
+  if (!document.fullscreenElement && GameScreen.active && !GameScreen.active.classList.contains('pseudo-fs')) GameScreen.exit();
+});

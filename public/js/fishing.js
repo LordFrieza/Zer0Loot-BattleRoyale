@@ -700,6 +700,9 @@
   function setup() {
     if (S.canvas) return;
     S.canvas = $('fish-canvas');
+    // Plein écran : sur téléphone, la scène passe en paysage et prend tout l'écran
+    $('fish-full').onclick = (e) => { e.stopPropagation(); GameScreen.toggle($('fish-scene'), S.canvas); };
+    $('fish-full').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
     S.ctx = S.canvas.getContext('2d');
     S.canvas.addEventListener('mousedown', (e) => { if (e.button === 0) { e.preventDefault(); press(); } });
     window.addEventListener('mouseup', release);
@@ -731,6 +734,7 @@
 
   function leave() {
     if (!S.active) return;
+    GameScreen.exit($('fish-scene'));
     S.active = false;
     cancelAnimationFrame(S.raf);
     if (Sound.music.state && /peche/.test(Sound.music.state.src || '')) Sound.music.stop();

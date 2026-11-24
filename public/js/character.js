@@ -6,6 +6,7 @@ let config = null;
 let invFilter = 'all';
 let invStat = 'all'; // filtre par stat : seulement les objets qui ont cette ligne (triés par sa valeur)
 let invSet = 'all'; // filtre par panoplie ('none' : objets hors panoplie)
+let invRarity = 'all'; // filtre par rareté
 const seenIds = new Set(); // déjà vus pendant cette visite (même si la fiche revient du serveur avant l'envoi)
 const isFresh = (item) => (item.isNew && !seenIds.has(item.id) ? 1 : 0);
 let recycleMode = false;
@@ -385,8 +386,18 @@ function renderInventory() {
     b.onclick = () => { invFilter = b.dataset.f; invPage = 0; renderInventory(); };
   });
   $('inv-count').textContent = inv.length + ' objet(s)';
-  const bySlot = (invFilter === 'other' ? inv : visible)
+  const bySlotOnly = (invFilter === 'other' ? inv : visible)
     .filter((item) => invFilter === 'all' || (invFilter === 'other' ? otherClass(item) : item.slot === invFilter));
+  // Filtre par rareté (combinable avec les autres) : seules les raretés présentes sont proposées, de la meilleure à la moins bonne.
+  const rarityCounts = {};
+  for (const item of bySlotOnly) rarityCounts[item.rarity] = (rarityCounts[item.rarity] || 0) + 1;
+  if (invRarity !== 'all' && !rarityCounts[invRarity]) invRarity = 'all';
+  $('inv-rarity-filters').innerHTML = `<span class="muted filter-label">Rareté :</span><button class="${invRarity === 'all' ? 'active' : ''}" data-rar="all">Toutes</button>`
+    + Rules.RARITIES.slice().reverse().filter((r) => rarityCounts[r]).map((r) => `<button class="rarity-chip ${invRarity === r ? 'active' : ''}" data-rar="${r}" style="--rc:${Rules.RARITY_INFO[r].color}"><span class="rarity-dot"></span>${Rules.RARITY_INFO[r].label} (${rarityCounts[r]})</button>`).join('');
+  $('inv-rarity-filters').querySelectorAll('[data-rar]').forEach((b) => {
+    b.onclick = () => { invRarity = b.dataset.rar; invPage = 0; renderInventory(); };
+  });
+  const bySlot = bySlotOnly.filter((item) => invRarity === 'all' || item.rarity === invRarity);
   // Filtre par stat (combinable avec l'emplacement) : seules les stats présentes dans le coffre sont proposées.
   const statOf = (item) => item.lines.reduce((sum, l) => (l.stat === invStat ? sum + l.value : sum), 0);
   const statCounts = {};
@@ -549,6 +560,27 @@ function renderPresets() {
       if (await act('/api/preset/delete', { id: p.id }, 'unequip')) toast(`🗑 Preset « ${p.name} » supprimé`);
     };
   });
+  renderSoloLoadout();
+}
+
+// Tenues sauvegardées, aussi dans le mode Solo : changer d'équipement avant un donjon sans quitter l'onglet
+function renderSoloLoadout() {
+  const c = me.character;
+  const equippedIds = Object.fromEntries(Rules.SLOTS.map((s) => [s, c.equipment[s] ? c.equipment[s].id : null]));
+  const chips = c.presets.map((p) => {
+    const current = Rules.SLOTS.every((s) => (p.items[s] || null) === equippedIds[s]);
+    return `<button type="button" class="chip ${current ? 'active' : ''}" data-solo-preset="${p.id}" ${current ? 'disabled' : ''} title="${current ? 'Déjà équipée' : 'Équiper cette tenue'}">${current ? '✅' : '💾'} ${esc(p.name)}</button>`;
+  }).join('');
+  $('solo-loadout').innerHTML = `<div class="solo-loadout-head"><b>🎽 Tenue</b><span class="muted">💪 Puissance : <b>${String(c.power).replace('.', ',')}</b></span>
+      <button type="button" class="small secondary" id="solo-loadout-manage">Gérer les tenues</button></div>
+    <div class="chips">${chips || '<span class="muted">Aucune tenue sauvegardée : enregistre ton équipement en preset (Personnage → Équipement) pour en changer ici en un clic.</span>'}</div>`;
+  $('solo-loadout').querySelectorAll('[data-solo-preset]').forEach((b) => {
+    b.onclick = async () => {
+      const r = await act('/api/preset/apply', { id: b.dataset.soloPreset }, 'equip');
+      if (r) toast(`✅ Tenue « ${r.name} » équipée${r.missing ? ` (${r.missing} objet(s) introuvable(s))` : ''}${r.locked ? ` (${r.locked} objet(s) d'une autre classe)` : ''}`);
+    };
+  });
+  $('solo-loadout-manage').onclick = () => { showTab('inventaire'); setTimeout(() => { const el = $('presets'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150); };
 }
 
 // ---------- Potions ----------
@@ -632,6 +664,22 @@ function layoutTree() {
   const avail = document.querySelector('.talent-scroll').clientWidth;
   if (!avail) return; // onglet caché : on garde la dernière disposition, recalculée à l'affichage
   const tiers = Rules.TALENT_TIERS.length;
+  // Écran étroit (téléphone) : l'arbre se dresse à la verticale (branche de gauche en haut, de droite en bas), à taille
+  // normale, au lieu d'être réduit jusqu'à devenir illisible.
+  TREE.vertical = avail < 640;
+  if (TREE.vertical) {
+    TREE.step = TREE_STEP.min + 4;
+    TREE.gap = Math.min(96, Math.max(70, (avail - 70) / 2));
+    TREE.w = Math.round(2 * TREE.gap + 70);
+    TREE.h = Math.round(2 * (tiers * TREE.step + TREE_MARGIN));
+    TREE.cx = TREE.w / 2;
+    TREE.cy = TREE.h / 2;
+    TREE.scale = Math.min(1, avail / TREE.w);
+    return;
+  }
+  TREE.gap = 96;
+  TREE.h = 380;
+  TREE.cy = 190;
   TREE.step = Math.max(TREE_STEP.min, Math.min(TREE_STEP.max, (avail / 2 - TREE_MARGIN) / tiers));
   TREE.w = Math.round(2 * (tiers * TREE.step + TREE_MARGIN));
   TREE.cx = TREE.w / 2;
@@ -640,9 +688,9 @@ function layoutTree() {
 
 function talentPos(n) {
   const dir = n.branch === 'left' ? -1 : 1;
-  const x = TREE.cx + dir * TREE.step * (n.tier + 1);
-  const y = n.tier === 2 || n.tier === 4 ? TREE.cy + (n.option - 1) * TREE.gap : TREE.cy;
-  return { x, y };
+  const side = n.tier === 2 || n.tier === 4 ? (n.option - 1) * TREE.gap : 0;
+  if (TREE.vertical) return { x: TREE.cx + side, y: TREE.cy + dir * TREE.step * (n.tier + 1) };
+  return { x: TREE.cx + dir * TREE.step * (n.tier + 1), y: TREE.cy + side };
 }
 
 const statsText = (points) => Object.entries(points).map(([st, v]) => `+${v} ${Rules.STAT_INFO[st].label}`).join(', ');
@@ -689,7 +737,7 @@ function renderTalents() {
   const unlockLevel = 1 + Rules.TALENT_EVERY;
   const locked = c.level < unlockLevel || !c.cls;
   $('talent-help').innerHTML = tutoHtml();
-  $('tab-arbre').classList.toggle('locked-tab', locked);
+  if (window.talentLocked !== locked) { window.talentLocked = locked; renderPlaceBar(); }
   $('talent-sub').textContent = locked ? `Débloqué au niveau ${unlockLevel}` : `${st.available} point${st.available > 1 ? 's' : ''} à dépenser`;
   $('talent-locked').innerHTML = locked
     ? `<div class="talent-lock-box">🔒 <b>${c.cls ? `Disponible au niveau ${unlockLevel}` : 'Choisis d\'abord une classe'}</b>${c.cls ? ` — encore ${unlockLevel - c.level} niveau${unlockLevel - c.level > 1 ? 'x' : ''}.` : ''}
@@ -1854,15 +1902,102 @@ function pityToast(r) {
   });
 })();
 
-// ---------- Onglets ----------
-const TABS = ['perso', 'inventaire', 'arbre', 'combat', 'boutique', 'marche', 'solo', 'familier', 'casino', 'survivor', 'peche', 'maison', 'entrainement', 'historique', 'statistiques', 'succes', 'classements', 'regles'];
+// ---------- Lieux et onglets ----------
+// La carte du monde (onglet « carte ») mène à des lieux ; un lieu regroupe un ou plusieurs onglets (ses sous-onglets).
+// L'adresse (#onglet) reste celle de l'onglet, si bien que les anciens liens (#solo, #casino…) marchent toujours.
+const PLACES = [
+  { id: 'heros', icon: '🧙', label: 'Personnage', desc: 'Ta fiche, ton équipement, tes compétences et ton style de combat',
+    tabs: [['perso', '🧙', 'Fiche'], ['inventaire', '🎒', 'Équipement'], ['arbre', '🌳', 'Compétences'], ['combat', '⚔️', 'Combat']] },
+  { id: 'maison', icon: '🏠', label: 'Maison', desc: 'Décore ta maison, relève ton courrier, visite tes voisins', tabs: [['maison', '🏠', 'Maison']] },
+  { id: 'niche', icon: '🐾', label: 'Niche', desc: 'Tes familiers, leur enclos et leurs trouvailles', tabs: [['familier', '🐾', 'Familiers']] },
+  { id: 'commerce', icon: '🛍️', label: 'Place du marché', desc: 'La boutique et le marché entre joueurs', tabs: [['boutique', '🛍️', 'Boutique'], ['marche', '🏪', 'Marché']] },
+  { id: 'donjon', icon: '🕳️', label: 'Donjon', desc: 'Mode Solo : Expédition et Défi des boss', tabs: [['solo', '🕳️', 'Solo']] },
+  { id: 'gym', icon: '🏋️', label: 'Gymnase', desc: 'Entraînement sans risque : duels, boss, Boss Rush', tabs: [['entrainement', '🏋️', 'Entraînement']] },
+  { id: 'casino', icon: '🎰', label: 'Casino', desc: 'Neuf jeux tenus par les boss en smoking', tabs: [['casino', '🎰', 'Casino']] },
+  { id: 'peche', icon: '🎣', label: 'Ponton de pêche', desc: 'Pêche tranquille et Pêchédex', tabs: [['peche', '🎣', 'Pêche']] },
+  { id: 'survivor', icon: '🧟', label: 'Terres sauvages', desc: 'Survivor : tiens le plus de vagues possible', tabs: [['survivor', '🧟', 'Survivor']] },
+  { id: 'hall', icon: '🏆', label: 'Hall des héros', desc: 'Classements, succès, statistiques et historique',
+    tabs: [['classements', '🏆', 'Classements'], ['succes', '🏅', 'Succès'], ['statistiques', '📊', 'Stats'], ['historique', '📜', 'Historique']] },
+  { id: 'guide', icon: '📖', label: 'Guide', desc: 'Toutes les règles du jeu', tabs: [['regles', '📖', 'Règles']] },
+  { id: 'arene', icon: '📺', label: 'Arène en direct', desc: 'Le combat du stream, en direct (nouvel onglet)', href: '/arena.html' },
+];
+const TABS = ['carte', ...PLACES.flatMap((p) => (p.tabs || []).map((t) => t[0]))];
+const placeOf = (tab) => PLACES.find((p) => p.tabs && p.tabs.some((t) => t[0] === tab)) || null;
+let tabBadges = {}; // pastille de chaque onglet (renderBadges)
+let lastSub = {}; // dernier sous-onglet ouvert de chaque lieu
+try { lastSub = JSON.parse(localStorage.getItem('zl_sub') || '{}') || {}; } catch (e) { lastSub = {}; }
+let currentTab = null;
+
+const placeBadge = (p) => (p.tabs || []).reduce((n, t) => n + (tabBadges[t[0]] || 0), 0);
+function goPlace(id) {
+  const p = PLACES.find((x) => x.id === id);
+  if (!p) return;
+  closePlaceMenu();
+  if (p.href) { window.open(p.href, '_blank'); return; }
+  const sub = lastSub[p.id] && p.tabs.some((t) => t[0] === lastSub[p.id]) ? lastSub[p.id] : p.tabs[0][0];
+  showTab(sub);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Barre du haut : bouton Carte, lieu actuel (ouvre le menu des lieux) et sous-onglets du lieu
+function renderPlaceBar() {
+  const p = placeOf(currentTab);
+  $('pb-ico').textContent = p ? p.icon : '🧭';
+  $('pb-name').textContent = p ? p.label : 'Aller à…';
+  const other = PLACES.reduce((n, x) => n + (x === p ? 0 : placeBadge(x)), 0);
+  const pb = $('pb-badge');
+  pb.textContent = other || '';
+  pb.classList.toggle('on', other > 0);
+  document.querySelector('#place-bar .pb-map').classList.toggle('active', currentTab === 'carte');
+  const sub = $('pb-sub');
+  sub.innerHTML = p && p.tabs.length > 1 ? p.tabs.map(([id, ico, label]) => {
+    const n = tabBadges[id] || 0;
+    const locked = id === 'arbre' && window.talentLocked;
+    return `<button type="button" role="tab" data-tab="${id}" class="${id === currentTab ? 'active' : ''} ${locked ? 'locked-tab' : ''}" aria-selected="${id === currentTab}">
+      <span class="pb-ico">${ico}</span><span class="pb-sub-label">${label}</span><span class="tab-badge ${n ? 'on' : ''}">${n || ''}</span></button>`;
+  }).join('') : '';
+  sub.classList.toggle('empty', !sub.innerHTML);
+  sub.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+  const act = sub.querySelector('.active');
+  if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest', inline: 'center' });
+  if (window.WorldMap) WorldMap.setBadges(Object.fromEntries(PLACES.map((x) => [x.id, placeBadge(x)])));
+  if ($('place-menu').classList.contains('open')) renderPlaceMenu();
+}
+
+// Menu des lieux : tous les lieux d'un coup d'œil, pour qui préfère aller droit au but
+function renderPlaceMenu() {
+  const cur = placeOf(currentTab);
+  $('place-menu').innerHTML = `<button type="button" class="pm-item ${currentTab === 'carte' ? 'active' : ''}" data-go="carte"><span class="pm-ico">🗺️</span><span class="pm-text"><b>Carte du monde</b><small>Tous les lieux sur la carte</small></span></button>`
+    + PLACES.map((p) => {
+      const n = placeBadge(p);
+      return `<button type="button" class="pm-item ${p === cur ? 'active' : ''}" data-place="${p.id}"><span class="pm-ico">${p.icon}</span>
+        <span class="pm-text"><b>${p.label}${p.href ? ' ↗' : ''}</b><small>${p.desc}</small></span><span class="tab-badge ${n ? 'on' : ''}">${n || ''}</span></button>`;
+    }).join('');
+  $('place-menu').querySelectorAll('[data-place]').forEach((b) => { b.onclick = () => goPlace(b.dataset.place); });
+  $('place-menu').querySelector('[data-go]').onclick = () => { closePlaceMenu(); showTab('carte'); };
+}
+function closePlaceMenu() { $('place-menu').classList.remove('open'); $('pb-current').setAttribute('aria-expanded', 'false'); }
+$('pb-current').onclick = (e) => {
+  e.stopPropagation();
+  const open = !$('place-menu').classList.contains('open');
+  if (open) renderPlaceMenu();
+  $('place-menu').classList.toggle('open', open);
+  $('pb-current').setAttribute('aria-expanded', String(open));
+};
+document.addEventListener('click', (e) => { if (!e.target.closest('#place-menu') && !e.target.closest('#pb-current')) closePlaceMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlaceMenu(); });
+document.querySelector('#place-bar .pb-map').onclick = () => { showTab('carte'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
 function showTab(name) {
-  if (!TABS.includes(name)) name = 'perso';
+  if (!TABS.includes(name)) name = 'carte';
+  currentTab = name;
   document.querySelectorAll('.tab').forEach((el) => el.classList.toggle('active', el.dataset.tab === name));
-  document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  const p = placeOf(name);
+  if (p) { lastSub[p.id] = name; try { localStorage.setItem('zl_sub', JSON.stringify(lastSub)); } catch (e) { /* ignore */ } }
   try { localStorage.setItem('zl_tab', name); } catch (e) { /* ignore */ }
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  renderPlaceBar();
+  if (name === 'carte') WorldMap.enter(); else WorldMap.leave();
   if (name === 'arbre' && me) renderTalents(); // la largeur de l'arbre ne se mesure qu'onglet affiché
   if (name === 'marche' && me) loadMarket();
   if (name === 'familier' && me) renderPets();
@@ -1872,21 +2007,23 @@ function showTab(name) {
   if (name === 'peche') Fishing.enter(); else Fishing.leave();
 }
 
-document.querySelectorAll('#tabs-nav [data-tab], #top-tabs [data-tab]').forEach((b) => {
-  b.onclick = () => { showTab(b.dataset.tab); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-});
+WorldMap.init(PLACES, goPlace);
+// Téléphone : le son et la déconnexion passent dans un petit menu ⚙️ du bandeau
+$('hdr-tools-btn').onclick = (e) => {
+  e.stopPropagation();
+  const open = !$('hdr-tools').classList.contains('open');
+  $('hdr-tools').classList.toggle('open', open);
+  $('hdr-tools-btn').setAttribute('aria-expanded', String(open));
+};
+document.addEventListener('click', (e) => { if (!e.target.closest('#hdr-tools') && !e.target.closest('#hdr-tools-btn')) $('hdr-tools').classList.remove('open'); });
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
-showTab(location.hash.slice(1) || (() => { try { return localStorage.getItem('zl_tab'); } catch (e) { return null; } })() || 'perso');
+showTab(location.hash.slice(1) || (() => { try { return localStorage.getItem('zl_tab'); } catch (e) { return null; } })() || 'carte');
 
 // Pastilles sur les onglets : points à répartir, coffres à ouvrir, succès à récupérer.
 function renderBadges() {
   const c = me.character;
   const claim = Rules.ACHIEVEMENTS.filter((a) => { const st = Rules.achievementState(c, a); return st.done && !st.claimed; }).length;
-  const set = (tab, n) => {
-    const el = document.querySelector(`[data-badge="${tab}"]`);
-    el.textContent = n || '';
-    el.classList.toggle('on', n > 0);
-  };
+  const set = (tab, n) => { tabBadges[tab] = Math.max(0, n || 0); };
   set('perso', c.skillPoints);
   set('inventaire', c.chests);
   set('arbre', Math.max(0, c.talentState.available));
@@ -1896,6 +2033,7 @@ function renderBadges() {
   set('familier', window.petFindsWaiting ? petFindsWaiting() : 0);
   set('maison', c.house ? Rules.houseMailDue(c.house.mailAt) : 0); // courriers qui attendent dans la boîte aux lettres
   set('succes', claim);
+  renderPlaceBar();
 }
 
 // ---------- Apparence ----------

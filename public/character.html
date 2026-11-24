@@ -13,13 +13,6 @@
 <body>
   <header class="topbar">
     <a class="logo" href="/"><img src="/img/logo.png" alt="Zer0Loot"><small>BATTLE ROYALE</small></a>
-    <nav class="top-tabs" id="top-tabs" aria-label="Infos">
-      <button data-tab="historique" title="Historique"><span class="tt-ico">📜</span><span class="tt-label">Historique</span></button>
-      <button data-tab="statistiques" title="Statistiques"><span class="tt-ico">📊</span><span class="tt-label">Stats</span></button>
-      <button data-tab="succes" title="Succès"><span class="tt-ico">🏅</span><span class="tt-label">Succès</span><span class="tab-badge" data-badge="succes"></span></button>
-      <button data-tab="classements" title="Classements"><span class="tt-ico">🏆</span><span class="tt-label">Classements</span></button>
-      <button data-tab="regles" title="Règles du jeu"><span class="tt-ico">📖</span><span class="tt-label">Règles</span></button>
-    </nav>
     <div class="right">
       <a href="/arena.html" target="_blank" class="arena-link" title="Arène en direct">📺<span class="wide-only"> Arène en direct</span></a>
       <button type="button" class="sched-chip" id="sched-chip" style="display:none"></button>
@@ -29,9 +22,14 @@
       <a href="#casino" class="gold-chip ticket-chip" id="ticket-chip" style="display:none" title="Tickets de casino : chacun paie une mise de 50 golds dans n'importe quel jeu du casino (sauf la Caisse de Grignotor)"></a>
       <a href="#solo" class="energy-chip" id="energy-chip" title="Énergie du mode Solo"></a>
       <a href="#solo" class="energy-chip key-chip" id="key-chip" title="Clés de boss (Défi des boss)"></a>
+    </div>
+    <div class="hdr-me">
       <span id="who"></span>
-      <div id="sound-ctl"></div>
-      <button class="secondary small logout-btn" onclick="logout()" title="Déconnexion"><span class="wide-only">Déconnexion</span><span class="narrow-only">⏻</span></button>
+      <button type="button" class="hdr-tools-btn" id="hdr-tools-btn" title="Son et compte" aria-expanded="false">⚙️</button>
+      <div class="hdr-tools" id="hdr-tools">
+        <div id="sound-ctl"></div>
+        <button class="secondary small logout-btn" onclick="logout()" title="Déconnexion"><span class="wide-only">Déconnexion</span><span class="narrow-only">⏻ Déconnexion</span></button>
+      </div>
     </div>
   </header>
 
@@ -59,23 +57,25 @@
         sur le gagnant, ou si la bataille est annulée, tout le monde est remboursé.</p>
     </div>
 
-    <nav class="tabs-nav" id="tabs-nav">
-      <button data-tab="perso">🧙 Personnage <span class="tab-badge" data-badge="perso"></span></button>
-      <button data-tab="inventaire"><i class="ico-chest"></i> Inventaire <span class="tab-badge" data-badge="inventaire"></span></button>
-      <button data-tab="arbre" id="tab-arbre" title="Arbre de compétences">🌳 Compétences <span class="tab-badge" data-badge="arbre"></span></button>
-      <button data-tab="combat" title="Style de combat">⚔️ Combat <span class="tab-badge" data-badge="combat"></span></button>
-      <button data-tab="boutique">🛍️ Boutique</button>
-      <button data-tab="marche">🏪 Marché <span class="tab-badge" data-badge="marche"></span></button>
-      <button data-tab="solo">🕳️ Solo <span class="tab-badge" data-badge="solo"></span></button>
-      <span class="act-group" title="Activités">
-        <button data-tab="familier" class="act-tab" title="Familier"><span class="act-ico">🐾</span><span class="act-label">Familier</span><span class="tab-badge" data-badge="familier"></span></button>
-        <button data-tab="casino" class="act-tab" title="Casino"><span class="act-ico">🎰</span><span class="act-label">Casino</span></button>
-        <button data-tab="survivor" class="act-tab" title="Survivor"><span class="act-ico">🧟</span><span class="act-label">Survivor</span></button>
-        <button data-tab="peche" class="act-tab" title="Pêche"><span class="act-ico">🎣</span><span class="act-label">Pêche</span></button>
-        <button data-tab="maison" class="act-tab" title="Maison"><span class="act-ico">🏠</span><span class="act-label">Maison</span><span class="tab-badge" data-badge="maison"></span></button>
-        <button data-tab="entrainement" class="act-tab" title="Entraînement"><span class="act-ico">🏋️</span><span class="act-label">Entraînement</span></button>
-      </span>
+    <!-- Navigation : la carte du monde, le menu des lieux et les sous-onglets du lieu ouvert (construits par character.js) -->
+    <nav class="place-bar" id="place-bar" aria-label="Lieux">
+      <button type="button" class="pb-map" data-tab="carte" title="Carte du monde"><span class="pb-ico">🗺️</span><span class="pb-label">Carte</span></button>
+      <button type="button" class="pb-current" id="pb-current" aria-haspopup="true" aria-expanded="false" title="Aller à un lieu">
+        <span class="pb-ico" id="pb-ico"></span><span class="pb-name" id="pb-name"></span><span class="tab-badge" id="pb-badge"></span><span class="pb-caret">▾</span>
+      </button>
+      <div class="pb-sub" id="pb-sub" role="tablist"></div>
     </nav>
+    <div class="place-menu" id="place-menu" role="menu"></div>
+
+    <section class="tab" data-tab="carte">
+      <div class="panel map-panel">
+        <div class="map-wrap" id="map-wrap">
+          <canvas id="map-canvas"></canvas>
+          <div class="map-spots" id="map-spots"></div>
+        </div>
+        <p class="muted map-hint">Clique sur un lieu pour t'y rendre, ou utilise le menu <b>▾</b> en haut pour y aller directement.</p>
+      </div>
+    </section>
 
     <section class="tab" data-tab="perso">
     <div class="grid2">
@@ -176,6 +176,7 @@
       <label class="inv-toggle"><input type="checkbox" id="inv-show-other"> Afficher les objets des autres classes
         <span class="muted">(armes et objets secondaires équipables, mais sans ton bonus de classe)</span></label>
       <div class="inv-filters" id="inv-filters"></div>
+      <div class="inv-filters stat-filters" id="inv-rarity-filters"></div>
       <div class="inv-filters stat-filters" id="inv-stat-filters"></div>
       <div class="inv-filters stat-filters" id="inv-set-filters"></div>
       <div class="inventory" id="inventory"></div>
@@ -397,6 +398,7 @@
         reliques de l'Expédition, et tu peux en garder autant que tu veux. Les potions ne servent pas en solo. Tu peux regarder la partie en vitesse ×1 ou ×2,
         et même fermer la page : elle continue et tes gains sont crédités à la fin.</p>
       <div class="energy-bar" id="energy-bar"></div>
+      <div class="solo-loadout" id="solo-loadout"></div>
       <div class="solo-modes" id="solo-modes">
         <div class="solo-card expedition">
           <h3>🕳️ Expédition</h3>
@@ -491,7 +493,7 @@
         seulement le jour ou la nuit, heure de Paris) ; 1 fois sur 20, c'est un <b>trésor</b> : coffres, golds, émeraudes, Clé de boss…
         ou, très rarement, la Canne à pêche légendaire.</p>
       <div class="fish-wrap">
-        <div class="fish-scene"><canvas id="fish-canvas" width="960" height="460"></canvas></div>
+        <div class="fish-scene" id="fish-scene"><canvas id="fish-canvas" class="fs-canvas" width="960" height="460"></canvas><button type="button" class="fs-btn" id="fish-full" title="Plein écran (en paysage sur téléphone)">⛶</button></div>
         <div class="fish-side" id="fish-side"></div>
       </div>
     </div>
@@ -507,7 +509,7 @@
         des <b>émeraudes</b> selon la vague atteinte, et une fois par jour, atteindre la <b>vague 30</b> rapporte 10 coffres et 3 Clés de boss.</p>
       <div id="sv-lobby"></div>
       <div class="sv-game" id="sv-game" style="display:none">
-        <canvas id="sv-canvas" width="1280" height="720"></canvas>
+        <canvas id="sv-canvas" class="fs-canvas" width="1280" height="720"></canvas>
         <div class="sv-overlay" id="sv-choice"></div>
         <div class="sv-overlay" id="sv-pause"></div>
         <div class="sv-overlay" id="sv-over"></div>
@@ -749,6 +751,7 @@
   <script src="/js/housing-draw.js"></script>
   <script src="/js/housing-life.js"></script>
   <script src="/js/housing.js"></script>
+  <script src="/js/worldmap.js"></script>
   <script src="/js/character.js"></script>
   <script src="/js/schedule.js"></script>
 </body>
