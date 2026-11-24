@@ -209,6 +209,15 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Compétences ; Combat), Place du marché (Boutique, Marché) et Hall des héros (Classements, Succès, Stats, Historique). Les
   pastilles (points à répartir, coffres, succès, courrier…) s'affichent sur les lieux de la carte et du menu. Les anciennes
   adresses (`#solo`, `#casino`…) marchent toujours.
+- **Tchat (la Taverne)** : un salon commun à tous les joueurs, sur la carte (la Taverne) et dans une **bulle 💬** flottante
+  pour discuter sans quitter son activité. Le pseudo prend la couleur du personnage, avec l'icône de sa classe et son titre.
+  **Émotes** des boss dessinées dans le style du jeu (`:pyrax:` en colère, `:ether:` timide, `:snif:` en larmes, `:daedra:`
+  coquine, `:lilith:` malicieuse, `:grokk:` mort de rire, `:malvorath:`, `:grignotor:`, `:givrenoire:`, `:maexxna:`,
+  `:dodo:`) et du jeu (`:coffre:`, `:loot:`, `:gg:`, `:rip:`, `:poisson:`, `:coeur:`, `:potion:`). Commandes : `/me`, `/roll [max]`,
+  `/pile`, `/aide` ; `@pseudo` interpelle un joueur (pastille, son et alerte). Les grands moments du jeu y sont annoncés
+  (file ouverte, vainqueurs, boss vaincus, familiers, jackpots du casino, poissons légendaires…). Le tchat s'affiche aussi
+  **en transparence sur l'arène en direct** (`/arena.html?tchat=0` pour le masquer). Anti-spam (1 message / s, 5 par 10 s),
+  et l'admin modère depuis sa page (supprimer, sourdine, vider le salon).
 - **Sur téléphone** : toutes les pages tiennent dans la largeur de l'écran (même avec le texte agrandi) ; le bandeau tient
   sur deux lignes (le son et la déconnexion sont dans le menu ⚙️), les filtres défilent au doigt, l'arbre de compétences
   se dresse à la verticale, la Pêche, le Survivor, l'arène du mode Solo (Expédition, Défi des boss) et celle de l'Entraînement ont un bouton **⛶ plein écran** qui passe en paysage, et l'arène en

@@ -1921,6 +1921,7 @@ const PLACES = [
   { id: 'survivor', icon: '🧟', label: 'Terres sauvages', desc: 'Survivor : tiens le plus de vagues possible', tabs: [['survivor', '🧟', 'Survivor']] },
   { id: 'hall', icon: '🏆', label: 'Hall des héros', desc: 'Classements, succès, statistiques et historique',
     tabs: [['classements', '🏆', 'Classements'], ['succes', '🏅', 'Succès'], ['statistiques', '📊', 'Stats'], ['historique', '📜', 'Historique']] },
+  { id: 'taverne', icon: '🍺', label: 'Taverne', desc: 'Le tchat : discute avec tous les joueurs, émotes des boss comprises', tabs: [['tchat', '💬', 'Tchat']] },
   { id: 'guide', icon: '📖', label: 'Guide', desc: 'Toutes les règles du jeu', tabs: [['regles', '📖', 'Règles']] },
   { id: 'arene', icon: '📺', label: 'Arène en direct', desc: 'Le combat du stream, en direct (nouvel onglet)', href: '/arena.html' },
 ];
@@ -2010,7 +2011,30 @@ function showTab(name) {
   if (name === 'survivor') Survivor.enter(); else Survivor.leave();
   if (name === 'maison') Housing.enter(); else Housing.leave();
   if (name === 'peche') Fishing.enter(); else Fishing.leave();
+  if (name === 'tchat') { closeChatPop(); Chat.markRead(); Chat.scrollDown(); }
+  $('chat-bubble').classList.toggle('hidden', name === 'tchat');
 }
+
+// ---------- Tchat ----------
+// Lieu Taverne (vue complète) et bulle flottante (vue compacte) ; pastilles : messages non lus et @mentions.
+function closeChatPop() { $('chat-pop').classList.remove('open'); }
+Chat.visible = () => currentTab === 'tchat' || $('chat-pop').classList.contains('open');
+Chat.onChange = () => {
+  if (Chat.visible()) { if (Chat.unread) Chat.markRead(); return; }
+  const n = Chat.unread;
+  const b = $('chat-bubble-n');
+  b.textContent = n > 99 ? '99+' : n || '';
+  b.classList.toggle('on', n > 0);
+  $('chat-bubble').classList.toggle('mention', Chat.mentions > 0);
+  if (me) renderBadges();
+};
+$('chat-bubble').onclick = () => {
+  const open = !$('chat-pop').classList.contains('open');
+  $('chat-pop').classList.toggle('open', open);
+  if (open) { Chat.markRead(); Chat.onChange(); Chat.scrollDown(); const inp = $('chat-pop').querySelector('.ct-input'); if (inp && window.innerWidth > 700) inp.focus(); }
+};
+$('chat-pop-close').onclick = closeChatPop;
+$('chat-pop-big').onclick = () => { closeChatPop(); showTab('tchat'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
 WorldMap.init(PLACES, goPlace);
 // Téléphone : le son et la déconnexion passent dans un petit menu ⚙️ du bandeau
@@ -2038,6 +2062,7 @@ function renderBadges() {
   set('familier', window.petFindsWaiting ? petFindsWaiting() : 0);
   set('maison', c.house ? Rules.houseMailDue(c.house.mailAt) : 0); // courriers qui attendent dans la boîte aux lettres
   set('succes', claim);
+  set('tchat', Chat.mentions); // quelqu'un t'a interpellé (@pseudo) dans le tchat
   renderPlaceBar();
 }
 
@@ -2695,6 +2720,10 @@ function myFighter(appOverride, clsOverride) {
 // Temps réel
 const socket = io();
 socket.on('me', (m) => { me = m; render(); });
+// Tchat : la Taverne (vue complète) et la bulle flottante (vue compacte), branchées sur le même salon
+Chat.mount($('chat-full'), 'full');
+Chat.mount($('chat-pop-body'), 'bubble');
+Chat.init(socket, { name: () => me && (me.twitchDisplayName || me.username), id: () => me && me.id });
 socket.on('queue', (q) => { queue = q; if (me) { renderQueue(); renderBets(); } });
 const REWARD_LABELS = {
   win: '🏆 VICTOIRE !', kill: '⚔️ Kill !', participation: '🎖️ Participation à la bataille',

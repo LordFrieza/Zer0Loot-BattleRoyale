@@ -12,7 +12,9 @@
 </head>
 <body class="obs">
   <!-- Page plein écran à utiliser comme « Source navigateur » dans OBS (1280×720 ou 1920×1080). -->
-  <div class="arena-wrap"><canvas id="arena"></canvas></div>
+  <div class="arena-wrap"><canvas id="arena"></canvas>
+    <!-- Tchat du site en transparence, dans un coin (les messages s'effacent seuls). ?tchat=0 pour le masquer. -->
+    <div id="arena-chat" class="arena-chat"></div></div>
   <!-- Visible seulement si le navigateur bloque le son (dans OBS, le son démarre tout seul). -->
   <button id="sound-unlock" class="secondary small" style="position:fixed;right:12px;bottom:12px;display:none">🔇 Cliquer pour activer le son</button>
   <script src="/socket.io/socket.io.js"></script>
@@ -22,8 +24,15 @@
   <script src="/js/monsters.js"></script>
   <script src="/js/sound.js"></script>
   <script src="/js/arena.js"></script>
+  <script src="/js/emotes.js"></script>
+  <script src="/js/chat.js"></script>
   <script>
-    new ArenaView(document.getElementById('arena'), io());
+    const socket = io();
+    new ArenaView(document.getElementById('arena'), socket);
+    if (new URLSearchParams(location.search).get('tchat') !== '0') {
+      Chat.mount(document.getElementById('arena-chat'), 'overlay');
+      Chat.init(socket);
+    } else document.getElementById('arena-chat').remove();
     const unlockBtn = document.getElementById('sound-unlock');
     const refreshUnlock = () => { unlockBtn.style.display = Sound.blocked && !Sound.muted ? '' : 'none'; };
     unlockBtn.onclick = () => setTimeout(refreshUnlock, 100);

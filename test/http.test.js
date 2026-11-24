@@ -1244,3 +1244,30 @@ test('[SV-1, SV-6, SV-8, HOUSE-1, HOUSE-2, HOUSE-6] survivor et maison via l\'AP
   assert.strictEqual((await v.get('/api/house/inconnu')).status, 404);
   assert.match((await s.post('/api/house/mail', {})).data.error, /vide/);
 });
+
+test('[TCH-6] tchat par HTTP : lecture publique, écriture des joueurs, diffusion, annonces de la file, modération admin', async () => {
+  const anon = client();
+  const p = client();
+  const me = await register(p, 'pl_tchat');
+  const sent = await p.post('/api/chat', { text: 'Bonjour :pyrax:' });
+  assert.strictEqual(sent.status, 200, JSON.stringify(sent.data));
+  const list = (await anon.get('/api/chat')).data;
+  const mine = list.messages.find((m) => m.id === sent.data.message.id);
+  assert.deepStrictEqual([mine.name, mine.text, mine.uid], ['pl_tchat', 'Bonjour :pyrax:', me.id]);
+  assert.ok(typeof list.online.n === 'number' && Array.isArray(list.online.names));
+  assert.strictEqual((await anon.post('/api/chat', { text: 'coucou' })).status, 401);
+  assert.match((await p.post('/api/chat', { text: '/danse' })).data.error, /Commande inconnue/);
+  // Les annonces du jeu arrivent aussi dans le tchat
+  await admin.post('/api/admin/battle/reset');
+  await admin.post('/api/admin/queue/open', { seconds: 60, mode: 'br' });
+  assert.ok((await anon.get('/api/chat')).data.messages.some((m) => m.sys && /est ouverte/.test(m.text)));
+  await admin.post('/api/admin/battle/reset');
+  // Modération
+  assert.strictEqual((await p.post('/api/admin/chat/delete', { id: mine.id })).status, 403);
+  assert.strictEqual((await admin.post('/api/admin/chat/delete', { id: mine.id })).status, 200);
+  assert.ok(!(await anon.get('/api/chat')).data.messages.some((m) => m.id === mine.id));
+  assert.strictEqual((await admin.post('/api/admin/chat/mute', { userId: me.id, minutes: 5 })).status, 200);
+  assert.match((await p.post('/api/chat', { text: 'hé' })).data.error, /sourdine/);
+  assert.strictEqual((await admin.post('/api/admin/chat/clear', {})).status, 200);
+  assert.deepStrictEqual((await anon.get('/api/chat')).data.messages, []);
+});

@@ -2121,6 +2121,48 @@
     return R;
   }
 
+  // ---------- Tchat ----------
+  // Messages de 200 caractères au plus ; les 120 derniers sont gardés (et sauvegardés) ; anti-spam : 1 message par seconde,
+  // 5 par tranche de 10 s ; 8 émotes au plus par message. L'incrustation de l'arène garde un message 40 s.
+  const CHAT = { maxLen: 200, history: 120, cooldown: 1, burst: 5, burstWindow: 10, maxEmotes: 8, overlayLife: 40, rollMax: 1000 };
+  // Émotes du tchat (« :id: » dans le message) : les boss en petit format (dessin du familier) avec une humeur, et
+  // quelques objets du jeu. Dessinées par public/js/emotes.js.
+  const CHAT_EMOTES = {
+    pyrax: { label: 'Pyrax en colère', boss: 'dragon', mood: 'rage' },
+    ether: { label: 'Ether timide', boss: 'ether', mood: 'shy' },
+    snif: { label: 'Ether en larmes', boss: 'ether', mood: 'cry' },
+    daedra: { label: 'Daedra coquine', boss: 'daedra', mood: 'flirt' },
+    lilith: { label: 'Lilith malicieuse', boss: 'lilith', mood: 'smug' },
+    grokk: { label: 'Grokk mort de rire', boss: 'troll', mood: 'lol' },
+    malvorath: { label: 'Malvorath mystérieux', boss: 'sorcier', mood: 'magic' },
+    grignotor: { label: 'Grignotor gourmand', boss: 'mimic', mood: 'money' },
+    givrenoire: { label: 'Givrenoire gelée', boss: 'liche', mood: 'cold' },
+    maexxna: { label: 'Maexxna terrifiée', boss: 'maexxna', mood: 'scared' },
+    dodo: { label: 'Grokk qui dort', boss: 'troll', mood: 'sleep' },
+    coffre: { label: 'Coffre de loot', item: 'chest' },
+    loot: { label: 'Pluie de golds', item: 'gold' },
+    gg: { label: 'GG', item: 'gg' },
+    rip: { label: 'RIP', item: 'rip' },
+    poisson: { label: 'Prise du jour', item: 'fish' },
+    coeur: { label: 'Cœur', item: 'heart' },
+    potion: { label: 'Potion', item: 'potion' },
+  };
+  // Découpe un message en morceaux de texte et d'émotes connues (« :pyrax: »). Partagé serveur / navigateur.
+  function chatTokens(text) {
+    const out = [];
+    const re = /:([a-z0-9_]+):/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(text))) {
+      if (!CHAT_EMOTES[m[1]]) continue;
+      if (m.index > last) out.push({ t: 'text', v: text.slice(last, m.index) });
+      out.push({ t: 'emote', id: m[1] });
+      last = re.lastIndex;
+    }
+    if (last < text.length) out.push({ t: 'text', v: text.slice(last) });
+    return out;
+  }
+
   // ---------- Casino ----------
   // Neuf jeux, chacun tenu par un boss en smoking (croupier = identifiant du boss). Tous les tirages se font côté serveur.
   const CASINO = {
@@ -3511,6 +3553,7 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
+    CHAT, CHAT_EMOTES, chatTokens,
     FISHING, FISH, FISH_IDS, fishTime, fishPool, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
     CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,

@@ -14,6 +14,7 @@ const { Battle } = require('./battle');
 const market = require('./market');
 const casino = require('./casino');
 const fishing = require('./fishing');
+const chat = require('./chat');
 const survivor = require('./survivor');
 const housing = require('./housing');
 const schedule = require('./schedule');
@@ -270,9 +271,19 @@ app.post('/api/forge/batch', requirePlayer, action((req) => game.fuseBatch(req.u
 function casinoAction(fn) {
   return action((req) => {
     const r = fn(req);
-    if (r && r.feed) io.emit('casino', { feed: casino.feed() });
+    if (r && r.feed) casinoFeedChanged();
     return r;
   });
+}
+// Un gros gain du casino : fil des gros gains et annonce dans le tchat du site.
+function casinoFeedChanged() {
+  io.emit('casino', { feed: casino.feed() });
+  const f = casino.feed()[0];
+  if (!f || Date.now() - f.at > 5000) return;
+  const G = Rules.CASINO.games[f.game];
+  const where = G ? `${G.icon} ${G.label}` : 'au casino';
+  const text = f.text ? `🎰 ${f.name} décroche ${f.text} (${where}) !` : `🎰 ${f.name} gagne ${f.amount} golds (mise ${f.bet}) à la ${where} !`;
+  io.to('chat').emit('chat', { add: chat.system(text, 'casino') });
 }
 // La salle : quelques joueurs (dont soi) qui se promènent entre les tables, le fil des gros gains et ses parties en cours.
 let crowdCache = { at: 0, ids: [] };
@@ -307,7 +318,7 @@ app.post('/api/casino/heaven/check', requirePlayer, (req, res) => {
     if (r.outcome) {
       db.save();
       pushMe(req.user);
-      if (r.feed) io.emit('casino', { feed: casino.feed() });
+      if (r.feed) casinoFeedChanged();
     }
     res.json({ ok: true, ...r });
   } catch (err) {
@@ -342,9 +353,34 @@ function fishBoard() {
 app.post('/api/fishing/land', requirePlayer, action((req) => {
   const r = fishing.land(req.user, req.body.id, req.body.toggles);
   if (r.caught && r.kind === 'fish') fishBoard();
+  // Les plus belles prises sont annoncées dans le tchat du site
+  const who = req.user.twitchDisplayName || req.user.username;
+  const F = r.kind === 'fish' && Rules.FISH[r.id];
+  if (F && F.rarity === 'legendaire') io.to('chat').emit('chat', { add: chat.system(`🎣 ${who} a pêché ${F.name}, une créature légendaire de ${String(r.size).replace('.', ',')} cm !`, 'fish') });
+  if (r.kind === 'treasure' && r.lot && r.lot.cosmetic) io.to('chat').emit('chat', { add: chat.system(`🎣 ${who} a remonté la Canne à pêche légendaire !`, 'fish') });
   return r;
 }));
 app.post('/api/casino/course', requirePlayer, casinoAction((req) => casino.course(req.user, req.body.bet, req.body.demon, !!req.body.ticket)));
+
+// ---------- Tchat ----------
+// Tout le monde lit (l'arène en direct aussi, sans compte) ; seuls les joueurs écrivent. Chaque message part à tous (`chat`).
+app.get('/api/chat', (req, res) => res.json({ messages: chat.history(), online: onlineView() }));
+app.post('/api/chat', requirePlayer, (req, res) => {
+  try {
+    const r = chat.send(req.user, req.body.text);
+    if (r.message) io.to('chat').emit('chat', { add: r.message });
+    res.json({ ok: true, ...r });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/admin/chat/delete', requireAdmin, action((req) => { const r = chat.remove(req.body.id); io.to('chat').emit('chat', { del: r.deleted }); return r; }));
+app.post('/api/admin/chat/clear', requireAdmin, action(() => { const r = chat.clear(); io.to('chat').emit('chat', { clear: true }); return r; }));
+app.post('/api/admin/chat/mute', requireAdmin, action((req) => chat.mute(db.state.users[req.body.userId], req.body.minutes)));
+// Joueurs connectés (au moins un onglet du site ouvert) : nombre et pseudos, pour le tchat
+const online = new Map(); // userId → nombre de connexions
+function onlineView() {
+  const names = [...online.keys()].map((id) => db.state.users[id]).filter((u) => u && u.role === 'player').map((u) => u.twitchDisplayName || u.username);
+  return { n: names.length, names: names.sort((a, b) => a.localeCompare(b)).slice(0, 60) };
+}
 
 // ---------- Survivor ----------
 // La partie tourne côté serveur (survivor.tickAll, branché dans start()) ; la position arrive par socket (`sv:pos`).
@@ -679,7 +715,7 @@ function rewardSub(login, displayName, kind) {
   pushMe(user);
   io.to('user:' + user.id).emit('reward', { type: 'sub', reward, levels: 0 });
   const what = kind === 'gift' ? 'ton sub offert' : 'ton abonnement';
-  twitch.say(`💜 Merci @${displayName} pour ${what} ! +${Rules.SUB_REWARD_GOLD} golds sur ton perso Zer0Loot.`);
+  announce(`💜 Merci @${displayName} pour ${what} ! +${Rules.SUB_REWARD_GOLD} golds sur ton perso Zer0Loot.`);
   console.log(`[twitch] sub (${kind}) de ${login} : +${Rules.SUB_REWARD_GOLD} golds`);
   return user;
 }
@@ -761,12 +797,18 @@ function notifyBets(results) {
 battle.on('cleared', () => notifyBets(bets.refundAll()));
 
 // Ouvre la file d'un mode (admin, ou planification automatique) et l'annonce dans le chat.
+// Annonce du jeu : dans le chat Twitch et dans le tchat du site (événement `chat`).
+function announce(text) {
+  twitch.say(text);
+  io.to('chat').emit('chat', { add: chat.system(text) });
+}
+
 function openQueueFor(seconds, mode, boss) {
   battle.openQueue(seconds, mode, boss || 'troll');
   const m = Rules.GAME_MODES[mode];
   const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}`
     : mode === 'rush' ? ' (les boss s\'enchaînent, de plus en plus forts !)' : '';
-  twitch.say(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
+  announce(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
   return { boss: mode === 'boss' ? battle.bossId : null };
 }
 
@@ -812,7 +854,7 @@ function startBattle() {
     // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
     battle.start(refreshParticipant, null);
     const B = Rules.BOSSES[battle.bossId];
-    twitch.say(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
+    announce(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
       : battle.mode === 'rush' ? `💀 BOSS RUSH ! Premier boss : ${B.icon} ${B.name}. Entre chaque boss, le chat vote : !1, !2 ou !3 !`
       : battle.mode === 'gold' ? `🪙 RUÉE VERS L'OR ! Il pleut des pièces et des coffres pendant ${Rules.GOLD.duration} s : chacun garde ce qu'il ramasse !`
       : battle.mode === 'clans' ? '⚔️ Guerre des clans : détruisez le cristal adverse ! 🔴 Rouges contre 🔵 Bleus !'
@@ -825,7 +867,7 @@ function startBattle() {
   battle.start(refreshParticipant, ev);
   pendingEvent = null; // un événement ne vaut que pour une bataille
   const info = ev && Rules.BATTLE_EVENTS[ev];
-  twitch.say(info ? `🔥 Que le combat commence ! Événement : ${info.icon} ${info.label} !` : '🔥 Que le combat commence !');
+  announce(info ? `🔥 Que le combat commence ! Événement : ${info.icon} ${info.label} !` : '🔥 Que le combat commence !');
   return { event: ev, pendingEvent };
 }
 
@@ -837,7 +879,7 @@ const scheduleCtl = {
   cancel: (reason, c) => {
     const m = Rules.GAME_MODES[c.mode];
     battle.reset(); // rembourse aussi les paris
-    twitch.say(`⏰ ${m.icon} ${m.label} planifié annulé : ${reason}.`);
+    announce(`⏰ ${m.icon} ${m.label} planifié annulé : ${reason}.`);
     console.log(`[planning] ${c.mode} annulé : ${reason}`);
   },
   changed: () => io.emit('schedule', schedule.publicView()),
@@ -934,14 +976,14 @@ battle.on('end', (winner, fighters) => {
     pushMe(user);
   }
   db.save();
-  if (winner && battle.mode === 'koth') twitch.say(`👑 ${winner.name} est le Roi de la Colline avec ${Math.floor(winner.score)} points (${winner.kills} kill(s)) !`);
-  else if (winner) twitch.say(`🏆 ${winner.name} remporte le Battle Royale avec ${winner.kills} kill(s) !`);
+  if (winner && battle.mode === 'koth') announce(`👑 ${winner.name} est le Roi de la Colline avec ${Math.floor(winner.score)} points (${winner.kills} kill(s)) !`);
+  else if (winner) announce(`🏆 ${winner.name} remporte le Battle Royale avec ${winner.kills} kill(s) !`);
 
   const betResults = bets.settle(winner ? winner.key : null, winner ? winner.name : null);
   notifyBets(betResults);
   const br = bets.summary().lastResult;
   if (br && !br.refund && br.winners) {
-    twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
+    announce(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
   }
   db.save();
   io.emit('leaderboard', leaderboard());
@@ -983,14 +1025,14 @@ battle.on('coopEnd', (result, fighters) => {
   db.save();
   if (result.mode === 'rush') {
     const r = result.reward;
-    twitch.say(`💀 Fin du Boss Rush : ${result.rush.killed} boss vaincu${result.rush.killed > 1 ? 's' : ''} !${r ? ` Tous les héros gagnent ${r.chests} coffres, ${r.xp} XP et ${r.gold} golds.` : ' Aucun boss vaincu cette fois…'}`);
+    announce(`💀 Fin du Boss Rush : ${result.rush.killed} boss vaincu${result.rush.killed > 1 ? 's' : ''} !${r ? ` Tous les héros gagnent ${r.chests} coffres, ${r.xp} XP et ${r.gold} golds.` : ' Aucun boss vaincu cette fois…'}`);
   } else if (result.mode === 'boss') {
-    twitch.say(result.victory
+    announce(result.victory
       ? `🏆 ${result.boss.name} est vaincu ! Tous les participants gagnent ${result.reward.chests} coffres, ${result.reward.xp} XP et ${result.reward.gold} golds !`
       : `💀 ${result.boss.name} a écrasé tout le monde… Retentez votre chance !`);
   } else {
     const r = result.reward;
-    twitch.say(`🏰 Le raid s'arrête en salle ${result.room} !${r ? ` Tous les aventuriers gagnent ${[r.chests ? r.chests + ' coffre(s)' : '', r.xp + ' XP', r.gold + ' golds'].filter(Boolean).join(', ')}.` : ' Il faut atteindre la salle 5 pour une récompense.'}`);
+    announce(`🏰 Le raid s'arrête en salle ${result.room} !${r ? ` Tous les aventuriers gagnent ${[r.chests ? r.chests + ' coffre(s)' : '', r.xp + ' XP', r.gold + ' golds'].filter(Boolean).join(', ')}.` : ' Il faut atteindre la salle 5 pour une récompense.'}`);
   }
   notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
@@ -1003,7 +1045,7 @@ function petDrop(user, bossId) {
   if (!r) return null;
   const name = user.twitchDisplayName || user.username;
   io.to('user:' + user.id).emit('pet', { species: r.pet.species, duplicate: r.duplicate, levels: r.levels });
-  if (!r.duplicate) twitch.say(`🐾 Incroyable ! ${name} a obtenu le familier ${Rules.PETS[bossId].name} ! Il l'attend dans son enclos.`);
+  if (!r.duplicate) announce(`🐾 Incroyable ! ${name} a obtenu le familier ${Rules.PETS[bossId].name} ! Il l'attend dans son enclos.`);
   return r;
 }
 
@@ -1020,7 +1062,7 @@ battle.on('rushBossDown', (info, fighters) => {
   }
   db.save();
   const B = Rules.BOSSES[info.boss];
-  twitch.say(`💥 ${B.icon} ${B.name} est vaincu ! (${info.killed} boss) Votez pour la suite : !1, !2 ou !3`);
+  announce(`💥 ${B.icon} ${B.name} est vaincu ! (${info.killed} boss) Votez pour la suite : !1, !2 ou !3`);
 });
 
 // ---------- Ruée vers l'or ----------
@@ -1042,7 +1084,7 @@ battle.on('goldEnd', (result, fighters) => {
   }
   db.save();
   const b = result.best;
-  twitch.say(`🪙 Fin du Golden Shower : ${result.totals.gold} golds et ${result.totals.chests} coffre(s) ramassés !${b ? ` Roi du butin : ${b.name} avec ${b.gold} golds (+1 coffre).` : ''}`);
+  announce(`🪙 Fin du Golden Shower : ${result.totals.gold} golds et ${result.totals.chests} coffre(s) ramassés !${b ? ` Roi du butin : ${b.name} avec ${b.gold} golds (+1 coffre).` : ''}`);
   notifyBets(bets.refundAll());
   io.emit('leaderboard', leaderboard());
 });
@@ -1077,10 +1119,10 @@ battle.on('clansEnd', (result, fighters) => {
   }
   db.save();
   const T = Rules.CLANS.teams[result.winner];
-  twitch.say(`${T.icon} Victoire des ${T.label} ! Chaque membre gagne ${result.reward.xp} XP, ${result.reward.gold} golds et ${result.reward.chests} coffres.${result.mvp ? ` MVP : ${result.mvp.name} (+${Rules.CLANS.mvpChests} coffres).` : ''}`);
+  announce(`${T.icon} Victoire des ${T.label} ! Chaque membre gagne ${result.reward.xp} XP, ${result.reward.gold} golds et ${result.reward.chests} coffres.${result.mvp ? ` MVP : ${result.mvp.name} (+${Rules.CLANS.mvpChests} coffres).` : ''}`);
   notifyBets(bets.settle('clan:' + result.winner, `les ${T.label}`));
   const br = bets.summary().lastResult;
-  if (br && !br.refund && br.winners) twitch.say(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
+  if (br && !br.refund && br.winners) announce(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
   db.save();
   io.emit('leaderboard', leaderboard());
 });
@@ -1091,10 +1133,10 @@ const boonText = (id) => { const b = Rules.DUNGEON_BOONS[id]; return `${b.icon} 
 
 battle.on('pollStart', (poll) => {
   if (poll.rush) {
-    twitch.say(`🗳️ Boss vaincu ! Votez pendant ${Rules.RUSH.poll.duration} s : ${poll.options.map((o, i) => `!${i + 1} ${o.icon} ${o.label}`).join(' · ')}`);
+    announce(`🗳️ Boss vaincu ! Votez pendant ${Rules.RUSH.poll.duration} s : ${poll.options.map((o, i) => `!${i + 1} ${o.icon} ${o.label}`).join(' · ')}`);
     return;
   }
-  twitch.say(`🗳️ Salle ${poll.room} franchie ! Votez dans le chat pendant ${Rules.DUNGEON_POLL.duration} s : ${poll.options.map((o) => boonText(o.id)).join(' OU ')}`);
+  announce(`🗳️ Salle ${poll.room} franchie ! Votez dans le chat pendant ${Rules.DUNGEON_POLL.duration} s : ${poll.options.map((o) => boonText(o.id)).join(' OU ')}`);
 });
 
 // Bonus immédiat (golds, XP, coffre) : pour TOUS les participants humains, morts compris.
@@ -1112,7 +1154,7 @@ battle.on('pollEnd', (result, fighters) => {
   }
   const total = result.counts.reduce((a, c) => a + c.votes, 0);
   const extra = result.revived ? ` ${result.revived.name} revient à la vie !` : '';
-  twitch.say(`🗳️ Le chat a choisi ${b.icon} ${b.label} (${total} vote${total > 1 ? 's' : ''}) : ${b.desc}${extra}`);
+  announce(`🗳️ Le chat a choisi ${b.icon} ${b.label} (${total} vote${total > 1 ? 's' : ''}) : ${b.desc}${extra}`);
 });
 
 // ---------- Classements ----------
@@ -1631,6 +1673,16 @@ app.get('/api/solo/state', requirePlayer, (req, res) => {
 io.on('connection', (socket) => {
   const user = userFromCookie(socket.request.headers.cookie);
   if (user) socket.join('user:' + user.id);
+  // Tchat : seules les pages qui l'affichent s'abonnent (room « chat ») aux messages et à la présence
+  socket.on('chat:join', () => { socket.join('chat'); socket.emit('chatOnline', onlineView()); });
+  if (user && user.role === 'player') {
+    online.set(user.id, (online.get(user.id) || 0) + 1);
+    if (online.get(user.id) === 1) io.to('chat').emit('chatOnline', onlineView());
+    socket.on('disconnect', () => {
+      const n = (online.get(user.id) || 1) - 1;
+      if (n > 0) online.set(user.id, n); else { online.delete(user.id); io.to('chat').emit('chatOnline', onlineView()); }
+    });
+  }
   // Survivor : position du joueur (ZQSD), jusqu'à 30 fois par seconde
   if (user) socket.on('sv:pos', (msg) => survivor.input(user.id, msg));
   socket.emit('queue', queueView());

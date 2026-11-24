@@ -2,6 +2,9 @@
 const $ = (id) => document.getElementById(id);
 const socket = io();
 new ArenaView($('arena'), socket);
+// Tchat des joueurs, en mode modération
+Chat.mount($('admin-chat'), 'admin');
+Chat.init(socket);
 Sound.bindVolume($('sound-ctl'));
 $('obs-url').textContent = location.origin + '/arena.html';
 

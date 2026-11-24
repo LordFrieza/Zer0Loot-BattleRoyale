@@ -67,6 +67,18 @@
     </nav>
     <div class="place-menu" id="place-menu" role="menu"></div>
 
+    <section class="tab" data-tab="tchat">
+      <div class="panel">
+        <h2>🍺 Taverne <span class="sub">Le tchat de tous les joueurs</span><button class="help-btn" type="button">?</button></h2>
+        <p class="muted help">Un seul salon pour tout le monde. Ton pseudo prend la couleur de ton personnage, avec ta classe et ton titre.
+          Les <b>émotes</b> (bouton 😀) s'écrivent <code>:pyrax:</code>, <code>:ether:</code>, <code>:daedra:</code>… ; <code>/me danse</code> décrit
+          une action, <code>/roll</code> lance un dé, <code>/pile</code> une pièce ; clique sur un pseudo pour l'interpeller avec <code>@pseudo</code>
+          (il est prévenu). Les grands moments du jeu (file ouverte, vainqueurs, boss vaincus, jackpots, poissons légendaires…) s'y affichent aussi,
+          et le tchat apparaît en transparence sur l'arène en direct. Pas de spam (un message par seconde) et reste correct : l'admin veille.</p>
+        <div id="chat-full"></div>
+      </div>
+    </section>
+
     <section class="tab" data-tab="carte">
       <div class="panel map-panel">
         <div class="map-wrap" id="map-wrap">
@@ -731,6 +743,14 @@
     </div>
   </div>
 
+  <!-- Tchat en bulle : on discute sans quitter son activité -->
+  <button type="button" class="chat-bubble" id="chat-bubble" title="Tchat (Taverne)">💬<span class="tab-badge" id="chat-bubble-n"></span></button>
+  <div class="chat-pop" id="chat-pop">
+    <div class="chat-pop-head"><b>🍺 Taverne</b><span class="spacer"></span>
+      <button type="button" class="secondary small" id="chat-pop-big" title="Ouvrir la Taverne en grand">⤢</button>
+      <button type="button" class="secondary small" id="chat-pop-close" title="Fermer">✕</button></div>
+    <div id="chat-pop-body"></div>
+  </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/shared/rules.js"></script>
   <script src="/js/common.js"></script>
@@ -753,6 +773,8 @@
   <script src="/js/housing-draw.js"></script>
   <script src="/js/housing-life.js"></script>
   <script src="/js/housing.js"></script>
+  <script src="/js/emotes.js"></script>
+  <script src="/js/chat.js"></script>
   <script src="/js/worldmap.js"></script>
   <script src="/js/character.js"></script>
   <script src="/js/schedule.js"></script>

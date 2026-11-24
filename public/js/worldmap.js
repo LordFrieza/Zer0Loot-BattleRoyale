@@ -14,6 +14,7 @@
         hall: [600, 150, 190, 130], donjon: [165, 205, 220, 165], survivor: [1045, 200, 230, 160], arene: [830, 205, 170, 120],
         gym: [335, 395, 160, 120], maison: [600, 385, 160, 150], niche: [735, 420, 90, 80], heros: [492, 470, 80, 120],
         casino: [935, 440, 190, 160], guide: [395, 545, 90, 90], peche: [170, 560, 240, 140], commerce: [720, 590, 260, 120],
+        taverne: [1065, 605, 170, 140],
       },
       deco: 52,
     },
@@ -23,6 +24,7 @@
         hall: [300, 150, 190, 130], donjon: [110, 230, 200, 165], survivor: [490, 230, 200, 165], arene: [470, 365, 160, 110],
         gym: [125, 395, 170, 120], maison: [300, 470, 160, 150], niche: [430, 505, 90, 80], heros: [190, 560, 80, 120],
         casino: [460, 670, 180, 160], guide: [130, 660, 90, 90], peche: [150, 860, 250, 150], commerce: [440, 880, 230, 120],
+        taverne: [300, 770, 160, 130],
       },
       deco: 40,
     },
@@ -396,6 +398,52 @@
     g.strokeStyle = '#6b4424'; g.lineWidth = 1.5; g.strokeRect(x + 128, y - 18, 20, 18); g.strokeRect(x + 134, y - 32, 16, 14);
   }
 
+  // Taverne : maison à colombages, enseigne à la chope, tonneaux, et des bulles de discussion qui s'échappent
+  function drawTavern(g, x, y, ph, t) {
+    shadow(g, x, y, 82, 12);
+    g.fillStyle = '#e9d9b8'; g.fillRect(x - 66, y - 82, 132, 82);
+    g.strokeStyle = '#6b4424'; g.lineWidth = 5;
+    g.strokeRect(x - 66, y - 82, 132, 82);
+    g.beginPath(); g.moveTo(x - 66, y - 42); g.lineTo(x + 66, y - 42); g.moveTo(x - 22, y - 82); g.lineTo(x - 22, y); g.moveTo(x + 22, y - 82); g.lineTo(x + 22, y);
+    g.moveTo(x - 66, y - 82); g.lineTo(x - 22, y - 42); g.moveTo(x + 66, y - 82); g.lineTo(x + 22, y - 42); g.stroke();
+    g.fillStyle = '#7a3b2a'; g.beginPath(); g.moveTo(x - 78, y - 78); g.lineTo(x, y - 122); g.lineTo(x + 78, y - 78); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.moveTo(x, y - 122); g.lineTo(x + 78, y - 78); g.lineTo(x, y - 78); g.closePath(); g.fill();
+    // porte et fenêtres
+    g.fillStyle = '#5a3418'; g.beginPath(); g.roundRect(x - 13, y - 38, 26, 38, [12, 12, 0, 0]); g.fill();
+    glowWin(g, x - 56, y - 34, 26, 20, ph.night || ph.dusk, '#ffc46a');
+    glowWin(g, x + 30, y - 34, 26, 20, ph.night || ph.dusk, '#ffc46a');
+    glowWin(g, x - 12, y - 72, 24, 18, ph.night || ph.dusk, '#ffc46a');
+    // enseigne à la chope qui se balance
+    const sw = Math.sin(t / 700) * 0.12;
+    g.strokeStyle = '#3a2a1a'; g.lineWidth = 3; g.beginPath(); g.moveTo(x + 66, y - 66); g.lineTo(x + 92, y - 66); g.stroke();
+    g.save(); g.translate(x + 86, y - 66); g.rotate(sw);
+    g.fillStyle = '#c8955a'; g.strokeStyle = '#5a3a1e'; g.lineWidth = 2; g.beginPath(); g.roundRect(-14, 4, 28, 26, 4); g.fill(); g.stroke();
+    g.fillStyle = '#ffcf3a'; g.fillRect(-7, 10, 11, 15); g.fillStyle = '#fff'; g.fillRect(-8, 8, 13, 4);
+    g.strokeStyle = '#ffcf3a'; g.lineWidth = 2.5; g.beginPath(); g.arc(5, 17, 4, -Math.PI / 2, Math.PI / 2); g.stroke();
+    g.restore();
+    // tonneaux
+    for (const [bx, s] of [[-84, 1], [-70, 0.8]]) {
+      g.fillStyle = '#8a5a30'; g.beginPath(); g.ellipse(x + bx, y - 12 * s, 11 * s, 13 * s, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#4e3018'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + bx - 10 * s, y - 16 * s); g.lineTo(x + bx + 10 * s, y - 16 * s); g.moveTo(x + bx - 10 * s, y - 7 * s); g.lineTo(x + bx + 10 * s, y - 7 * s); g.stroke();
+    }
+    // bulles de discussion qui montent du toit
+    for (let i = 0; i < 3; i++) {
+      const k = ((t / 2600 + i / 3) % 1);
+      const bx = x - 30 + i * 30 + Math.sin(k * 6 + i) * 6;
+      const by = y - 126 - k * 46;
+      g.globalAlpha = Math.sin(k * Math.PI);
+      g.fillStyle = '#fff'; g.beginPath(); g.roundRect(bx - 13, by - 9, 26, 18, 8); g.fill();
+      g.beginPath(); g.moveTo(bx - 4, by + 8); g.lineTo(bx - 8, by + 14); g.lineTo(bx + 2, by + 8); g.fill();
+      g.fillStyle = ['#ff5a8a', '#3b8bff', '#ff9a1f'][i];
+      if (i === 0) heartTiny(g, bx, by);
+      else for (let d = -1; d <= 1; d++) { g.beginPath(); g.arc(bx + d * 6, by, 2, 0, Math.PI * 2); g.fill(); }
+      g.globalAlpha = 1;
+    }
+  }
+  function heartTiny(g, x, y) {
+    g.beginPath(); g.moveTo(x, y + 4); g.bezierCurveTo(x - 7, y - 1, x - 3, y - 7, x, y - 3); g.bezierCurveTo(x + 3, y - 7, x + 7, y - 1, x, y + 4); g.fill();
+  }
+
   function drawSign(g, x, y, ph, t) {
     shadow(g, x, y, 26, 6);
     g.fillStyle = '#6b4424'; g.fillRect(x - 3, y - 70, 6, 70);
@@ -417,7 +465,7 @@
     drawFighter(g, x, y - 56, { name: me.twitchDisplayName || me.username, cls: c.cls, look, app: c.look }, { scale: 1.45, facing: 1, bob: Math.sin(t / 500) * 1.2 });
   }
 
-  const DRAWERS = { maison: drawHouse, niche: drawNiche, hall: drawHall, donjon: drawDungeon, survivor: drawWilds, arene: drawArena, gym: drawGym, casino: drawCasino, peche: drawPond, commerce: drawMarket, guide: drawSign };
+  const DRAWERS = { maison: drawHouse, niche: drawNiche, hall: drawHall, donjon: drawDungeon, survivor: drawWilds, arene: drawArena, gym: drawGym, casino: drawCasino, peche: drawPond, commerce: drawMarket, guide: drawSign, taverne: drawTavern };
 
   function drawGround(g, L, ph, t) {
     const day = ph.night ? ['#1b3a2c', '#14301f'] : ph.dusk ? ['#5e8a4a', '#4a7340'] : ['#7cc36a', '#62ad57'];
