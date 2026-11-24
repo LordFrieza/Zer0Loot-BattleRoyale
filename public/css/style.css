@@ -696,7 +696,7 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 .ms-label {
   position: relative; transform: translateY(70%); display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 12px;
   background: rgba(10, 6, 30, .82); border: 1px solid rgba(150, 100, 255, .55); color: #fff; font-size: 12px; font-weight: 800;
-  white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .45); pointer-events: none;
+  white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .45); cursor: pointer;
 }
 .map-spot:hover .ms-label, .map-spot:focus-visible .ms-label { border-color: var(--accent2); background: rgba(60, 30, 110, .92); transform: translateY(70%) scale(1.06); }
 .ms-ico { font-size: 14px; }
