@@ -49,6 +49,11 @@
   const TILE = 64;
   const CELL = 8; // résolution du sol (lissé ensuite : pas de gros carrés)
   const chunks = new Map();
+  // Définition de l'image : RES pour le canvas (plein écran, haute densité), SK (≤ 2) pour les morceaux de carte et les sprites
+  // mis en cache, refaits quand elle change.
+  let RES = 1;
+  let SK = 1;
+  const chunkMax = () => Math.max(20, Math.round(48 / (SK * SK)));
   const hash = (x, y, s = 0) => {
     let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
     h = (h ^ (h >>> 13)) * 1274126177;
@@ -306,9 +311,10 @@
 
   function buildChunk(cx, cy) {
     const c = document.createElement('canvas');
-    c.width = CHUNK;
-    c.height = CHUNK;
+    c.width = Math.round(CHUNK * SK);
+    c.height = Math.round(CHUNK * SK);
     const g = c.getContext('2d');
+    g.scale(SK, SK);
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
     // 1) Sol : couleurs calculées tous les 8 px puis agrandies en douceur (frontières fondues, pas de carrés)
@@ -492,7 +498,7 @@
     if (!c) {
       c = buildChunk(cx, cy);
       chunks.set(k, c);
-      if (chunks.size > 48) chunks.delete(chunks.keys().next().value);
+      if (chunks.size > chunkMax()) chunks.delete(chunks.keys().next().value);
     } else {
       chunks.delete(k); // le plus récemment vu passe en fin de file
       chunks.set(k, c);
@@ -505,7 +511,7 @@
       for (let cy = Math.floor(camY / CHUNK) - 1; cy <= Math.floor((camY + H) / CHUNK) + 1; cy++) {
         if (cx < -1 || cy < -1 || cx * CHUNK > SV.map.w || cy * CHUNK > SV.map.h || chunks.has(cx * 100 + cy)) continue;
         chunks.set(cx * 100 + cy, buildChunk(cx, cy));
-        if (chunks.size > 48) chunks.delete(chunks.keys().next().value);
+        if (chunks.size > chunkMax()) chunks.delete(chunks.keys().next().value);
         return;
       }
     }
@@ -519,9 +525,11 @@
     if (!c) {
       const size = elite ? 200 : 120;
       c = document.createElement('canvas');
-      c.width = size;
-      c.height = size;
+      c.width = Math.round(size * SK);
+      c.height = Math.round(size * SK);
+      c.logical = size;
       const g = c.getContext('2d');
+      g.scale(SK, SK);
       drawMonster(g, size / 2, size * 0.62, { kind, elite, scale: elite ? SV.elite.scale : 1 }, { t: step * 120, seed: step });
       sprites.set(key, c);
     }
@@ -853,12 +861,15 @@
     const shake = now < (G.shakeUntil || 0) ? G.shakeAmp * ((G.shakeUntil - now) / 450) : 0;
     const camX = Math.max(W / 2, Math.min(SV.map.w - W / 2, G.me.x)) - W / 2 + (shake ? (Math.random() - 0.5) * shake : 0);
     const camY = Math.max(H / 2, Math.min(SV.map.h - H / 2, G.me.y)) - H / 2 + (shake ? (Math.random() - 0.5) * shake : 0);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    RES = canvasScale(ctx.canvas, W, H, 2);
+    const sk = Math.min(2, RES);
+    if (sk !== SK) { SK = sk; chunks.clear(); sprites.clear(); }
+    ctx.setTransform(RES, 0, 0, RES, 0, 0);
     // Sol
     const cx0 = Math.floor(camX / CHUNK);
     const cy0 = Math.floor(camY / CHUNK);
     for (let cx = cx0; cx <= Math.floor((camX + W) / CHUNK); cx++) {
-      for (let cy = cy0; cy <= Math.floor((camY + H) / CHUNK); cy++) ctx.drawImage(chunk(cx, cy), Math.round(cx * CHUNK - camX), Math.round(cy * CHUNK - camY));
+      for (let cy = cy0; cy <= Math.floor((camY + H) / CHUNK); cy++) ctx.drawImage(chunk(cx, cy), Math.round(cx * CHUNK - camX), Math.round(cy * CHUNK - camY), CHUNK, CHUNK);
     }
     prefetch(camX, camY);
     ctx.translate(-Math.round(camX), -Math.round(camY));
@@ -1154,12 +1165,12 @@
       if (!meDrawn && m.y > G.me.y) drawMe();
       const step = (Math.floor(now / 110) + m.step) % 6;
       const img = sprite(m.kind, m.elite, step);
-      const size = img.width;
+      const size = img.logical;
       ctx.save();
       ctx.translate(m.x, m.y);
       if (m.facing < 0) ctx.scale(-1, 1);
-      ctx.drawImage(img, -size / 2, -size * 0.62);
-      if (now - m.flash < 90) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(img, -size / 2, -size * 0.62); }
+      ctx.drawImage(img, -size / 2, -size * 0.62, size, size);
+      if (now - m.flash < 90) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6; ctx.drawImage(img, -size / 2, -size * 0.62, size, size); }
       ctx.restore();
       if (m.elite) {
         ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(m.x - 30, m.y - 70, 60, 6);
@@ -1409,7 +1420,7 @@
     }
     ctx.globalAlpha = 1;
     // Interface (écran)
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(RES, 0, 0, RES, 0, 0);
     drawDaylight(f, now, Math.round(camX), Math.round(camY));
     drawHud(f, now, camX, camY);
   }
@@ -1464,7 +1475,7 @@
       for (let i = 0; i < f.pk.length; i += 3) hole(f.pk[i], f.pk[i + 1], 80, 0.6);
       for (const e of G.fx) if (e.k === 'ring' || e.k === 'zap' || e.k === 'quake') hole(e.x, e.y, (e.r || 80) * 1.2, 0.8 * (1 - (now - e.t0) / e.life));
       for (const p of G.proj.values()) if (!p.bolt && p.rx != null) hole(p.rx, p.ry, 40, 0.7); // les projectiles ennemis luisent : on les voit venir
-      ctx.drawImage(darkCv, 0, 0);
+      ctx.drawImage(darkCv, 0, 0, W, H);
       // Lucioles
       if (L.dark > 0.4) {
         ctx.save(); ctx.globalCompositeOperation = 'lighter';

@@ -111,6 +111,7 @@
       this.announces = []; // « PREMIER KILL ! », « DOUBLE KILL ! »…
       this.lastShotSound = 0;
       this.last = performance.now();
+      this.bgScale = 1; // définition des fonds en cache (suit celle de l'image, au plus ×2)
       this.bg = this.makeBackground();
       this.dungeonBgs = []; // une image de fond par ambiance, créée à la demande
       this.loadImages();
@@ -123,8 +124,9 @@
     // Pré : herbe, dalles et cailloux (Battle Royale et Combat de Boss).
     makeBackground() {
       const c = document.createElement('canvas');
-      c.width = W; c.height = H;
+      c.width = Math.round(W * this.bgScale); c.height = Math.round(H * this.bgScale);
       const g = c.getContext('2d');
+      g.scale(this.bgScale, this.bgScale);
       const grad = g.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.7);
       grad.addColorStop(0, '#2b3a2a');
       grad.addColorStop(1, '#141b16');
@@ -165,8 +167,9 @@
     makeDungeonBackground(theme = 0) {
       const P = DUNGEON_PALETTES[theme] || DUNGEON_PALETTES[0];
       const c = document.createElement('canvas');
-      c.width = W; c.height = H;
+      c.width = Math.round(W * this.bgScale); c.height = Math.round(H * this.bgScale);
       const g = c.getContext('2d');
+      g.scale(this.bgScale, this.bgScale);
       let seed = 11 + theme * 101;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       g.fillStyle = P.base;
@@ -832,6 +835,10 @@
 
     draw(dt, t) {
       const ctx = this.ctx;
+      // Image nette à toute taille (OBS en 1080p, plein écran, écran haute densité) : même repère W × H, plus de pixels
+      const k = canvasScale(this.canvas, W, H, 2);
+      if (k !== this.bgScale) { this.bgScale = k; this.bg = this.makeBackground(); this.dungeonBgs = []; }
+      ctx.setTransform(k, 0, 0, k, 0, 0);
       // Tremblement de l'écran (impact de météore)
       this.shake = Math.max(0, (this.shake || 0) - dt);
       ctx.save();
@@ -839,7 +846,7 @@
       const phase = (this.queue && this.queue.phase) || 'idle';
       const dungeon = phase !== 'idle' && this.queue && this.queue.mode === 'dungeon';
       const theme = dungeon && this.frame && this.frame.dungeon ? Rules.dungeonTheme(this.frame.dungeon.room) : 0;
-      ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.bg, 0, 0);
+      ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.bg, 0, 0, W, H);
       if (dungeon) this.drawTorches(t, theme);
       if (phase !== 'idle' && this.queue && this.queue.mode === 'gold') this.drawGoldSky(t);
 

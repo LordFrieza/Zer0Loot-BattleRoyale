@@ -463,6 +463,9 @@
     const dt = Math.min(0.05, (now - (S.last || now)) / 1000);
     S.last = now;
     const ctx = S.ctx;
+    // Plein écran ou écran haute densité : on dessine en pleine définition (même repère W × H)
+    const k = canvasScale(S.canvas, W, H, 3);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
     const ph = skyPhase();
     const t = now;
     tickPhase(now);

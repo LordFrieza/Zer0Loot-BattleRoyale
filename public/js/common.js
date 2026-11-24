@@ -185,3 +185,18 @@ document.addEventListener('fullscreenchange', () => {
   // Sortie par la touche Échap ou le geste « retour » : on remet tout en place
   if (!document.fullscreenElement && GameScreen.active && !GameScreen.active.classList.contains('pseudo-fs')) GameScreen.exit();
 });
+
+
+// Image nette à toute taille (plein écran, écrans haute densité) : le jeu dessine toujours dans son repère W × H, mais
+// la mémoire d'image du canvas suit sa taille réellement affichée × devicePixelRatio (par paliers de 0,25, jamais sous
+// W × H, au plus `max` fois). Renvoie l'échelle k : le jeu fait ctx.setTransform(k, 0, 0, k, 0, 0) avant de dessiner.
+function canvasScale(canvas, W, H, max = 3) {
+  const r = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  let k = r.width ? (r.width * dpr) / W : 1;
+  k = Math.max(1, Math.min(max, Math.round(k * 4) / 4));
+  const w = Math.round(W * k);
+  const h = Math.round(H * k);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  return k;
+}
