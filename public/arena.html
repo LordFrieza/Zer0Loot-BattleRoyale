@@ -29,7 +29,11 @@
   <script src="/js/chat.js"></script>
   <script>
     const socket = io();
-    new ArenaView(document.getElementById('arena'), socket);
+    const view = new ArenaView(document.getElementById('arena'), socket);
+    // Joueur connecté : encart personnel (vie, ultime) en bas à droite et repère « TOI » ; ?hud=0 pour les masquer
+    if (new URLSearchParams(location.search).get('hud') !== '0') {
+      fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((me) => { if (me && me.role === 'player' && me.id) view.meKey = 'u' + me.id; }).catch(() => {});
+    }
     if (new URLSearchParams(location.search).get('tchat') !== '0') {
       Chat.mount(document.getElementById('arena-chat'), 'overlay');
       Chat.init(socket);

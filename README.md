@@ -125,7 +125,12 @@ de la file, confirme les `!join` et annonce le vainqueur.
 - **Séries de kills** (annoncées en grand sur le stream avec un son) : premier kill de la bataille = +3 coffres ;
   double kill (2 kills d'affilée en moins de 8 s) = +3 coffres ; triple kill = annonce seulement ;
   massacre (5 kills dans la bataille) = +6 coffres.
-- **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence.
+- **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence. **Niveau maximum : 100** (au-delà, l'XP n'est
+  plus comptée ; la fiche affiche « Niveau maximum »).
+- **Ton encart dans l'arène** : quand tu regardes l'arène connecté à ton compte (« Regarder l'arène », Solo,
+  Entraînement), un encart en bas à droite affiche ton portrait, ta vie (avec la traînée des dégâts reçus), ta barre
+  d'ultime (« PRÊT ! » quand elle est pleine), ta potion, tes kills et tes effets, ou « K.O. » ; une flèche **TOI**
+  marque ton personnage dans la mêlée. Rien ne s'affiche sur l'écran du stream (non connecté) ; `?hud=0` les masque.
 - **Répartition des points** (onglet Personnage) : les boutons **+** (placer un point libre) et **−** (retirer un point
   pour le replacer ailleurs) ne changent rien tout de suite : la fiche montre l'effet en direct (ancienne valeur barrée →
   nouvelle valeur, en vert ou en rouge, « aucun effet » au-delà du plafond), puis on **valide** d'un coup ou on annule

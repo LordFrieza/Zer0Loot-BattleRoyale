@@ -188,15 +188,18 @@ function derived(character) {
   return Rules.derive(points, gearBonus(character), character.cls);
 }
 
+// Niveau maximum (Rules.MAX_LEVEL) : on ne monte plus, et l'XP reste à 0 (un niveau déjà au-delà n'est jamais retiré).
 function addXp(character, amount) {
+  if (character.level >= Rules.MAX_LEVEL) { character.xp = 0; return 0; }
   character.xp += amount;
   let levels = 0;
-  while (character.xp >= Rules.xpToNext(character.level)) {
+  while (character.level < Rules.MAX_LEVEL && character.xp >= Rules.xpToNext(character.level)) {
     character.xp -= Rules.xpToNext(character.level);
     character.level += 1;
     character.skillPoints += 1;
     levels += 1;
   }
+  if (character.level >= Rules.MAX_LEVEL) character.xp = 0;
   return levels;
 }
 

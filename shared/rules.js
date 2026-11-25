@@ -3517,6 +3517,7 @@
    */
   const XP_BASE = 300;
   const XP_STEP = 200;
+  const MAX_LEVEL = 100; // niveau maximum : au-delà, l'XP gagnée n'est plus comptée
   function xpToNext(level) {
     return XP_BASE + XP_STEP * (level - 1);
   }
@@ -3648,7 +3649,7 @@
     LUCK_CAP, LOOT_BASE, LOOT_AT_CAP, LOOT_PER_LUCK, XP_BASE, XP_STEP, BASE_ATTACK_COOLDOWN,
     CRIT_BASE, CRIT_PER_POINT, CRIT_CAP, CRIT_MULTIPLIER,
     classInfo, chestLightRarity, lootTable, itemWeights, itemClass, canEquip, CLASS_ITEM_BONUS, classBonusOf, itemClassBonus, fuseUpgradeChance,
-    xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
+    xpToNext, MAX_LEVEL, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTiers, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
     SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, TOURNEY, tourneyBracket, tourneyReward, tourneyRoundName, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,

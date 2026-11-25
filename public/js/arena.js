@@ -92,7 +92,13 @@
   }
 
   class ArenaView {
-    constructor(canvas, socket) {
+    /*
+     * opts.me : fonction qui renvoie la clé du combattant du joueur connecté (« u<id> »), pour l'encart personnel en
+     * bas à droite et le repère « TOI » ; sinon on peut régler `meKey` directement (arena.html, d'après /api/me).
+     */
+    constructor(canvas, socket, opts = {}) {
+      this.opts = opts;
+      this.meKey = null;
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       canvas.width = W;
@@ -1329,6 +1335,16 @@
         }
         if (f.koth && f.koth.king === fi.key) this.label('👑', x, (fi.title ? y - 67 : y - 58) - 20 + Math.sin(t / 200) * 2, 22, '#ffd23f');
         const nameY = fi.title ? y - 67 : y - 58;
+        // Repère « TOI » au-dessus de son propre personnage
+        if (fi.key === this.myKey() && fi.alive) {
+          const by = nameY - (f.koth && f.koth.king === fi.key ? 44 : 20) + Math.sin(t / 180) * 3;
+          ctx.save();
+          ctx.shadowColor = '#29e7ff'; ctx.shadowBlur = 10;
+          ctx.fillStyle = '#29e7ff';
+          ctx.beginPath(); ctx.moveTo(x - 8, by - 6); ctx.lineTo(x + 8, by - 6); ctx.lineTo(x, by + 3); ctx.closePath(); ctx.fill();
+          ctx.restore();
+          this.label('TOI', x, by - 14, 11, '#9ff6ff');
+        }
         const icon = fi.spec ? fi.spec.icon + ' ' : classIcon(fi.cls);
         const potion = fi.potion && Rules.CONSUMABLES[fi.potion] ? ' ' + Rules.CONSUMABLES[fi.potion].icon : '';
         const pts = fi.score !== undefined ? ` · ${fi.score} pts` : fi.gold !== undefined ? ` · 🪙 ${fi.gold}${fi.chests ? ` · 🎁${fi.chests}` : ''}` : '';
@@ -1602,6 +1618,7 @@
       if (f.mode === 'dungeon' && f.dungeon && f.phase === 'battle') this.drawRoomTransition(f.dungeon);
       if (f.mode === 'dungeon' && f.dungeon && f.dungeon.poll && f.phase === 'battle') this.drawPoll(f.dungeon.poll, t);
       if (f.tourney && f.phase === 'battle' && f.tourney.stage === 'bracket') this.drawTourneyBracket(t, f.tourney);
+      else this.drawMyHud(t, dt);
       if (f.rush && f.phase === 'battle') {
         if (f.rush.stage === 'intro') this.drawRushIntro(f, dt, t);
         if (f.rush.poll && !f.solo) this.drawPoll(f.rush.poll, t, true); // (en solo : cartes cliquables sous l'arène)
@@ -2852,6 +2869,164 @@
       const m = this.queue && this.queue.event === 'double' ? 2 : 1;
       const W = Rules.REWARDS.win;
       return `+${W.xp * m} XP · +${W.gold * m} golds · ${W.chests * m} coffres`;
+    }
+
+    myKey() {
+      return this.opts.me ? this.opts.me() : this.meKey;
+    }
+
+    // Rectangle aux coins arrondis (chemin seul)
+    rr(x, y, w, h, r) {
+      const ctx = this.ctx;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    /*
+     * Encart personnel, en bas à droite : le portrait, la vie et la barre d'ultime de TON personnage (pour le retrouver
+     * dans la mêlée), sa potion, ses effets (gel, cocon, renfort) ; « K.O. » / retour au combat ; au Tournoi, l'attente
+     * de son match ou l'élimination.
+     */
+    drawMyHud(t, dt) {
+      const key = this.myKey();
+      const f = this.frame;
+      const q = this.queue;
+      if (!key || !f || !q || q.phase !== 'battle') return;
+      const fi = f.fighters.find((x) => x.key === key);
+      const part = (q.participants || []).find((p) => p.key === key);
+      if (!fi && !part) return; // pas dans cette partie
+      const p = fi || part;
+      const ctx = this.ctx;
+      const ci = Rules.CLASS_INFO[p.cls];
+      const accent = (fi && fi.spec && fi.spec.color) || (ci ? ci.color : '#29e7ff');
+      const PW = 352;
+      const PH = 104;
+      const x0 = W - PW - 16;
+      const y0 = H - PH - 16;
+      // État affiché lissé : la vie descend en douceur, avec une traînée blanche des dégâts récents
+      const st = this.myHudState && this.myHudState.key === key ? this.myHudState : (this.myHudState = { key, hp: 1, trail: 1, st: 0 });
+      const ratio = fi ? Math.max(0, Math.min(1, fi.hp / fi.maxHp)) : 0;
+      st.hp += (ratio - st.hp) * Math.min(1, dt * 12);
+      st.trail = ratio > st.trail ? ratio : st.trail + (ratio - st.trail) * Math.min(1, dt * 2.2);
+      st.st += (((fi && fi.st) || 0) - st.st) * Math.min(1, dt * 10);
+      ctx.save();
+      // Cadre
+      ctx.shadowColor = accent; ctx.shadowBlur = 18;
+      this.rr(x0, y0, PW, PH, 14);
+      const bg = ctx.createLinearGradient(x0, y0, x0, y0 + PH);
+      bg.addColorStop(0, 'rgba(26,16,60,.92)'); bg.addColorStop(1, 'rgba(10,6,28,.92)');
+      ctx.fillStyle = bg; ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2; ctx.strokeStyle = accent; ctx.stroke();
+      // Liseré néon en haut
+      const sh = ctx.createLinearGradient(x0, 0, x0 + PW, 0);
+      sh.addColorStop(0, 'rgba(41,231,255,0)'); sh.addColorStop(0.5, 'rgba(41,231,255,.9)'); sh.addColorStop(1, 'rgba(255,63,216,0)');
+      ctx.fillStyle = sh; ctx.fillRect(x0 + 18, y0, PW - 36, 2);
+      // Portrait
+      const dead = fi ? !fi.alive : true;
+      this.drawMedal(x0 + 52, y0 + PH / 2, 36, p, { grey: dead ? 1 : 0, ring: dead ? undefined : accent });
+      // Nom, classe, niveau
+      const tx = x0 + 102;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#fff';
+      let name = p.name;
+      while (name.length > 4 && ctx.measureText(name).width > 150) name = name.slice(0, -2) + '…';
+      ctx.fillText(name, tx, y0 + 24);
+      ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = accent;
+      ctx.textAlign = 'right';
+      ctx.fillText(`${fi && fi.spec ? fi.spec.icon + ' ' + fi.spec.spec : ci ? ci.icon + ' ' + ci.label : ''} · Niv. ${p.level}`, x0 + PW - 14, y0 + 23);
+      ctx.textAlign = 'left';
+      const bw = PW - 102 - 16;
+      if (!fi) {
+        // Tournoi : pas dans l'arène en ce moment
+        const T = q.tourney;
+        const out = T && T.rounds.flat().some((m) => (m.out || []).includes(key));
+        ctx.font = '800 16px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = out ? '#ff8fa3' : '#ffd98a';
+        ctx.fillText(T ? (out ? '❌ Éliminé du tournoi' : '⏳ En attente de ton match') : '💀 K.O.', tx, y0 + 58);
+        ctx.font = '600 12px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#cfc6ff';
+        ctx.fillText(T ? (out ? 'Merci d\'avoir combattu !' : 'Regarde l\'arbre : ton tour arrive') : 'Tu es tombé dans une salle précédente', tx, y0 + 80);
+        ctx.restore();
+        return;
+      }
+      // Barre de vie
+      const hy = y0 + 34;
+      const hh = 20;
+      this.rr(tx, hy, bw, hh, 6); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill();
+      ctx.save();
+      this.rr(tx, hy, bw, hh, 6); ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fillRect(tx, hy, bw * st.trail, hh); // traînée des dégâts
+      const hpCol = st.hp > 0.5 ? ['#3ddc5a', '#1f9e3a'] : st.hp > 0.25 ? ['#ffc21a', '#d48a00'] : ['#ff4d6d', '#b81c3c'];
+      const hg = ctx.createLinearGradient(0, hy, 0, hy + hh);
+      hg.addColorStop(0, hpCol[0]); hg.addColorStop(1, hpCol[1]);
+      ctx.fillStyle = hg; ctx.fillRect(tx, hy, bw * st.hp, hh);
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(tx, hy, bw * st.hp, hh / 2.4);
+      if (st.hp <= 0.25 && fi.alive) { ctx.fillStyle = `rgba(255,0,40,${0.15 + Math.sin(t / 120) * 0.12})`; ctx.fillRect(tx, hy, bw, hh); }
+      ctx.restore();
+      this.rr(tx, hy, bw, hh, 6); ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = '800 12px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+      const hpText = `❤️ ${Math.max(0, Math.round(fi.hp))} / ${fi.maxHp}`;
+      ctx.strokeText(hpText, tx + bw / 2, hy + hh / 2 + 1); ctx.fillStyle = '#fff'; ctx.fillText(hpText, tx + bw / 2, hy + hh / 2 + 1);
+      // Barre d'ultime
+      const uy = hy + hh + 8;
+      const uh = 12;
+      const U = fi.ult && Rules.ULTS[fi.ult];
+      this.rr(tx, uy, bw, uh, 5); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill();
+      if (U) {
+        const ready = st.st >= 0.99;
+        ctx.save();
+        this.rr(tx, uy, bw, uh, 5); ctx.clip();
+        const ug = ctx.createLinearGradient(tx, 0, tx + bw, 0);
+        ug.addColorStop(0, '#2a7bff'); ug.addColorStop(1, ready ? '#9ff6ff' : '#29e7ff');
+        ctx.fillStyle = ug; ctx.fillRect(tx, uy, bw * st.st, uh);
+        if (ready) { ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.sin(t / 90) * 0.15})`; ctx.fillRect(tx, uy, bw, uh); }
+        ctx.restore();
+        if (ready) { ctx.save(); ctx.shadowColor = '#29e7ff'; ctx.shadowBlur = 12 + Math.sin(t / 80) * 6; this.rr(tx, uy, bw, uh, 5); ctx.strokeStyle = '#9ff6ff'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore(); }
+        ctx.font = '800 10px "Segoe UI", system-ui, sans-serif';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+        const ut = `${U.icon} ${U.label}${ready ? ' · PRÊT !' : ` · ${Math.floor(st.st * 100)} %`}`;
+        ctx.strokeText(ut, tx + bw / 2, uy + uh / 2 + 1); ctx.fillStyle = ready ? '#ffffff' : '#d6f7ff'; ctx.fillText(ut, tx + bw / 2, uy + uh / 2 + 1);
+      } else {
+        ctx.font = '700 10px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(207,198,255,.55)';
+        ctx.fillText('Pas encore d\'ultime (arbre de compétences)', tx + bw / 2, uy + uh / 2 + 1);
+      }
+      // Petites étiquettes : potion, kills, effets
+      const tags = [];
+      if (fi.potion && Rules.CONSUMABLES[fi.potion]) tags.push(Rules.CONSUMABLES[fi.potion].icon + ' prête');
+      if (fi.kills) tags.push(`⚔️ ${fi.kills}`);
+      if (fi.score !== undefined) tags.push(`👑 ${fi.score} pts`);
+      if (fi.gold !== undefined) tags.push(`🪙 ${fi.gold}`);
+      if (fi.ice !== undefined) tags.push(`🧊 ${Math.ceil(fi.ice)} s`);
+      if (fi.cocooned) tags.push('🕸️ cocon');
+      if (fi.boost) tags.push(`⬆️ ×${String(fi.boost).replace('.', ',')}`);
+      ctx.textAlign = 'left';
+      ctx.font = '700 11px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#cfc6ff';
+      ctx.fillText(tags.join('   '), tx, y0 + PH - 12);
+      // K.O.
+      if (!fi.alive) {
+        this.rr(x0, y0, PW, PH, 14); ctx.fillStyle = 'rgba(20,0,8,.55)'; ctx.fill();
+        ctx.textAlign = 'center';
+        ctx.font = '900 30px Orbitron, "Segoe UI", system-ui, sans-serif';
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+        ctx.strokeText('K.O.', x0 + PW / 2 + 30, y0 + PH / 2 - 6); ctx.fillStyle = '#ff4d6d'; ctx.fillText('K.O.', x0 + PW / 2 + 30, y0 + PH / 2 - 6);
+        if (fi.respawn !== undefined) {
+          ctx.font = '800 14px "Segoe UI", system-ui, sans-serif';
+          ctx.fillStyle = '#9ff6ff';
+          ctx.fillText(`↻ retour dans ${Math.ceil(fi.respawn)} s`, x0 + PW / 2 + 30, y0 + PH / 2 + 22);
+        }
+      }
+      ctx.restore();
     }
 
     // ---------- Tournoi ----------

@@ -49,3 +49,26 @@ test('[PWR-1, PWR-2] puissance et bonus du plus faible (vie et dégâts), plafon
   assert.strictEqual(Rules.powerUnderdog(10, 0), 1);
   assert.strictEqual(Rules.rewardMultiplier, undefined, 'les récompenses ne dépendent plus de la puissance');
 });
+
+test('[PRG-9] niveau maximum 100 : plus de niveau ni de point, l\'XP reste à 0', () => {
+  assert.strictEqual(Rules.MAX_LEVEL, 100);
+  const c = game.newCharacter();
+  c.level = 99;
+  c.xp = 0;
+  const sp = c.skillPoints;
+  const levels = game.grant(c, { xp: Rules.xpToNext(99) * 5, gold: 10, chests: 1 });
+  assert.strictEqual(levels, 1, 'un seul niveau gagné');
+  assert.strictEqual(c.level, 100);
+  assert.strictEqual(c.skillPoints, sp + 1);
+  assert.strictEqual(c.xp, 0, 'le surplus d\'XP est perdu');
+  assert.strictEqual(c.gold >= 10, true, 'les golds et coffres restent crédités');
+  assert.strictEqual(game.grant(c, { xp: 1e6, gold: 0, chests: 0 }), 0);
+  assert.strictEqual(c.level, 100);
+  assert.strictEqual(c.xp, 0);
+  // Un personnage déjà au-delà (ancienne sauvegarde) garde son niveau
+  const old = game.newCharacter();
+  old.level = 104;
+  game.grant(old, { xp: 5000, gold: 0, chests: 0 });
+  assert.strictEqual(old.level, 104);
+  assert.strictEqual(old.xp, 0);
+});

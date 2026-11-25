@@ -45,10 +45,12 @@ function render() {
     : ci ? `<span style="color:${ci.color}">${ci.icon} ${ci.label}</span>` : '<span class="muted">Sans classe</span>';
   $('change-class').textContent = c.cls ? `🔄 Changer de classe (${Rules.CLASS_CHANGE_PRICE} 🪙)` : '🎭 Choisir ma classe';
   if (!c.cls && !classModalShown) { classModalShown = true; openClassModal(); }
-  $('level').textContent = 'Niveau ' + c.level;
-  $('xp-fill').style.width = (c.xp / c.xpToNext) * 100 + '%';
-  $('xp-text').textContent = `${c.xp} / ${c.xpToNext} XP`;
-  $('xp-text').parentElement.title = `Niveau ${c.level + 1} à ${c.xpToNext} XP. Chaque niveau demande ${Rules.XP_STEP} XP de plus que le précédent.`;
+  $('level').textContent = 'Niveau ' + c.level + (c.level >= Rules.MAX_LEVEL ? ' (max)' : '');
+  const maxed = c.level >= Rules.MAX_LEVEL;
+  $('xp-fill').style.width = (maxed ? 100 : (c.xp / c.xpToNext) * 100) + '%';
+  $('xp-text').textContent = maxed ? `⭐ Niveau maximum (${Rules.MAX_LEVEL})` : `${c.xp} / ${c.xpToNext} XP`;
+  $('xp-text').parentElement.title = maxed ? `Tu as atteint le niveau maximum (${Rules.MAX_LEVEL}) : l'XP n'est plus comptée.`
+    : `Niveau ${c.level + 1} à ${c.xpToNext} XP. Chaque niveau demande ${Rules.XP_STEP} XP de plus que le précédent (niveau maximum : ${Rules.MAX_LEVEL}).`;
   $('gold').textContent = c.gold;
   $('chests-small').textContent = c.chests;
   $('chests').textContent = c.chests;
@@ -931,7 +933,7 @@ let soloSpeed = (() => { try { return Number(localStorage.getItem('zl_solo_speed
 
 function ensureSoloView() {
   if (soloView) return;
-  soloView = new ArenaView($('solo-arena'), soloBus);
+  soloView = new ArenaView($('solo-arena'), soloBus, { me: () => (me ? 'u' + me.id : null) });
   soloBus.emit('queue', { phase: 'idle', mode: 'dungeon', soloView: true, participants: [], result: null });
 }
 
@@ -1295,7 +1297,7 @@ let trainingOpponents = null;
 
 function ensureTrainingView() {
   if (trainingView) return;
-  trainingView = new ArenaView($('training-arena'), trainingBus);
+  trainingView = new ArenaView($('training-arena'), trainingBus, { me: () => (me ? 'u' + me.id : null) });
   trainingBus.emit('queue', { phase: 'idle', mode: 'br', training: true, participants: [], result: null });
 }
 
