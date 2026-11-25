@@ -35,7 +35,7 @@ test('[AI-2] recul : un Archer acculé dans un coin longe le mur au lieu de rest
   archer.recovery = 0;
   Object.assign(archer, { x: 30, y: 30 });
   Object.assign(melee, { x: 80, y: 80, speed: 0, cd: 99 });
-  tickFor(b, 2);
+  tickFor(b, 3); // (il recule à 60 % de sa vitesse)
   const moved = Math.hypot(archer.x - 30, archer.y - 30);
   assert.ok(moved > 40, `il s'est dégagé (${moved.toFixed(0)} px)`);
   assert.ok(Math.hypot(archer.x - melee.x, archer.y - melee.y) > Math.hypot(30 - 80, 30 - 80), 'et s\'est éloigné de l\'ennemi');
@@ -81,7 +81,7 @@ test('[TAC-1] tactique : posture, cible, distance de recul (classes à distance 
   c.gold = 1e6;
   game.chooseClass(c, 'archer');
   game.setTactics(c, { kite: 9999 });
-  assert.strictEqual(c.tactics.kite, 200, 'portée 230 − 30');
+  assert.strictEqual(c.tactics.kite, 110, 'au plus 110 px (COMBAT_AI.kiteMax)');
   game.setTactics(c, { kite: -5 });
   assert.strictEqual(c.tactics.kite, 0);
   game.setTactics(c, { kite: null });
@@ -92,7 +92,7 @@ test('[TAC-2] tactique en combat : recul selon la posture, fuite prudente, cible
   const kite = (cls, tactics) => testBattle([player('a', { cls, tactics }), player('b')]).fighters[0].kite;
   assert.strictEqual(kite('archer', null), 80);
   assert.strictEqual(kite('archer', { stance: 'agressif', kite: 150 }), 0);
-  assert.strictEqual(kite('archer', { stance: 'prudent' }), 112);
+  assert.strictEqual(kite('archer', { stance: 'prudent' }), 110, '80 × 1,4 = 112, plafonné à 110');
   assert.strictEqual(kite('archer', { stance: 'equilibre', kite: 40 }), 40);
   assert.strictEqual(kite('mage', { stance: 'prudent' }), 84);
   assert.strictEqual(kite('guerrier', { stance: 'prudent', kite: 80 }), 0, 'pas de recul au corps à corps');

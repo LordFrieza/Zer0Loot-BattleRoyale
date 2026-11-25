@@ -80,8 +80,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   | Classe | Combat | Bonus / malus | Arme · secondaire |
   |---|---|---|---|
   | ⚔️ Guerriloot (guerrier) | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
-  | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche à moins de 80 px | +15 pts Précision, −10 % Vie, −25 % Dégâts, −20 % Vitesse | Arc · Carquois |
-  | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +20 % Dégâts, −15 % Vie, −10 % Vitesse, attaque 35 % plus lente | Bâton · Grimoire |
+  | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche à moins de 80 px | +15 pts Précision, −10 % Vie, −25 % Dégâts, **vitesse finale ×0,65** | Arc · Carquois |
+  | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +20 % Dégâts, −15 % Vie, **vitesse finale ×0,65**, attaque 35 % plus lente | Bâton · Grimoire |
   | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, +15 pts Précision, +1 pt Vol de vie, −10 % Vie | Dagues · Dague de parade |
   | ✨ Saint-Loot (prêtre) | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
 
@@ -90,6 +90,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Précision, Magiloot : Force, Lootassin : Critique, Saint-Loot : Vie) de +2 / +3 / +4 / +5 / +7 % selon la rareté.
   Dans les coffres, ils sont pour ta classe 1 fois sur 2 (sinon une classe au hasard), et toujours à la forge. En changeant
   de classe, l'équipement reste en place et le bonus suit la nouvelle classe.
+- **Classes à distance plus lentes** : la vitesse de l'Archiloot et du Magiloot est multipliée par 0,65 **après**
+  l'équipement et le plafond de 220 px/s (l'équipement de vitesse ne peut plus l'effacer : au plafond, 143 px/s). En
+  reculant, un tireur ne va qu'à 60 % de sa vitesse, et la distance de recul réglable dans la tactique est limitée à
+  110 px (200 avant) : le corps à corps finit par les rattraper.
 - **Riposte** (entre joueurs) : un combattant au corps à corps touché par le tir d'un Archiloot ou d'un Magiloot fonce
   sur le tireur pendant 3 s au lieu de rester sur l'ennemi le plus proche. Les classes à distance ne peuvent plus
   arroser tranquillement une mêlée sans être inquiétées.
@@ -135,7 +139,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Vie : 100 PV + 10 par point
   - Force : 10 dégâts + 2 par point
   - Défense : armure 5 + 3 par point → réduction des dégâts `armure / (armure + 100)`
-  - Vitesse : 60 px/s + 5 par point (plafond 220)
+  - Vitesse : 60 px/s + 5 par point (plafond 220), puis ×0,65 pour l'Archiloot et le Magiloot
   - Esquive : 5 + 3 par point → chance d'esquive `valeur / (valeur + 100)`, plafond 60 %
   - Critique : 1 % + 2 % par point, plafond 60 % ; un coup critique inflige le double de dégâts
   - Vitesse d'attaque : 1 attaque / s, +5 % par point, plafond ×2,5

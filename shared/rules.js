@@ -46,19 +46,20 @@
     archer: {
       label: 'Archiloot', role: 'Archer', icon: '🏹', color: '#3ddc5a',
       desc: 'Tire de loin et recule quand un ennemi s\'approche trop près.',
-      perks: ['Attaque à distance', 'Recule face aux ennemis proches (sans se coincer contre les bords)', '+15 % Précision', 'S\'immobilise un instant après chaque tir', '−10 % Vie', '−25 % Dégâts', '−20 % Vitesse'],
+      perks: ['Attaque à distance', 'Recule face aux ennemis proches (sans se coincer contre les bords)', '+15 % Précision', 'S\'immobilise un instant après chaque tir', '−10 % Vie', '−25 % Dégâts', 'Vitesse finale ×0,65 (après l\'équipement)'],
       weapon: 'arc', offhand: 'carquois',
-      // Nerf des classes à distance : −10 points de Force, −20 % de Vitesse, recul ramené de 110 à 80 px
-      bonus: { vie: -10, force: -25, vitesse: -20 }, flat: { precision: 0.15 },
+      // Nerf des classes à distance : −10 points de Force, vitesse finale ×0,65 (speedMult, que l'équipement ne
+      // compense pas), recul ramené de 110 à 80 px
+      bonus: { vie: -10, force: -25 }, flat: { precision: 0.15 }, speedMult: 0.65,
       combat: { range: 230, kite: 80, projectile: 'arrow', recovery: 0.6 },
     },
     mage: {
       label: 'Magiloot', role: 'Mage', icon: '🔮', color: '#b14dff',
       desc: 'Lance des boules de feu qui explosent et touchent aussi les ennemis autour de la cible.',
-      perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+20 % Dégâts', '−15 % Vie', '−10 % Vitesse', 'Attaque 35 % plus lente'],
+      perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+20 % Dégâts', '−15 % Vie', 'Vitesse finale ×0,65 (après l\'équipement)', 'Attaque 35 % plus lente'],
       weapon: 'baton', offhand: 'grimoire',
-      // Nerf des classes à distance : −5 points de Force et −10 % de Vitesse (déjà faible en duel, l'explosion fait sa force)
-      bonus: { vie: -15, force: 20, vitesse: -10 }, flat: {},
+      // Nerf des classes à distance : −5 points de Force et vitesse finale ×0,65 (speedMult, que l'équipement ne compense pas)
+      bonus: { vie: -15, force: 20 }, flat: {}, speedMult: 0.65,
       combat: { range: 170, projectile: 'fire', aoeRadius: 75, aoeRatio: 0.6, cooldownMult: 1.35, recovery: 0.5 },
     },
     assassin: {
@@ -1596,7 +1597,7 @@
    * le prend pour cible de préférence pendant `time` s (sa « distance » compte × mult) : il fonce sur le tireur au lieu
    * de rester sur le plus proche. Seulement entre joueurs (les monstres et les boss gardent leur ciblage).
    */
-  const COMBAT_AI = { wallMargin: 110, fleeHp: 0.3, fleeRange: 130, prudentKite: 1.4, retaliate: { minRange: 100, time: 3, mult: 0.35 } };
+  const COMBAT_AI = { wallMargin: 110, fleeHp: 0.3, fleeRange: 130, prudentKite: 1.4, kiteSpeed: 0.6, kiteMax: 110, retaliate: { minRange: 100, time: 3, mult: 0.35 } };
 
   // Tactique réglable sur la fiche : posture, cible préférée et distance de recul (classes à distance).
   const TACTICS = {
@@ -1616,7 +1617,8 @@
   const DEFAULT_TACTICS = { stance: 'equilibre', target: 'auto', kite: null };
   function tacticsKiteMax(cls) {
     const c = classInfo(cls).combat;
-    return c.projectile ? Math.max(0, c.range - 30) : 0;
+    // Distance de recul réglable : au plus 110 px (avant : la portée − 30, soit 200 px pour l'Archer)
+    return c.projectile ? Math.max(0, Math.min(COMBAT_AI.kiteMax, c.range - 30)) : 0;
   }
 
   /*
@@ -3547,7 +3549,8 @@
     const damage = Math.round((10 + 2 * p.force) * mult('force') * 10) / 10;
     const armor = (5 + 3 * p.defense) * mult('defense');
     const reduction = armor / (armor + 100);
-    const speed = Math.min(220, (60 + 5 * p.vitesse) * mult('vitesse'));
+    // Classes à distance : multiplicateur de vitesse appliqué en dernier (l'équipement ne peut pas le compenser)
+    const speed = Math.min(220, (60 + 5 * p.vitesse) * mult('vitesse')) * (ci.speedMult || 1);
     const dodgeRating = (5 + 3 * p.esquive) * mult('esquive');
     const dodge = Math.min(0.6, dodgeRating / (dodgeRating + 100));
     const crit = Math.min(CRIT_CAP / 100, ((CRIT_BASE + CRIT_PER_POINT * p.critique) * mult('critique')) / 100 + (flat.crit || 0));

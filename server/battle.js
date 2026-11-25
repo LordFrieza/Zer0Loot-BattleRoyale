@@ -2014,7 +2014,7 @@ class Battle extends EventEmitter {
         f.y += (dy / dist) * step;
       } else if (f.kite && reach < f.kite) {
         // Archer (ou tactique de recul) : recule quand l'ennemi est trop près, en évitant les bords.
-        this.retreat(f, best, speed * 0.8 * dt);
+        this.retreat(f, best, speed * Rules.COMBAT_AI.kiteSpeed * dt);
       }
       if (inRange && f.cd <= 0) {
         f.cd = f.cooldown / this.buffMult(f, 'attackSpeed');

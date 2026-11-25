@@ -65,12 +65,13 @@ test('[CLS-2, STAT-2] classes : bonus de stats', () => {
   assert.strictEqual(Rules.derive({}, {}, 'guerrier').maxHp, 130);
   assert.strictEqual(Rules.derive({}, {}, 'mage').maxHp, 85);
   assert.strictEqual(Rules.derive({}, {}, 'mage').damage, 12);
-  // Nerf des classes à distance : Archer −25 % de Force et −20 % de Vitesse, Mage +20 % de Force et −10 % de Vitesse
+  // Nerf des classes à distance : Archer −25 % de Force, Mage +20 % ; vitesse finale ×0,65 pour les deux, après l'équipement
   assert.strictEqual(Rules.derive({}, {}, 'archer').damage, 7.5);
-  assert.strictEqual(Rules.derive({}, {}, 'archer').speed, 48);
-  assert.strictEqual(Rules.derive({}, {}, 'mage').speed, 54);
+  assert.ok(Math.abs(Rules.derive({}, {}, 'archer').speed - 39) < 1e-9);
+  assert.ok(Math.abs(Rules.derive({}, {}, 'mage').speed - 39) < 1e-9);
   assert.strictEqual(Rules.derive({}, {}, 'guerrier').speed, 60, 'les classes au corps à corps gardent leur vitesse');
-  assert.strictEqual(Rules.derive({}, { vitesse: 20 }, 'archer').speed, 60, 'le malus s\'ajoute aux % d\'équipement (+20 % compense −20 %)');
+  assert.ok(Math.abs(Rules.derive({}, { vitesse: 100 }, 'archer').speed - 78) < 1e-9, '+100 % d\'équipement : 120 × 0,65, l\'équipement ne compense pas le malus');
+  assert.ok(Math.abs(Rules.derive({ vitesse: 40 }, { vitesse: 100 }, 'mage').speed - 220 * 0.65) < 1e-9, 'le plafond de 220 s\'applique avant le malus');
   assert.ok(Math.abs(Rules.derive({}, {}, 'assassin').crit - 0.11) < 1e-9);
   // Lootassin : +15 pts de Précision et +1 pt de Vol de vie (bonus plats, comme la Précision de l'Archer)
   const as = Rules.derive({}, {}, 'assassin');
