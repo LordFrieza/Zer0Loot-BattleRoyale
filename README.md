@@ -615,6 +615,30 @@ jouées en boucle pendant le combat, une par mode :
 
 Le Roi de la Colline, la Guerre des clans et le Tournoi reprennent la musique du Battle Royale.
 
+## Décors de l'arène
+
+Chaque boss a son arène (aussi en Boss Rush, où le décor suit le boss en cours, et au Défi des boss), comme certains
+modes (`public/js/arena-themes.js`) :
+
+| Partie | Décor |
+|---|---|
+| Grokk le Troll | Forêt : frondaisons, racines, champignons, feuilles mortes qui tombent, lucioles |
+| Pyrax le Dragon | Zone volcanique : basalte fendu, rivières de lave, braises qui montent |
+| Malvorath | Sanctuaire : dallage violet, grand cercle de runes qui s'illumine, chandelles |
+| Grignotor le Mimic | Salle au trésor : tapis rouge, montagnes d'or qui scintillent, coffres |
+| Givrenoire la Liche | Champ de neige, mares gelées, sapins enneigés, blizzard |
+| Maexxna | Grotte couverte de toiles, cocons, champignons luminescents, araignées au bout de leur fil |
+| Ether le Fantôme | Cimetière dans la brume, tombes, arbres morts, feux follets |
+| Lilith le Chat | Scène de théâtre de magie : rideaux rouges, cartes à jouer, poursuites |
+| Daedra la Succube | Enfer d'obsidienne : pentacle rougeoyant, chaînes, braseros |
+| Tournoi | Colisée : piste de sable, gradins, foule qui s'agite, étendards |
+| Guerre des clans | Cour du château : pavés, remparts, herse, bannières rouges et bleues |
+| Golden Shower | Nuage dans le ciel : arc-en-ciel, soleil, blocs dorés |
+| Roi de la Colline | Sommet au-dessus d'une mer de nuages |
+
+Le Battle Royale garde son pré et le Raid de Donjon ses salles. Les décors restent sombres ou doux au centre pour que
+les combats restent lisibles.
+
 Pour changer une musique, il suffit de remplacer le fichier (même nom) ; la liste est dans `TRACKS` (`sound.js`).
 
 **Volume** : en haut des pages perso et admin, deux curseurs, **🔊 Sons** (combats, début et fin de partie, coffres…)

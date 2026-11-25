@@ -301,6 +301,27 @@
       return c;
     }
 
+    // Décor de la partie en cours : celui du boss (le boss affiché pendant le combat, celui de la file avant) ou du mode.
+    arenaThemeKey(phase) {
+      if (!window.ArenaThemes || !this.queue) return null;
+      const q = this.queue;
+      const live = (phase === 'battle' || phase === 'ended') && this.frame && this.frame.boss ? this.frame.boss.id : null;
+      const key = ArenaThemes.of(q.mode, live || q.boss);
+      return key && ArenaThemes.has(key) ? key : null;
+    }
+
+    // Un seul décor gardé en cache (refait si le décor ou la définition change)
+    themeBackground(key) {
+      if (this.themeBg && this.themeBg.key === key) return this.themeBg.canvas;
+      const c = document.createElement('canvas');
+      c.width = Math.round(W * this.bgScale); c.height = Math.round(H * this.bgScale);
+      const g = c.getContext('2d');
+      g.scale(this.bgScale, this.bgScale);
+      ArenaThemes.paint(key, g);
+      this.themeBg = { key, canvas: c };
+      return c;
+    }
+
     dungeonBackground(theme) {
       if (!this.dungeonBgs[theme]) this.dungeonBgs[theme] = this.makeDungeonBackground(theme);
       return this.dungeonBgs[theme];
@@ -852,7 +873,7 @@
       const ctx = this.ctx;
       // Image nette à toute taille (OBS en 1080p, plein écran, écran haute densité) : même repère W × H, plus de pixels
       const k = canvasScale(this.canvas, W, H, 2);
-      if (k !== this.bgScale) { this.bgScale = k; this.bg = this.makeBackground(); this.dungeonBgs = []; }
+      if (k !== this.bgScale) { this.bgScale = k; this.bg = this.makeBackground(); this.dungeonBgs = []; this.themeBg = null; }
       ctx.setTransform(k, 0, 0, k, 0, 0);
       // Tremblement de l'écran (impact de météore)
       this.shake = Math.max(0, (this.shake || 0) - dt);
@@ -861,8 +882,11 @@
       const phase = (this.queue && this.queue.phase) || 'idle';
       const dungeon = phase !== 'idle' && this.queue && this.queue.mode === 'dungeon';
       const theme = dungeon && this.frame && this.frame.dungeon ? Rules.dungeonTheme(this.frame.dungeon.room) : 0;
-      ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.bg, 0, 0, W, H);
+      // Décor du boss ou du mode (forêt de Grokk, colisée du Tournoi…), sinon le pré
+      this.themeKey = phase === 'idle' || dungeon ? null : this.arenaThemeKey(phase);
+      ctx.drawImage(dungeon ? this.dungeonBackground(theme) : this.themeKey ? this.themeBackground(this.themeKey) : this.bg, 0, 0, W, H);
       if (dungeon) this.drawTorches(t, theme);
+      if (this.themeKey) ArenaThemes.under(this.themeKey, ctx, t);
       if (phase !== 'idle' && this.queue && this.queue.mode === 'gold') this.drawGoldSky(t);
 
       if (phase === 'ended' && this.queue.result && this.queue.result.mode === 'tourney') {
@@ -1452,6 +1476,9 @@
       }
       ctx.globalAlpha = 1;
       this.floaters = this.floaters.filter((fl) => fl.life > 0);
+
+      // Décor : ce qui passe devant les combattants (neige, braises, feuilles…), sous le HUD
+      if (this.themeKey) ArenaThemes.over(this.themeKey, ctx, t);
 
       // HUD
       const heroes = f.fighters.filter((x) => !isMonster(x) && !isBossKind(x) && !TINTS[x.kind]); // ni copies, ni serviteurs
