@@ -431,6 +431,21 @@
         this.projectiles = []; this.blasts = []; this.floaters = [];
         if (window.Sound) Sound.play('roomEnter');
       }
+      // Tournoi : nouveau match (positions repartent de zéro), match gagné (annonce, montée dans l'arbre)
+      for (const e of f.events || []) {
+        if (e.t === 'tourneyMatch') {
+          for (const k of e.slots) this.disp.delete(k);
+          this.feed = []; this.projectiles = []; this.blasts = []; this.floaters = [];
+          const T = this.queue && this.queue.tourney;
+          const names = e.slots.map((k) => this.tourneyName(k)).join('  ⚔  ');
+          this.announces.push({ text: Rules.tourneyRoundName(T && T.rounds[e.round] ? T.rounds[e.round].length : 1).toUpperCase(), sub: names, subSize: 26, color: '#ffb84d', life: 2.6, age: 0 });
+          if (window.Sound) Sound.play('battleStart');
+        } else if (e.t === 'tourneyWin') {
+          const name = this.tourneyName(e.to);
+          this.announces.push({ text: e.final ? `🏆 ${name.toUpperCase()} !` : `${name.toUpperCase()} GAGNE !`, sub: e.final ? 'Champion du tournoi !' : 'Il monte dans l\'arbre…', subSize: 24, color: '#ffc21a', life: 2.4, age: 0 });
+          if (window.Sound && !e.final) Sound.play('reward');
+        }
+      }
       this.frame = f;
       this.frameAt = performance.now();
       const byKey = new Map(f.fighters.map((x) => [x.key, x]));
@@ -850,7 +865,9 @@
       if (dungeon) this.drawTorches(t, theme);
       if (phase !== 'idle' && this.queue && this.queue.mode === 'gold') this.drawGoldSky(t);
 
-      if (phase === 'battle' || (phase === 'ended' && this.frame && this.frame.fighters.length)) {
+      if (phase === 'ended' && this.queue.result && this.queue.result.mode === 'tourney') {
+        this.drawResult(t); // (l'arbre occupe tout l'écran)
+      } else if (phase === 'battle' || (phase === 'ended' && this.frame && this.frame.fighters.length)) {
         this.drawBattle(dt, t);
         if (phase === 'ended') this.drawResult(t);
       } else if (phase === 'queue' || phase === 'ready') {
@@ -911,7 +928,7 @@
         this.title(formatCountdown(left), 188, 50, left < 10000 ? '#ff4d6d' : '#ffc21a', left < 10000 ? '#ff4d6d' : '#ff9a00');
       } else {
         this.title('FILE FERMÉE', 70, 56, '#fff', '#b83cff', W - 360);
-        this.title(q.mode === 'br' || q.mode === 'koth' ? 'La bataille va commencer !' : 'L\'aventure va commencer !', 188, 30, '#ffc21a', '#ff9a00');
+        this.title(q.mode === 'tourney' ? 'Le tournoi va commencer !' : q.mode === 'br' || q.mode === 'koth' ? 'La bataille va commencer !' : 'L\'aventure va commencer !', 188, 30, '#ffc21a', '#ff9a00');
       }
       // Mode de jeu choisi par le streamer
       const QB = q.mode === 'boss' && Rules.BOSSES[q.boss];
@@ -923,6 +940,8 @@
       if (q.mode === 'clans') {
         const cnt = (c) => q.participants.filter((p) => p.clan === c).length;
         this.title(`🔴 ${cnt('rouge')} Rouges   ⚔   ${cnt('bleu')} Bleus 🔵${pot}`, 240, 24, '#cfc6ff');
+      } else if (q.mode === 'tourney') {
+        this.title(`${n} / ${Rules.TOURNEY.maxPlayers} combattants${n >= Rules.TOURNEY.maxPlayers ? ' (complet)' : ''}${pot}`, 240, 24, '#cfc6ff');
       } else this.title(`${n} ${who}${n > 1 ? 's' : ''}${pot}`, 240, 24, '#cfc6ff');
 
       // Grille des inscrits
@@ -1473,6 +1492,8 @@
       } else if (f.mode === 'clans' && f.clans) {
         this.drawClansHud(f, t);
         hudY = 16;
+      } else if (f.mode === 'tourney' && f.tourney) {
+        hudY = this.drawTourneyHud(f, t);
       } else if (f.mode === 'koth' && f.koth) {
         this.hudBox(16, 16, 250, 64, '#ffd23f');
         ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
@@ -1553,6 +1574,7 @@
       else this.drawAnnounces(dt);
       if (f.mode === 'dungeon' && f.dungeon && f.phase === 'battle') this.drawRoomTransition(f.dungeon);
       if (f.mode === 'dungeon' && f.dungeon && f.dungeon.poll && f.phase === 'battle') this.drawPoll(f.dungeon.poll, t);
+      if (f.tourney && f.phase === 'battle' && f.tourney.stage === 'bracket') this.drawTourneyBracket(t, f.tourney);
       if (f.rush && f.phase === 'battle') {
         if (f.rush.stage === 'intro') this.drawRushIntro(f, dt, t);
         if (f.rush.poll && !f.solo) this.drawPoll(f.rush.poll, t, true); // (en solo : cartes cliquables sous l'arène)
@@ -2805,6 +2827,252 @@
       return `+${W.xp * m} XP · +${W.gold * m} golds · ${W.chests * m} coffres`;
     }
 
+    // ---------- Tournoi ----------
+
+    tourneyPlayer(key) {
+      return (this.queue && this.queue.participants || []).find((p) => p.key === key) || null;
+    }
+
+    tourneyName(key) {
+      const p = this.tourneyPlayer(key);
+      return p ? p.name : '?';
+    }
+
+    // Bandeau pendant un match : tour, adversaires, temps restant (la zone se referme à 30 s).
+    drawTourneyHud(f, t) {
+      const ctx = this.ctx;
+      const T = this.queue && this.queue.tourney;
+      const cur = T && T.rounds.flat().find((m) => m.id === (f.tourney.stage === 'fight' ? f.tourney.match : f.tourney.last && f.tourney.last.id));
+      const round = cur ? Number(cur.id.split('m')[0].slice(1)) : 0;
+      this.hudBox(16, 16, 270, 64, '#ffb84d');
+      ctx.font = '900 21px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#ffb84d';
+      ctx.fillText(`🏆 ${Rules.tourneyRoundName(T && T.rounds[round] ? T.rounds[round].length : 1)}`, 30, 40);
+      ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
+      if (f.tourney.stage === 'fight') {
+        const left = Math.ceil(f.tourney.left);
+        ctx.fillStyle = f.storm && f.storm.active ? '#d49bff' : '#cfc6ff';
+        ctx.fillText(`⏱ ${left} s${f.storm && f.storm.active ? '  ⚡ la zone se referme' : ''}`, 30, 66);
+      } else {
+        ctx.fillStyle = '#cfc6ff';
+        ctx.fillText(`${(T ? T.rounds.flat().filter((m) => m.winner).length : 0)} / ${T ? T.rounds.flat().length : 0} matchs joués`, 30, 66);
+      }
+      // Adversaires du match en cours, en haut au centre
+      if (cur && f.tourney.stage !== 'bracket') {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '900 24px Orbitron, "Segoe UI", system-ui, sans-serif';
+        const text = cur.slots.map((k) => this.tourneyName(k)).join('  ⚔  ');
+        const w = Math.min(W - 620, ctx.measureText(text).width + 40);
+        this.hudBox(W / 2 - w / 2, 14, w, 40, '#ffb84d');
+        ctx.fillStyle = '#fff';
+        ctx.fillText(text, W / 2, 42, w - 24);
+        ctx.restore();
+      }
+      return 88;
+    }
+
+    /*
+     * Disposition de l'arbre, de bas en haut : les joueurs du premier tour sur la ligne du bas, chaque match au-dessus
+     * de ses deux (ou trois) entrées, la finale tout en haut. Renvoie les positions des feuilles et des matchs.
+     */
+    tourneyLayout(T, top) {
+      const leaves = T.rounds[0].flatMap((m) => m.slots);
+      const n = Math.max(1, leaves.length);
+      const gap = Math.min(130, (W - 100) / n);
+      const yLeaf = H - 110;
+      const rowH = (yLeaf - top) / T.rounds.length;
+      const R = Math.max(13, Math.min(30, gap * 0.36));
+      const pos = { leaf: {}, node: {}, R, gap, yLeaf };
+      leaves.forEach((k, i) => { pos.leaf[k] = { x: W / 2 + (i - (n - 1) / 2) * gap, y: yLeaf }; });
+      T.rounds.forEach((r, ri) => r.forEach((m) => {
+        const kids = ri === 0 ? m.slots.map((k) => pos.leaf[k]) : m.from.map((id) => pos.node[id]);
+        pos.node[m.id] = { x: kids.reduce((a, c) => a + c.x, 0) / kids.length, y: yLeaf - (ri + 1) * rowH, kids };
+      }));
+      return pos;
+    }
+
+    // Médaillon : la tête du joueur dans un cercle (grisée s'il est éliminé).
+    drawMedal(x, y, R, p, o = {}) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
+      ctx.fillStyle = o.out ? '#2a2733' : '#1d1440';
+      ctx.fill();
+      if (p) {
+        ctx.save();
+        ctx.clip();
+        if (o.grey) ctx.filter = `grayscale(${o.grey}) brightness(${1 - 0.35 * o.grey})`;
+        const s = R / 13;
+        drawFighter(ctx, x, y + 16 * s + R * 0.22, p, { scale: s });
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(207,198,255,.45)';
+        ctx.font = `900 ${Math.round(R)}px "Segoe UI", system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', x, y + 1);
+      }
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2);
+      ctx.lineWidth = o.ring ? 4 : 3;
+      ctx.strokeStyle = o.ring || (o.grey ? `rgba(130,125,145,${0.5 + 0.5 * o.grey})` : '#ffc21a');
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /*
+     * Arbre du tournoi : chaque joueur est dessiné à l'endroit le plus haut qu'il a atteint ; le vainqueur du dernier
+     * match monte (animation) et le perdant reste sur place, grisé. Le prochain match clignote.
+     */
+    drawTourneyBracket(t, ft, o = {}) {
+      const T = this.queue && this.queue.tourney;
+      if (!T) return;
+      const ctx = this.ctx;
+      ctx.fillStyle = o.result ? 'rgba(8,4,20,.82)' : 'rgba(8,4,20,.78)';
+      ctx.fillRect(0, 0, W, H);
+      const top = o.result ? 205 : 235;
+      const L = this.tourneyLayout(T, top);
+      const now = performance.now();
+      const last = ft && ft.last;
+      if (last && this.tourneyAnimId !== last.id) { this.tourneyAnimId = last.id; this.tourneyAnimAt = now; }
+      const p = last ? Math.min(1, (now - (this.tourneyAnimAt || now)) / 1300) : 1;
+      const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const all = T.rounds.flat();
+      const byId = Object.fromEntries(all.map((m) => [m.id, m]));
+      const outKeys = new Set(all.flatMap((m) => m.out));
+      // Où se trouve chaque joueur (le plus haut atteint), et d'où il vient
+      const where = {};
+      const from = {};
+      for (const k of Object.keys(L.leaf)) where[k] = L.leaf[k];
+      for (const m of all) if (m.winner) { from[m.winner] = where[m.winner]; where[m.winner] = L.node[m.id]; }
+      // Noms des tours, à gauche
+      ctx.save();
+      ctx.font = '800 13px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      T.rounds.forEach((r, ri) => {
+        const y = L.node[r[0].id].y;
+        ctx.fillStyle = 'rgba(255,184,77,.75)';
+        ctx.fillText(Rules.tourneyRoundName(r.length).toUpperCase(), 14, y + 4);
+      });
+      ctx.restore();
+      // Traits : du joueur (ou du match précédent) jusqu'au match
+      const pending = ft && ft.stage === 'bracket' ? ft.match : null;
+      for (const m of all) {
+        const node = L.node[m.id];
+        const ri = Number(m.id.split('m')[0].slice(1));
+        const childKeys = ri === 0 ? m.slots : m.from.map((id) => byId[id].winner);
+        node.kids.forEach((c, i) => {
+          const k = childKeys[i];
+          const won = m.winner && k === m.winner;
+          const lost = m.winner && k !== m.winner;
+          const animating = last && last.id === m.id && p < 1;
+          ctx.save();
+          ctx.lineWidth = won ? 4 : 2.5;
+          ctx.strokeStyle = won ? (animating ? `rgba(255,194,26,${0.25 + 0.75 * ease})` : '#ffc21a') : lost ? 'rgba(120,115,135,.55)' : m.id === pending ? `rgba(255,184,77,${0.5 + Math.sin(t / 160) * 0.3})` : 'rgba(170,150,255,.35)';
+          const midY = (c.y + node.y) / 2;
+          ctx.beginPath();
+          ctx.moveTo(c.x, c.y - L.R);
+          ctx.lineTo(c.x, midY);
+          ctx.lineTo(node.x, midY);
+          ctx.lineTo(node.x, node.y + L.R);
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+      // Matchs pas encore joués : un « ? » (le prochain clignote)
+      for (const m of all) {
+        const node = L.node[m.id];
+        const isFinal = m === T.rounds[T.rounds.length - 1][0];
+        const R = isFinal ? L.R * 1.5 : L.R;
+        if (!m.winner || (last && last.id === m.id && p < 1)) {
+          const ring = m.id === pending ? `rgba(255,184,77,${0.6 + Math.sin(t / 140) * 0.4})` : 'rgba(170,150,255,.5)';
+          this.drawMedal(node.x, node.y, R, null, { ring });
+        }
+        if (isFinal) {
+          ctx.save();
+          ctx.font = `${Math.round(R * 1.1)}px "Segoe UI Emoji", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('👑', node.x, node.y - R - R * 0.35);
+          ctx.restore();
+        }
+      }
+      // Places laissées vides par ceux qui sont montés plus haut : un cercle en pointillés
+      const passed = Object.keys(L.leaf).filter((k) => where[k] !== L.leaf[k]).map((k) => L.leaf[k])
+        .concat(all.filter((m) => m.winner && where[m.winner] !== L.node[m.id]).map((m) => L.node[m.id]));
+      for (const pt of passed) {
+        ctx.save();
+        ctx.setLineDash([4, 5]);
+        ctx.strokeStyle = 'rgba(255,194,26,.45)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, L.R * 0.8, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      // Les joueurs, à leur place
+      const champion = T.rounds[T.rounds.length - 1][0].winner;
+      for (const k of Object.keys(L.leaf)) {
+        const pl = this.tourneyPlayer(k) || { name: '?', look: {} };
+        let pt = where[k];
+        let grey = outKeys.has(k) ? 1 : 0;
+        if (last && p < 1) {
+          if (k === last.winner && from[k]) pt = { x: from[k].x + (pt.x - from[k].x) * ease, y: from[k].y + (pt.y - from[k].y) * ease };
+          if (last.out.includes(k)) grey = ease;
+        }
+        const isTop = k === champion && (!last || last.winner !== k || p >= 1);
+        const R = isTop ? L.R * 1.5 : L.R;
+        const pulse = isTop ? 1 + Math.sin(t / 250) * 0.04 : 1;
+        this.drawMedal(pt.x, pt.y, R * pulse, pl, { grey, ring: isTop ? '#ffe27a' : undefined });
+      }
+      // Noms sous la ligne des joueurs (sur deux lignes en quinconce si l'arbre est serré)
+      const tight = L.gap < 74;
+      ctx.save();
+      ctx.font = `700 ${tight ? 11 : 13}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      Object.keys(L.leaf).forEach((k, i) => {
+        const pl = this.tourneyPlayer(k);
+        let name = pl ? pl.name : '?';
+        const maxW = tight ? L.gap * 1.9 : L.gap - 6;
+        while (name.length > 3 && ctx.measureText(name).width > maxW) name = name.slice(0, -2) + '…';
+        const y = L.yLeaf + L.R + 14 + (tight && i % 2 ? 16 : 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,.85)';
+        ctx.strokeText(name, L.leaf[k].x, y);
+        ctx.fillStyle = outKeys.has(k) ? '#8d88a0' : '#fff';
+        ctx.fillText(name, L.leaf[k].x, y);
+      });
+      ctx.restore();
+      if (o.result) return;
+      // Titre : prochain match
+      const next = pending && byId[pending];
+      this.title('🏆 TOURNOI', 46, 40, '#ffb84d', '#ff9a00');
+      if (next) {
+        const ri = Number(next.id.split('m')[0].slice(1));
+        const names = next.slots.map((k) => this.tourneyName(k)).join('  ⚔  ');
+        this.title(`${Rules.tourneyRoundName(T.rounds[ri].length)} · prochain match dans ${Math.ceil(ft.left)} s`, 92, 20, '#cfc6ff');
+        this.title(names, 128, 30, '#fff', '#ff3fd8');
+      }
+    }
+
+    // Fin du tournoi : l'arbre complet, le champion tout en haut, les gains et les paris.
+    drawTourneyResult(t, r) {
+      const f = this.frame;
+      this.drawTourneyBracket(t, { last: f && f.tourney ? f.tourney.last : null, stage: 'ended' }, { result: true });
+      const s = 1 + Math.sin(t / 300) * 0.03;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.translate(W / 2, 46); ctx.scale(s, s); ctx.translate(-W / 2, -46);
+      this.title(`🏆 ${r.winner.name.toUpperCase()} REMPORTE LE TOURNOI 🏆`, 46, 40, '#ffc21a', '#ff9a00');
+      ctx.restore();
+      const g = Rules.tourneyReward(r.winner.wins, true);
+      this.title(`${r.winner.wins} victoire${r.winner.wins > 1 ? 's' : ''} · +${g.xp} XP · +${g.gold} golds · +${g.chests} coffres`, 92, 22, '#cfc6ff');
+      const br = this.queue.bets && this.queue.bets.lastResult;
+      if (br) {
+        const text = br.refund
+          ? `💰 Personne n'avait parié sur le champion : ${br.pool} golds remboursés`
+          : `💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds !`;
+        this.label(text, W / 2, H - 16, 18, '#ffb000');
+      }
+    }
+
     drawResult(t) {
       const r = this.queue && this.queue.result;
       if (!r) return;
@@ -2812,6 +3080,7 @@
       if (r.mode === 'boss' || r.mode === 'dungeon' || r.mode === 'rush') { this.drawCoopResult(t, r); return; }
       if (r.mode === 'clans') { this.drawClansResult(t, r); return; }
       if (r.mode === 'gold') { this.drawGoldResult(t, r); return; }
+      if (r.mode === 'tourney') { this.drawTourneyResult(t, r); return; }
       const koth = r.mode === 'koth';
       const ctx = this.ctx;
       ctx.fillStyle = 'rgba(0,0,0,.55)';

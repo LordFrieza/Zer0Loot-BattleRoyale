@@ -31,6 +31,12 @@
     const boss = d.boss && Rules.BOSSES[d.boss];
     switch (e.mode) {
       case 'br': return e.rank ? `${e.rank === 1 ? '🏆 ' : ''}${e.rank}ᵉ sur ${e.total}` : '';
+      case 'tourney': {
+        const b = d.bracket;
+        if (e.outcome === 'win') return `🏆 Champion du tournoi · ${d.wins || 0} victoire${d.wins > 1 ? 's' : ''}`;
+        const r = b && b.rounds[d.wins || 0];
+        return `${d.wins || 0} victoire${d.wins > 1 ? 's' : ''}${r ? ` · éliminé en ${Rules.tourneyRoundName(r.length).toLowerCase()}` : ''}`;
+      }
       case 'koth': return `${e.rank ? `${e.rank}ᵉ sur ${e.total} · ` : ''}${d.score || 0} points · ${fmtDur(d.hillTime)} sur la colline`;
       case 'clans': return `${d.clan ? Rules.CLANS.teams[d.clan].icon + ' ' + Rules.CLANS.teams[d.clan].label : ''}${d.mvp ? ' · 🌟 MVP' : ''}`;
       case 'gold': return `🪙 ${d.gold || 0} golds ramassés · 🎁 ${d.chests || 0}${d.best ? ' · 👑 Roi du butin' : ''}`;
@@ -64,6 +70,85 @@
     ['thorns', '🌵 Épines', (v) => `${v} %`], ['luck', '🍀 Chance', (v) => `${v}`],
   ];
 
+  /*
+   * Image de l'arbre d'un tournoi (SVG) : chaque joueur à l'endroit le plus haut qu'il a atteint, les éliminés grisés,
+   * le chemin du joueur de la fiche surligné. b = { players: [{ n, c, k }], rounds: [[[indices], gagnant]], me }.
+   */
+  function bracketSvg(b) {
+    if (!b || !b.players || !b.rounds || !b.rounds.length) return '';
+    const leaves = b.rounds[0].flatMap((m) => m[0]);
+    const n = leaves.length;
+    const gap = 80;
+    const w = Math.max(320, n * gap + 30);
+    const rowH = 64;
+    const R = 15;
+    const yLeaf = 34 + b.rounds.length * rowH;
+    const h = yLeaf + 44;
+    const leafPos = {};
+    leaves.forEach((p, i) => { leafPos[p] = { x: w / 2 + (i - (n - 1) / 2) * gap, y: yLeaf }; });
+    const nodes = b.rounds.map((r, ri) => r.map(() => null));
+    b.rounds.forEach((r, ri) => r.forEach((m, mi) => {
+      // Entrées d'un match : les joueurs (1er tour) ou les matchs du tour précédent, dans l'ordre de l'arbre
+      let kids;
+      if (ri === 0) kids = m[0].map((p) => leafPos[p]);
+      else {
+        let start = 0;
+        for (let j = 0; j < mi; j++) start += b.rounds[ri][j][0].length; // (un match par joueur qualifié)
+        kids = [];
+        for (let j = 0; j < m[0].length; j++) kids.push(nodes[ri - 1][start + j]);
+      }
+      nodes[ri][mi] = { x: kids.reduce((a, c) => a + c.x, 0) / kids.length, y: yLeaf - (ri + 1) * rowH, kids, m };
+    }));
+    const where = {};
+    leaves.forEach((p) => { where[p] = leafPos[p]; });
+    const out = new Set();
+    nodes.flat().forEach((nd) => { if (nd.m[1] >= 0) where[nd.m[1]] = nd; nd.m[0].forEach((p) => { if (p !== nd.m[1]) out.add(p); }); });
+    const color = (p) => {
+      const P = b.players[p] || {};
+      const opt = P.k && Rules.APPEARANCE.color.options[P.k];
+      if (opt) return opt.hex;
+      let hue = 0;
+      for (const ch of String(P.n || '')) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+      return `hsl(${hue}, 55%, 62%)`;
+    };
+    // Traits : le chemin du gagnant en or, celui du joueur de la fiche en cyan
+    let lines = '';
+    nodes.forEach((r, ri) => r.forEach((nd) => nd.kids.forEach((c, i) => {
+      const k = nd.m[0][i]; // (au-delà du 1er tour, les places suivent l'ordre des matchs précédents)
+      const won = k === nd.m[1];
+      const stroke = won ? (k === b.me ? '#29e7ff' : '#ffc21a') : '#5d5873';
+      const mid = (c.y + nd.y) / 2;
+      lines += `<path d="M${c.x} ${c.y - R}V${mid}H${nd.x}V${nd.y + R}" fill="none" stroke="${stroke}" stroke-width="${won ? 3 : 2}"/>`;
+    })));
+    // Places quittées par ceux qui sont montés plus haut : cercles en pointillés
+    let heads = leaves.filter((p) => where[p] !== leafPos[p]).map((p) => leafPos[p])
+      .concat(nodes.flat().filter((nd) => nd.m[1] >= 0 && where[nd.m[1]] !== nd))
+      .map((pt) => `<circle cx="${pt.x}" cy="${pt.y}" r="${R * 0.75}" fill="none" stroke="#ffc21a" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="3 4"/>`).join('');
+    const champ = nodes[nodes.length - 1][0].m[1];
+    leaves.forEach((p) => {
+      const pt = where[p];
+      const isOut = out.has(p);
+      const big = p === champ ? 1.35 : 1;
+      const r = R * big;
+      const ring = p === b.me ? '#29e7ff' : isOut ? '#6f6a80' : '#ffc21a';
+      heads += `<g opacity="${isOut ? 0.55 : 1}" ${isOut ? 'filter="url(#hb-grey)"' : ''}>
+        <circle cx="${pt.x}" cy="${pt.y}" r="${r}" fill="${color(p)}" stroke="${ring}" stroke-width="${p === b.me ? 3.5 : 2.5}"/>
+        <circle cx="${pt.x - r * 0.33}" cy="${pt.y - r * 0.08}" r="${r * 0.12}" fill="#1b1030"/><circle cx="${pt.x + r * 0.33}" cy="${pt.y - r * 0.08}" r="${r * 0.12}" fill="#1b1030"/>
+        <path d="M${pt.x - r * 0.3} ${pt.y + r * 0.32}Q${pt.x} ${pt.y + r * (isOut ? 0.15 : 0.55)} ${pt.x + r * 0.3} ${pt.y + r * 0.32}" fill="none" stroke="#1b1030" stroke-width="1.6" stroke-linecap="round"/>
+      </g>`;
+      if (p === champ) heads += `<text x="${pt.x}" y="${pt.y - r - 4}" text-anchor="middle" font-size="${r}">👑</text>`;
+    });
+    const names = leaves.map((p, i) => {
+      const P = b.players[p] || {};
+      const ci = P.c && Rules.CLASS_INFO[P.c];
+      const name = String(P.n || '?');
+      const short = name.length > 11 ? name.slice(0, 10) + '…' : name;
+      return `<text x="${leafPos[p].x}" y="${yLeaf + R + 14 + (n > 10 && i % 2 ? 12 : 0)}" text-anchor="middle" font-size="11" font-weight="700" fill="${p === b.me ? '#29e7ff' : out.has(p) ? '#8d88a0' : '#fff'}">${esc((ci ? ci.icon : '') + short)}</text>`;
+    }).join('');
+    return `<svg class="hist-bracket" viewBox="0 0 ${w} ${h + (n > 10 ? 12 : 0)}" style="max-width:${w}px" role="img" aria-label="Arbre du tournoi">
+      <defs><filter id="hb-grey"><feColorMatrix type="saturate" values="0"/></filter></defs>${lines}${heads}${names}</svg>`;
+  }
+
   // Une ligne d'historique (dépliable : niveau, stats et équipement du moment). who : nom du joueur (vue admin).
   function historyRowHtml(e, who) {
     const K = kindOf(e.mode);
@@ -89,6 +174,7 @@
         <div class="hist-meta">Niveau <b>${e.level}</b> · ${ci ? `${ci.icon} ${ci.label}` : 'Sans classe'} · 💪 Puissance <b>${String(e.power || 0).replace('.', ',')}</b>
           · ⚔️ ${e.kills || 0} kill${e.kills > 1 ? 's' : ''} · ☠️ ${e.deaths || 0} mort${e.deaths > 1 ? 's' : ''}
           · 💥 ${fmt(e.dealt)} dégâts infligés · 🩸 ${fmt(e.taken)} dégâts subis${e.bossDealt ? ` · 👹 ${fmt(e.bossDealt)} sur les boss` : ''}</div>
+        ${e.mode === 'tourney' && e.details && e.details.bracket ? `<div class="hist-bracket-wrap"><h4>🏆 Arbre du tournoi</h4>${bracketSvg(e.details.bracket)}</div>` : ''}
         <div class="hist-cols">
           <div><h4>📊 Stats du moment</h4><div class="hist-stats">${stats}</div></div>
           <div><h4>🛡️ Équipement porté</h4><div class="hist-gear">${gear}</div></div>

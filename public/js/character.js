@@ -1860,6 +1860,26 @@ function pityToast(r) {
     `Au bout de ${Math.floor(K.duration / 60)} min ${K.duration % 60} s, le <b>meilleur score gagne</b> (égalité : le plus de kills). Le vainqueur reçoit la récompense de victoire du Battle Royale, et <b>les paris sont ouverts</b>.`,
     `Les Guerriers et les Prêtres, solides, tiennent bien la colline ; les Mages nettoient les groupes qui s'y entassent.`,
   ].map((x) => `<li>${x}</li>`).join('');
+  const TR = Rules.TOURNEY;
+  const TM = TR.matchWin;
+  const champ16 = Rules.tourneyReward(4, true);
+  $('tourney-rules').innerHTML = [
+    `Jusqu'à <b>${TR.maxPlayers} joueurs</b>. Au lancement, tout le monde est classé par <b>puissance</b> : les plus forts s'affrontent entre eux, les plus faibles entre eux. Avec un nombre impair, les trois plus faibles se départagent dans un <b>1v1v1</b>.`,
+    `Les matchs se jouent <b>un par un</b>. Entre deux matchs, l'arène montre l'<b>arbre</b> : le vainqueur monte d'un étage, le perdant reste sur place, grisé.`,
+    `Chaque match repart à <b>pleine vie</b> ; le plus faible du match est renforcé. Une zone se referme au bout de ${TR.zone.at} s et, à ${TR.maxDuration} s, le plus en forme l'emporte.`,
+    `Gains : +${Rules.REWARDS.participation.xp} XP de participation, puis pour chaque match gagné <b>${TM.xp} XP, ${TM.gold} golds et ${TM.chests} coffre</b>, <b>+${TM.xpPerRound} XP et +${TM.goldPerRound} golds de plus à chaque tour</b>. Le <b>champion</b> gagne en plus ${TR.champion.xp} XP, ${TR.champion.gold} golds et ${TR.champion.chests} coffres (sur 16 joueurs : ${champ16.xp + Rules.REWARDS.participation.xp} XP, ${champ16.gold} golds, ${champ16.chests} coffres).`,
+    `On <b>parie sur le champion</b>. L'arbre de chaque tournoi est gardé dans ton <b>historique</b>.`,
+  ].map((x) => `<li>${x}</li>`).join('');
+  const tc = $('tourney-portrait').getContext('2d');
+  tc.strokeStyle = '#ffc21a';
+  tc.lineWidth = 3;
+  tc.beginPath(); tc.moveTo(40, 96); tc.lineTo(40, 70); tc.lineTo(110, 70); tc.lineTo(110, 96); tc.moveTo(75, 70); tc.lineTo(75, 46); tc.stroke();
+  drawFighter(tc, 40, 92, { name: 'A', cls: 'assassin', look: {} }, { scale: 0.9 });
+  drawFighter(tc, 110, 92, { name: 'B', cls: 'archer', look: {} }, { scale: 0.9, facing: -1 });
+  drawFighter(tc, 75, 46, { name: 'Champion', cls: 'guerrier', look: {} }, { scale: 1.1 });
+  tc.font = '22px "Segoe UI Emoji", sans-serif';
+  tc.textAlign = 'center';
+  tc.fillText('👑', 75, 14);
   const CL = Rules.CLANS;
   $('clans-rules').innerHTML = [
     `Tape <b>!rouge</b> ou <b>!bleu</b> dans le chat (ou clique sur le bouton de l'équipe) pour choisir ton camp ; <b>!join</b> te place dans l'équipe la moins nombreuse. On peut changer d'avis tant que la bataille n'a pas commencé.`,
@@ -1967,7 +1987,58 @@ function renderPlaceBar() {
   if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest', inline: 'center' });
   if (window.WorldMap) WorldMap.setBadges(Object.fromEntries(PLACES.map((x) => [x.id, placeBadge(x)])));
   if ($('place-menu').classList.contains('open')) renderPlaceMenu();
+  renderSideNav();
 }
+
+/*
+ * Menu latéral (grand écran) : la carte, chaque lieu et tous ses onglets, en un clic. Replié, il ne garde qu'une
+ * colonne d'icônes (un clic ouvre le lieu). L'état (déplié / replié) est retenu ; par défaut, déplié s'il y a la place.
+ */
+let sideNavOpen = (() => {
+  try { const v = localStorage.getItem('zl_sidenav'); if (v) return v === 'open'; } catch (e) { /* ignore */ }
+  return window.innerWidth >= 1400;
+})();
+function renderSideNav() {
+  const nav = $('side-nav');
+  if (!nav) return;
+  document.body.classList.toggle('sidenav-open', sideNavOpen);
+  document.body.classList.toggle('sidenav-closed', !sideNavOpen);
+  const cur = placeOf(currentTab);
+  const badge = (n) => `<span class="tab-badge ${n ? 'on' : ''}">${n || ''}</span>`;
+  const toggle = `<button type="button" class="sn-toggle" id="sn-toggle" aria-expanded="${sideNavOpen}" title="${sideNavOpen ? 'Replier le menu' : 'Déplier le menu'}">
+    <span class="sn-ico">${sideNavOpen ? '«' : '☰'}</span><span class="sn-label">Replier le menu</span></button>`;
+  let html = toggle + `<button type="button" class="sn-item sn-place ${currentTab === 'carte' ? 'active' : ''}" data-sn-tab="carte" title="Carte du monde"><span class="sn-ico">🗺️</span><span class="sn-label">Carte du monde</span></button>`;
+  for (const p of PLACES) {
+    const n = placeBadge(p);
+    const many = p.tabs && p.tabs.length > 1;
+    if (!sideNavOpen || !many) {
+      // Un seul onglet (ou menu replié) : une ligne par lieu
+      const tab = p.tabs && !many ? p.tabs[0][0] : null;
+      html += `<button type="button" class="sn-item sn-place ${p === cur ? 'active' : ''}" ${tab ? `data-sn-tab="${tab}"` : `data-sn-place="${p.id}"`} title="${esc(p.label)}${p.href ? ' (nouvel onglet)' : ''}">
+        <span class="sn-ico">${p.icon}</span><span class="sn-label">${p.label}${p.href ? ' ↗' : ''}</span>${badge(n)}</button>`;
+    } else {
+      html += `<div class="sn-group ${p === cur ? 'current' : ''}"><div class="sn-head"><span class="sn-ico">${p.icon}</span><span class="sn-label">${p.label}</span></div>`
+        + p.tabs.map(([id, ico, label]) => `<button type="button" class="sn-item sn-sub ${id === currentTab ? 'active' : ''}" data-sn-tab="${id}" title="${esc(label)}">
+          <span class="sn-ico">${ico}</span><span class="sn-label">${label}</span>${badge(tabBadges[id] || 0)}</button>`).join('') + '</div>';
+    }
+  }
+  nav.innerHTML = html;
+  nav.classList.toggle('collapsed', !sideNavOpen);
+  nav.querySelectorAll('[data-sn-tab]').forEach((b) => { b.onclick = () => { closePlaceMenu(); showTab(b.dataset.snTab); window.scrollTo({ top: 0, behavior: 'smooth' }); }; });
+  nav.querySelectorAll('[data-sn-place]').forEach((b) => { b.onclick = () => goPlace(b.dataset.snPlace); });
+  $('sn-toggle').onclick = () => {
+    sideNavOpen = !sideNavOpen;
+    try { localStorage.setItem('zl_sidenav', sideNavOpen ? 'open' : 'closed'); } catch (e) { /* ignore */ }
+    renderSideNav();
+  };
+}
+// Le menu commence juste sous le bandeau (dont la hauteur change avec la largeur de l'écran)
+function placeSideNav() {
+  const h = document.querySelector('.topbar').getBoundingClientRect().height;
+  document.documentElement.style.setProperty('--hdr-h', Math.round(h) + 'px');
+}
+window.addEventListener('resize', placeSideNav);
+placeSideNav();
 
 // Menu des lieux : tous les lieux d'un coup d'œil, pour qui préfère aller droit au but
 function renderPlaceMenu() {
@@ -2611,7 +2682,7 @@ function renderQueue() {
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const QB = Rules.BOSSES[queue.boss];
-    const what = queue.mode === 'gold' ? '🪙 Golden Shower en cours : il pleut des pièces !' : queue.mode === 'clans' ? '⚔️ Guerre des clans en cours !' : queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
+    const what = queue.mode === 'gold' ? '🪙 Golden Shower en cours : il pleut des pièces !' : queue.mode === 'clans' ? '⚔️ Guerre des clans en cours !' : queue.mode === 'koth' ? '👑 Roi de la Colline en cours !' : queue.mode === 'tourney' ? '🏆 Tournoi en cours !' : queue.mode === 'boss' ? `${QB ? QB.icon : '👹'} Combat contre ${QB ? QB.name : 'le boss'} en cours !` : queue.mode === 'dungeon' ? '🏰 Raid de Donjon en cours !' : '🔥 Bataille en cours !';
     box.innerHTML = `<b>${what}</b> ${ev ? `<span class="tag" style="color:${ev.color}">${ev.icon} ${ev.label}</span>` : ''} <a href="/arena.html" target="_blank">Regarder l'arène</a> ${inQueue ? '<span class="up">Ton perso se bat !</span>' : ''}`;
     if (queue.poll) renderPollVote(box);
   } else if (queue.phase === 'ended' && queue.result) {
@@ -2621,6 +2692,7 @@ function renderQueue() {
     else if (r.mode === 'dungeon') text = `🏰 Le raid s'est arrêté en salle ${r.room}${r.reward ? ' : récompense pour tous les participants !' : '.'}`;
     else if (r.mode === 'gold') text = `🪙 Fin du Golden Shower : ${r.totals.gold} golds ramassés !${r.best ? ` Roi du butin : ${esc(r.best.name)} (${r.best.gold} golds).` : ''}`;
     else if (r.mode === 'clans') text = `${Rules.CLANS.teams[r.winner].icon} Victoire des ${Rules.CLANS.teams[r.winner].label} !${r.mvp ? ` MVP : ${esc(r.mvp.name)}.` : ''}`;
+    else if (r.mode === 'tourney') text = r.winner ? `🏆 ${esc(r.winner.name)} remporte le Tournoi (${r.winner.wins} victoire${r.winner.wins > 1 ? 's' : ''}) !` : 'Tournoi terminé.';
     else if (r.mode === 'koth') text = r.winner ? `👑 ${esc(r.winner.name)} est le Roi de la Colline (${r.winner.score} points, ${r.winner.kills} kill(s)) !` : 'Partie terminée.';
     else text = r.winner ? `🏆 ${esc(r.winner.name)} remporte la bataille (${r.winner.kills} kill(s)) !` : 'Bataille terminée.';
     box.innerHTML = `<b>${text}</b>`;
@@ -2785,10 +2857,11 @@ const REWARD_LABELS = {
   sub: '💜 Merci pour ton abonnement !', gift: '🎁 Cadeau du streamer !',
   boss: '👹 BOSS VAINCU !', dungeon: '🏰 Récompense du raid :', poll: '🗳️ Bonus voté par le chat :',
   solo_boss: '👹 Défi des boss réussi !', clans: '⚔️ VICTOIRE DE TON CLAN !', mvp: '🌟 MVP de la Guerre des clans !', gold: '🪙 Butin du Golden Shower :',
+  tourney: '🏆 Tournoi :',
 };
 const REWARD_SOUNDS = {
   win: 'victory', kill: 'reward', participation: 'levelUp', firstblood: 'reward', double: 'reward', massacre: 'reward', sub: 'victory', gift: 'reward',
-  boss: 'victory', dungeon: 'victory', solo_boss: 'victory', solo_expedition: 'victory', poll: 'reward', clans: 'victory', mvp: 'reward', gold: 'victory',
+  boss: 'victory', dungeon: 'victory', solo_boss: 'victory', solo_expedition: 'victory', poll: 'reward', clans: 'victory', mvp: 'reward', gold: 'victory', tourney: 'victory',
 };
 socket.on('leaderboard', (data) => loadLeaderboard(data));
 socket.on('trainingQueue', (q) => {
@@ -2851,7 +2924,8 @@ socket.on('reward', (r) => {
   if (r.energy) gains.push(`+${r.energy} ⚡ énergie`);
   if (r.emeralds) gains.push(`+${r.emeralds} {em} émeraude${r.emeralds > 1 ? 's' : ''}`);
   const label = r.type === 'dungeon' ? `🏰 Raid : salle ${r.room} atteinte !`
-    : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !` : REWARD_LABELS[r.type];
+    : r.type === 'solo_expedition' ? `🕳️ Expédition : profondeur ${r.depth} !`
+      : r.type === 'tourney' ? (r.champion ? '🏆 CHAMPION DU TOURNOI !' : `🏆 Tournoi : ${r.wins} match${r.wins > 1 ? 's' : ''} gagné${r.wins > 1 ? 's' : ''} !`) : REWARD_LABELS[r.type];
   const mult = r.mult && r.mult !== 1 ? ` (×${String(r.mult).replace('.', ',')} ${r.mult > 1 ? '⬆️ adversaires plus forts' : '⬇️ adversaires plus faibles'})` : '';
   toast(`${label} ${gains.join(', ')}${mult}`, 5000);
   if (r.levels) toast(`✨ Niveau supérieur ! +${r.levels} point(s) de compétence`, 5000);

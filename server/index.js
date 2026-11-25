@@ -852,6 +852,7 @@ function chatCommand(command, from) {
       const hint = r.user.ghost ? ' Crée ton compte sur le site et lie ton Twitch pour garder ton loot !' : '';
       twitch.say(`@${from.displayName} rejoint ${p && p.clan ? 'les ' + clanText(p.clan) : 'la bataille'} ⚔️${hint}`);
     } else if (r.switched) twitch.say(`@${from.displayName} passe chez les ${clanText(p.clan)} !`);
+    else if (r.user && !p && battle.phase === 'queue' && battle.mode === 'tourney') twitch.say(`@${from.displayName} le tableau du tournoi est complet (${Rules.TOURNEY.maxPlayers} joueurs) !`);
     return;
   }
   const login = String(from.login || '').toLowerCase();
@@ -875,6 +876,7 @@ app.post('/api/queue/join', requirePlayer, (req, res) => {
   if (battle.phase !== 'queue') return res.status(400).json({ error: 'La file n\'est pas ouverte' });
   const joined = battle.join({ ...participantFromUser(req.user), clan });
   const p = battle.participants.get(key);
+  if (!p && battle.mode === 'tourney') return res.status(400).json({ error: `Le tableau du tournoi est complet (${Rules.TOURNEY.maxPlayers} joueurs)` });
   res.json({ ok: true, joined, clan: p && p.clan });
 });
 
@@ -980,6 +982,7 @@ function startBattle() {
       : battle.mode === 'rush' ? `💀 BOSS RUSH ! Premier boss : ${B.icon} ${B.name}. Entre chaque boss, le chat vote : !1, !2 ou !3 !`
       : battle.mode === 'gold' ? `🪙 RUÉE VERS L'OR ! Il pleut des pièces et des coffres pendant ${Rules.GOLD.duration} s : chacun garde ce qu'il ramasse !`
       : battle.mode === 'clans' ? '⚔️ Guerre des clans : détruisez le cristal adverse ! 🔴 Rouges contre 🔵 Bleus !'
+      : battle.mode === 'tourney' ? `🏆 Le TOURNOI commence : ${battle.players.length} combattants, ${battle.tourney.rounds.length} tour${battle.tourney.rounds.length > 1 ? 's' : ''}. Que le meilleur gagne !`
       : battle.mode === 'koth' ? `👑 Roi de la Colline : tenez la colline pendant ${Math.round(Rules.KOTH.duration / 60 * 10) / 10} min ! Les morts reviennent au combat.`
         : '🏰 Les aventuriers entrent dans le donjon… Jusqu\'où irez-vous ?');
     return { event: null, pendingEvent };
@@ -1186,6 +1189,61 @@ battle.on('rushBossDown', (info, fighters) => {
   const B = Rules.BOSSES[info.boss];
   announce(`💥 ${B.icon} ${B.name} est vaincu ! (${info.killed} boss) Votez pour la suite : !1, !2 ou !3`);
 });
+
+// ---------- Tournoi ----------
+
+battle.on('tourneyMatch', (m) => {
+  if (m.final) return; // le champion est annoncé par tourneyEnd
+  const next = Rules.tourneyRoundName(m.next);
+  announce(`🏆 ${m.winner.name} élimine ${m.out.map((f) => f.name).join(' et ')} et se qualifie : ${next} !`);
+});
+
+// Participation pour tous ; chaque match gagné rapporte plus que le précédent ; le champion gagne un bonus.
+battle.on('tourneyEnd', (result, fighters) => {
+  const bracket = tourneySnapshot();
+  for (const f of fighters) {
+    const user = f.userId && db.state.users[f.userId];
+    if (!user) continue;
+    game.upgrade(user.character);
+    user.character.record.battles += 1;
+    const participation = scaled(Rules.REWARDS.participation);
+    const pl = grantBattle(user, participation);
+    io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
+    const champion = result.winner.key === f.key;
+    const reward = scaled(Rules.tourneyReward(f.wins, champion));
+    if (reward.xp || reward.gold || reward.chests) {
+      const levels = grantBattle(user, reward);
+      io.to('user:' + user.id).emit('reward', { type: 'tourney', reward, levels, wins: f.wins, champion });
+    }
+    const C = user.character.counters;
+    C.tourneyBest = Math.max(C.tourneyBest || 0, f.wins);
+    if (champion) { user.character.record.wins += 1; game.bump(user.character, 'tourneyWins'); }
+    recordBattle(f, user, champion ? 'win' : 'loss', { wins: f.wins, rounds: result.rounds, bracket: { ...bracket, me: battle.players.indexOf(f) } });
+    pushMe(user);
+  }
+  db.save();
+  const w = result.winner;
+  announce(`🏆 ${w.name} remporte le TOURNOI (${w.wins} victoire${w.wins > 1 ? 's' : ''}) et gagne ${Rules.tourneyReward(w.wins, true).chests} coffres !`);
+  notifyBets(bets.settle(w.key, w.name));
+  const br = bets.summary().lastResult;
+  if (br && !br.refund && br.winners) announce(`💰 ${br.winners > 1 ? br.winners + ' parieurs se partagent' : '1 parieur remporte'} ${br.distributed} golds de mises perdues !`);
+  db.save();
+  io.emit('leaderboard', leaderboard());
+});
+
+/*
+ * Image de l'arbre gardée dans l'historique de chaque participant : les joueurs (nom, classe, couleur) et, par tour,
+ * les matchs (indices des joueurs, indice du gagnant). Compact : 50 parties au plus par personnage.
+ */
+function tourneySnapshot() {
+  const t = battle.tourney;
+  const keys = battle.players.map((p) => p.key);
+  const idx = (k) => keys.indexOf(k);
+  return {
+    players: battle.players.map((p) => ({ n: p.name, c: p.cls || undefined, k: (p.look && p.look.color) || undefined })),
+    rounds: t.rounds.map((r) => r.map((m) => [m.slots.map(idx), idx(m.winner)])),
+  };
+}
 
 // ---------- Ruée vers l'or ----------
 

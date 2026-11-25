@@ -113,7 +113,8 @@ test('[B-2] placement : dans l\'arène avec marge de 60 px et distance minimale'
   b.join(player('a'));
   b.join(player('b'));
   b.start(); b.stopLoop();
-  assert.strictEqual(started, b.fighters, '« start » émis avec les combattants');
+  assert.strictEqual(started, b.players, '« start » émis avec les combattants (les joueurs, même au Tournoi où l\'arène commence vide)');
+  assert.deepStrictEqual(started.map((f) => f.key), b.fighters.map((f) => f.key));
 });
 
 test('[B-3] boucle : un tick et un frame toutes les 50 ms', (t) => {

@@ -446,6 +446,66 @@ test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompen
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[TRN-1, TRN-6, TRN-7, TRN-8, BET-1] Tournoi : tableau complet, gains par tour, champion, paris et arbre dans l\'historique', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const a = client();
+  const b = client();
+  const c = client();
+  const ida = (await register(a, 'pl_trn_a')).id;
+  const idb = (await register(b, 'pl_trn_b')).id;
+  const idc = (await register(c, 'pl_trn_c')).id;
+  await give(idc, { gold: 100 });
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'tourney' });
+  await a.post('/api/queue/join');
+  await b.post('/api/queue/join');
+  await admin.post('/api/admin/queue/bots', { count: 2 });
+  assert.strictEqual((await c.post('/api/bet', { target: 'u' + ida, amount: 40 })).status, 200, 'paris ouverts (sur le champion)');
+  // Tableau complet : 32 au plus
+  await admin.post('/api/admin/queue/bots', { count: 28 });
+  const full = await c.post('/api/queue/join');
+  assert.strictEqual(full.status, 400);
+  assert.match(full.data.error, /complet/);
+  for (const k of [...battle.participants.keys()].filter((k) => k.startsWith('bot')).slice(2)) battle.participants.delete(k);
+  assert.strictEqual(battle.participants.size, 4);
+  const before = { a: (await meOf(a)).character, b: (await meOf(b)).character };
+  await admin.post('/api/admin/battle/start');
+  battle.stopLoop();
+  assert.strictEqual(battle.tourney.rounds.length, 2);
+  // a gagne tous ses matchs ; b perd le sien s'il ne croise pas a
+  const fa = battle.players.find((f) => f.userId === ida);
+  const fb = battle.players.find((f) => f.userId === idb);
+  for (const f of battle.players) if (f !== fa) { f.damage = 0.001; f.lifesteal = 0; f.thorns = 0; f.baseDamage = 0.001; f.baseHp = 50; }
+  fa.baseDamage = 1000;
+  fa.baseHp = 100000;
+  for (let i = 0; i < 20 * 900 && battle.phase === 'battle'; i++) battle.tick(0.05);
+  assert.strictEqual(battle.phase, 'ended');
+  assert.strictEqual(battle.result.mode, 'tourney');
+  assert.strictEqual(battle.result.winner.key, fa.key);
+  const ca = (await meOf(a)).character;
+  const cb = (await meOf(b)).character;
+  const win = Rules.tourneyReward(2, true);
+  assert.strictEqual(ca.gold, before.a.gold + win.gold);
+  assert.strictEqual(ca.chests, before.a.chests + win.chests);
+  assert.strictEqual(ca.record.wins, before.a.record.wins + 1);
+  assert.strictEqual(ca.counters.tourneyWins, 1);
+  assert.strictEqual(ca.counters.tourneyBest, 2);
+  assert.strictEqual(cb.gold, before.b.gold + Rules.tourneyReward(fb.wins).gold, 'b est payé selon les matchs gagnés');
+  assert.strictEqual(cb.counters.tourneyWins, 0);
+  // Historique : arbre compact, place du joueur
+  const h = ca.history[0];
+  assert.strictEqual(h.mode, 'tourney');
+  assert.strictEqual(h.outcome, 'win');
+  assert.strictEqual(h.details.wins, 2);
+  assert.strictEqual(h.details.bracket.players.length, 4);
+  assert.strictEqual(h.details.bracket.players[h.details.bracket.me].n, 'pl_trn_a');
+  assert.strictEqual(h.details.bracket.rounds[1][0][1], h.details.bracket.me, 'le joueur a gagné la finale');
+  assert.strictEqual(cb.history[0].outcome, 'loss');
+  assert.strictEqual(ca.lifetime.modes.tourney.wins, 1);
+  // Paris : seul parieur, sur le champion → remboursé (personne d'autre n'a misé)
+  assert.strictEqual((await meOf(c)).character.gold, 100);
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changement de camp, récompenses et paris d\'équipe', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();

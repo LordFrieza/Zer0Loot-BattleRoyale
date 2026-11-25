@@ -79,6 +79,7 @@ class Battle extends EventEmitter {
       result: this.result,
       poll: this.publicPoll(),
       solo: this.soloInfo(),
+      tourney: this.publicTourney(),
     };
   }
 
@@ -130,6 +131,7 @@ class Battle extends EventEmitter {
     this.clans = null;
     this.gold = null;
     this.rush = null;
+    this.tourney = null;
     this.webs = [];
     this.slams = [];
     this.result = null;
@@ -144,6 +146,7 @@ class Battle extends EventEmitter {
   join(participant) {
     if (this.phase !== 'queue') return false;
     if (this.participants.has(participant.key)) return false;
+    if (this.mode === 'tourney' && this.participants.size >= Rules.TOURNEY.maxPlayers) return false; // tableau complet
     // Guerre des clans : l'équipe demandée (!rouge / !bleu), sinon la moins nombreuse.
     if (this.mode === 'clans') participant.clan = Rules.CLANS.teams[participant.clan] ? participant.clan : this.smallerClan();
     else delete participant.clan;
@@ -199,6 +202,7 @@ class Battle extends EventEmitter {
     this.clans = null;
     this.gold = null;
     this.rush = null;
+    this.tourney = null;
     this.webs = [];
     this.firstBlood = false;
     this.event = event;
@@ -233,6 +237,8 @@ class Battle extends EventEmitter {
       }
     } else if (this.mode === 'gold') {
       this.setupGold();
+    } else if (this.mode === 'tourney') {
+      this.setupTourney();
     } else if (this.mode === 'clans') {
       this.setupClans();
     } else if (this.mode === 'boss') {
@@ -252,7 +258,7 @@ class Battle extends EventEmitter {
 
     this.phase = 'battle';
     this.changed();
-    this.emit('start', this.fighters);
+    this.emit('start', this.players); // (les potions des joueurs sont consommées au lancement)
     this.interval = setInterval(() => this.loopStep(), TICK_MS);
   }
 
@@ -1894,6 +1900,7 @@ class Battle extends EventEmitter {
     this.time += dt;
     if (this.mode === 'dungeon' && this.dungeon.stage !== 'fight') this.tickDungeonStage(dt);
     else if (this.mode === 'rush' && this.rush.stage !== 'fight') this.tickRushStage(dt);
+    else if (this.mode === 'tourney' && this.tourney.stage !== 'fight') this.tickTourneyStage(dt);
     else if (this.mode === 'gold') this.tickGold(dt);
     else this.tickFight(dt);
     this.tally();
@@ -1903,7 +1910,7 @@ class Battle extends EventEmitter {
 
   tickFight(dt) {
     const alive = this.fighters.filter((f) => f.alive);
-    const storm = this.mode === 'br' ? this.storm() : null;
+    const storm = this.mode === 'br' ? this.storm() : this.tourney ? this.tourneyStorm() : null;
 
     this.updateEvent(dt, alive);
     if (this.boss) this.updateBoss(dt);
@@ -2065,8 +2072,158 @@ class Battle extends EventEmitter {
     if (this.mode === 'br') this.checkBrEnd();
     else if (this.mode === 'koth') this.checkKothEnd();
     else if (this.mode === 'clans') this.checkClansEnd();
+    else if (this.mode === 'tourney') this.checkTourneyMatchEnd();
     else if (this.mode === 'boss' || this.mode === 'rush') this.checkBossEnd();
     else this.checkDungeonEnd();
+  }
+
+  // ---------- Tournoi ----------
+
+  setupTourney() {
+    for (const f of this.players) Object.assign(f, { baseHp: f.maxHp, baseDamage: f.damage, wins: 0, outRound: null });
+    const { rounds } = Rules.tourneyBracket(this.players.map((p) => ({ key: p.key, power: p.power })));
+    for (const r of rounds) for (const m of r) { m.winner = null; m.out = []; }
+    this.tourney = { rounds, stage: 'bracket', stageT: 0, stageLen: Rules.TOURNEY.firstBracketTime, match: null, matchStart: 0, last: null, played: 0 };
+    this.tourney.match = this.nextTourneyMatch();
+    this.fighters = []; // personne dans l'arène pendant l'affichage de l'arbre
+  }
+
+  // Prochain match : le premier tour qui n'est pas fini, du plus faible (fin du tour) au plus fort.
+  nextTourneyMatch() {
+    for (const r of this.tourney.rounds) {
+      for (let i = r.length - 1; i >= 0; i--) if (!r[i].winner) return r[i];
+    }
+    return null;
+  }
+
+  publicTourney() {
+    const t = this.tourney;
+    if (!t) return undefined;
+    return {
+      stage: t.stage,
+      match: t.match ? t.match.id : null,
+      last: t.last,
+      rounds: t.rounds.map((r) => r.map((m) => ({ id: m.id, slots: [...m.slots], from: m.from, winner: m.winner, out: [...m.out] }))),
+    };
+  }
+
+  tickTourneyStage(dt) {
+    const t = this.tourney;
+    t.stageT += dt;
+    if (t.stage === 'result' && t.stageT >= Rules.TOURNEY.resultTime) {
+      if (!t.match) { this.finishTourney(); return; }
+      this.fighters = [];
+      this.zones = [];
+      t.stage = 'bracket';
+      t.stageT = 0;
+      t.stageLen = Rules.TOURNEY.bracketTime;
+      this.changed();
+    } else if (t.stage === 'bracket' && t.stageT >= t.stageLen) {
+      this.startTourneyMatch();
+    }
+  }
+
+  // Les combattants du match entrent dans l'arène, à pleine vie ; le plus faible du match est renforcé.
+  startTourneyMatch() {
+    const t = this.tourney;
+    const m = t.match;
+    const list = m.slots.map((k) => this.players.find((p) => p.key === k));
+    const cx = ARENA.w / 2;
+    const cy = ARENA.h / 2;
+    const pos = list.length === 2
+      ? [{ x: cx - 260, y: cy }, { x: cx + 260, y: cy }]
+      : [{ x: cx, y: cy - 190 }, { x: cx - 250, y: cy + 140 }, { x: cx + 250, y: cy + 140 }];
+    const total = list.reduce((a, f) => a + (f.power || 1), 0);
+    list.forEach((f, i) => {
+      const others = (total - (f.power || 1)) / Math.max(1, list.length - 1);
+      const boost = this.balance === false ? 1 : Rules.powerUnderdog(others, f.power || 1);
+      Object.assign(f, pos[i], {
+        alive: true, boost: boost > 1 ? boost : undefined,
+        maxHp: Math.round(f.baseHp * boost), damage: f.baseDamage * boost,
+        buffs: [], stunUntil: 0, iceUntil: 0, cocooned: null, stamina: 0, cd: Math.random() * 0.5, recoverUntil: 0,
+        techCd: {}, targetKey: null, engaged: false, secondWindUsed: false, nextCrit: false, diedAt: null, chain: 0,
+        lastKillAt: -Infinity, protectUntil: 0,
+      });
+      f.hp = f.maxHp;
+    });
+    this.fighters = list;
+    this.zones = [];
+    this.slams = [];
+    t.stage = 'fight';
+    t.stageT = 0;
+    t.matchStart = this.time;
+    this.events.push({ t: 'tourneyMatch', id: m.id, round: m.round, slots: [...m.slots] });
+    this.changed();
+  }
+
+  tourneyStorm() {
+    const Z = Rules.TOURNEY.zone;
+    const maxR = Math.hypot(ARENA.w, ARENA.h) / 2;
+    const el = this.time - this.tourney.matchStart;
+    if (el < Z.at) return { x: ARENA.w / 2, y: ARENA.h / 2, r: maxR, active: false };
+    const k = Math.min(1, (el - Z.at) / Z.duration);
+    return { x: ARENA.w / 2, y: ARENA.h / 2, r: maxR - (maxR - Z.minRadius) * k, active: true };
+  }
+
+  checkTourneyMatchEnd() {
+    const t = this.tourney;
+    if (t.stage !== 'fight') return;
+    let alive = this.fighters.filter((f) => f.alive);
+    if (!alive.length) {
+      // Morts simultanées (épines) : le dernier tombé gagne, à 1 PV.
+      const last = [...this.fighters].sort((a, b) => b.diedAt - a.diedAt)[0];
+      Object.assign(last, { alive: true, hp: 1 });
+      alive = [last];
+    }
+    if (alive.length > 1 && this.time - t.matchStart < Rules.TOURNEY.maxDuration) return;
+    // Fin du temps : le plus en forme (part de vie restante) l'emporte.
+    const winner = alive.length === 1 ? alive[0] : [...alive].sort((a, b) => b.hp / b.maxHp - a.hp / a.maxHp)[0];
+    this.endTourneyMatch(winner);
+  }
+
+  endTourneyMatch(winner) {
+    const t = this.tourney;
+    const m = t.match;
+    m.winner = winner.key;
+    m.out = m.slots.filter((k) => k !== winner.key);
+    winner.wins += 1;
+    for (const k of m.out) {
+      const f = this.players.find((p) => p.key === k);
+      f.outRound = m.round;
+      if (f.alive) { f.alive = false; f.hp = 0; f.diedAt = this.time; } // éliminé au temps : il quitte le tableau
+    }
+    const next = t.rounds[m.round + 1];
+    const parent = next && next.find((x) => x.from.includes(m.id));
+    if (parent) parent.slots[parent.from.indexOf(m.id)] = winner.key;
+    t.played += 1;
+    t.last = { id: m.id, round: m.round, winner: winner.key, out: [...m.out], final: !parent };
+    this.events.push({ t: 'tourneyWin', to: winner.key, id: m.id, round: m.round, out: [...m.out], final: !parent });
+    this.emit('tourneyMatch', { winner, out: m.out.map((k) => this.players.find((p) => p.key === k)), round: m.round, final: !parent, next: next ? next.length : 0 });
+    t.match = this.nextTourneyMatch();
+    t.stage = 'result';
+    t.stageT = 0;
+    this.changed();
+  }
+
+  finishTourney() {
+    this.stopLoop();
+    this.phase = 'ended';
+    const t = this.tourney;
+    const final = t.rounds[t.rounds.length - 1][0];
+    const champion = this.players.find((p) => p.key === final.winner);
+    const ranking = [...this.players].sort((a, b) => (a === champion ? -1 : b === champion ? 1 : (b.wins - a.wins) || (b.dealt - a.dealt)));
+    Object.assign(champion, { alive: true, hp: champion.maxHp, x: ARENA.w / 2, y: ARENA.h / 2 + 60 });
+    this.fighters = [champion];
+    this.result = {
+      mode: 'tourney',
+      winner: { key: champion.key, name: champion.name, kills: champion.kills, wins: champion.wins },
+      ranking: ranking.map((f, i) => ({ rank: i + 1, key: f.key, name: f.name, kills: f.kills, wins: f.wins })),
+      rounds: t.rounds.length,
+      duration: Math.round(this.time),
+    };
+    this.events.push({ t: 'win', to: champion.key });
+    this.emit('tourneyEnd', this.result, this.players);
+    this.changed();
   }
 
   // ---------- Ruée vers l'or (mode bonus, sans combat) ----------
@@ -3234,7 +3391,7 @@ class Battle extends EventEmitter {
       mode: this.mode,
       time: Math.round(this.time * 100) / 100,
       arena: ARENA,
-      storm: this.phase === 'battle' && this.mode === 'br' ? this.storm() : null,
+      storm: this.phase !== 'battle' ? null : this.mode === 'br' ? this.storm() : this.tourney && this.tourney.stage === 'fight' ? this.tourneyStorm() : null,
       event: this.event || null,
       fogs: (this.fogs || []).map((z) => ({ x: Math.round(z.x), y: Math.round(z.y), r: Math.round(z.r), a: Math.round(z.a * 100) / 100 })),
       meteors: (this.meteors || []).map((m) => ({ x: Math.round(m.x), y: Math.round(m.y), r: m.r, p: Math.round((1 - m.t / METEOR_FALL) * 100) / 100 })),
@@ -3275,6 +3432,14 @@ class Battle extends EventEmitter {
         overtime: this.clans.overtime,
         left: Math.max(0, Math.round((Rules.CLANS.duration - this.time) * 10) / 10),
         mult: this.clans.mult,
+      } : null,
+      // Tournoi : étape (arbre, match, vainqueur du match) ; l'arbre complet passe par la file (publicQueue)
+      tourney: this.tourney ? {
+        stage: this.tourney.stage, match: this.tourney.match ? this.tourney.match.id : null,
+        left: this.tourney.stage === 'fight'
+          ? Math.max(0, Math.round((Rules.TOURNEY.maxDuration - (this.time - this.tourney.matchStart)) * 10) / 10)
+          : Math.max(0, Math.round((this.tourney.stageLen - this.tourney.stageT) * 10) / 10),
+        last: this.tourney.last,
       } : null,
       koth: this.koth ? {
         hill: { x: Math.round(this.koth.hill.x), y: Math.round(this.koth.hill.y), r: this.koth.hill.r },

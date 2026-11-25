@@ -1980,3 +1980,45 @@ body { overflow-wrap: break-word; }
   .modal { padding: 8px; }
   .modal-box { padding: 14px 12px; max-height: 94vh; border-radius: 12px; }
 }
+
+/* Historique : image de l'arbre d'un tournoi */
+.hist-bracket-wrap { margin: 4px 0 12px; overflow-x: auto; }
+.hist-bracket-wrap h4 { margin: 0 0 6px; }
+.hist-bracket { display: block; width: 100%; height: auto; margin: 0 auto; background: rgba(10, 6, 26, .55); border: 1px solid rgba(255, 184, 77, .35); border-radius: 10px; }
+
+/* ---------- Menu latéral (grand écran) : tous les lieux et onglets, repliable ---------- */
+:root { --sn-w: 236px; --sn-w-closed: 58px; --hdr-h: 61px; }
+.side-nav {
+  position: fixed; left: 0; top: var(--hdr-h); bottom: 0; width: var(--sn-w); z-index: 8; padding: 10px 8px 16px;
+  display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+  background: rgba(8, 5, 28, .86); border-right: 1px solid rgba(150, 100, 255, .32); backdrop-filter: blur(8px);
+  box-shadow: 6px 0 24px rgba(0, 0, 0, .35); transition: width .18s ease;
+}
+.side-nav.collapsed { width: var(--sn-w-closed); padding-left: 6px; padding-right: 6px; }
+.side-nav button {
+  position: relative; display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; white-space: nowrap;
+  background: transparent; border: 1px solid transparent; box-shadow: none; color: var(--muted); padding: 7px 10px; min-height: 38px;
+  font-weight: 600; font-size: 13.5px; border-radius: 9px;
+}
+.side-nav button:hover { color: var(--text); background: rgba(184, 60, 255, .14); box-shadow: none; }
+.side-nav button.active { color: #fff; background: linear-gradient(135deg, rgba(200, 75, 255, .85), rgba(122, 44, 255, .85)); border-color: rgba(255, 63, 216, .55); box-shadow: 0 0 12px rgba(184, 60, 255, .4); }
+.side-nav .sn-ico { flex: 0 0 22px; text-align: center; font-size: 17px; line-height: 1; }
+.side-nav .sn-label { overflow: hidden; text-overflow: ellipsis; }
+.side-nav .tab-badge { margin-left: auto; }
+.side-nav .sn-toggle { color: var(--neon); font-family: var(--title-font); font-size: 11px; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 6px; border-color: rgba(41, 231, 255, .25); }
+.side-nav .sn-toggle .sn-ico { font-size: 16px; font-weight: 900; }
+.side-nav .sn-group { margin: 4px 0 2px; padding: 2px 0; border-top: 1px solid rgba(150, 100, 255, .16); }
+.side-nav .sn-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px 2px; color: var(--accent2); font-family: var(--title-font); font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; white-space: nowrap; }
+.side-nav .sn-head .sn-ico { font-size: 14px; }
+.side-nav .sn-group.current .sn-head { color: #fff; }
+.side-nav .sn-sub { padding-left: 22px; min-height: 34px; font-size: 13px; }
+.side-nav.collapsed button { justify-content: center; padding: 7px 0; }
+.side-nav.collapsed .sn-label { display: none; }
+.side-nav.collapsed .tab-badge { position: absolute; top: 1px; right: 1px; min-width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; padding: 0 3px; margin: 0; }
+/* La page se décale seulement si la marge de gauche ne suffit pas à loger le menu */
+body.sidenav-open main.container { margin-left: max(calc(var(--sn-w) + 8px), calc((100% - 1200px) / 2)); }
+body.sidenav-closed main.container { margin-left: max(calc(var(--sn-w-closed) + 8px), calc((100% - 1200px) / 2)); }
+@media (max-width: 700px) {
+  .side-nav { display: none; }
+  body.sidenav-open main.container, body.sidenav-closed main.container { margin-left: auto; }
+}

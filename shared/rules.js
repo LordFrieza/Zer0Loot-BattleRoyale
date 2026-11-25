@@ -402,6 +402,8 @@
     { id: 'sorcier10', metric: 'sorcierWins', goal: 10, name: 'Exorciste', desc: 'Vaincre le Magicien des ténèbres 10 fois', gold: 500 },
     { id: 'koth1', metric: 'kothWins', goal: 1, name: 'Prince de la colline', desc: 'Gagner 1 partie de Roi de la Colline', gold: 50 },
     { id: 'koth10', metric: 'kothWins', goal: 10, name: 'Roi de la montagne', desc: 'Gagner 10 parties de Roi de la Colline', gold: 300 },
+    { id: 'tourney1', metric: 'tourneyWins', goal: 1, name: 'Champion du tournoi', desc: 'Remporter 1 Tournoi', gold: 100 },
+    { id: 'tourney10', metric: 'tourneyWins', goal: 10, name: 'Légende des arènes', desc: 'Remporter 10 Tournois', gold: 600 },
     { id: 'clans1', metric: 'clansWins', goal: 1, name: 'Soldat du clan', desc: 'Gagner 1 Guerre des clans avec ton équipe', gold: 30 },
     { id: 'clans10', metric: 'clansWins', goal: 10, name: 'Général', desc: 'Gagner 10 Guerres des clans avec ton équipe', gold: 200 },
     { id: 'mvp1', metric: 'clansMvp', goal: 1, name: 'MVP', desc: 'Être le MVP d\'une Guerre des clans', gold: 100 },
@@ -464,9 +466,9 @@
     'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak',
     'etherWins', 'lilithWins', 'daedraWins', 'soloEther', 'soloLilith', 'soloDaedra', 'heroEther', 'heroLilith', 'heroDaedra',
     'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins',
-    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod'];
+    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod', 'tourneyWins', 'tourneyBest'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod', 'tourneyBest'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna', ether: 'soloEther', lilith: 'soloLilith', daedra: 'soloDaedra' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
@@ -528,6 +530,10 @@
     rush: {
       label: 'Boss Rush', icon: '💀', color: '#ff4d6d', coop: true, minPlayers: 1,
       desc: 'Les boss s\'enchaînent, de plus en plus forts ! Entre deux boss, le chat vote : bonus, résurrection ou quitte ou double. Jusqu\'où irez-vous ?',
+    },
+    tourney: {
+      label: 'Tournoi', icon: '🏆', color: '#ffb84d', coop: false, minPlayers: 2,
+      desc: 'Un tableau à élimination directe : des duels entre joueurs de puissance proche, le gagnant monte dans l\'arbre jusqu\'à la grande finale. Plus on monte, plus on gagne !',
     },
     gold: {
       label: 'Golden Shower', icon: '🪙', color: '#ffd23f', coop: false, bonus: true, minPlayers: 1,
@@ -612,6 +618,90 @@
     respawn: 4,
     protect: 1.5,
   };
+
+  /*
+   * Tournoi : tableau à élimination directe (32 joueurs au plus). Au lancement, les combattants sont classés par
+   * puissance et appariés deux par deux dans l'ordre (les plus forts ensemble, les plus faibles ensemble) ; si leur
+   * nombre est impair, les trois plus faibles s'affrontent dans un 1v1v1. Les tours suivants suivent l'arbre : le
+   * gagnant du match k affronte celui du match voisin (un nombre impair de matchs → les trois derniers forment un 1v1v1).
+   * Les matchs se jouent l'un après l'autre (du plus faible au plus fort dans chaque tour), entre deux affichages de
+   * l'arbre. Chaque match repart à pleine vie ; le plus faible du match est renforcé (Rules.powerUnderdog). Une zone
+   * se referme au bout de 30 s ; à 90 s, le plus en forme gagne.
+   * Récompenses : participation (100 XP) pour tous, puis pour chaque match gagné au tour r (0 = premier tour)
+   * 120 + 60 r XP, 15 + 10 r golds et 1 coffre ; le champion gagne en plus 600 XP, 100 golds et 3 coffres.
+   */
+  const TOURNEY = {
+    maxPlayers: 32,
+    bracketTime: 6, // affichage de l'arbre entre deux matchs (s)
+    firstBracketTime: 8, // premier affichage (présentation du tableau)
+    resultTime: 2.5, // pause sur le vainqueur d'un match avant de revenir à l'arbre
+    zone: { at: 30, duration: 30, minRadius: 90 },
+    maxDuration: 90,
+    matchWin: { xp: 120, xpPerRound: 60, gold: 15, goldPerRound: 10, chests: 1 },
+    champion: { xp: 600, gold: 100, chests: 3 },
+  };
+
+  /*
+   * Arbre du tournoi (fonction pure) : entries = [{ key, power }] → { rounds: [[{ id, round, slots, from }]] }.
+   * Premier tour : classement par puissance décroissante (ordre d'entrée en cas d'égalité), paires dans l'ordre,
+   * 1v1v1 des trois derniers si le nombre est impair. Tours suivants : slots vides (null) remplis par les gagnants
+   * des matchs `from`. Le dernier tour contient un seul match : la finale.
+   */
+  function tourneyBracket(entries) {
+    const list = entries.map((e, i) => ({ ...e, i })).sort((a, b) => (b.power || 0) - (a.power || 0) || a.i - b.i);
+    const groups = (n) => {
+      // Tailles des matchs d'un tour de n éléments : des paires, et un trio à la fin si n est impair.
+      if (n < 2) return [];
+      if (n === 3) return [3];
+      const sizes = Array(Math.floor(n / 2)).fill(2);
+      if (n % 2) sizes[sizes.length - 1] = 3;
+      return sizes;
+    };
+    const rounds = [];
+    let at = 0;
+    rounds.push(groups(list.length).map((size, m) => {
+      const slots = list.slice(at, at + size).map((e) => e.key);
+      at += size;
+      return { id: `r0m${m}`, round: 0, slots, from: null };
+    }));
+    while (rounds[rounds.length - 1].length > 1) {
+      const prev = rounds[rounds.length - 1];
+      const r = rounds.length;
+      at = 0;
+      rounds.push(groups(prev.length).map((size, m) => {
+        const from = prev.slice(at, at + size).map((x) => x.id);
+        at += size;
+        return { id: `r${r}m${m}`, round: r, slots: from.map(() => null), from };
+      }));
+    }
+    return { rounds };
+  }
+
+  // Nom d'un tour du tableau, d'après son nombre de matchs : 1 → finale, 2 → demi-finales, 3-4 → quarts…
+  function tourneyRoundName(matches) {
+    if (matches <= 1) return 'Finale';
+    if (matches === 2) return 'Demi-finales';
+    if (matches <= 4) return 'Quarts de finale';
+    if (matches <= 8) return 'Huitièmes de finale';
+    return 'Seizièmes de finale';
+  }
+
+  // Gains d'un joueur du tournoi : `wins` matchs gagnés (aux tours 0, 1, … wins - 1), et le titre de champion.
+  function tourneyReward(wins, champion = false) {
+    const M = TOURNEY.matchWin;
+    const out = { xp: 0, gold: 0, chests: 0 };
+    for (let r = 0; r < wins; r++) {
+      out.xp += M.xp + M.xpPerRound * r;
+      out.gold += M.gold + M.goldPerRound * r;
+      out.chests += M.chests;
+    }
+    if (champion) {
+      out.xp += TOURNEY.champion.xp;
+      out.gold += TOURNEY.champion.gold;
+      out.chests += TOURNEY.champion.chests;
+    }
+    return out;
+  }
 
   /*
    * Combat de Boss : la vie et les dégâts du Troll dépendent du nombre de combattants au lancement.
@@ -3551,7 +3641,7 @@
     xpToNext, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTiers, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
-    SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, TOURNEY, tourneyBracket, tourneyReward, tourneyRoundName, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

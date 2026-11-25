@@ -33,6 +33,9 @@
     </div>
   </header>
 
+  <!-- Menu latéral : tous les lieux et leurs onglets en un clic ; repliable en une colonne d'icônes (character.js) -->
+  <aside class="side-nav" id="side-nav" aria-label="Tous les onglets"></aside>
+
   <main class="container">
     <div class="panel queue-box" id="queue-box" style="display:none"></div>
 
@@ -675,6 +678,11 @@
           <div class="mode-head"><canvas id="koth-portrait" width="150" height="110"></canvas>
             <div><h3>👑 Roi de la Colline</h3><p class="muted">Chacun pour soi, mais <b>personne n'est éliminé</b> : celui qui tient la colline le plus longtemps gagne.</p></div></div>
           <ul class="rules-list" id="koth-rules"></ul>
+        </div>
+        <div class="mode-card" style="--c:#ffb84d">
+          <div class="mode-head"><canvas id="tourney-portrait" width="150" height="110"></canvas>
+            <div><h3>🏆 Tournoi</h3><p class="muted">Un <b>tableau à élimination directe</b> : des duels entre joueurs de puissance proche, le gagnant monte dans l'arbre jusqu'à la finale.</p></div></div>
+          <ul class="rules-list" id="tourney-rules"></ul>
         </div>
         <div class="mode-card" style="--c:#ff6b9a">
           <div class="mode-head"><canvas id="clans-portrait" width="170" height="110"></canvas>

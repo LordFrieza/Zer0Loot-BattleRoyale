@@ -106,7 +106,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     niveau 15, parmi 14 techniques (Roulade, Charge, Second souffle, Frénésie, et 2 par classe : Cri de guerre, Coup de
     bouclier, Flèche repoussante, Tir rapide, Clignement, Nova de givre, Pas de l'ombre, Lame empoisonnée, Prière de
     soin, Lumière aveuglante). Détails : `TECHNIQUES` dans `shared/rules.js`.
-- **Récompenses des modes PvP** (Battle Royale, Roi de la Colline, Guerre des clans) : kill = 300 XP + 3 coffres + 30 golds ;
+- **Récompenses des modes PvP** (Battle Royale, Roi de la Colline, Guerre des clans ; Tournoi : voir plus bas) : kill = 300 XP + 3 coffres + 30 golds ;
   victoire = 900 XP + 3 coffres + 90 golds ; participation = 100 XP pour chaque combattant à la fin de la bataille
   (gagnant compris, pas si l'admin annule). Les mêmes pour tous, quelle que soit la puissance (×2 avec le Loot double).
   Les modes coopératifs et le Golden Shower gardent 25 XP de participation.
@@ -210,7 +210,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   paginé par 20 objets avec filtres par emplacement / rareté / stat / panoplie et badge « Nouveau ! », forge et alchimie ;
   Compétences ; Combat), Place du marché (Boutique, Marché) et Hall des héros (Classements, Succès, Stats, Historique). Les
   pastilles (points à répartir, coffres, succès, courrier…) s'affichent sur les lieux de la carte et du menu. Les anciennes
-  adresses (`#solo`, `#casino`…) marchent toujours.
+  adresses (`#solo`, `#casino`…) marchent toujours. Sur grand écran, un **menu latéral** à gauche liste la carte, tous
+  les lieux et tous leurs sous-onglets (avec leurs pastilles), chacun à un clic ; le bouton « « Replier le menu » le
+  réduit à une colonne d'icônes (le choix est retenu). Il se loge dans la marge de gauche, ou décale la page si elle est
+  trop étroite ; il est masqué sur téléphone.
 - **Compte et sécurité** (fiche du personnage) : lier une **adresse e-mail** (confirmée par un lien) pour pouvoir
   récupérer son compte, et changer de mot de passe. Sur la page d'accueil, **« Mot de passe oublié ? »** envoie un lien
   (1 h, une seule fois) à l'adresse confirmée ; **« Se connecter avec Twitch »** marche pour les comptes dont le Twitch
@@ -377,6 +380,16 @@ de la file, confirme les `!join` et annonce le vainqueur.
     reviennent au bord de l'arène au bout de 4 s, protégés 1,5 s. Le meilleur score gagne (égalité : le plus de kills) et
     reçoit la récompense de victoire du Battle Royale ; les paris sont ouverts comme en Battle Royale, pas les
     événements de bataille ni les récompenses de kill. Classement en direct dans l'arène.
+  - **Tournoi** (dès 2 joueurs, 32 au plus) : un **tableau à élimination directe**. Les combattants sont classés par
+    puissance et appariés dans l'ordre (les plus forts ensemble, les plus faibles ensemble) ; avec un nombre impair, les
+    trois plus faibles se départagent dans un **1v1v1** (même règle aux tours suivants : 7 joueurs → 2 duels + 1v1v1, puis
+    une finale à trois). Les matchs se jouent un par un : entre deux matchs, l'arène montre **l'arbre** (les têtes des
+    joueurs, le vainqueur qui **monte** jusqu'à sa nouvelle place, le perdant qui **reste grisé**, le prochain match qui
+    clignote). Chaque match repart à pleine vie, le plus faible du match est renforcé (comme en Battle Royale), une zone
+    se referme à 30 s et, à 90 s, le plus en forme gagne. Gains : 100 XP de participation, puis pour chaque match gagné au
+    tour r (0 = premier tour) **120 + 60 r XP, 15 + 10 r golds et 1 coffre** ; le **champion** gagne en plus 600 XP,
+    100 golds et 3 coffres (16 joueurs : 1 540 XP, 220 golds, 7 coffres). On **parie sur le champion**. Pas de
+    récompense de kill ni d'événement de bataille. L'historique de chaque participant garde **l'image de l'arbre**.
   - **Guerre des clans** (deux équipes, dès 2 joueurs, 3 min) : **🔴 Rouges contre Bleus 🔵**. On choisit son camp avec
     `!rouge` / `!bleu` dans le chat ou les boutons de la fiche personnage (`!join` place dans l'équipe la moins nombreuse) ;
     on peut changer d'équipe tant que la bataille n'a pas commencé. Chaque équipe a un **cristal** dans son camp (400 PV +
@@ -600,7 +613,7 @@ jouées en boucle pendant le combat, une par mode :
 | Raid de Donjon | Mattashi — « The Final Battle » (Epic 8-Bit Orchestral Battle) | `donjon.mp3` |
 | Ruée vers l'or | « YV Remix » | `ruee.mp3` |
 
-Le Roi de la Colline et la Guerre des clans reprennent la musique du Battle Royale.
+Le Roi de la Colline, la Guerre des clans et le Tournoi reprennent la musique du Battle Royale.
 
 Pour changer une musique, il suffit de remplacer le fichier (même nom) ; la liste est dans `TRACKS` (`sound.js`).
 

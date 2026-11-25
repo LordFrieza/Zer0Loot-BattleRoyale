@@ -62,7 +62,7 @@ function renderModes() {
   // Le bouton de lancement suit le mode de la file ouverte (ou le mode choisi s'il n'y a pas de file).
   const live = queue && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.mode : selectedMode;
   const liveBoss = Rules.BOSSES[queue && queue.boss && ['queue', 'ready', 'battle'].includes(queue.phase) ? queue.boss : selectedBoss];
-  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : live === 'rush' ? '💀 LANCER LE BOSS RUSH' : '⚔️ LANCER LA BATAILLE';
+  $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : live === 'rush' ? '💀 LANCER LE BOSS RUSH' : live === 'tourney' ? '🏆 LANCER LE TOURNOI' : '⚔️ LANCER LA BATAILLE';
 }
 
 $('open').onclick = async () => (queue && queue.participants.length && queue.phase !== 'ended' && !await confirmBox('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
