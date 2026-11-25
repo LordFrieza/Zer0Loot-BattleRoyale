@@ -1948,6 +1948,8 @@ class Battle extends EventEmitter {
             : d * o.taunt;
         // Roi de la Colline : on se bat de préférence pour la colline.
         if (this.koth) score += Math.hypot(o.x - this.koth.hill.x, o.y - this.koth.hill.y) * (f.hunter ? 3 : 1.5);
+        // Riposte : le tireur qui vient de nous toucher passe devant les autres
+        if (f.provokedBy === o.key && this.time < f.provokedUntil) score *= Rules.COMBAT_AI.retaliate.mult;
         // Guerre des clans : le cristal adverse attire, mais on défend le sien et on répond à qui nous colle.
         if (this.clans) {
           const A = Rules.CLANS.aggro;
@@ -3206,6 +3208,12 @@ class Battle extends EventEmitter {
     const dmg = Math.max(1, Math.round(raw * (1 - target.reduction) * this.buffMult(target, 'taken')));
     target.hp -= dmg;
     attacker.dealt += dmg;
+    // Riposte : un joueur au corps à corps touché par le tir d'un autre joueur fonce sur le tireur (COMBAT_AI.retaliate).
+    const RT = Rules.COMBAT_AI.retaliate;
+    if (attacker.kind === 'player' && target.kind === 'player' && attacker.range >= RT.minRange && target.range < RT.minRange) {
+      target.provokedBy = attacker.key;
+      target.provokedUntil = this.time + RT.time;
+    }
     this.events.push({ t: 'hit', from: attacker.key, to: target.key, dmg, crit: !!opts.crit, proj: opts.proj, splash: opts.splash || undefined, ult: opts.ult || undefined });
     const lifesteal = attacker.lifesteal + this.buffSum(attacker, 'lifesteal');
     if (lifesteal && attacker.alive) this.heal(attacker, dmg * lifesteal);

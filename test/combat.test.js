@@ -34,11 +34,39 @@ test('[AI-2] recul : un Archer acculé dans un coin longe le mur au lieu de rest
   archer.cd = 99;
   archer.recovery = 0;
   Object.assign(archer, { x: 30, y: 30 });
-  Object.assign(melee, { x: 90, y: 90, speed: 0, cd: 99 });
+  Object.assign(melee, { x: 80, y: 80, speed: 0, cd: 99 });
   tickFor(b, 2);
   const moved = Math.hypot(archer.x - 30, archer.y - 30);
   assert.ok(moved > 40, `il s'est dégagé (${moved.toFixed(0)} px)`);
-  assert.ok(Math.hypot(archer.x - melee.x, archer.y - melee.y) > Math.hypot(30 - 90, 30 - 90), 'et s\'est éloigné de l\'ennemi');
+  assert.ok(Math.hypot(archer.x - melee.x, archer.y - melee.y) > Math.hypot(30 - 80, 30 - 80), 'et s\'est éloigné de l\'ennemi');
+});
+
+test('[AI-3] riposte : un combattant au corps à corps touché par un tireur fonce sur lui (entre joueurs seulement)', () => {
+  const b = testBattle([player('m', { cls: 'guerrier' }), player('n', { cls: 'pretre' }), player('arc', { cls: 'archer' })]);
+  const [m, n, arc] = b.fighters;
+  hold(n, arc);
+  m.cd = 99;
+  Object.assign(m, { x: 400, y: 360 });
+  Object.assign(n, { x: 500, y: 360 }); // à 100 px (un Prêtre : pas d'aggro de Guerrier)
+  Object.assign(arc, { x: 400, y: 160 }); // à 200 px
+  b.tick(0.05);
+  assert.strictEqual(m.targetKey, 'n', 'sans tir : le plus proche');
+  b.hit(arc, m, 5, { proj: 'arrow' });
+  assert.strictEqual(m.provokedBy, 'arc');
+  assert.ok(Math.abs(m.provokedUntil - (b.time + Rules.COMBAT_AI.retaliate.time)) < 1e-9);
+  b.tick(0.05);
+  assert.strictEqual(m.targetKey, 'arc', 'il fonce sur le tireur');
+  // 3 s plus tard, il revient au plus proche
+  b.time = m.provokedUntil + 0.01;
+  b.tick(0.05);
+  assert.strictEqual(m.targetKey, 'n');
+  // Un coup au corps à corps ne provoque pas ; un monstre ne provoque pas
+  const before = m.provokedBy;
+  b.hit(n, m, 5);
+  assert.strictEqual(m.provokedBy, before, 'le coup d\'un autre combattant au corps à corps ne change rien');
+  m.provokedBy = null;
+  b.hit({ ...arc, kind: 'squelette', key: 'm1' }, m, 5, { proj: 'arrow' });
+  assert.strictEqual(m.provokedBy, null, 'les monstres ne provoquent pas de riposte');
 });
 
 test('[TAC-1] tactique : posture, cible, distance de recul (classes à distance seulement)', () => {
@@ -62,9 +90,9 @@ test('[TAC-1] tactique : posture, cible, distance de recul (classes à distance 
 
 test('[TAC-2] tactique en combat : recul selon la posture, fuite prudente, cible préférée', () => {
   const kite = (cls, tactics) => testBattle([player('a', { cls, tactics }), player('b')]).fighters[0].kite;
-  assert.strictEqual(kite('archer', null), 110);
+  assert.strictEqual(kite('archer', null), 80);
   assert.strictEqual(kite('archer', { stance: 'agressif', kite: 150 }), 0);
-  assert.strictEqual(kite('archer', { stance: 'prudent' }), 154);
+  assert.strictEqual(kite('archer', { stance: 'prudent' }), 112);
   assert.strictEqual(kite('archer', { stance: 'equilibre', kite: 40 }), 40);
   assert.strictEqual(kite('mage', { stance: 'prudent' }), 84);
   assert.strictEqual(kite('guerrier', { stance: 'prudent', kite: 80 }), 0, 'pas de recul au corps à corps');

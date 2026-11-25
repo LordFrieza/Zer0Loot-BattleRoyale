@@ -195,10 +195,13 @@ test('[B-9, B-10, B-11] déplacement, recul de l\'Archer et attaque à portée',
   const d = Math.hypot(a.x - t.x, a.y - t.y);
   assert.ok(d <= 40 && d > 30, `s'arrête à portée (${d})`);
 
-  // B-10 : l'Archer recule à 80 % de sa vitesse si la cible est à moins de 110 px
+  // B-10 : l'Archer recule à 80 % de sa vitesse si la cible est à moins de 80 px
   b = duel('archer');
   [a, t] = b.fighters;
   Object.assign(a, { x: 600, y: 300, speed: 100 }); Object.assign(t, { x: 700, y: 300 });
+  b.tick(0.5);
+  assert.strictEqual(a.x, 600, 'à 100 px : il ne recule plus (recul ramené de 110 à 80 px)');
+  Object.assign(a, { x: 600, y: 300, speed: 100 }); Object.assign(t, { x: 670, y: 300 });
   b.tick(0.5);
   assert.ok(Math.abs(a.x - 560) < 1e-6, `recule de 40 px (x=${a.x})`);
   Object.assign(a, { x: 600, y: 300, speed: 100 }); Object.assign(t, { x: 750, y: 300 });

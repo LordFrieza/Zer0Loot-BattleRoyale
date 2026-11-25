@@ -46,17 +46,19 @@
     archer: {
       label: 'Archiloot', role: 'Archer', icon: '🏹', color: '#3ddc5a',
       desc: 'Tire de loin et recule quand un ennemi s\'approche trop près.',
-      perks: ['Attaque à distance', 'Recule face aux ennemis proches (sans se coincer contre les bords)', '+15 % Précision', 'S\'immobilise un instant après chaque tir', '−10 % Vie', '−15 % Dégâts'],
+      perks: ['Attaque à distance', 'Recule face aux ennemis proches (sans se coincer contre les bords)', '+15 % Précision', 'S\'immobilise un instant après chaque tir', '−10 % Vie', '−25 % Dégâts', '−20 % Vitesse'],
       weapon: 'arc', offhand: 'carquois',
-      bonus: { vie: -10, force: -15 }, flat: { precision: 0.15 },
-      combat: { range: 230, kite: 110, projectile: 'arrow', recovery: 0.6 },
+      // Nerf des classes à distance : −10 points de Force, −20 % de Vitesse, recul ramené de 110 à 80 px
+      bonus: { vie: -10, force: -25, vitesse: -20 }, flat: { precision: 0.15 },
+      combat: { range: 230, kite: 80, projectile: 'arrow', recovery: 0.6 },
     },
     mage: {
       label: 'Magiloot', role: 'Mage', icon: '🔮', color: '#b14dff',
       desc: 'Lance des boules de feu qui explosent et touchent aussi les ennemis autour de la cible.',
-      perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+25 % Dégâts', '−15 % Vie', 'Attaque 35 % plus lente'],
+      perks: ['Attaque à distance', 'Explosion : 60 % des dégâts autour de la cible', '+20 % Dégâts', '−15 % Vie', '−10 % Vitesse', 'Attaque 35 % plus lente'],
       weapon: 'baton', offhand: 'grimoire',
-      bonus: { vie: -15, force: 25 }, flat: {},
+      // Nerf des classes à distance : −5 points de Force et −10 % de Vitesse (déjà faible en duel, l'explosion fait sa force)
+      bonus: { vie: -15, force: 20, vitesse: -10 }, flat: {},
       combat: { range: 170, projectile: 'fire', aoeRadius: 75, aoeRatio: 0.6, cooldownMult: 1.35, recovery: 0.5 },
     },
     assassin: {
@@ -1589,7 +1591,12 @@
    * CLASS_INFO.combat.recovery), divisé par sa vitesse d'attaque. L'Assassin récupère presque tout de suite.
    * Fuite : un combattant qui recule évite les bords de l'arène (il glisse le long des murs au lieu de s'y coincer).
    */
-  const COMBAT_AI = { wallMargin: 110, fleeHp: 0.3, fleeRange: 130, prudentKite: 1.4 };
+  /*
+   * retaliate : un combattant au corps à corps (portée < minRange) touché par un tir d'un autre joueur (portée ≥ minRange)
+   * le prend pour cible de préférence pendant `time` s (sa « distance » compte × mult) : il fonce sur le tireur au lieu
+   * de rester sur le plus proche. Seulement entre joueurs (les monstres et les boss gardent leur ciblage).
+   */
+  const COMBAT_AI = { wallMargin: 110, fleeHp: 0.3, fleeRange: 130, prudentKite: 1.4, retaliate: { minRange: 100, time: 3, mult: 0.35 } };
 
   // Tactique réglable sur la fiche : posture, cible préférée et distance de recul (classes à distance).
   const TACTICS = {

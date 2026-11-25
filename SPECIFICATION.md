@@ -126,7 +126,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **B-7** L'Assassin (`hunter`) doit cibler l'ennemi minimisant `pv × (1 + distance/500)`.
 - **B-8** Tant qu'un ennemi est dans le brouillard (événement `fog`) et à plus de 80 px, il ne doit pas être ciblable ; si aucun n'est visible, le combattant doit se rabattre sur la meilleure cible ignorant le brouillard.
 - **B-9** Si la cible est hors de portée, le combattant doit avancer vers elle à sa vitesse, sans dépasser sa portée.
-- **B-10** Si le combattant a un `kite` (Archer) et que la cible est plus proche que 110 px, alors il doit reculer à 80 % de sa vitesse.
+- **B-10** Si le combattant a un `kite` (Archer) et que la cible est plus proche que 80 px, alors il doit reculer à 80 % de sa vitesse.
 - **B-11** Quand la cible est à portée et que le délai de recharge est écoulé, le combattant doit attaquer ; le délai initial est aléatoire (0 à 0,5 s). Un combattant au contact de sa cible (distance ≤ somme des rayons + 2 px) est toujours à portée, quelle que soit sa portée (petits monstres comme les chauves-souris, chefs agrandis).
 - **B-12** Le serveur doit séparer les combattants qui se chevauchent (rayon 16 px ; plus grand pour le Troll et les chefs du donjon, qui poussent les petits plus qu'ils ne sont poussés) et les maintenir dans l'arène.
 - **B-13** Tant que le Prêtre est vivant, le serveur doit lui rendre 1,5 % de sa vie max par seconde.
@@ -316,6 +316,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 ### 7.13 Style de combat (V2)
 
 - **AI-1** Après chaque attaque, un combattant doit rester immobile pendant `récupération de sa classe / vitesse d'attaque` secondes (Guerrier 0,3 ; Archer 0,6 ; Mage 0,5 ; Assassin 0,05 ; Prêtre 0,3 ; sans classe 0,3), divisé aussi par ses bonus de vitesse d'attaque ; il peut toujours viser, mais ne se déplace pas. Les monstres qui tirent en reculant (squelettes archers, chefs compris) ont la même pause qu'un Archer (0,6 s), pour qu'un combattant au corps à corps puisse les rattraper ; les autres monstres et les boss n'ont pas de récupération.
+- **AI-3** Entre joueurs, quand un combattant au corps à corps (portée < 100) est touché par le tir d'un joueur à distance (portée ≥ 100), il doit prendre ce tireur pour cible de préférence pendant 3 s (sa distance compte ×0,35 dans le choix de la cible, `COMBAT_AI.retaliate`) : il fonce sur lui au lieu de rester sur l'ennemi le plus proche. Les monstres et les boss ne sont pas concernés.
 - **AI-2** Un combattant qui recule (distance de recul, fuite) doit s'éloigner de la menace en étant repoussé par les bords de l'arène (à moins de 110 px d'un mur), et longer le mur, du côté du centre, quand il est coincé, au lieu de rester bloqué contre lui.
 - **TAC-1** La cible « Selon ma classe » doit être décrite « Le plus proche (sauf le Lootassin : le plus faible, si cette option est choisie) ». Un joueur doit pouvoir régler sa tactique (`/api/tactics`) : posture (`equilibre`, `agressif`, `prudent`), cible préférée (`auto`, `proche`, `faible`, `menace`) et, pour les classes à distance seulement, une distance de recul de 0 à `portée − 30` px (`null` = celle de la classe) ; une valeur inconnue est refusée.
 - **TAC-2** En combat : la posture Agressive supprime le recul ; la posture Prudente multiplie le recul des classes à distance par 1,4 (60 px si la classe n'en a pas) et fait fuir l'ennemi le plus proche (à moins de 130 px) quand la vie passe sous 30 % ; la cible `faible` vise le moins de vie (comme l'Assassin par défaut), `menace` l'ennemi qui frappe le plus fort, `proche` le plus proche.
@@ -331,8 +332,10 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 | Classe | Bonus / malus | Combat | Arme · secondaire |
 |---|---|---|---|
 | Guerrier | Vie +30 %, Défense +25 % | portée 40, `taunt` 0,7 | épée · bouclier |
-| Archer | Vie −10 %, Force −15 %, Précision +15 pts | portée 230, recule < 110, flèche | arc · carquois |
-| Mage | Vie −15 %, Force +25 % | portée 170, boule de feu, AoE 75 px × 60 %, recharge ×1,35 | bâton · grimoire |
+| Archer | Vie −10 %, Force −25 %, Vitesse −20 %, Précision +15 pts | portée 230, recule < 80, flèche | arc · carquois |
+| Mage | Vie −15 %, Force +20 %, Vitesse −10 % | portée 170, boule de feu, AoE 75 px × 60 %, recharge ×1,35 | bâton · grimoire |
+
+Les bonus et malus en % de la classe s'ajoutent aux % de l'équipement (ex. un Archer avec +20 % de Vitesse d'équipement retrouve la vitesse de base).
 | Assassin | Vie −10 %, Vitesse d'attaque +25 %, Critique +10 pts, Précision +15 pts, Vol de vie +1 pt | portée 36, traque le plus faible | dagues · dague de parade |
 | Prêtre | Vie +10 %, Défense +10 %, Force −10 % | portée 40, régénère 1,5 %/s | masse · relique |
 

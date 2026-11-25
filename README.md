@@ -80,8 +80,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   | Classe | Combat | Bonus / malus | Arme · secondaire |
   |---|---|---|---|
   | ⚔️ Guerriloot (guerrier) | Corps à corps, attire l'aggro | +30 % Vie, +25 % Défense | Épée · Bouclier |
-  | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche | +15 pts Précision, −10 % Vie, −15 % Dégâts | Arc · Carquois |
-  | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +25 % Dégâts, −15 % Vie, attaque 35 % plus lente | Bâton · Grimoire |
+  | 🏹 Archiloot (archer) | À distance (230 px), recule si un ennemi approche à moins de 80 px | +15 pts Précision, −10 % Vie, −25 % Dégâts, −20 % Vitesse | Arc · Carquois |
+  | 🔮 Magiloot (mage) | À distance (170 px), explosion : 60 % des dégâts autour de la cible | +20 % Dégâts, −15 % Vie, −10 % Vitesse, attaque 35 % plus lente | Bâton · Grimoire |
   | 🗡️ Lootassin (assassin) | Traque l'ennemi le plus faible | +10 pts Critique, +25 % Vitesse d'attaque, +15 pts Précision, +1 pt Vol de vie, −10 % Vie | Dagues · Dague de parade |
   | ✨ Saint-Loot (prêtre) | Corps à corps, régénère 1,5 % de sa vie / s | +10 % Vie, +10 % Défense, −10 % Dégâts | Masse · Relique |
 
@@ -90,6 +90,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Précision, Magiloot : Force, Lootassin : Critique, Saint-Loot : Vie) de +2 / +3 / +4 / +5 / +7 % selon la rareté.
   Dans les coffres, ils sont pour ta classe 1 fois sur 2 (sinon une classe au hasard), et toujours à la forge. En changeant
   de classe, l'équipement reste en place et le bonus suit la nouvelle classe.
+- **Riposte** (entre joueurs) : un combattant au corps à corps touché par le tir d'un Archiloot ou d'un Magiloot fonce
+  sur le tireur pendant 3 s au lieu de rester sur l'ennemi le plus proche. Les classes à distance ne peuvent plus
+  arroser tranquillement une mêlée sans être inquiétées.
 - **Verrou** : le bouton 🔓 / 🔒 d'un objet (coffre ou équipement) le protège comme un objet de preset : il ne peut plus
   être fusionné, sacrifié à l'Alchimie noire, recyclé ni vendu par mégarde (il peut toujours être relancé ou renforcé).
   Les anciennes épées / anciens boucliers (d'avant les classes) sont devenus des objets de Guerrier.
