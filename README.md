@@ -433,7 +433,7 @@ de la file, confirme les `!join` et annonce le vainqueur.
     | ⚡ Adrénaline | `!vitesse` | vitesse et vitesse d'attaque ×1,2 jusqu'au prochain sondage |
     | 🧛 Soif de sang | `!vampire` | +15 % de vol de vie jusqu'au prochain sondage |
     | 🌵 Armure de ronces | `!ronces` | renvoie 25 % des dégâts reçus jusqu'au prochain sondage |
-    | 💀 Quitte ou double | `!defi` | monstres +25 % de vie et de dégâts pour le reste du raid, récompense finale ×1,5 (cumulable) |
+    | 💀 Quitte ou double | `!defi` | monstres +50 % de vie et de dégâts pour le reste du raid, récompense finale ×1,2 (cumulable) |
     | 🗝️ Passage secret | `!raccourci` | le groupe saute 2 salles, qui comptent pour la récompense |
 
     Les golds, l'XP et le coffre vont à tous les participants humains, morts compris.

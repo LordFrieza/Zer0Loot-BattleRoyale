@@ -241,7 +241,7 @@ test('[DNG-1, DNG-2] donjon : nombre de monstres, types débloqués, multiplicat
   }
   assert.deepStrictEqual(Rules.dungeonMultipliers(1), { hp: 1, damage: 1 });
   const m11 = Rules.dungeonMultipliers(11);
-  assert.ok(Math.abs(m11.hp - 1.8) < 1e-9 && Math.abs(m11.damage - 1.6) < 1e-9);
+  assert.ok(Math.abs(m11.hp - 2.1) < 1e-9 && Math.abs(m11.damage - 1.8) < 1e-9, '+11 % de vie et +8 % de dégâts par salle');
   assert.strictEqual(Rules.dungeonRoom(5, 10).filter((m) => m.elite).length, 1);
   assert.ok(!Rules.dungeonRoom(4, 10).some((m) => m.elite));
 
@@ -520,7 +520,7 @@ test('[DNG-13] sondage : bonus jusqu\'au prochain sondage et « Quitte ou double
     if (id === 'vitesse') assert.strictEqual(x.buffMult(f, 'attackSpeed'), 1.2);
   }
 
-  // Quitte ou double : monstres plus forts pour le reste du raid, récompense ×1,5
+  // Quitte ou double : monstres +50 % pour le reste du raid, récompense ×1,2
   const d = atPoll(['defi', 'vie'], 4);
   d.vote('t:x', '!defi');
   d.closePoll();
@@ -528,17 +528,18 @@ test('[DNG-13] sondage : bonus jusqu\'au prochain sondage et « Quitte ou double
   const room = d.dungeon.room;
   const mult = Rules.dungeonMultipliers(room);
   const normal = d.monsters.find((m) => !m.elite);
-  assert.strictEqual(normal.maxHp, Math.round(Rules.MONSTERS[normal.kind].hp * (mult.hp * 1.25)));
+  assert.strictEqual(normal.maxHp, Math.round(Rules.MONSTERS[normal.kind].hp * (mult.hp * 1.5)));
+  assert.strictEqual(d.dungeon.monsterMult, 1.5);
   let res = null;
   d.on('coopEnd', (r) => { res = r; });
   d.dungeon.room = 12;
   d.setStage('fight');
   for (const f of d.players) d.kill(null, f);
   d.tick(0.05);
-  assert.deepStrictEqual(res.reward, { tier: 10, xp: 225, gold: 225, chests: 0 });
-  assert.strictEqual(res.rewardMult, 1.5);
-  assert.deepStrictEqual(Rules.dungeonReward(15, 1.5), { tier: 15, xp: 450, gold: 450, chests: 2 });
-  assert.deepStrictEqual(Rules.dungeonReward(15, 1.5 * 1.5), { tier: 15, xp: 675, gold: 675, chests: 2 });
+  assert.deepStrictEqual(res.reward, { tier: 10, xp: 180, gold: 180, chests: 0 });
+  assert.strictEqual(res.rewardMult, 1.2);
+  assert.deepStrictEqual(Rules.dungeonReward(15, 1.2), { tier: 15, xp: 360, gold: 360, chests: 1 });
+  assert.deepStrictEqual(Rules.dungeonReward(20, 1.2 * 1.2), { tier: 20, xp: 720, gold: 720, chests: 3 });
 });
 
 test('[DNG-14] sondage : golds, XP et coffre calculés selon la salle', () => {

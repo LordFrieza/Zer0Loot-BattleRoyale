@@ -1190,8 +1190,8 @@
   const DUNGEON = {
     countBase: 0.55, // monstres par aventurier dans la salle 1…
     countPerRoom: 0.06, // … puis +0,06 par salle
-    hpPerRoom: 0.08, // +8 % de vie des monstres par salle
-    damagePerRoom: 0.06, // +6 % de dégâts par salle
+    hpPerRoom: 0.11, // +11 % de vie des monstres par salle (8 % avant le renforcement du raid)
+    damagePerRoom: 0.08, // +8 % de dégâts par salle (6 % avant)
     healBetweenRooms: 0.3, // les survivants récupèrent 30 % de leur vie entre deux salles
     enrageAt: 45, // au-delà de 45 s dans une salle, les monstres s'énervent…
     enrageRate: 0.05, // … +5 % de dégâts par seconde
@@ -1289,7 +1289,7 @@
     },
     defi: {
       cmd: '!defi', icon: '💀', label: 'Quitte ou double', color: '#9b59ff',
-      desc: 'Monstres +25 % de vie et de dégâts pour le reste du raid, mais la récompense finale est ×1,5.', effect: { monsters: 1.25, reward: 1.5 },
+      desc: 'Monstres +50 % de vie et de dégâts pour le reste du raid, mais la récompense finale est ×1,2.', effect: { monsters: 1.5, reward: 1.2 },
     },
     raccourci: {
       cmd: '!raccourci', icon: '🗝️', label: 'Passage secret', color: '#c8a2ff',
