@@ -1629,7 +1629,9 @@
     relicEvery: 3,
     relicChoices: 3,
     relicTimeout: 30, // s : passé ce délai, une relique est choisie au hasard
-    rewardScale: 2 / 3, // XP et golds de fin d'expédition
+    // Butin de fin : il monte vite sur les premières profondeurs puis de moins en moins (n^0,73), pour resserrer l'écart
+    // entre débutants et joueurs les plus forts ; coffres : le k-ième à la profondeur 2k² (2, 8, 18, 32, 50, 72…).
+    reward: { xp: 60, gold: 47, power: 0.73 },
     // Seul face aux monstres, le corps à corps est désavantagé (pas de groupe pour encaisser) : vie et dégâts
     // ajustés par classe pendant l'Expédition, pour que chaque classe descende à peu près aussi loin.
     classMult: {
@@ -1652,17 +1654,17 @@
       damage: EXPEDITION.baseDamage * EXPEDITION.damageGrowth ** (depth - 1) * Math.min(EXPEDITION.levelCap, 1 + EXPEDITION.levelDamage * lv),
     };
   }
-  // Récompense pour `floors` étages nettoyés (× `mult` avec la relique Trésor) : 1 coffre tous les 5 étages.
-  // XP et golds × EXPEDITION.rewardScale (2/3 depuis la 1.3 : l'Expédition rapportait trop).
+  // Récompense pour `floors` étages nettoyés : XP et golds = base × n^0,73 (courbe qui s'aplatit), coffres = ⌊√(n/2)⌋.
   function expeditionReward(floors, mult = 1) {
     const n = Math.max(0, Math.floor(floors || 0));
     if (!n) return null;
-    const k = mult * EXPEDITION.rewardScale;
+    const R = EXPEDITION.reward;
+    const k = mult * n ** R.power;
     return {
       floors: n,
-      xp: Math.round((25 * n + 2 * n * n) * k),
-      gold: Math.round((20 * n + 1.5 * n * n) * k),
-      chests: Math.floor(n / 5),
+      xp: Math.round(R.xp * k),
+      gold: Math.round(R.gold * k),
+      chests: Math.floor(Math.sqrt(n / 2)),
     };
   }
   /*
@@ -1683,7 +1685,6 @@
     braise: { label: 'Braise éternelle', icon: '🔥', desc: 'Remplit la moitié de ta barre d\'ultime', effect: { stamina: 0.5 }, needsUlt: true },
     pacte: { label: 'Pacte sanglant', icon: '🩸', desc: '+30 % de dégâts, mais +15 % de dégâts subis', effect: { damage: 1.3, taken: 1.15 } },
     plume: { label: 'Plume de phénix', icon: '🪶', desc: 'Une vie en plus (renaît à 50 %)', effect: { life: 0.5 } },
-    tresor: { label: 'Carte au trésor', icon: '🗺️', desc: '+25 % d\'XP et de golds à la fin', effect: { reward: 1.25 } },
     // Rare : jamais tirée avec les autres, elle remplace une des propositions (SOLO.keyChance). Gardée même en cas de défaite.
     cle_boss: { label: 'Clé de boss', icon: '🗝️', desc: '+1 Clé de boss à la fin de l\'expédition (pour le Défi des boss)', effect: { key: 1 }, rare: true },
   };
@@ -1710,12 +1711,14 @@
    * que la racine carrée du multiplicateur de vie (et dégâts^0,7), sinon elles seraient indestructibles.
    */
   const BOSS_CHALLENGE = {
-    normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 450, gold: 375, chests: 2 } },
-    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 900, gold: 750, chests: 3 } },
-    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 1500, gold: 1350, chests: 6 } },
-    fabuleux: { label: 'Fabuleux', icon: '🌟', ultimate: true, hp: 38, damage: 5.5, special: 1.6, attackSpeed: 1.35, enrageAt: 100, healTaken: 0.45, reward: { xp: 3000, gold: 3500, chests: 10 } },
-    mythique: { label: 'Mythique', icon: '🌟🌟', ultimate: true, hp: 65, damage: 8, special: 1.9, attackSpeed: 1.55, enrageAt: 85, healTaken: 0.25, reward: { xp: 5000, gold: 7000, chests: 16 } },
-    divin: { label: 'Divin', icon: '👑', ultimate: true, hp: 82, damage: 9.5, special: 2, attackSpeed: 1.65, enrageAt: 80, healTaken: 0.2, reward: { xp: 8000, gold: 15000, chests: 25 } },
+    // Récompenses divisées par 2 (Normal à Légendaire) et davantage pour les difficultés ultimes (÷ 2,3 à ÷ 2,7) :
+    // les joueurs montaient trop vite.
+    normal: { label: 'Normal', icon: '⭐', hp: 0.7, damage: 0.7, reward: { xp: 225, gold: 185, chests: 1 } },
+    heroique: { label: 'Héroïque', icon: '⭐⭐', hp: 1.4, damage: 1.25, reward: { xp: 450, gold: 375, chests: 2 } },
+    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', hp: 2.4, damage: 1.6, reward: { xp: 750, gold: 675, chests: 3 } },
+    fabuleux: { label: 'Fabuleux', icon: '🌟', ultimate: true, hp: 38, damage: 5.5, special: 1.6, attackSpeed: 1.35, enrageAt: 100, healTaken: 0.45, reward: { xp: 1300, gold: 1500, chests: 4 } },
+    mythique: { label: 'Mythique', icon: '🌟🌟', ultimate: true, hp: 65, damage: 8, special: 1.9, attackSpeed: 1.55, enrageAt: 85, healTaken: 0.25, reward: { xp: 2000, gold: 2800, chests: 6 } },
+    divin: { label: 'Divin', icon: '👑', ultimate: true, hp: 82, damage: 9.5, special: 2, attackSpeed: 1.65, enrageAt: 80, healTaken: 0.2, reward: { xp: 3000, gold: 5500, chests: 9 } },
   };
   const BOSS_CHALLENGE_ORDER = ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin'];
   // Rang d'une difficulté (0 = Normal) : « Héroïque ou plus », « Légendaire ou plus »…

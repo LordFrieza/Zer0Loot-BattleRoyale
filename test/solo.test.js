@@ -134,8 +134,8 @@ test('[SOLO-4] reliques : 3 au choix toutes les 3 profondeurs, cumulables', () =
   p.hp = 100;
   b.applyRelic('fiole');
   assert.strictEqual(p.hp, 700);
-  b.applyRelic('tresor');
-  assert.strictEqual(b.dungeon.rewardMult, 1.25);
+  assert.strictEqual(Rules.RELICS.tresor, undefined, 'la Carte au trésor (butin ×1,25) a été retirée');
+  assert.ok(Object.values(Rules.RELICS).every((r) => !r.effect.reward), 'aucune relique ne change le butin');
   // Plume de phénix : une vie en plus
   b.applyRelic('plume'); b.dungeon.relics.push('plume');
   assert.ok(b.activeRelics().includes('plume'));
@@ -154,9 +154,19 @@ test('[SOLO-4] reliques : 3 au choix toutes les 3 profondeurs, cumulables', () =
 
 test('[SOLO-5] expédition : butin selon les profondeurs nettoyées', () => {
   assert.strictEqual(Rules.expeditionReward(0), null);
-  assert.deepStrictEqual(Rules.expeditionReward(1), { floors: 1, xp: 18, gold: 14, chests: 0 });
-  assert.deepStrictEqual(Rules.expeditionReward(10), { floors: 10, xp: 300, gold: 233, chests: 2 });
-  assert.deepStrictEqual(Rules.expeditionReward(20, 1.25), { floors: 20, xp: 1083, gold: 833, chests: 4 });
+  // Courbe qui monte vite au début puis s'aplatit : base × n^0,73 ; coffres à 2, 8, 18, 32, 50… (⌊√(n/2)⌋)
+  assert.deepStrictEqual(Rules.EXPEDITION.reward, { xp: 60, gold: 47, power: 0.73 });
+  assert.deepStrictEqual(Rules.expeditionReward(1), { floors: 1, xp: 60, gold: 47, chests: 0 });
+  assert.deepStrictEqual(Rules.expeditionReward(2), { floors: 2, xp: 100, gold: 78, chests: 1 });
+  assert.deepStrictEqual(Rules.expeditionReward(10), { floors: 10, xp: 322, gold: 252, chests: 2 });
+  assert.deepStrictEqual(Rules.expeditionReward(50), { floors: 50, xp: 1043, gold: 817, chests: 5 });
+  assert.deepStrictEqual([8, 18, 32, 72].map((n) => Rules.expeditionReward(n).chests), [2, 3, 4, 6]);
+  // Chaque profondeur rapporte moins que la précédente
+  for (let n = 2; n <= 100; n++) {
+    const gain = Rules.expeditionReward(n).xp - Rules.expeditionReward(n - 1).xp;
+    const before = n > 2 ? Rules.expeditionReward(n - 1).xp - Rules.expeditionReward(n - 2).xp : Infinity;
+    assert.ok(gain > 0 && gain <= before + 1, `profondeur ${n}`);
+  }
   const b = soloBattle('expedition');
   let res = null;
   b.on('coopEnd', (r) => { res = r; });
@@ -195,10 +205,11 @@ test('[SOLO-6] défi des boss : boss à ta mesure, renforcé selon la difficult�
   leg.kill(leg.players[0], leg.boss);
   leg.tick(0.05);
   assert.deepStrictEqual([res.solo, res.victory, res.difficulty, res.boss.id], ['boss', true, 'legendaire', 'troll']);
-  assert.deepStrictEqual(res.reward, { xp: 1500, gold: 1350, chests: 6 });
-  // 1.4 : butin +50 % (arrondi) depuis l'arrivée des Clés de boss
-  assert.deepStrictEqual(['normal', 'heroique', 'legendaire'].map((d) => Rules.BOSS_CHALLENGE[d].reward),
-    [{ xp: 450, gold: 375, chests: 2 }, { xp: 900, gold: 750, chests: 3 }, { xp: 1500, gold: 1350, chests: 6 }]);
+  assert.deepStrictEqual(res.reward, { xp: 750, gold: 675, chests: 3 });
+  // Butin divisé par 2 (et davantage pour les difficultés ultimes) : les joueurs montaient trop vite
+  assert.deepStrictEqual(Rules.BOSS_CHALLENGE_ORDER.map((d) => Rules.BOSS_CHALLENGE[d].reward), [
+    { xp: 225, gold: 185, chests: 1 }, { xp: 450, gold: 375, chests: 2 }, { xp: 750, gold: 675, chests: 3 },
+    { xp: 1300, gold: 1500, chests: 4 }, { xp: 2000, gold: 2800, chests: 6 }, { xp: 3000, gold: 5500, chests: 9 }]);
   normal.on('coopEnd', (r) => { res = r; });
   normal.kill(normal.boss, normal.players[0]);
   normal.tick(0.05);

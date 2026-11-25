@@ -785,7 +785,7 @@ test('[SOLO-1, SOLO-2, SOLO-5, SOLO-6, SOLO-7, SOLO-9, LOOK-7, ACH-4, ADM-3] mod
   bb.kill(bb.players[0], bb.boss);
   bb.tick(0.05);
   ch = (await meOf(s)).character;
-  assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value, ch.bossKeys], [1, before.gold + rw.gold + 375, 2, 2],
+  assert.deepStrictEqual([ch.counters.soloSorcier, ch.gold, ch.energyState.value, ch.bossKeys], [1, before.gold + rw.gold + Rules.BOSS_CHALLENGE.normal.reward.gold, 2, 2],
     'le défi coûte une clé, pas d\'énergie');
   assert.deepStrictEqual([ch.counters.sorcierWins, ch.counters.challengeWins, ch.counters.heroWins, ch.counters.heroSorcier], [1, 1, 0, 0],
     'Normal : pas de peau légendaire');
