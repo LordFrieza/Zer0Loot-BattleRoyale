@@ -487,6 +487,11 @@ test('[TRN-1, TRN-6, TRN-7, TRN-8, BET-1] Tournoi : tableau complet, gains par t
   assert.strictEqual(ca.gold, before.a.gold + win.gold);
   assert.strictEqual(ca.chests, before.a.chests + win.chests);
   assert.strictEqual(ca.record.wins, before.a.record.wins + 1);
+  assert.ok(fa.kills >= 2, 'le champion a gagné ses matchs');
+  assert.strictEqual(ca.record.kills, before.a.record.kills + fa.kills, 'les kills du tournoi comptent dans le record (classement des kills)');
+  assert.strictEqual(ca.record.battles, before.a.record.battles + 1);
+  const board = (await a.get('/api/leaderboard')).data;
+  if (board && board.kills) assert.ok(board.kills.some((p) => p.id === ida && p.value === ca.record.kills), 'visible dans le classement des kills');
   assert.strictEqual(ca.counters.tourneyWins, 1);
   assert.strictEqual(ca.counters.tourneyBest, 2);
   assert.strictEqual(cb.gold, before.b.gold + Rules.tourneyReward(fb.wins).gold, 'b est payé selon les matchs gagnés');

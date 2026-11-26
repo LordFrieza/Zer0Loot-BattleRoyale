@@ -178,3 +178,20 @@ test('[LOOK-6, LOOK-7] peaux légendaires des nouveaux boss : vaincre le Mimic, 
     assert.strictEqual(c.look.body, id);
   }
 });
+
+test('[LOOK-10] coupes de cheveux : 10 coupes à 500 golds, à la place du casque', () => {
+  const hair = Object.entries(Rules.COSMETICS).filter(([, it]) => it.hair);
+  assert.strictEqual(hair.length, 10);
+  assert.ok(hair.every(([, it]) => it.slot === 'hat' && it.price === 500 && !it.unlock && it.color));
+  assert.deepStrictEqual(hair.map(([, it]) => it.label), ['Crête punk', 'Afro', 'Coupe au bol', 'Couettes', 'Queue de cheval', 'Mèche rebelle', 'Banane rock', 'Dreadlocks', 'Chignon', 'Cheveux en pétard']);
+  const c = game.newCharacter();
+  c.gold = 1200;
+  assert.deepStrictEqual(game.buyCosmetic(c, 'cheveux_afro'), { price: 500, worn: true });
+  assert.strictEqual(c.look.hat, 'cheveux_afro', 'portée à la place du casque');
+  assert.strictEqual(c.gold, 700);
+  game.buyCosmetic(c, 'cheveux_crete');
+  assert.strictEqual(c.look.hat, 'cheveux_crete', 'une seule coupe (ou un seul chapeau) à la fois');
+  assert.ok(c.owned.includes('cheveux_afro') && c.owned.includes('cheveux_crete'));
+  game.setLook(c, 'hat', 'cheveux_afro');
+  assert.strictEqual(c.look.hat, 'cheveux_afro');
+});

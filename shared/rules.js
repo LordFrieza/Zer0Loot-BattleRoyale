@@ -3353,6 +3353,17 @@
     couronne: { slot: 'hat', label: 'Couronne royale', price: 1200, color: '#ffc93a' },
     aureole: { slot: 'hat', label: 'Auréole', price: 900, color: '#fff3a0' },
     chat: { slot: 'hat', label: 'Oreilles de chat', price: 250, color: '#f08cb4' },
+    // Coupes de cheveux (emplacement « chapeau » : elles remplacent l'apparence du casque), rangées à part dans la boutique
+    cheveux_crete: { slot: 'hat', hair: true, label: 'Crête punk', price: 500, color: '#ff3fd8' },
+    cheveux_afro: { slot: 'hat', hair: true, label: 'Afro', price: 500, color: '#3a2414' },
+    cheveux_bol: { slot: 'hat', hair: true, label: 'Coupe au bol', price: 500, color: '#b5651d' },
+    cheveux_couettes: { slot: 'hat', hair: true, label: 'Couettes', price: 500, color: '#f2d06b', trim: '#ff6fae' },
+    cheveux_queue: { slot: 'hat', hair: true, label: 'Queue de cheval', price: 500, color: '#c0392b' },
+    cheveux_emo: { slot: 'hat', hair: true, label: 'Mèche rebelle', price: 500, color: '#1e1e3a', trim: '#3fa0ff' },
+    cheveux_banane: { slot: 'hat', hair: true, label: 'Banane rock', price: 500, color: '#20160f' },
+    cheveux_dreads: { slot: 'hat', hair: true, label: 'Dreadlocks', price: 500, color: '#4a3020', trim: '#ffd23f' },
+    cheveux_chignon: { slot: 'hat', hair: true, label: 'Chignon', price: 500, color: '#e8e2f0', trim: '#c0203a' },
+    cheveux_herisses: { slot: 'hat', hair: true, label: 'Cheveux en pétard', price: 500, color: '#ffd23f' },
     couronne_os: { slot: 'hat', label: 'Couronne d\'os', price: 0, color: '#efe6cf', unlock: { metric: 'dungeonBest', goal: 30, desc: 'Atteindre la salle 30 du Raid de Donjon' } },
     // Capes
     cape_rouge: { slot: 'cape', label: 'Cape écarlate', price: 300, color: '#c8323c' },

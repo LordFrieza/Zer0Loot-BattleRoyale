@@ -1990,6 +1990,7 @@ function renderPlaceBar() {
   if (window.WorldMap) WorldMap.setBadges(Object.fromEntries(PLACES.map((x) => [x.id, placeBadge(x)])));
   if ($('place-menu').classList.contains('open')) renderPlaceMenu();
   renderSideNav();
+  placeSideNav(); // (la hauteur de la barre change avec les sous-onglets du lieu)
 }
 
 /*
@@ -2038,6 +2039,9 @@ function renderSideNav() {
 function placeSideNav() {
   const h = document.querySelector('.topbar').getBoundingClientRect().height;
   document.documentElement.style.setProperty('--hdr-h', Math.round(h) + 'px');
+  // Bas de la barre des lieux (collée en haut) : les panneaux collants de l'onglet se posent dessous (aperçu de la boutique)
+  const pb = $('place-bar');
+  if (pb) document.documentElement.style.setProperty('--pb-h', Math.round(pb.getBoundingClientRect().height + (parseFloat(getComputedStyle(pb).top) || 0)) + 'px');
 }
 window.addEventListener('resize', placeSideNav);
 placeSideNav();
@@ -2228,8 +2232,12 @@ function renderShop() {
   $('shop-gold').textContent = c.gold;
   const t = trying && Rules.COSMETICS[trying];
   $('shop-try').innerHTML = t ? `Essai : <b>${esc(t.label)}</b>` : 'Clique sur un article pour l\'essayer';
-  $('shop-list').innerHTML = Object.entries(Rules.COSMETIC_SLOTS).map(([slot, def]) => {
-    const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot)
+  // Les coupes de cheveux (emplacement « chapeau ») ont leur propre rayon, juste après les chapeaux
+  const sections = Object.entries(Rules.COSMETIC_SLOTS).flatMap(([slot, def]) => (slot === 'hat'
+    ? [[slot, def, (it) => !it.hair], [slot, { icon: '💇', plural: 'Coupes de cheveux', note: 'Remplacent l\'apparence du casque' }, (it) => it.hair]]
+    : [[slot, def, () => true]]));
+  $('shop-list').innerHTML = sections.map(([slot, def, keep]) => {
+    const items = Object.entries(Rules.COSMETICS).filter(([, it]) => it.slot === slot && keep(it))
       .sort((a, b) => (!!a[1].unlock - !!b[1].unlock) || (!!a[1].legend - !!b[1].legend) || (a[1].cls || '').localeCompare(b[1].cls || '') || a[1].price - b[1].price);
     return `<div class="shop-cat"><h3>${def.icon} ${def.plural}${def.note ? ` <span class="sub">${def.note}</span>` : ''}</h3><div class="shop-grid">${items.map(([id, it]) => {
       const owned = c.owned.includes(id);

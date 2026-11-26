@@ -626,9 +626,117 @@
   }
 
   // Chapeaux (remplacent l'affichage du casque).
+  /*
+   * Coupes de cheveux : une calotte qui épouse le crâne (le visage regarde vers la droite : les cheveux descendent
+   * derrière, la frange reste au-dessus des yeux), puis la forme propre à la coupe.
+   */
+  function hairCap(ctx, col, fringe = -20.6) {
+    ctx.fillStyle = col;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(10.6, fringe + 1);
+    ctx.quadraticCurveTo(11.6, -28.4, 1, -28.8);
+    ctx.quadraticCurveTo(-11.2, -29, -11.3, -18);
+    ctx.quadraticCurveTo(-11.5, -11, -8.4, -9);
+    ctx.quadraticCurveTo(-7, -14, -5.4, -19);
+    ctx.quadraticCurveTo(0, fringe - 1.6, 4, fringe - 0.4);
+    ctx.quadraticCurveTo(8, fringe, 10.6, fringe + 1);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  function hairShine(ctx) {
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(-1, -18, 8.5, -2.4, -1.6); ctx.stroke();
+  }
+  function drawHair(ctx, id, c) {
+    const dark = shade(c.color, -0.35);
+    switch (id) {
+      case 'cheveux_crete': {
+        hairCap(ctx, dark, -21.5); // côtés rasés
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.moveTo(-8, -26.5);
+        [[-9, -38], [-4, -28.5], [-3, -41], [1, -29], [3, -42], [5, -28.6], [9, -38], [9.5, -27]].forEach(([x, y]) => ctx.lineTo(x, y));
+        ctx.quadraticCurveTo(0, -30.5, -8, -26.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'cheveux_afro': {
+        ctx.fillStyle = c.color;
+        [[-11, -13, 5.5], [-12.5, -20, 6.5], [-8, -27.5, 7.5], [1, -30.5, 8], [8.5, -27, 6.5], [11, -21.5, 3.5]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); });
+        ctx.fillStyle = shade(c.color, 0.25);
+        for (let k = 0; k < 9; k++) { ctx.beginPath(); ctx.arc(-10 + (k * 13) % 20, -31 + (k * 7) % 18, 1, 0, Math.PI * 2); ctx.fill(); }
+        break;
+      }
+      case 'cheveux_bol':
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.moveTo(11.4, -19.6); ctx.quadraticCurveTo(11.8, -30, 0, -30); ctx.quadraticCurveTo(-12.2, -30, -12, -17);
+        ctx.lineTo(-11.4, -12.5); ctx.lineTo(-5, -12.5); ctx.lineTo(-5, -19.6); ctx.closePath(); ctx.fill(); ctx.stroke();
+        hairShine(ctx);
+        break;
+      case 'cheveux_couettes':
+        for (const [x, y, r] of [[-15, -12, 0.35], [13, -15, -0.4]]) {
+          ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+          ctx.beginPath(); ctx.ellipse(x, y, 3.8, 7.5, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = c.trim; ctx.beginPath(); ctx.arc(x * 0.82, y - 6, 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+        hairCap(ctx, c.color);
+        hairShine(ctx);
+        break;
+      case 'cheveux_queue':
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.moveTo(-9, -25); ctx.quadraticCurveTo(-22, -22, -18, -4); ctx.quadraticCurveTo(-16, -12, -11, -18); ctx.closePath(); ctx.fill(); ctx.stroke();
+        hairCap(ctx, c.color);
+        ctx.fillStyle = '#ffd23f'; ctx.fillRect(-13, -24, 4, 3);
+        hairShine(ctx);
+        break;
+      case 'cheveux_emo':
+        hairCap(ctx, c.color);
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.moveTo(-2, -27); ctx.quadraticCurveTo(10, -28, 12, -21); ctx.quadraticCurveTo(11, -16, 9.5, -13.5); ctx.quadraticCurveTo(8, -18.5, 1, -21); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = c.trim; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(1, -26); ctx.quadraticCurveTo(8, -25, 10, -17); ctx.stroke();
+        break;
+      case 'cheveux_banane':
+        hairCap(ctx, c.color);
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.ellipse(4, -30, 10, 5.5, -0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.ellipse(4, -30.5, 6.5, 2.6, -0.25, Math.PI * 1.05, Math.PI * 1.75); ctx.stroke();
+        break;
+      case 'cheveux_dreads':
+        ctx.strokeStyle = c.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        for (const [x0, x1, y1] of [[-10, -13, -4], [-7, -9, -3], [-11, -16, -8], [-3, -2, -6], [8, 11, -10]]) { ctx.beginPath(); ctx.moveTo(x0, -20); ctx.quadraticCurveTo(x0 - 2, (y1 - 20) / 2, x1, y1); ctx.stroke(); }
+        ctx.fillStyle = c.trim;
+        for (const [x, y] of [[-12.5, -7], [-9, -6], [-15, -10]]) { ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fill(); }
+        hairCap(ctx, c.color);
+        break;
+      case 'cheveux_chignon':
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath(); ctx.arc(-4, -31, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        hairCap(ctx, c.color);
+        ctx.strokeStyle = c.trim; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-11, -35); ctx.lineTo(3, -28); ctx.stroke();
+        hairShine(ctx);
+        break;
+      case 'cheveux_herisses': {
+        ctx.fillStyle = c.color; ctx.strokeStyle = INK; ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        const spikes = [[11, -20], [15, -27], [8, -27], [9, -37], [2, -29], [-2, -41], [-5, -29], [-12, -36], [-10, -25], [-17, -24], [-11, -18], [-14, -11], [-8, -10]];
+        ctx.moveTo(10.6, -19.5);
+        spikes.forEach(([x, y]) => ctx.lineTo(x, y));
+        ctx.quadraticCurveTo(-6, -16, -4, -20); ctx.quadraticCurveTo(3, -22, 10.6, -19.5);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      default:
+        hairCap(ctx, c.color);
+    }
+  }
+
   function drawHat(ctx, id) {
     const c = cosmetic(id);
     if (!c) return;
+    if (c.hair) { ctx.save(); drawHair(ctx, id, c); ctx.restore(); return; }
     ctx.fillStyle = c.color;
     ctx.strokeStyle = INK;
     ctx.lineWidth = 1.2;

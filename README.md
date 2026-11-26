@@ -127,6 +127,10 @@ de la file, confirme les `!join` et annonce le vainqueur.
   massacre (5 kills dans la bataille) = +6 coffres.
 - **Niveaux** : il faut 300 XP pour passer niveau 2, puis 200 XP de plus à chaque niveau (300, 500, 700, 900…) ; chaque niveau donne 1 point de compétence. **Niveau maximum : 100** (au-delà, l'XP n'est
   plus comptée ; la fiche affiche « Niveau maximum »).
+- **Coupes de cheveux** (boutique, 500 golds chacune) : Crête punk, Afro, Coupe au bol, Couettes, Queue de cheval,
+  Mèche rebelle, Banane rock, Dreadlocks, Chignon, Cheveux en pétard. Comme un chapeau, une coupe remplace l'apparence
+  du casque (ses stats restent) ; elles ont leur propre rayon dans la boutique. Sur téléphone, l'aperçu de la boutique
+  est un petit bandeau collé en haut qui ne cache plus les articles.
 - **Ton encart dans l'arène** : quand tu regardes l'arène connecté à ton compte (« Regarder l'arène », Solo,
   Entraînement), un encart en bas à droite affiche ton portrait, ta vie (avec la traînée des dégâts reçus), ta barre
   d'ultime (« PRÊT ! » quand elle est pleine), ta potion, tes kills et tes effets, ou « K.O. » ; une flèche **TOI**

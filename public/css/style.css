@@ -727,7 +727,17 @@ li.alch-up { animation: alchUp 1.6s ease-out; font-weight: 800; }
 
 /* ---------- Boutique ---------- */
 .shop-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 18px; align-items: start; }
-@media (max-width: 800px) { .shop-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 800px) {
+  .shop-layout { grid-template-columns: minmax(0, 1fr); }
+  /* Écran étroit : l'aperçu devient un petit bandeau collé sous la barre des lieux (il ne cache plus la liste) */
+  .shop-side {
+    top: calc(var(--pb-h, 0px) + 6px); z-index: 5; display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center;
+    gap: 2px 12px; padding: 4px 10px; text-align: left; box-shadow: 0 8px 18px rgba(0, 0, 0, .45);
+  }
+  .shop-side canvas { width: 64px; height: auto; grid-row: span 2; }
+  .shop-side #shop-try { font-size: 13px; align-self: end; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shop-side .wallet-line { margin: 0; font-size: 14px; align-self: start; }
+}
 .shop-side { position: sticky; top: 130px; text-align: center; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .wallet-line { margin-top: 8px; font-size: 16px; }
 .shop-cat h3 { margin: 6px 0 8px; font-family: var(--title-font); font-size: 15px; }

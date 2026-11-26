@@ -1206,6 +1206,7 @@ battle.on('tourneyEnd', (result, fighters) => {
     if (!user) continue;
     game.upgrade(user.character);
     user.character.record.battles += 1;
+    user.character.record.kills += f.kills || 0; // les kills de tous ses matchs comptent dans le classement des kills
     const participation = scaled(Rules.REWARDS.participation);
     const pl = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
