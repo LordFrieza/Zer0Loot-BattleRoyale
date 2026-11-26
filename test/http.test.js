@@ -418,7 +418,7 @@ test('[BOSS-8, BOSS-7, LOOK-7] Combat de Boss : l\'admin choisit le boss (Dragon
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompense de victoire au meilleur score', async () => {
+test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompense de victoire au meilleur score, kills au classement', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();
   const b = client();
@@ -433,7 +433,9 @@ test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompen
   await admin.post('/api/admin/battle/start');
   battle.stopLoop();
   const fa = battle.players.find((f) => f.userId === ida);
+  const fb = battle.players.find((f) => f.userId === idb);
   fa.score = 50;
+  battle.kill(fa, fb); // un kill pendant la partie (fb reviendra plus tard)
   battle.time = Rules.KOTH.duration;
   battle.tick(0.05);
   assert.strictEqual(battle.result.mode, 'koth');
@@ -441,7 +443,9 @@ test('[KOTH-6, BET-1, PRG-4, ACH-4] Roi de la Colline : paris ouverts, récompen
   const ch = (await meOf(a)).character;
   assert.strictEqual(ch.record.wins, 1);
   assert.strictEqual(ch.counters.kothWins, 1);
+  assert.strictEqual(ch.record.kills, 1, 'les kills du Roi de la Colline comptent au classement des kills');
   assert.strictEqual((await meOf(b)).character.counters.kothWins, 0);
+  assert.strictEqual((await meOf(b)).character.record.kills, 0);
   assert.strictEqual(ch.gold, 100 + Rules.REWARDS.win.gold);
   await admin.post('/api/admin/battle/reset');
 });
@@ -511,7 +515,7 @@ test('[TRN-1, TRN-6, TRN-7, TRN-8, BET-1] Tournoi : tableau complet, gains par t
   await admin.post('/api/admin/battle/reset');
 });
 
-test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changement de camp, récompenses et paris d\'équipe', async () => {
+test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changement de camp, récompenses, kills et paris d\'équipe', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();
   const b = client();
@@ -539,13 +543,16 @@ test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changem
   const fa = battle.players.find((f) => f.userId === ida);
   assert.strictEqual(fa.clan, 'rouge', 'l\'équipe choisie survit au recalcul des stats du lancement');
   fa.dealt = 9999; // MVP
-  battle.kill(fa, battle.clans.crystals.bleu);
+  const fbClan = battle.players.find((f) => f.userId === idb);
+  battle.kill(fa, fbClan); // un combattant abattu : compte au classement des kills
+  battle.kill(fa, battle.clans.crystals.bleu); // le cristal : non
   battle.tick(0.05);
   assert.strictEqual(battle.result.winner, 'rouge');
   const ca = (await meOf(a)).character;
   assert.strictEqual(ca.gold, Rules.CLANS.reward.gold);
   assert.strictEqual(ca.chests, Rules.CLANS.reward.chests + Rules.CLANS.mvpChests, 'victoire + MVP');
   assert.strictEqual(ca.record.wins, 1);
+  assert.strictEqual(ca.record.kills, 1, 'le combattant abattu compte, pas le cristal');
   assert.deepStrictEqual([ca.counters.clansWins, ca.counters.clansMvp], [1, 1]);
   const cb = (await meOf(b)).character;
   assert.deepStrictEqual([cb.counters.clansWins, cb.counters.clansMvp], [0, 0]);

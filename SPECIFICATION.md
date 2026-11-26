@@ -279,7 +279,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **KOTH-3** Chaque seconde passée sur la colline doit rapporter 2 points à chaque combattant présent, ou 5 points à celui qui y est seul (le Roi, événement `king` quand il change) ; un kill doit rapporter 2 points (aucune récompense de kill ni de série, comme en coopération).
 - **KOTH-4** Un combattant tué doit réapparaître au bord de l'arène au bout de 4 s, avec toute sa vie, et être intouchable et non ciblable pendant 1,5 s (événement `respawn`).
 - **KOTH-5** Les combattants doivent viser de préférence les ennemis proches de la colline ; un combattant hors de la colline (au-delà de 80 % de son rayon) dont la cible est hors de portée et hors de la colline doit marcher vers la colline au lieu de la poursuivre, de même quand il n'a personne à viser.
-- **KOTH-6** À 150 s, le meilleur score doit gagner (égalité : le plus de kills, puis au hasard) : le résultat (`mode: 'koth'`) classe tout le monde par score, et le vainqueur reçoit les récompenses et les paris comme en Battle Royale (`end`).
+- **KOTH-6** À 150 s, le meilleur score doit gagner (égalité : le plus de kills, puis au hasard) : le résultat (`mode: 'koth'`) classe tout le monde par score, et le vainqueur reçoit les récompenses et les paris comme en Battle Royale (`end`). Les combattants abattus par chaque humain pendant la partie s'ajoutent à son record de kills (classement des kills), comme en Battle Royale.
 
 ### 7.10 bis Tournoi
 
@@ -302,7 +302,7 @@ Description du comportement **réellement implémenté** (déduite du code), au 
 - **CLAN-5** Un combattant tué doit réapparaître dans son camp, avec toute sa vie et protégé 1,5 s, au bout de `min(30, 5 × nombre de morts)` secondes (5 s, puis 10 s, 15 s…).
 - **CLAN-6** À partir de 90 s (« mort subite », événement `overtime`), les cristaux doivent subir des dégâts ×3.
 - **CLAN-7** La partie doit se terminer quand un cristal est détruit (l'autre équipe gagne), sinon à 180 s : le cristal qui a gardé la plus grande part de sa vie gagne (égalité : le plus de kills, puis au hasard). Le résultat (`mode: 'clans'`) donne l'équipe gagnante, l'état des deux équipes, le MVP (le plus de dégâts infligés) et le classement par dégâts.
-- **CLAN-8** À la fin, chaque humain doit gagner 100 XP de participation (+1 bataille) ; chaque humain de l'équipe gagnante, 600 XP, 120 golds, 3 coffres et +1 victoire ; le MVP, 3 coffres de plus. Ces récompenses ne dépendent pas de la puissance (PWR-3 : l'équipe faible est déjà renforcée, CLAN-2). Aucune récompense de kill ni de série.
+- **CLAN-8** À la fin, chaque humain doit gagner 100 XP de participation (+1 bataille) ; chaque humain de l'équipe gagnante, 600 XP, 120 golds, 3 coffres et +1 victoire ; le MVP, 3 coffres de plus. Ces récompenses ne dépendent pas de la puissance (PWR-3 : l'équipe faible est déjà renforcée, CLAN-2). Aucune récompense de kill ni de série, mais les combattants abattus par chaque humain (pas le cristal) s'ajoutent à son record de kills (classement des kills).
 - **CLAN-9** En Guerre des clans, les paris doivent porter sur une équipe (`clan:rouge` ou `clan:bleu`, la sienne comprise), jamais sur un combattant ; les parieurs de l'équipe gagnante se partagent la cagnotte comme pour un combattant gagnant.
 
 ### 7.12 Ruée vers l'or (mode bonus)

@@ -600,7 +600,8 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Côté joueurs, un bandeau à côté de « Arène en direct » annonce le prochain mode et le temps restant (puis « file
   ouverte » avec le compte à rebours du lancement) ; un clic ouvre le planning de la semaine.
 - **Classements** (top 10, podium pour le top 3, page perso et page admin) : victoires (Battle Royale, Roi de la Colline,
-  Guerre des clans), kills (Battle Royale uniquement), batailles jouées (tous les modes du stream), record de profondeur
+  Guerre des clans, Tournoi), kills (tous les modes où l'on s'affronte : Battle Royale, Roi de la Colline, Guerre des
+  clans — combattants abattus, pas le cristal — et Tournoi), batailles jouées (tous les modes du stream), record de profondeur
   en Expédition, record de salle du Raid de Donjon, record de vague au Survivor, coffres ouverts, légendaires sortis
   des coffres, jackpots au casino, profits positifs au casino (gagné − misé, les plus gros gagnants), profits négatifs au
   casino (misé − gagné, les plus poissards en haut) et joueurs les plus riches (golds possédés en ce

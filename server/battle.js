@@ -3296,6 +3296,8 @@ class Battle extends EventEmitter {
     }
     if (!killer) return;
     killer.kills += 1;
+    // Combattants abattus (ni monstre, ni cristal) : ceux qui comptent au classement des kills
+    if (victim.kind === 'player' && killer.kind === 'player') killer.playerKills = (killer.playerKills || 0) + 1;
     if (killer.techs.includes('frenesie') && killer.alive) {
       this.addBuff(killer, 'frenesie', 5, { attackSpeed: 1.4 });
       this.events.push({ t: 'tech', from: killer.key, id: 'frenesie' });

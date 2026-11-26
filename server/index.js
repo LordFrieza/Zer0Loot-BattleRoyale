@@ -1097,6 +1097,8 @@ battle.on('end', (winner, fighters) => {
       if (battle.mode === 'koth') game.bump(user.character, 'kothWins');
       io.to('user:' + user.id).emit('reward', { type: 'win', reward: win, levels });
     }
+    // Roi de la Colline : les kills de la partie comptent dans le record (en Battle Royale, ils sont comptés à chaque kill)
+    if (battle.mode === 'koth') user.character.record.kills += f.playerKills || 0;
     recordBattle(f, user, f === winner ? 'win' : 'loss', battle.mode === 'koth' ? { score: Math.floor(f.score || 0), hillTime: Math.round(f.hillTime || 0) } : {});
     pushMe(user);
   }
@@ -1206,7 +1208,7 @@ battle.on('tourneyEnd', (result, fighters) => {
     if (!user) continue;
     game.upgrade(user.character);
     user.character.record.battles += 1;
-    user.character.record.kills += f.kills || 0; // les kills de tous ses matchs comptent dans le classement des kills
+    user.character.record.kills += f.playerKills || 0; // les kills de tous ses matchs comptent dans le classement des kills
     const participation = scaled(Rules.REWARDS.participation);
     const pl = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
@@ -1278,6 +1280,7 @@ battle.on('clansEnd', (result, fighters) => {
     const user = f.userId && db.state.users[f.userId];
     if (!user) continue;
     user.character.record.battles += 1;
+    user.character.record.kills += f.playerKills || 0; // combattants abattus (pas les cristaux), pour le classement des kills
     const participation = { ...Rules.REWARDS.participation };
     const pl = grantBattle(user, participation);
     io.to('user:' + user.id).emit('reward', { type: 'participation', reward: participation, levels: pl });
