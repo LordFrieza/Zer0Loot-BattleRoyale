@@ -48,6 +48,8 @@
     session: [], // dernières prises de la séance
     // Étang partagé : liste reçue du serveur, barques des autres (uid → barque), barques qui repartent, sa bulle, ses réactions
     pond: null, boats: new Map(), leaving: [], mine: { bubble: null, floats: [] }, socket: null, chat: null, contest: null, schoolEnd: 0,
+    // Météo (Rules.fishWeather, la même pour tous), houle, gouttes / flocons, éclairs ; aperçu de la barque (boutique)
+    weather: 'normal', waveAmp: 1, drops: [], flash: 0, nextFlash: 0, previewBoat: null, lockUntil: 0, shopTab: 'baits',
   };
   try { S.auto = localStorage.getItem('zl_fish_auto') === '1'; } catch (e) { /* ignore */ }
 
@@ -246,13 +248,18 @@
   // ({ name, cls, look, app }), pet (espèce), legend (canne légendaire), reeling, hop }. Renvoie le bout de la canne et
   // le haut de la tête (repère de l'écran).
   function drawBoatAt(ctx, t, ph, B) {
-    const bob = Math.sin(t / 800 + (B.phase || 0)) * 3;
+    const bob = Math.sin(t / (S.weather === 'tempete' ? 520 : 800) + (B.phase || 0)) * 3 * S.waveAmp;
     const by = B.y + bob * B.s;
+    const eq = { ...Rules.BOAT_DEFAULT, ...(B.boat || {}) };
+    const opt = (part) => Rules.BOAT_PARTS[part].options[eq[part]] || Object.values(Rules.BOAT_PARTS[part].options)[0];
     ctx.save();
     ctx.translate(B.x, by);
     ctx.scale(B.s * B.dir, B.s);
+    if (S.weather === 'tempete') ctx.rotate(Math.sin(t / 700 + (B.phase || 0)) * 0.04);
     // reflet sombre
     ctx.fillStyle = 'rgba(0,20,40,.25)'; ctx.beginPath(); ctx.ellipse(0, 30, 120, 12, 0, 0, Math.PI * 2); ctx.fill();
+    // fanion au mât (derrière le personnage)
+    drawFlag(ctx, t, opt('fanion'));
     // personnage debout dans la barque (on cache son arme habituelle : il tient la canne)
     // (pieds sous le bord de la coque : on ne voit que le haut du corps, il est vraiment DANS la barque)
     // (le pseudo donne la couleur de peau « automatique », comme partout ailleurs)
@@ -262,20 +269,10 @@
       const hop = B.hop > 0 ? -Math.abs(Math.sin(B.hop * 12)) * 14 : 0;
       drawPet(ctx, 64, 6 + hop, B.pet, { t, size: 0.95, facing: 1 });
     }
-    // coque
-    const hull = ctx.createLinearGradient(0, -4, 0, 30);
-    hull.addColorStop(0, '#a8703e'); hull.addColorStop(1, '#6a4020');
-    ctx.fillStyle = hull;
-    ctx.beginPath(); ctx.moveTo(-118, -6); ctx.lineTo(118, -6); ctx.quadraticCurveTo(100, 28, 60, 30); ctx.lineTo(-70, 30); ctx.quadraticCurveTo(-106, 26, -118, -6); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#4a2a10'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,220,170,.25)'; ctx.lineWidth = 1.5;
-    for (const k of [6, 15]) { ctx.beginPath(); ctx.moveTo(-110 + k * 0.6, k - 6); ctx.lineTo(108 - k * 0.6, k - 6); ctx.stroke(); }
-    ctx.fillStyle = '#c8905a'; ctx.fillRect(-118, -9, 236, 5);
-    // lanterne sur la poupe (allumée le soir et la nuit)
-    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-108, -8); ctx.lineTo(-108, -46); ctx.lineTo(-96, -46); ctx.stroke();
-    if (ph.night || ph.dusk) { const gl = ctx.createRadialGradient(-96, -38, 2, -96, -38, 50); gl.addColorStop(0, 'rgba(255,210,120,.6)'); gl.addColorStop(1, 'rgba(255,210,120,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(-96, -38, 50, 0, Math.PI * 2); ctx.fill(); }
-    ctx.fillStyle = ph.night || ph.dusk ? '#ffe9a8' : '#e8e0c8'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1.5;
-    ctx.fillRect(-101, -44, 10, 12); ctx.strokeRect(-101, -44, 10, 12);
+    drawHull(ctx, t, opt('coque'));
+    drawAnchor(ctx, t, opt('ancre'));
+    drawFigurehead(ctx, t, eq.proue);
+    drawLantern(ctx, t, ph, opt('lanterne'));
     // canne (dorée avec la canne légendaire)
     const hand = { x: 8, y: -43 };
     const tip = tipLocal(t, B.reeling);
@@ -291,6 +288,119 @@
     };
   }
 
+  // ---------- Pièces de la barque (Rules.BOAT_PARTS), dans le repère de la barque ----------
+  function hullPath(ctx) {
+    ctx.beginPath(); ctx.moveTo(-118, -6); ctx.lineTo(118, -6); ctx.quadraticCurveTo(100, 28, 60, 30); ctx.lineTo(-70, 30); ctx.quadraticCurveTo(-106, 26, -118, -6); ctx.closePath();
+  }
+  function drawHull(ctx, t, O) {
+    const hull = ctx.createLinearGradient(0, -4, 0, 30);
+    hull.addColorStop(0, O.hull[0]); hull.addColorStop(1, O.hull[1]);
+    ctx.fillStyle = hull;
+    hullPath(ctx); ctx.fill();
+    ctx.save(); hullPath(ctx); ctx.clip();
+    if (O.scales) {
+      // écailles de dragon
+      ctx.strokeStyle = 'rgba(255, 200, 80, .35)'; ctx.lineWidth = 1.2;
+      for (let row = 0; row < 4; row++) for (let x = -120 + (row % 2) * 9; x < 120; x += 18) { ctx.beginPath(); ctx.arc(x, row * 8 - 2, 9, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+    }
+    if (O.skull) {
+      // tête de mort peinte et bandes
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.beginPath(); ctx.arc(0, 10, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-4, 14, 8, 5);
+      ctx.fillStyle = O.hull[1]; ctx.beginPath(); ctx.arc(-2.6, 9, 1.8, 0, Math.PI * 2); ctx.arc(2.6, 9, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-13, 3); ctx.lineTo(13, 21); ctx.moveTo(13, 3); ctx.lineTo(-13, 21); ctx.stroke();
+      ctx.strokeStyle = O.rim; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-118, 22); ctx.lineTo(118, 22); ctx.stroke();
+    }
+    if (O.shine) {
+      // reflet qui glisse sur la coque
+      const x = ((t / 9) % 360) - 180;
+      const g = ctx.createLinearGradient(x - 30, 0, x + 30, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 30, -10, 60, 44);
+    }
+    ctx.restore();
+    hullPath(ctx); ctx.strokeStyle = O.line; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,220,170,.22)'; ctx.lineWidth = 1.5;
+    for (const k of [6, 15]) { ctx.beginPath(); ctx.moveTo(-110 + k * 0.6, k - 6); ctx.lineTo(108 - k * 0.6, k - 6); ctx.stroke(); }
+    ctx.fillStyle = O.rim; ctx.fillRect(-118, -9, 236, 5);
+  }
+  function drawLantern(ctx, t, ph, O) {
+    const lit = ph.night || ph.dusk || S.weather === 'brume' || S.weather === 'tempete' || S.weather === 'aurore';
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-108, -8); ctx.lineTo(-108, -46); ctx.lineTo(-96, -46); ctx.stroke();
+    const flick = 0.85 + Math.sin(t / 90) * 0.08 + Math.sin(t / 37) * 0.05;
+    if (lit) { const gl = ctx.createRadialGradient(-96, -38, 2, -96, -38, 50); gl.addColorStop(0, `rgba(${O.glow},${0.6 * flick})`); gl.addColorStop(1, `rgba(${O.glow},0)`); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(-96, -38, 50, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1.5;
+    if (O.pumpkin) {
+      ctx.fillStyle = '#f08a1a'; ctx.beginPath(); ctx.ellipse(-96, -37, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = lit ? '#ffe86a' : '#5a2a0a'; ctx.beginPath(); ctx.moveTo(-99, -39); ctx.lineTo(-97, -41); ctx.lineTo(-97, -38); ctx.fill(); ctx.beginPath(); ctx.moveTo(-93, -39); ctx.lineTo(-95, -41); ctx.lineTo(-95, -38); ctx.fill();
+      ctx.fillRect(-99, -35, 6, 1.6);
+      ctx.fillStyle = '#4a8a2a'; ctx.fillRect(-97, -46, 2, 3);
+    } else if (O.paper) {
+      ctx.fillStyle = O.glass; ctx.beginPath(); ctx.ellipse(-96, -37, 7, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(80,20,10,.5)'; for (const dy of [-41, -37, -33]) { ctx.beginPath(); ctx.moveTo(-102, dy); ctx.lineTo(-90, dy); ctx.stroke(); }
+    } else if (O.wisp) {
+      ctx.fillStyle = 'rgba(160,255,190,.25)'; ctx.fillRect(-101, -44, 10, 12); ctx.strokeRect(-101, -44, 10, 12);
+      ctx.save(); ctx.shadowColor = '#8affb0'; ctx.shadowBlur = 10; ctx.fillStyle = O.glass;
+      ctx.beginPath(); ctx.arc(-96, -38 + Math.sin(t / 200) * 1.5, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    } else {
+      ctx.fillStyle = lit ? O.glass : '#e8e0c8'; ctx.fillRect(-101, -44, 10, 12); ctx.strokeRect(-101, -44, 10, 12);
+    }
+  }
+  function drawAnchor(ctx, t, O) {
+    if (!O.color) return;
+    // corde depuis le bord, ancre posée contre la coque
+    ctx.strokeStyle = '#c8b080'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-58, -8); ctx.quadraticCurveTo(-62, 2, -60, 6); ctx.stroke();
+    ctx.save(); ctx.translate(-60, 16); ctx.rotate(Math.sin(t / 900) * 0.08);
+    ctx.strokeStyle = O.color; ctx.fillStyle = O.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, -10, 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(0, 8); ctx.moveTo(-6, -3); ctx.lineTo(6, -3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 2, 8, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, 4); ctx.lineTo(-10, 0); ctx.lineTo(-5, 3); ctx.fill(); ctx.beginPath(); ctx.moveTo(8, 4); ctx.lineTo(10, 0); ctx.lineTo(5, 3); ctx.fill();
+    ctx.restore();
+  }
+  function drawFlag(ctx, t, O) {
+    if (!O.colors && !O.rainbow) return;
+    ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-74, -6); ctx.lineTo(-74, -96); ctx.stroke();
+    const wind = S.weather === 'tempete' ? 2.4 : 1;
+    const pts = [];
+    for (let i = 0; i <= 8; i++) { const k = i / 8; pts.push([-74 - k * 30, Math.sin(t / (160 / wind) - k * 5) * 3 * k * wind]); }
+    const path = () => { ctx.beginPath(); ctx.moveTo(-74, -94); for (const [x, w] of pts) ctx.lineTo(x, -94 + w); for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], -76 + pts[i][1]); ctx.closePath(); };
+    ctx.save(); path(); ctx.clip();
+    if (O.rainbow) ['#ff4a4a', '#ff9a2a', '#ffe03a', '#4ad84a', '#3a8aff', '#9a4aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-110, -95 + i * 3.2, 40, 3.4); });
+    else { ctx.fillStyle = O.colors[0]; ctx.fillRect(-110, -96, 40, 22); ctx.fillStyle = O.colors[1]; ctx.fillRect(-110, -80, 40, 5); }
+    if (O.skull) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-89, -87, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-91, -85, 4, 3); }
+    if (O.text) { ctx.save(); ctx.scale(-1, 1); ctx.fillStyle = '#fff'; ctx.font = '900 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(O.text, 89, -81); ctx.restore(); }
+    ctx.restore();
+  }
+  function drawFigurehead(ctx, t, id) {
+    if (!id || id === 'aucune') return;
+    ctx.save(); ctx.translate(120, -8);
+    if (id === 'canard') {
+      ctx.fillStyle = '#ffd83a'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(5, -7, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff8a1a'; ctx.beginPath(); ctx.moveTo(9, -8); ctx.lineTo(15, -6.5); ctx.lineTo(9, -5); ctx.fill();
+      ctx.fillStyle = '#1d1a26'; ctx.beginPath(); ctx.arc(6, -8.5, 1, 0, Math.PI * 2); ctx.fill();
+    } else if (id === 'licorne') {
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#c8a8e8'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-4, 4); ctx.quadraticCurveTo(0, -14, 10, -16); ctx.quadraticCurveTo(18, -14, 16, -8); ctx.lineTo(6, -6); ctx.lineTo(4, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd34a'; ctx.beginPath(); ctx.moveTo(10, -16); ctx.lineTo(16, -28); ctx.lineTo(13, -15); ctx.fill();
+      ctx.fillStyle = '#ff8ad8'; ctx.beginPath(); ctx.moveTo(-4, -2); ctx.quadraticCurveTo(-8, -10, 2, -14); ctx.lineTo(4, -8); ctx.fill();
+      ctx.fillStyle = '#1d1a26'; ctx.beginPath(); ctx.arc(11, -12, 1.1, 0, Math.PI * 2); ctx.fill();
+    } else if (id === 'dragon') {
+      ctx.fillStyle = '#3a8a4a'; ctx.strokeStyle = '#1a4a24'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-4, 6); ctx.quadraticCurveTo(-2, -16, 12, -18); ctx.lineTo(22, -14); ctx.lineTo(14, -9); ctx.lineTo(18, -6); ctx.lineTo(6, -5); ctx.lineTo(4, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffcc44'; for (const [x, y] of [[0, -10], [3, -16], [8, -20]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y - 6); ctx.lineTo(x + 3, y - 1); ctx.fill(); }
+      ctx.fillStyle = '#ff4a2a'; ctx.beginPath(); ctx.arc(13, -14, 1.5, 0, Math.PI * 2); ctx.fill();
+      if (Math.sin(t / 400) > 0.7) { ctx.fillStyle = 'rgba(255,140,40,.6)'; ctx.beginPath(); ctx.arc(26, -12, 3, 0, Math.PI * 2); ctx.fill(); }
+    } else if (id === 'sirene') {
+      ctx.fillStyle = '#ffcc44'; ctx.strokeStyle = '#8a5a08'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-6, 8); ctx.quadraticCurveTo(-2, -4, 4, -8); ctx.quadraticCurveTo(10, -12, 8, -20); ctx.arc(8, -24, 4.5, Math.PI / 2, Math.PI * 2.5); ctx.quadraticCurveTo(14, -10, 8, -2); ctx.lineTo(4, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e8a020'; ctx.beginPath(); ctx.moveTo(-6, 8); ctx.lineTo(-12, 12); ctx.lineTo(-4, 12); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function myBoat() {
     const c = me.character;
     const P = c.pets;
@@ -299,6 +409,7 @@
       x: BOAT.x, y: BOAT.y, s: BOAT.s, dir: 1, phase: 0,
       fighter: { name: me.twitchDisplayName || me.username, cls: c.cls, look: lookOf(), app: c.look },
       pet: pet && pet.species, legend: c.look && c.look.weapon === 'canne_legendaire', reeling: S.phase === 'reel', hop: S.petHop,
+      boat: S.previewBoat || (c.boat && c.boat.equip),
     };
   }
   // ---------- Les autres pêcheurs de l'étang ----------
@@ -382,7 +493,7 @@
     return {
       x, y: b.pos.y, s: b.pos.s, dir, phase: b.phase, rowing,
       fighter: { name: m.name, cls: m.cls, look: m.look, app: m.app }, pet: m.pet,
-      legend: m.app && m.app.weapon === 'canne_legendaire', reeling: b.state === 'reel' && !rowing, hop: b.hop,
+      legend: m.app && m.app.weapon === 'canne_legendaire', reeling: b.state === 'reel' && !rowing, hop: b.hop, boat: m.boat,
     };
   }
   // Sillage et rames d'une barque qui arrive ou repart
@@ -550,6 +661,157 @@
     if (m.uid === me.id) { S.mine.bubble = bubbleOf(m); return; }
     const b = S.boats.get(m.uid);
     if (b) b.bubble = bubbleOf(m);
+  }
+
+  // ---------- Météo (Rules.fishWeather) : animations ----------
+  const WINFO = Rules.FISH_WEATHER.kinds;
+  function updateWeather(dt) {
+    if (!S.weatherAt || performance.now() > S.weatherAt) {
+      S.weatherAt = performance.now() + 3000;
+      const w = window.ZL_WEATHER || Rules.fishWeather(Date.now());
+      if (w !== S.weather) { S.weather = w; S.drops = []; renderSide(); }
+    }
+    const amp = S.weather === 'tempete' ? 2.3 : S.weather === 'pluie' ? 1.3 : 1;
+    S.waveAmp += (amp - S.waveAmp) * Math.min(1, dt * 0.8);
+  }
+  // Nuages bas qui masquent le ciel (pluie, tempête, neige)
+  function heavyClouds(ctx, t, color, n, speed) {
+    ctx.fillStyle = color;
+    for (let i = 0; i < n; i++) {
+      const x = ((i * 157 + t / speed) % (W + 300)) - 150;
+      const y = 18 + (i % 4) * 26;
+      ctx.beginPath(); ctx.ellipse(x, y, 110, 30, 0, 0, Math.PI * 2); ctx.ellipse(x + 70, y + 8, 80, 24, 0, 0, Math.PI * 2); ctx.ellipse(x - 70, y + 10, 70, 22, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function drawWeatherSky(ctx, t, ph) {
+    const w = S.weather;
+    if (w === 'pluie') { ctx.fillStyle = 'rgba(60, 70, 90, .38)'; ctx.fillRect(0, 0, W, WATER); heavyClouds(ctx, t, ph.night ? 'rgba(40,44,60,.85)' : 'rgba(120,128,145,.85)', 9, 120); }
+    else if (w === 'tempete') {
+      ctx.fillStyle = 'rgba(20, 20, 40, .6)'; ctx.fillRect(0, 0, W, WATER);
+      heavyClouds(ctx, t, 'rgba(34,34,52,.92)', 11, 45);
+      // éclair : zigzag et grondement
+      if (performance.now() > S.nextFlash) {
+        S.nextFlash = performance.now() + 4000 + Math.random() * 9000;
+        S.flash = 1;
+        S.bolt = { x: 80 + Math.random() * (W - 160), seed: Math.random() };
+        setTimeout(() => { if (S.active && S.weather === 'tempete') Sound.play('fishThunder'); }, 250 + Math.random() * 500);
+      }
+      if (S.flash > 0.4 && S.bolt) {
+        ctx.save(); ctx.strokeStyle = `rgba(255,255,230,${S.flash})`; ctx.lineWidth = 3; ctx.shadowColor = '#bfe8ff'; ctx.shadowBlur = 18;
+        ctx.beginPath(); let x = S.bolt.x; let y = 0; ctx.moveTo(x, y);
+        for (let i = 0; i < 9; i++) { x += Math.sin(S.bolt.seed * 50 + i * 2.3) * 22; y += WATER / 9; ctx.lineTo(x, y); }
+        ctx.stroke(); ctx.restore();
+      }
+    } else if (w === 'neige') { ctx.fillStyle = 'rgba(225, 232, 245, .35)'; ctx.fillRect(0, 0, W, WATER); heavyClouds(ctx, t, ph.night ? 'rgba(90,96,120,.6)' : 'rgba(235,238,245,.75)', 7, 160); }
+    else if (w === 'aurore') {
+      ctx.fillStyle = 'rgba(8, 10, 40, .62)'; ctx.fillRect(0, 0, W, WATER);
+      for (let i = 0; i < 80; i++) { ctx.fillStyle = `rgba(255,255,255,${0.25 + 0.5 * Math.abs(Math.sin(t / 900 + i))})`; ctx.fillRect((i * 97.3) % W, (i * 37.9) % (WATER - 80), 1.6, 1.6); }
+      // rubans de l'aurore qui ondulent
+      const bands = [['120,255,200', 60, 0], ['200,130,255', 95, 2], ['120,220,255', 125, 4]];
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const [rgb, y0, ph0] of bands) {
+        for (let x = 0; x < W; x += 6) {
+          const y = y0 + Math.sin(x / 120 + t / 1800 + ph0) * 22 + Math.sin(x / 47 + t / 900) * 6;
+          const h = 50 + Math.sin(x / 80 + t / 1300 + ph0) * 25;
+          const g = ctx.createLinearGradient(0, y - h, 0, y + 10);
+          g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.7, `rgba(${rgb},.22)`); g.addColorStop(1, `rgba(${rgb},0)`);
+          ctx.fillStyle = g; ctx.fillRect(x, y - h, 7, h + 10);
+        }
+      }
+      ctx.restore();
+    }
+  }
+  function drawWeatherWater(ctx, t) {
+    const w = S.weather;
+    if (w === 'pluie' || w === 'tempete') {
+      // gouttes qui tombent dans l'eau
+      ctx.strokeStyle = 'rgba(220,235,255,.45)'; ctx.lineWidth = 1;
+      const n = w === 'tempete' ? 40 : 26;
+      for (let i = 0; i < n; i++) {
+        const p = ((t / 700) + i * 0.137) % 1;
+        const x = (i * 211.7 + Math.floor((t / 700) + i * 0.137) * 97) % W;
+        const y = WATER + 10 + ((i * 53.3) % (H - WATER - 20));
+        ctx.globalAlpha = 1 - p; ctx.beginPath(); ctx.ellipse(x, y, 2 + p * 9, (2 + p * 9) * 0.32, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(30, 40, 60, .22)'; ctx.fillRect(0, WATER, W, H - WATER);
+    }
+    if (w === 'tempete') {
+      // moutons d'écume sur la houle
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+      for (let r = 0; r < 8; r++) {
+        const y = WATER + 20 + r * 34;
+        for (let i = 0; i < 6; i++) {
+          const x = ((i * 190 + r * 60 + t / 14) % (W + 120)) - 60;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 16, y - 7, x + 34, y); ctx.stroke();
+        }
+      }
+    }
+    if (w === 'neige') { ctx.fillStyle = 'rgba(230, 240, 255, .16)'; ctx.fillRect(0, WATER, W, H - WATER); }
+    if (w === 'aurore') {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 12; i++) { const y = WATER + 10 + i * 9; ctx.fillStyle = `rgba(${i % 2 ? '120,255,200' : '200,130,255'},${0.09 - i * 0.006})`; ctx.fillRect(Math.sin(t / 600 + i) * 30, y, W, 3); }
+      ctx.restore();
+    }
+  }
+  // Devant tout (sauf l'interface) : pluie, neige, brume, éclair
+  function drawWeatherFront(ctx, t, dt) {
+    const w = S.weather;
+    const want = w === 'tempete' ? 240 : w === 'pluie' ? 150 : w === 'neige' ? 130 : 0;
+    while (S.drops.length < want) S.drops.push({ x: Math.random() * (W + 200) - 100, y: Math.random() * H, v: 0.7 + Math.random() * 0.6, p: Math.random() * 6 });
+    if (S.drops.length > want) S.drops.length = want;
+    if (w === 'pluie' || w === 'tempete') {
+      const slant = w === 'tempete' ? 0.45 : 0.12;
+      ctx.strokeStyle = w === 'tempete' ? 'rgba(200,215,240,.55)' : 'rgba(200,220,255,.45)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const d of S.drops) {
+        const sp = (w === 'tempete' ? 900 : 650) * d.v;
+        d.y += sp * dt; d.x += sp * slant * dt;
+        if (d.y > H) { d.y = -20; d.x = Math.random() * (W + 200) - 200; }
+        ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - slant * 16, d.y - 16);
+      }
+      ctx.stroke();
+    } else if (w === 'neige') {
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      for (const d of S.drops) {
+        d.y += 40 * d.v * dt; d.x += Math.sin(t / 900 + d.p) * 18 * dt;
+        if (d.y > H) { d.y = -5; d.x = Math.random() * W; }
+        ctx.beginPath(); ctx.arc(d.x, d.y, 1.2 + d.v * 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (w === 'brume') {
+      // nappes de brouillard qui dérivent
+      for (let i = 0; i < 6; i++) {
+        const y = 150 + i * 62;
+        const x = ((t / (60 + i * 15) + i * 230) % (W + 600)) - 300;
+        const g = ctx.createRadialGradient(x, y, 20, x, y, 340);
+        g.addColorStop(0, 'rgba(225,230,240,.42)'); g.addColorStop(1, 'rgba(225,230,240,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - 340, y - 120, 680, 240);
+      }
+      ctx.fillStyle = 'rgba(210, 216, 228, .25)'; ctx.fillRect(0, 0, W, H);
+    }
+    if (S.flash > 0) {
+      ctx.fillStyle = `rgba(235, 240, 255, ${S.flash * 0.55})`; ctx.fillRect(0, 0, W, H);
+      S.flash = Math.max(0, S.flash - dt * 2.2);
+    }
+  }
+  // En bas à gauche : la météo du moment et l'appât utilisé
+  function drawWeatherBadge(ctx) {
+    const c = me.character;
+    const fz = c.fishing || {};
+    const parts = [];
+    if (S.weather !== 'normal') parts.push(`${WINFO[S.weather].icon} ${WINFO[S.weather].label}`);
+    const B = fz.bait && Rules.FISH_BAITS[fz.bait];
+    if (B) parts.push(`${B.icon} ${B.label} ×${(fz.baits && fz.baits[fz.bait]) || 0}`);
+    if (fz.streak) parts.push(`🔥 Série ${fz.streak}`);
+    if (!parts.length) return;
+    const text = parts.join('  ·  ');
+    ctx.save();
+    ctx.font = '800 13px system-ui'; ctx.textAlign = 'right';
+    const w = ctx.measureText(text).width + 20;
+    ctx.fillStyle = 'rgba(15, 10, 30, .6)';
+    ctx.beginPath(); ctx.roundRect(W - w - 60, 10, w, 24, 12); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(text, W - 70, 27);
+    ctx.restore();
   }
 
   // ---------- Banc de poissons ----------
@@ -770,7 +1032,8 @@
       drawFish(ctx, 0, -32, f, { size: 120, t, facing: 1 });
       ctx.font = '900 22px system-ui'; ctx.fillStyle = col; ctx.fillText(f.name, 0, 46);
       ctx.font = '700 14px system-ui'; ctx.fillStyle = '#e8e0ff';
-      ctx.fillText(`${RLAB[f.rarity]} · ${cm(r.size)}${f.when ? (f.when === 'nuit' ? ' · 🌙' : ' · ☀️') : ''}`, 0, 68);
+      ctx.fillText(`${RLAB[f.rarity]} · ${cm(r.size)}${f.weather ? ` · ${WINFO[f.weather].icon} ${WINFO[f.weather].label}` : f.when ? (f.when === 'nuit' ? ' · 🌙' : ' · ☀️') : ''}`, 0, 68);
+      if (r.streak > 1) { ctx.font = '900 13px system-ui'; ctx.fillStyle = '#ffb04a'; ctx.fillText(`🔥 ${r.streak} d'affilée${r.streak >= r.bestStreak ? ' · record !' : ''}`, 0, -86); }
       const tag = r.isNew ? '🆕 Nouvelle espèce au Pêchédex !' : r.record ? `🏆 Nouveau record ! (${cm(r.best)})` : `Déjà pêché ×${r.n} · record ${cm(r.best)}`;
       ctx.font = '800 14px system-ui'; ctx.fillStyle = r.isNew || r.record ? '#ffd34a' : '#a8a0c8'; ctx.fillText(tag, 0, 92);
     } else {
@@ -838,10 +1101,13 @@
     if (now > S.jumpAt) { S.jumpAt = now + 9000 + Math.random() * 16000; const ids = Rules.FISH_IDS; S.jumps.push({ x: 420 + Math.random() * 380, y: WATER + 30 + Math.random() * 40, p: 0, fish: Rules.FISH[ids[Math.floor(Math.random() * 30)]] }); }
     if (Math.random() < dt * 0.12) Sound.play(ph.night ? 'cricket' : 'birdChirp');
     S.petHop = Math.max(0, S.petHop - dt);
+    updateWeather(dt);
     drawSky(ctx, t, ph);
+    drawWeatherSky(ctx, t, ph);
     if (!S.sky && window.HouseLife && HouseLife.makeSky) S.sky = HouseLife.makeSky({ ads: SKY_ADS, signs: SKY_SIGNS, scale: 0.34, gap: [6000, 14000] });
     if (S.sky) S.sky(ctx, W, H, t, ph);
     drawWater(ctx, t, ph);
+    drawWeatherWater(ctx, t);
     drawDucks(ctx, t, dt, ph);
     drawJumps(ctx, dt);
     drawShadow(ctx, t);
@@ -857,7 +1123,10 @@
     S.hearts = S.hearts.filter((h) => h.life > 0);
     drawBugs(ctx, t, ph);
     if (ph.night) { ctx.fillStyle = 'rgba(10, 14, 50, .18)'; ctx.fillRect(0, 0, W, H); }
+    drawWeatherFront(ctx, t, dt);
+    drawWeatherBadge(ctx);
     drawPondBadge(ctx);
+    drawPreview(t, ph);
     drawReel(ctx, t);
     drawResult(ctx, t);
     drawMessage(ctx, t);
@@ -888,7 +1157,11 @@
   }
   // Une prise vue puis laissée effraie les poissons : il faut attendre avant de relancer
   function scared(wait) {
-    if (wait > 0) S.calmUntil = performance.now() + wait * 1000;
+    if (wait > 0) {
+      S.calmUntil = performance.now() + wait * 1000;
+      if (me && me.character.fishing) me.character.fishing.streak = 0; // (la série repart de zéro)
+    }
+    S.lockUntil = performance.now() + 1000;
   }
   function tickPhase(now) {
     const c = S.cast;
@@ -979,6 +1252,9 @@
         refresh().then(renderSide).catch(() => {});
       }
       S.nextAt = performance.now() + (r.caught ? 3200 : 1800);
+      S.lockUntil = performance.now() + 1000;
+      if (r.caught && r.streak != null) me.character.fishing.streak = r.streak;
+      if (!r.caught && me.character.fishing) me.character.fishing.streak = 0;
     } catch (err) {
       toast('⚠️ ' + err.message);
       S.phase = 'idle';
@@ -988,6 +1264,8 @@
 
   // Un seul bouton pour tout (clic gauche ou Espace) : lancer, ferrer, tenir la zone verte, relancer
   function press() {
+    // (1 s de pause après la fin d'une prise : un clic de trop ne fait pas disparaître la carte du poisson)
+    if ((S.phase === 'result' || S.phase === 'escape') && performance.now() < S.lockUntil) return;
     if (S.phase === 'idle' || S.phase === 'result' || S.phase === 'escape') { castLine(); return; }
     if (S.phase === 'wait' || S.phase === 'bite') { hook(); return; }
     if (S.phase === 'reel') S.holding = true;
@@ -1010,17 +1288,43 @@
         <div><span class="muted">Poissons pêchés</span><b>${fmt(k.fishCaught || 0)}</b></div>
         <div><span class="muted">Trésors</span><b>${fmt(k.fishTreasures || 0)}</b></div>
         <div><span class="muted">Légendaires</span><b>${fmt(k.fishLegend || 0)}</b></div>
+        <div><span class="muted">Série</span><b>🔥 ${fmt((me.character.fishing && me.character.fishing.streak) || 0)}</b></div>
+        <div><span class="muted">Record de série</span><b>${fmt(k.fishStreak || 0)}</b></div>
+        <div><span class="muted">Espèces</span><b>${n}</b></div>
       </div>
       <div class="fish-time">${time === 'nuit' ? '🌙 C\'est la nuit (heure de Paris) : les poissons de nuit mordent.' : '☀️ C\'est le jour (heure de Paris) : les poissons de jour mordent.'}</div>
+      ${weatherHtml()}
       ${pondHtml()}
       ${contestHtml()}
       <label class="fish-auto"><input type="checkbox" id="fish-auto" ${S.auto ? 'checked' : ''}> Relancer la ligne toute seule</label>
       <div class="fish-session"><b>🐟 Dernières prises</b>${S.session.length ? S.session.map((s) => { const f = Rules.FISH[s.id]; return `<div><span style="color:${RCOL[f.rarity]}">${esc(f.name)}</span> <span class="muted">${cm(s.size)}</span>${s.isNew ? ' <b class="fish-new">Nouveau</b>' : s.record ? ' <b class="fish-new">Record</b>' : ''}</div>`; }).join('') : '<div class="muted">Rien encore… patience !</div>'}</div>
-      <div class="fish-reward muted">${n >= total ? '🎉 Pêchédex complet : la <b>panoplie du pêcheur</b> t\'attend à la boutique !' : `Complète le Pêchédex pour débloquer la <b>panoplie du pêcheur</b> à la boutique.`}</div>`;
+      <div class="fish-reward muted">${n >= 100 ? '🎉 100 espèces : la <b>panoplie du pêcheur</b> t\'attend à la boutique !' : `Inscris 100 espèces au Pêchédex pour débloquer la <b>panoplie du pêcheur</b> à la boutique.`}</div>`;
     $('fish-dex-btn').onclick = openDex;
+    renderShop();
+    const plan = $('fish-side').querySelector('.fw-plan');
+    if (plan) { plan.open = !!S.planOpen; plan.ontoggle = () => { S.planOpen = plan.open; }; }
     const cf = $('fish-side').querySelector('[data-contest-fish]');
     if (cf && S.contest) { const f = Rules.FISH[S.contest.species]; drawFish(cf.getContext('2d'), 42, 24, f, { size: f.shape === 'anguille' || f.shape === 'long' ? 64 : 48, t: 600 }); }
     $('fish-auto').onchange = (e) => { S.auto = e.target.checked; try { localStorage.setItem('zl_fish_auto', S.auto ? '1' : '0'); } catch (er) { /* ignore */ } if (S.auto && (S.phase === 'result' || S.phase === 'escape')) S.nextAt = performance.now() + 800; };
+  }
+
+  // Météo du moment et planning d'aujourd'hui et de demain (créneaux de 2 h, heure de Paris)
+  function weatherHtml() {
+    const now = Date.now();
+    const plan = Rules.fishWeatherPlan(now);
+    const cur = plan.find((p) => p.start <= now && now < p.end);
+    const W0 = WINFO[S.weather] || WINFO.normal;
+    const left = cur ? Math.max(1, Math.round((cur.end - now) / 60000)) : 0;
+    const next = plan.find((p) => p.start > now && p.weather !== 'normal');
+    const days = [...new Set(plan.map((p) => p.day))];
+    const grid = days.map((d, i) => `<div class="fw-day"><small class="muted">${i ? 'Demain' : 'Aujourd\'hui'}</small><div class="fw-grid">${plan.filter((p) => p.day === d).map((p) => {
+      const K = WINFO[p.weather];
+      const state = p.end <= now ? ' past' : p === cur ? ' now' : '';
+      return `<span class="fw-cell${state}${p.weather !== 'normal' ? ' special' : ''}" title="${p.h} h – ${p.h + 2} h : ${esc(K.label)}"><b>${K.icon}</b><small>${p.h}h</small></span>`;
+    }).join('')}</div></div>`).join('');
+    return `<div class="fish-weather"><b>${W0.icon} Météo : ${esc(W0.label)}</b> <small class="muted">${cur ? `encore ${left >= 60 ? `${Math.floor(left / 60)} h ${String(left % 60).padStart(2, '0')}` : `${left} min`}` : ''}</small>
+      <small class="muted">${esc(W0.desc)}${next && S.weather === 'normal' ? ` · prochaine : ${WINFO[next.weather].icon} ${esc(WINFO[next.weather].label)} à ${next.h} h${next.day !== cur.day ? ' (demain)' : ''}` : ''}</small>
+      <details class="fw-plan"><summary>📅 Planning de la météo</summary>${grid}</details></div>`;
   }
 
   // Les pêcheurs de l'étang (soi compris), avec ce qu'ils font
@@ -1055,6 +1359,84 @@
     try { S.contest = await api('/api/fishing/contest'); renderSide(); } catch (e) { /* ignore */ }
   }
 
+  // ---------- Boutique du ponton : appâts et barque ----------
+  const gold = (n) => `${fmt(n)} 🪙`;
+  async function shopCall(url, body, msg) {
+    try {
+      await api(url, body);
+      if (msg) toast(msg);
+      await refresh();
+      renderSide();
+    } catch (err) { toast('⚠️ ' + err.message); }
+  }
+  function renderShop() {
+    const el = $('fish-shop');
+    if (!el || !me) return;
+    const c = me.character;
+    const fz = c.fishing || { baits: {} };
+    const boat = c.boat || { owned: [], equip: Rules.BOAT_DEFAULT };
+    const tabs = `<div class="fs-tabs"><button type="button" data-shop="baits" class="${S.shopTab === 'baits' ? 'active' : ''}">🪱 Appâts</button><button type="button" data-shop="boat" class="${S.shopTab === 'boat' ? 'active' : ''}">🛶 Ma barque</button><span class="spacer"></span><span class="fs-gold">${gold(c.gold)}</span></div>`;
+    let body;
+    if (S.shopTab === 'baits') {
+      const cur = fz.bait && Rules.FISH_BAITS[fz.bait];
+      body = `<p class="muted fs-note">Un appât est utilisé à chaque lancer tant qu'il en reste. En ce moment : <b>${cur ? `${cur.icon} ${esc(cur.label)} (${fz.baits[fz.bait] || 0})` : 'aucun appât'}</b>
+          ${cur ? '<button type="button" class="secondary small" data-bait-use="">Pêcher sans appât</button>' : ''}</p>
+        <div class="fs-grid">${Object.entries(Rules.FISH_BAITS).map(([id, B]) => {
+    const n = fz.baits[id] || 0;
+    const used = fz.bait === id;
+    return `<div class="fs-card${used ? ' used' : ''}"><div class="fs-card-top"><span class="fs-ico">${B.icon}</span><div><b>${esc(B.label)}</b><small class="muted">${esc(B.desc)}</small></div></div>
+            <div class="fs-card-row"><span class="muted">Stock : <b>${n}</b></span>${n ? (used ? '<span class="fs-used">✓ Utilisé</span>' : `<button type="button" class="secondary small" data-bait-use="${id}">Utiliser</button>`) : ''}</div>
+            <div class="fs-buy">${Rules.FISH_BAIT_PACKS.map((k) => `<button type="button" class="small" data-bait-buy="${id}" data-n="${k}" ${c.gold < B.price * k ? 'disabled' : ''}>×${k} · ${gold(B.price * k)}</button>`).join('')}</div></div>`;
+  }).join('')}</div>`;
+    } else {
+      const prev = S.previewBoat || {};
+      body = `<div class="fs-boat"><div class="fs-preview"><canvas id="fish-boat-preview" width="340" height="200"></canvas><small class="muted">Clique une pièce pour l'essayer ; elle s'affiche aussi sur ta barque, sur le lac.</small></div>
+        <div class="fs-parts">${Object.entries(Rules.BOAT_PARTS).map(([part, P]) => {
+    const tryId = prev[part];
+    const tryO = tryId && P.options[tryId];
+    const owned = (id) => !P.options[id].price || boat.owned.includes(`${part}:${id}`);
+    return `<div class="fs-part"><b>${P.icon} ${esc(P.label)}</b><div class="fs-opts">${Object.entries(P.options).map(([id, O]) => {
+      const on = boat.equip[part] === id;
+      return `<button type="button" class="fs-opt${on ? ' on' : ''}${tryId === id ? ' try' : ''}" data-part="${part}" data-opt="${id}">${esc(O.label)}<small>${on ? '✓ Posée' : owned(id) ? 'À toi' : gold(O.price)}</small></button>`;
+    }).join('')}</div>
+            ${tryO && !owned(tryId) ? `<div class="fs-try">Essai : <b>${esc(tryO.label)}</b> <button type="button" class="gold small" data-boat-buy="${part}" data-opt="${tryId}" ${c.gold < tryO.price ? 'disabled' : ''}>Acheter · ${gold(tryO.price)}</button> <button type="button" class="secondary small" data-boat-cancel="${part}">Annuler</button></div>` : ''}</div>`;
+  }).join('')}</div></div>`;
+    }
+    el.innerHTML = `<h3>🛶 Boutique du ponton</h3>${tabs}${body}`;
+    el.querySelectorAll('[data-shop]').forEach((b) => { b.onclick = () => { S.shopTab = b.dataset.shop; if (S.shopTab !== 'boat') S.previewBoat = null; renderShop(); }; });
+    el.querySelectorAll('[data-bait-buy]').forEach((b) => { b.onclick = () => { const B = Rules.FISH_BAITS[b.dataset.baitBuy]; shopCall('/api/fishing/bait/buy', { id: b.dataset.baitBuy, n: Number(b.dataset.n) }, `${B.icon} ${b.dataset.n} × ${B.label} acheté${b.dataset.n > 1 ? 's' : ''}`); }; });
+    el.querySelectorAll('[data-bait-use]').forEach((b) => { b.onclick = () => shopCall('/api/fishing/bait/use', { id: b.dataset.baitUse || null }); });
+    el.querySelectorAll('[data-part]').forEach((b) => {
+      b.onclick = () => {
+        const { part, opt } = b.dataset;
+        const O = Rules.BOAT_PARTS[part].options[opt];
+        const mine = !O.price || boat.owned.includes(`${part}:${opt}`);
+        const rest = { ...(S.previewBoat || {}) };
+        delete rest[part];
+        if (mine) { S.previewBoat = Object.keys(rest).length ? { ...boat.equip, ...rest } : null; shopCall('/api/fishing/boat/equip', { part, id: opt }); return; }
+        S.previewBoat = { ...boat.equip, ...rest, [part]: opt };
+        renderShop();
+      };
+    });
+    el.querySelectorAll('[data-boat-buy]').forEach((b) => { b.onclick = () => { const { boatBuy: part, opt } = b.dataset; const rest = { ...(S.previewBoat || {}) }; delete rest[part]; S.previewBoat = Object.keys(rest).filter((k) => rest[k] !== boat.equip[k]).length ? { ...boat.equip, ...rest } : null; shopCall('/api/fishing/boat/buy', { part, id: opt }, `🛶 ${Rules.BOAT_PARTS[part].options[opt].label} : à toi !`); }; });
+    el.querySelectorAll('[data-boat-cancel]').forEach((b) => { b.onclick = () => { const p2 = b.dataset.boatCancel; const rest = { ...(S.previewBoat || {}) }; rest[p2] = boat.equip[p2]; S.previewBoat = Object.keys(rest).some((k) => rest[k] !== boat.equip[k]) ? { ...boat.equip, ...rest } : null; renderShop(); }; });
+  }
+  // Aperçu de la barque dans la boutique (redessiné à chaque image tant qu'il est affiché)
+  function drawPreview(t, ph) {
+    const cv = S.shopTab === 'boat' && $('fish-boat-preview');
+    if (!cv || !cv.offsetParent) return;
+    const PW = 340;
+    const PH = 200;
+    const k = canvasScale(cv, PW, PH, 2);
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, 0, PH);
+    g.addColorStop(0, ph.night ? '#1a2050' : '#bfe4ff'); g.addColorStop(0.55, ph.night ? '#2b2c5e' : '#e8f6ff'); g.addColorStop(0.56, ph.night ? '#1c2c54' : '#6ab8e0'); g.addColorStop(1, ph.night ? '#0c1430' : '#2f78b0');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, PW, PH);
+    const B = { ...myBoat(), x: 175, y: 150, s: 0.95, reeling: false };
+    drawBoatAt(ctx, t, ph, B);
+  }
+
   let dexFilter = 'all';
   function openDex() {
     let el = $('fish-dex');
@@ -1073,7 +1455,10 @@
     const dex = (me.character.fishing && me.character.fishing.dex) || {};
     const n = Object.keys(dex).length;
     const total = Rules.FISH_IDS.length;
-    const list = Object.values(Rules.FISH).filter((f) => dexFilter === 'all' || (dexFilter === 'missing' ? !dex[f.id] : f.rarity === dexFilter));
+    // Filtres : toutes, manquantes, une rareté, les espèces de toujours ou celles d'une météo
+    const keep = (f) => dexFilter === 'all' || (dexFilter === 'missing' ? !dex[f.id] : dexFilter === 'base' ? !f.weather : WINFO[dexFilter] ? f.weather === dexFilter : f.rarity === dexFilter);
+    const list = Object.values(Rules.FISH).filter(keep);
+    const wcount = (w) => Object.values(Rules.FISH).filter((f) => (w === 'base' ? !f.weather : f.weather === w) && dex[f.id]).length + ' / ' + Object.values(Rules.FISH).filter((f) => (w === 'base' ? !f.weather : f.weather === w)).length;
     const count = (r) => Object.values(Rules.FISH).filter((f) => f.rarity === r && dex[f.id]).length + ' / ' + Object.values(Rules.FISH).filter((f) => f.rarity === r).length;
     el.innerHTML = `<div class="fish-book">
       <div class="fish-book-head"><h2>📖 Pêchédex</h2><span class="fish-book-count">${n} / ${total} espèces</span><button class="secondary small" data-close>✕</button></div>
@@ -1083,9 +1468,13 @@
         <button data-f="missing" class="${dexFilter === 'missing' ? 'active' : ''}">Manquantes</button>
         ${Object.keys(F.rarities).map((r) => `<button data-f="${r}" class="${dexFilter === r ? 'active' : ''}" style="--rc:${RCOL[r]}">${RLAB[r]} <small>${count(r)}</small></button>`).join('')}
       </div>
+      <div class="fish-filters">
+        <button data-f="base" class="${dexFilter === 'base' ? 'active' : ''}">🕒 De toujours <small>${wcount('base')}</small></button>
+        ${Rules.FISH_WEATHER_SPECIAL.map((w) => `<button data-f="${w}" class="${dexFilter === w ? 'active' : ''}" style="--rc:#5a8ac8">${WINFO[w].icon} ${esc(WINFO[w].label)} <small>${wcount(w)}</small></button>`).join('')}
+      </div>
       <div class="fish-grid">${list.map((f) => {
     const e = dex[f.id];
-    const when = f.when === 'nuit' ? '🌙 Nuit' : f.when === 'jour' ? '☀️ Jour' : '🕒 Toujours';
+    const when = f.weather ? `${WINFO[f.weather].icon} ${WINFO[f.weather].label}` : f.when === 'nuit' ? '🌙 Nuit' : f.when === 'jour' ? '☀️ Jour' : '🕒 Toujours';
     return `<div class="fish-card ${e ? '' : 'unknown'}" style="--rc:${RCOL[f.rarity]}">
           <canvas width="120" height="80" data-fish="${f.id}"></canvas>
           <b>${e ? esc(f.name) : '???'}</b>
@@ -1094,8 +1483,9 @@
           ${e ? `<small>🏆 ${cm(e.best)} · ×${e.n}</small>` : `<small class="muted">${cm(f.min)} – ${cm(f.max)}</small>`}
         </div>`;
   }).join('')}</div>
-      <p class="muted fish-book-foot">Les espèces manquantes apparaissent en ombre noire. Certaines ne mordent que le jour ☀️ ou la nuit 🌙 (heure de Paris).
-        Compléter le Pêchédex débloque la panoplie du pêcheur à la boutique.</p></div>`;
+      <p class="muted fish-book-foot">Les espèces manquantes apparaissent en ombre noire. Certaines ne mordent que le jour ☀️ ou la nuit 🌙 (heure de Paris),
+        les 100 espèces des intempéries seulement par leur météo (pluie, brume, tempête, neige, aurore boréale : voir le planning).
+        100 espèces inscrites débloquent la panoplie du pêcheur à la boutique.</p></div>`;
     el.querySelector('[data-close]').onclick = () => el.classList.remove('open');
     el.querySelectorAll('[data-f]').forEach((b) => { b.onclick = () => { dexFilter = b.dataset.f; renderDex(); }; });
     el.querySelectorAll('canvas[data-fish]').forEach((cv) => {

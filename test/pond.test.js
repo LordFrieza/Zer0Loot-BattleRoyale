@@ -117,7 +117,7 @@ test('[FISH-12] banc de poissons : à partir de 2 pêcheurs, toutes les 6 à 14 
   fishing.calm.delete(a.id);
   let seen = null;
   const real = fishing.rollTarget;
-  fishing.rollTarget = (now, school) => { seen = school; return { kind: 'fish', id: 'perche', size: 20 }; };
+  fishing.rollTarget = (now, o) => { seen = o.school; return { kind: 'fish', id: 'perche', size: 20 }; };
   try { assert.strictEqual(fishing.cast(a, s2.at + 1000).school, true); } finally { fishing.rollTarget = real; fishing.stop(a, s2.at + 1000); }
   assert.strictEqual(seen, true);
 });

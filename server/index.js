@@ -450,7 +450,7 @@ pond.init({
     const c = user.character;
     const P = c.pets;
     const pet = P && P.list && P.list.find((x) => x.id === P.active);
-    return { name: user.twitchDisplayName || user.username, cls: c.cls || null, level: c.level, title: game.titleOf(c), look: lookOf(user), app: appOf(user), pet: pet ? pet.species : null };
+    return { name: user.twitchDisplayName || user.username, cls: c.cls || null, level: c.level, title: game.titleOf(c), look: lookOf(user), app: appOf(user), pet: pet ? pet.species : null, boat: { ...((c.boat && c.boat.equip) || Rules.BOAT_DEFAULT) }, streak: (c.fishing && c.fishing.streak) || 0 };
   },
 });
 const fishSize = (x) => (x >= 100 ? `${String(Math.round(x) / 100).replace('.', ',')} m` : `${String(Math.round(x * 10) / 10).replace('.', ',')} cm`);
@@ -480,6 +480,13 @@ app.post('/api/fishing/stop', requirePlayer, light((req) => {
   pond.act(req.user.id, 'stop');
   return r;
 }));
+// Boutique du ponton : appâts (consommés au lancer) et pièces de barque
+app.post('/api/fishing/bait/buy', requirePlayer, action((req) => fishing.buyBait(req.user, String(req.body.id || ''), req.body.n || 1)));
+app.post('/api/fishing/bait/use', requirePlayer, action((req) => fishing.useBait(req.user, req.body.id == null ? null : String(req.body.id))));
+app.post('/api/fishing/boat/buy', requirePlayer, action((req) => { const r = fishing.buyBoatPart(req.user, String(req.body.part || ''), String(req.body.id || '')); pondRefresh(req.user); return r; }));
+app.post('/api/fishing/boat/equip', requirePlayer, action((req) => { const r = fishing.equipBoatPart(req.user, String(req.body.part || ''), String(req.body.id || '')); pondRefresh(req.user); return r; }));
+// Météo de la pêche : celle du moment et le planning d'aujourd'hui et de demain (heure de Paris)
+app.get('/api/fishing/weather', (req, res) => res.json({ now: Date.now(), weather: Rules.fishWeather(Date.now()), plan: Rules.fishWeatherPlan(Date.now()) }));
 app.get('/api/fishing/contest', requirePlayer, (req, res) => res.json(fishing.contestView(Date.now(), req.user.id)));
 // Une prise peut changer le classement des pêcheurs : diffusion au plus toutes les 10 s.
 let fishBoardAt = 0;
@@ -504,8 +511,10 @@ app.post('/api/fishing/land', requirePlayer, action((req) => {
   if (r.kind === 'fish') {
     fishBoard();
     pond.act(req.user.id, 'catch', { fish: { id: r.id, size: r.size } });
-    const tags = `${r.isNew ? ' 🆕' : ''}${r.record ? ' 🏆 record' : ''}`;
+    const tags = `${r.isNew ? ' 🆕' : ''}${r.record ? ' 🏆 record' : ''}${F.weather ? ` ${Rules.FISH_WEATHER.kinds[F.weather].icon}` : ''}`;
     fishLine(req.user, `a pêché ${F.name} (${fishSize(r.size)})${tags}`, 'fishcatch', ['rare', 'epique', 'legendaire'].includes(F.rarity), { fish: { id: r.id, size: r.size, rarity: F.rarity } });
+    // Série de prises : annoncée tous les 25 poissons d'affilée
+    if (r.streak && r.streak % 25 === 0) fishLine(req.user, `enchaîne ${r.streak} poissons d'affilée sans en rater un ! 🔥`, 'fishstreak', true);
     if (r.contest && r.contest.lead) fishSys(`🏆 ${who} prend la tête du concours du jour : ${F.name} de ${fishSize(r.size)} !`, 'contest');
   } else {
     pond.act(req.user.id, 'catch', { treasure: { icon: r.lot.icon, label: r.lot.label } });
@@ -1462,6 +1471,7 @@ function leaderboard() {
     legendary: (u.character.lootStats && u.character.lootStats.legendaire) || 0, // légendaires sortis des coffres
     survivor: (u.character.counters && u.character.counters.svBestWave) || 0, // vague record au Survivor
     fish: (u.character.counters && u.character.counters.fishCaught) || 0, // poissons pêchés
+    fishStreak: (u.character.counters && u.character.counters.fishStreak) || 0, // record de série de poissons d'affilée
     jackpots: (u.character.counters && u.character.counters.jackpots) || 0, // jackpots au casino
     casino: u.character.lifetime ? (u.character.lifetime.casinoWon || 0) - (u.character.lifetime.casinoWagered || 0) : 0, // bilan du casino
     casinoLoss: u.character.lifetime ? (u.character.lifetime.casinoWagered || 0) - (u.character.lifetime.casinoWon || 0) : 0, // pertes nettes au casino
@@ -1471,7 +1481,7 @@ function leaderboard() {
     .map((p) => ({ ...p, value: p[key] }));
   return {
     wins: top('wins'), kills: top('kills'), battles: top('battles'), expedition: top('expedition'), dungeon: top('dungeon'),
-    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), fish: top('fish'), jackpots: top('jackpots'), casino: top('casino'), casinoLoss: top('casinoLoss'), gold: top('gold'),
+    chests: top('chests'), legendary: top('legendary'), survivor: top('survivor'), fish: top('fish'), fishStreak: top('fishStreak'), jackpots: top('jackpots'), casino: top('casino'), casinoLoss: top('casinoLoss'), gold: top('gold'),
   };
 }
 
@@ -1997,6 +2007,14 @@ io.on('connection', (socket) => {
   socket.emit('frame', battle.frame());
 });
 
+// L'apparence d'un pêcheur a changé (barque) : l'étang est prévenu
+function pondRefresh(user) {
+  const id = pond.pondOf(user.id);
+  if (!id) return;
+  const m = pond.memberOf(user.id);
+  m.info = pond.describe(user);
+  io.to('pond:' + id).emit('pond', pond.view(id));
+}
 function pondLeave(socket, userId) {
   const id = pond.pondOf(userId);
   const r = pond.leave(userId, socket.id);

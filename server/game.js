@@ -74,6 +74,17 @@ function upgrade(character) {
   // Pêche : Pêchédex (espèce → { n prises, best plus grande taille en cm, first date de la première prise })
   if (!character.fishing || typeof character.fishing !== 'object') character.fishing = { dex: {} };
   if (!character.fishing.dex || typeof character.fishing.dex !== 'object') character.fishing.dex = {};
+  // Pêche 2 : série de prises sans en rater (`streak`), appâts (stock et appât choisi), barque personnalisée
+  if (!Number.isFinite(character.fishing.streak)) character.fishing.streak = 0;
+  if (!character.fishing.baits || typeof character.fishing.baits !== 'object') character.fishing.baits = {};
+  if (character.fishing.bait !== null && !Rules.FISH_BAITS[character.fishing.bait]) character.fishing.bait = null;
+  if (!character.boat || typeof character.boat !== 'object') character.boat = newBoat();
+  if (!Array.isArray(character.boat.owned)) character.boat.owned = [];
+  if (!character.boat.equip || typeof character.boat.equip !== 'object') character.boat.equip = {};
+  for (const [part, P] of Object.entries(Rules.BOAT_PARTS)) {
+    const id = character.boat.equip[part];
+    if (!P.options[id] || (P.options[id].price && !character.boat.owned.includes(`${part}:${id}`))) character.boat.equip[part] = Rules.BOAT_DEFAULT[part];
+  }
   // 2.1 : forge, +1 % de réussite par échec d'affilée, par rareté
   if (!character.forgePity || typeof character.forgePity !== 'object') character.forgePity = {};
   if (!character.survivor) character.survivor = newSurvivor();
@@ -114,6 +125,11 @@ function upgrade(character) {
   return character;
 }
 
+// Barque de la pêche : aucune pièce achetée, la première option de chaque pièce (offerte).
+function newBoat() {
+  return { owned: [], equip: { ...Rules.BOAT_DEFAULT } };
+}
+
 function newCharacter() {
   return {
     level: 1,
@@ -148,7 +164,8 @@ function newCharacter() {
     pets: newPets(), // familiers (onglet Familier)
     emeralds: 0, // émeraudes (Survivor → méta-progression et Maison)
     casinoTickets: 0, // tickets de casino (Mini Lilith) : une partie gratuite à 50 golds
-    fishing: { dex: {} }, // Pêchédex
+    fishing: { dex: {}, streak: 0, baits: {}, bait: null }, // Pêchédex, série de prises, appâts
+    boat: newBoat(), // barque de la pêche (pièces achetées « pièce:option » et choisies)
     forgePity: {}, // forge : échecs d'affilée par rareté ({ commun: 2 } = +2 % à la prochaine fusion commune)
     survivor: newSurvivor(), // Survivor : méta-progression, déblocages, record, récompense du jour
     survivorActive: null, // partie de Survivor en cours (golds rendus si le serveur redémarre)
@@ -1302,6 +1319,7 @@ function absorbGhost(user, ghost) {
   c.gold += g.gold;
   c.chests += g.chests;
   upgrade(g);
+  upgrade(c);
   c.inventory.push(...g.inventory, ...Object.values(g.equipment));
   c.record.battles += g.record.battles;
   c.record.kills += g.record.kills;
@@ -1332,6 +1350,9 @@ function absorbGhost(user, ghost) {
     c.fishing.dex[id] = mine ? { n: mine.n + (e.n || 0), best: Math.max(mine.best || 0, e.best || 0), first: Math.min(mine.first || Infinity, e.first || Infinity) } : { ...e };
   }
   c.counters.fishSpecies = Object.keys(c.fishing.dex).length;
+  // Appâts additionnés, pièces de barque réunies
+  for (const [id, n] of Object.entries((g.fishing && g.fishing.baits) || {})) c.fishing.baits[id] = (c.fishing.baits[id] || 0) + (n || 0);
+  for (const k of (g.boat && g.boat.owned) || []) if (!c.boat.owned.includes(k)) c.boat.owned.push(k);
   delete db.state.users[ghost.id];
 }
 

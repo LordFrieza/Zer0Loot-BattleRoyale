@@ -19,10 +19,10 @@ function rig(target, fn) {
   try { return fn(); } finally { fishing.rollTarget = real; }
 }
 
-test('[FISH-1] Pêchédex : 100 espèces, 5 raretés, 18 formes, poissons du jour et de la nuit', () => {
-  const all = Object.values(Rules.FISH);
+test('[FISH-1] Pêchédex : 100 espèces de toujours, 5 raretés, 18 formes, poissons du jour et de la nuit', () => {
+  const all = Rules.FISH_BASE_IDS.map((id) => Rules.FISH[id]);
   assert.strictEqual(all.length, 100);
-  assert.strictEqual(new Set(Rules.FISH_IDS).size, 100);
+  assert.strictEqual(new Set(Rules.FISH_IDS).size, 200, '200 espèces en tout, intempéries comprises');
   const count = {};
   for (const f of all) count[f.rarity] = (count[f.rarity] || 0) + 1;
   assert.deepStrictEqual(count, { commun: 40, peu_commun: 28, rare: 18, epique: 10, legendaire: 4 });
@@ -77,7 +77,7 @@ test('[FISH-2] lancer : poisson (95 %) ou trésor (5 %), selon l\'heure ; rien n
   assert.ok(kinds.treasure > 60 && kinds.treasure < 260, `≈ 5 % de trésors (${kinds.treasure})`);
   const u = angler();
   const { r, s } = castFor(u, { kind: 'fish', id: 'perche', size: 30 }, 1000);
-  assert.deepStrictEqual(Object.keys(r).sort(), ['approach', 'id', 'school'], 'ni temps, ni fenêtre, ni silhouette au lancer (seulement le banc de poissons, visible de tous)');
+  assert.deepStrictEqual(Object.keys(r).sort(), ['approach', 'bait', 'id', 'school'], 'ni temps, ni fenêtre, ni silhouette au lancer (seulement le banc de poissons, visible de tous)');
   assert.strictEqual(r.id.length, 12);
   assert.ok(s.appear >= 3 && s.appear <= 15);
   assert.ok(s.nibbles.every((x) => x >= s.appear + Rules.FISHING.approach - 0.006), 'temps arrondis au centième');
@@ -276,20 +276,20 @@ test('[FISH-6] panoplie du pêcheur après le Pêchédex complet ; succès de p�
   assert.deepStrictEqual(set.map((id) => Rules.COSMETICS[id].slot), ['hat', 'chest', 'pants', 'shoes']);
   const c = game.newCharacter();
   c.gold = 20000;
-  assert.throws(() => game.buyCosmetic(c, 'gilet_pecheur'), /Exploit requis : Compléter le Pêchédex/);
+  assert.throws(() => game.buyCosmetic(c, 'gilet_pecheur'), /Exploit requis : Inscrire 100 espèces au Pêchédex/);
   c.counters.fishSpecies = 100;
   game.buyCosmetic(c, 'gilet_pecheur');
   assert.strictEqual(c.gold, 20000 - 2500);
   assert.ok(c.owned.includes('gilet_pecheur'));
   const ach = Rules.ACHIEVEMENTS.filter((a) => /^fish|^species|^treasure/.test(a.id)).map((a) => [a.metric, a.goal]);
-  assert.deepStrictEqual(ach, [['fishCaught', 1], ['fishCaught', 10], ['fishCaught', 100], ['fishCaught', 500], ['fishSpecies', 25], ['fishSpecies', 50], ['fishSpecies', 100], ['fishLegend', 1], ['fishTreasures', 1], ['fishTreasures', 10]]);
+  assert.deepStrictEqual(ach, [['fishCaught', 1], ['fishCaught', 10], ['fishCaught', 100], ['fishCaught', 500], ['fishSpecies', 25], ['fishSpecies', 50], ['fishSpecies', 100], ['fishSpecies', 150], ['fishSpecies', 200], ['fishLegend', 1], ['fishTreasures', 1], ['fishTreasures', 10]]);
 });
 
 test('[FISH-7] migration : Pêchédex ajouté aux anciennes sauvegardes, fusion d\'un fantôme', () => {
   const old = game.newCharacter();
   delete old.fishing;
   game.upgrade(old);
-  assert.deepStrictEqual(old.fishing, { dex: {} });
+  assert.deepStrictEqual(old.fishing, { dex: {}, streak: 0, baits: {}, bait: null });
   // Fusion : prises additionnées, record et première date gardés, espèces recomptées
   const { db } = require('./helpers');
   const user = { id: 'fishmain', username: 'Main', role: 'player', character: game.newCharacter() };
@@ -301,4 +301,183 @@ test('[FISH-7] migration : Pêchédex ajouté aux anciennes sauvegardes, fusion 
   game.linkTwitch(user, 'pecheurfantome', 'PecheurFantome');
   assert.deepStrictEqual(user.character.fishing.dex, { perche: { n: 3, best: 35, first: 100 }, gardon: { n: 4, best: 20, first: 300 } });
   assert.strictEqual(user.character.counters.fishSpecies, 2);
+});
+
+test('[FISH-14] météo : créneaux de 2 h, 3 fois sur 4 temps calme ; 100 espèces des intempéries (20 par météo), la moitié des prises', () => {
+  const W = Rules.FISH_WEATHER;
+  assert.deepStrictEqual(Rules.FISH_WEATHER_SPECIAL, ['pluie', 'brume', 'tempete', 'neige', 'aurore']);
+  for (const w of Rules.FISH_WEATHER_SPECIAL) {
+    const list = Object.values(Rules.FISH).filter((f) => f.weather === w);
+    const count = {};
+    for (const f of list) count[f.rarity] = (count[f.rarity] || 0) + 1;
+    assert.deepStrictEqual(count, { commun: 8, peu_commun: 5, rare: 4, epique: 2, legendaire: 1 }, w);
+    assert.ok(list.every((f) => !f.when && Rules.FISHING.shapes.includes(f.shape)));
+  }
+  // Même météo pour tous, tout le créneau ; planning d'aujourd'hui et de demain (12 créneaux par jour)
+  const t0 = Date.parse('2026-11-26T10:30:00+01:00');
+  assert.strictEqual(Rules.fishWeather(t0), Rules.fishWeather(Date.parse('2026-11-26T11:59:00+01:00')));
+  const plan = Rules.fishWeatherPlan(t0);
+  assert.strictEqual(plan.length, 24);
+  assert.deepStrictEqual(plan.slice(0, 12).map((p) => p.h), [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]);
+  assert.deepStrictEqual([plan[0].day, plan[12].day], ['2026-11-26', '2026-11-27']);
+  for (const p of plan) assert.strictEqual(Rules.fishWeather(p.start + 60000), p.weather);
+  assert.strictEqual(plan[5].start, Date.parse('2026-11-26T10:00:00+01:00'));
+  const n = {};
+  for (let i = 0; i < 6000; i++) { const w = Rules.fishWeather(t0 + i * 7200e3); n[w] = (n[w] || 0) + 1; }
+  assert.ok(n.normal / 6000 > 0.71 && n.normal / 6000 < 0.79, `temps calme : ${n.normal / 6000}`);
+  for (const w of Rules.FISH_WEATHER_SPECIAL) assert.ok(n[w] > 200, w);
+  assert.strictEqual(W.share, 0.5);
+  // Temps calme : jamais d'espèce des intempéries ; par pluie, environ la moitié des poissons viennent de la pluie
+  const day = Date.parse('2026-06-15T12:00:00+02:00');
+  let fromRain = 0;
+  let fish = 0;
+  for (let i = 0; i < 4000; i++) {
+    const calmT = fishing.rollTarget(day, { weather: 'normal' });
+    if (calmT.kind === 'fish') assert.ok(!Rules.FISH[calmT.id].weather);
+    const r = fishing.rollTarget(day, { weather: 'pluie' });
+    if (r.kind !== 'fish') continue;
+    fish += 1;
+    const w = Rules.FISH[r.id].weather;
+    assert.ok(!w || w === 'pluie');
+    if (w) fromRain += 1;
+  }
+  assert.ok(fromRain / fish > 0.45 && fromRain / fish < 0.55, `part de la pluie : ${fromRain / fish}`);
+  // L'appât des intempéries pousse la part à 75 %
+  let boosted = 0;
+  let fish2 = 0;
+  for (let i = 0; i < 4000; i++) { const r = fishing.rollTarget(day, { weather: 'neige', bait: 'intemperies' }); if (r.kind === 'fish') { fish2 += 1; if (Rules.FISH[r.id].weather) boosted += 1; } }
+  assert.ok(boosted / fish2 > 0.7 && boosted / fish2 < 0.8, `appât des intempéries : ${boosted / fish2}`);
+});
+
+test('[FISH-15] appâts : achat par 1, 5 ou 10, appât choisi consommé à chaque lancer, effets sur le tirage et la remontée', () => {
+  const u = angler();
+  const c = u.character;
+  c.gold = 1000;
+  assert.throws(() => fishing.buyBait(u, 'nope', 1), /inconnu/);
+  assert.throws(() => fishing.buyBait(u, 'ver', 3), /Quantité/);
+  assert.deepStrictEqual(fishing.buyBait(u, 'larme', 5), { bait: 'larme', count: 5, cost: 1000 });
+  assert.strictEqual(c.gold, 0);
+  assert.strictEqual(c.fishing.bait, 'larme', 'premier appât acheté : choisi d\'office');
+  assert.throws(() => fishing.buyBait(u, 'ver', 1), /Il te faut 25 golds/);
+  c.gold = 500;
+  fishing.buyBait(u, 'collant', 1);
+  fishing.buyBait(u, 'apaisant', 1);
+  fishing.buyBait(u, 'parfume', 1);
+  assert.strictEqual(c.fishing.bait, 'larme');
+  assert.throws(() => fishing.useBait(u, 'ver'), /plus cet appât/);
+  // Chaque lancer consomme un appât et le dit
+  const r1 = castFor(u, { kind: 'fish', id: 'perche', size: 20 }).r;
+  assert.deepStrictEqual(r1.bait, { id: 'larme', left: 4 });
+  fishing.stop(u);
+  // Collant : zone verte ×1,15 ; apaisant : nage ×0,88 ; parfumé : ça mord en 2 à 8 s
+  fishing.useBait(u, 'collant');
+  let s = castFor(u, { kind: 'fish', id: 'perche', size: 20 }).s;
+  assert.ok(Math.abs(s.diff.zone - Rules.FISHING.rarities.commun.zone * 1.15) < 1e-9);
+  fishing.stop(u);
+  fishing.useBait(u, 'apaisant');
+  s = castFor(u, { kind: 'fish', id: 'perche', size: 20 }).s;
+  assert.ok(Math.abs(s.diff.vmax - Rules.FISHING.rarities.commun.vmax * 0.88) < 1e-9 && Math.abs(s.diff.dart - Rules.FISHING.rarities.commun.dart * 0.88) < 1e-9);
+  fishing.stop(u);
+  fishing.useBait(u, 'parfume');
+  s = castFor(u, { kind: 'fish', id: 'perche', size: 20 }).s;
+  assert.ok(s.appear >= 2 && s.appear <= 8);
+  fishing.stop(u);
+  // Plus d'appât : on pêche sans (le choix reste), et on peut choisir « sans appât »
+  assert.strictEqual(c.fishing.baits.parfume, 0);
+  assert.strictEqual(castFor(u, { kind: 'fish', id: 'perche', size: 20 }).r.bait, null);
+  fishing.stop(u);
+  assert.deepStrictEqual(fishing.useBait(u, null), { bait: null });
+  // Effets sur le tirage (rareté + points, formes ×2,5, trésors + 2 points)
+  const day = Date.parse('2026-06-15T12:00:00+02:00');
+  const share = (bait, pred) => { let k = 0; let f = 0; for (let i = 0; i < 8000; i++) { const r = fishing.rollTarget(day, { weather: 'normal', bait }); if (r.kind === 'fish') { f += 1; if (pred(Rules.FISH[r.id])) k += 1; } } return k / f; };
+  const leg = (f) => f.rarity === 'legendaire';
+  assert.ok(share('larme', leg) > share(null, leg) + 0.008, 'Larme de sirène : légendaires plus fréquents');
+  const crab = (f) => ['crabe', 'crevette'].includes(f.shape);
+  assert.ok(share('crustaces', crab) > share(null, crab) * 1.6, 'crustacés plus fréquents');
+  let tr = 0;
+  for (let i = 0; i < 8000; i++) if (fishing.rollTarget(day, { weather: 'normal', bait: 'aimant' }).kind === 'treasure') tr += 1;
+  assert.ok(tr / 8000 > 0.06, `trésors avec l'aimant : ${tr / 8000}`);
+  assert.deepStrictEqual(Object.keys(Rules.FISH_BAITS).length, 13);
+  assert.deepStrictEqual([Rules.FISH_BAITS.larme.price, Rules.FISH_BAITS.larme.rarity], [200, { legendaire: 2 }]);
+});
+
+test('[FISH-16] barque : pièces achetées une fois en golds puis choisies ; migration et fusion d\'un fantôme', () => {
+  const u = angler();
+  const c = u.character;
+  assert.deepStrictEqual(c.boat, { owned: [], equip: Rules.BOAT_DEFAULT });
+  assert.deepStrictEqual(Object.keys(Rules.BOAT_PARTS), ['coque', 'lanterne', 'ancre', 'fanion', 'proue']);
+  c.gold = 10000;
+  assert.throws(() => fishing.buyBoatPart(u, 'voile', 'x'), /Pièce inconnue/);
+  assert.throws(() => fishing.buyBoatPart(u, 'coque', 'x'), /Option inconnue/);
+  assert.throws(() => fishing.buyBoatPart(u, 'coque', 'bois'), /déjà/, 'la première option est offerte');
+  assert.throws(() => fishing.equipBoatPart(u, 'coque', 'pirate'), /Achète d'abord/);
+  assert.deepStrictEqual(fishing.buyBoatPart(u, 'coque', 'pirate'), { part: 'coque', id: 'pirate', cost: 6000 });
+  assert.deepStrictEqual([c.gold, c.boat.equip.coque, c.boat.owned], [4000, 'pirate', ['coque:pirate']]);
+  assert.throws(() => fishing.buyBoatPart(u, 'coque', 'pirate'), /déjà/);
+  assert.throws(() => fishing.buyBoatPart(u, 'coque', 'or'), /Il te faut 20000 golds/);
+  fishing.equipBoatPart(u, 'coque', 'bois');
+  fishing.equipBoatPart(u, 'coque', 'pirate');
+  assert.strictEqual(c.boat.equip.coque, 'pirate');
+  // Migration : barque ajoutée, pièce non possédée ou inconnue remise d'origine
+  const old = game.newCharacter();
+  delete old.boat;
+  game.upgrade(old);
+  assert.deepStrictEqual(old.boat, { owned: [], equip: Rules.BOAT_DEFAULT });
+  old.boat.equip = { coque: 'or', lanterne: 'zzz' };
+  game.upgrade(old);
+  assert.deepStrictEqual(old.boat.equip, Rules.BOAT_DEFAULT);
+  // Fusion d'un fantôme : appâts additionnés, pièces réunies
+  const { db } = require('./helpers');
+  const user = { id: 'boatmain', username: 'Capitaine', role: 'player', character: game.newCharacter() };
+  const ghost = { id: 'boatghost', username: 'mousse', ghost: true, role: 'player', twitchLogin: 'moussefantome', character: game.newCharacter() };
+  db.state.users[user.id] = user;
+  db.state.users[ghost.id] = ghost;
+  user.character.fishing.baits = { ver: 2 };
+  user.character.boat.owned = ['coque:rouge'];
+  ghost.character.fishing.baits = { ver: 3, larme: 1 };
+  ghost.character.boat.owned = ['coque:rouge', 'ancre:fer'];
+  game.linkTwitch(user, 'moussefantome', 'MousseFantome');
+  assert.deepStrictEqual(user.character.fishing.baits, { ver: 5, larme: 1 });
+  assert.deepStrictEqual(user.character.boat.owned, ['coque:rouge', 'ancre:fer']);
+});
+
+test('[FISH-17] série de prises : +1 par poisson, le trésor ne la coupe pas, une prise vue puis laissée ou perdue la remet à 0 ; succès', () => {
+  const u = angler();
+  const ch = u.character;
+  const catchFish = (target, good = true) => {
+    for (;;) {
+      const { r: c, s } = castFor(u, target);
+      const h = fishing.hook(u, c.id, (s.sink + 0.1) * 1000);
+      const p = play(h.reel, good);
+      if (p.R.won !== good) { fishing.calm.delete(u.id); ch.fishing.streak = keep; fishing.stop(u, 0); continue; }
+      return fishing.land(u, c.id, p.toggles, (s.sink + 0.1 + p.seconds + 0.2) * 1000);
+    }
+  };
+  let keep = 0;
+  for (let i = 1; i <= 3; i++) { keep = ch.fishing.streak; assert.strictEqual(catchFish({ kind: 'fish', id: 'perche', size: 20 }).streak, i); }
+  assert.strictEqual(ch.counters.fishStreak, 3);
+  keep = 3;
+  const t = catchFish({ kind: 'treasure' });
+  assert.deepStrictEqual([t.kind, t.streak], ['treasure', 3], 'un trésor ne coupe pas la série');
+  // Perdue en pleine remontée : la série repart de zéro (le record reste)
+  keep = 3;
+  const lost = catchFish({ kind: 'fish', id: 'perche', size: 20 }, false);
+  assert.strictEqual(lost.escaped, true);
+  assert.deepStrictEqual([ch.fishing.streak, ch.counters.fishStreak], [0, 3]);
+  // Vue puis laissée (ligne rentrée après l'apparition) : remise à zéro ; avant l'apparition : rien
+  ch.fishing.streak = 5;
+  let { s } = castFor(u, { kind: 'fish', id: 'perche', size: 20 }, 0);
+  fishing.stop(u, (s.appear - 0.5) * 1000);
+  assert.strictEqual(ch.fishing.streak, 5, 'rentrée avant l\'apparition : la série tient');
+  ({ s } = castFor(u, { kind: 'fish', id: 'perche', size: 20 }, 0));
+  fishing.stop(u, (s.appear + 0.5) * 1000);
+  assert.strictEqual(ch.fishing.streak, 0);
+  // Ferrage trop tard : remise à zéro
+  ch.fishing.streak = 4;
+  ({ s } = castFor(u, { kind: 'fish', id: 'perche', size: 20 }, 0));
+  assert.strictEqual(fishing.hook(u, s.id, (s.sink + s.window + 1) * 1000).escaped, true);
+  assert.strictEqual(ch.fishing.streak, 0);
+  const ach = Rules.ACHIEVEMENTS.filter((a) => a.metric === 'fishStreak').map((a) => [a.name, a.goal]);
+  assert.deepStrictEqual(ach, [['Main sûre', 25], ['Imperturbable', 100]]);
+  assert.ok(Rules.MAX_COUNTERS.includes('fishStreak'));
 });

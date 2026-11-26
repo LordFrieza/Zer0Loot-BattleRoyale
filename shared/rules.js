@@ -456,7 +456,11 @@
     { id: 'fish500', metric: 'fishCaught', goal: 500, name: 'Loup de mer', desc: 'Pêcher 500 poissons', gold: 2000 },
     { id: 'species25', metric: 'fishSpecies', goal: 25, name: 'Naturaliste', desc: 'Inscrire 25 espèces au Pêchédex', gold: 300 },
     { id: 'species50', metric: 'fishSpecies', goal: 50, name: 'Ichtyologue', desc: 'Inscrire 50 espèces au Pêchédex', gold: 1000 },
-    { id: 'species100', metric: 'fishSpecies', goal: 100, name: 'Pêchédex complet', desc: 'Inscrire les 100 espèces au Pêchédex', gold: 5000 },
+    { id: 'species100', metric: 'fishSpecies', goal: 100, name: 'Encyclopédiste', desc: 'Inscrire 100 espèces au Pêchédex', gold: 5000 },
+    { id: 'species150', metric: 'fishSpecies', goal: 150, name: 'Chasseur d\'intempéries', desc: 'Inscrire 150 espèces au Pêchédex', gold: 8000 },
+    { id: 'species200', metric: 'fishSpecies', goal: 200, name: 'Pêchédex complet', desc: 'Inscrire les 200 espèces au Pêchédex (intempéries comprises)', gold: 15000 },
+    { id: 'streak25', metric: 'fishStreak', goal: 25, name: 'Main sûre', desc: 'Pêcher 25 poissons d\'affilée sans en rater un', gold: 500 },
+    { id: 'streak100', metric: 'fishStreak', goal: 100, name: 'Imperturbable', desc: 'Pêcher 100 poissons d\'affilée sans en rater un', gold: 3000 },
     { id: 'fishLegend1', metric: 'fishLegend', goal: 1, name: 'Prise légendaire', desc: 'Pêcher un poisson légendaire', gold: 1500 },
     { id: 'treasure1', metric: 'fishTreasures', goal: 1, name: 'Chasseur de trésor', desc: 'Pêcher un trésor', gold: 200 },
     { id: 'treasure10', metric: 'fishTreasures', goal: 10, name: 'Trésors engloutis', desc: 'Pêcher 10 trésors', gold: 1000 },
@@ -471,9 +475,9 @@
     'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak',
     'etherWins', 'lilithWins', 'daedraWins', 'soloEther', 'soloLilith', 'soloDaedra', 'heroEther', 'heroLilith', 'heroDaedra',
     'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins',
-    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod', 'tourneyWins', 'tourneyBest', 'fishContest'];
+    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod', 'tourneyWins', 'tourneyBest', 'fishContest', 'fishStreak'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
-  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod', 'tourneyBest'];
+  const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod', 'tourneyBest', 'fishStreak'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
   const SOLO_BOSS_COUNTER = { troll: 'soloTroll', dragon: 'soloDragon', sorcier: 'soloSorcier', mimic: 'soloMimic', liche: 'soloLiche', maexxna: 'soloMaexxna', ether: 'soloEther', lilith: 'soloLilith', daedra: 'soloDaedra' };
   // Victoires contre chaque boss (Combat de Boss et Défi des boss confondus).
@@ -2197,26 +2201,257 @@
     ['kraken', 'Kraken', 'legendaire', 'poulpe', '#6a1a4a', '#ff7ac8', 'points', 600, 1200, 'mixte', 'nuit'],
     ['carpe_imperiale', 'Carpe d\'or impériale', 'legendaire', 'poisson', '#ffcc33', '#fff4b0', 'ecailles', 100, 180, 'vif', 'jour'],
     ['esprit_lac', 'Esprit du lac', 'legendaire', 'meduse', '#e8fff8', '#8affd8', 'degrade', 50, 100, 'flotteur', 'nuit'],
+    // ----- Les 100 espèces des intempéries : elles ne mordent que par leur météo (20 par météo : 8 communes, 5 peu communes,
+    // 4 rares, 2 épiques, 1 légendaire), à toute heure. Dernière colonne : la météo.
+
+    // Météo : pluie (20)
+    ['goutte_argent', 'Goutte d\'argent', 'commun', 'poisson', '#c8d8e8', '#ffffff', 'degrade', 6, 12, 'vif', null, 'pluie'],
+    ['tetard_averse', 'Têtard des averses', 'commun', 'axolotl', '#4a5a4a', '#8a9a7a', 'uni', 3, 6, 'vif', null, 'pluie'],
+    ['crapaud_flaque', 'Poisson-crapaud des flaques', 'commun', 'globe', '#7a8a5a', '#c8c890', 'points', 8, 15, 'calme', null, 'pluie'],
+    ['crevette_bruine', 'Crevette de bruine', 'commun', 'crevette', '#a8c0d8', '#e8f0ff', 'uni', 3, 6, 'flotteur', null, 'pluie'],
+    ['gardon_gris', 'Gardon gris-pluie', 'commun', 'poisson', '#8a98a8', '#c8d0d8', 'ecailles', 10, 24, 'calme', null, 'pluie'],
+    ['meduse_goutte', 'Méduse-goutte', 'commun', 'meduse', '#b8d8ff', '#ffffff', 'uni', 6, 14, 'flotteur', null, 'pluie'],
+    ['loche_ruisseau', 'Loche des ruisseaux', 'commun', 'long', '#6a7a8a', '#a8b8c8', 'points', 8, 14, 'coulant', null, 'pluie'],
+    ['ecrevisse_pluie', 'Écrevisse de pluie', 'commun', 'crabe', '#4a6a9a', '#a8c0e8', 'uni', 8, 14, 'coulant', null, 'pluie'],
+    ['truite_averse', 'Truite des averses', 'peu_commun', 'poisson', '#6a8aa8', '#d8e8f8', 'points', 25, 55, 'vif', null, 'pluie'],
+    ['anguille_ruisselante', 'Anguille ruisselante', 'peu_commun', 'anguille', '#4a5a7a', '#a8c8e8', 'degrade', 40, 90, 'mixte', null, 'pluie'],
+    ['raie_flaque', 'Raie des flaques', 'peu_commun', 'raie', '#6a7a8a', '#c8d8e8', 'points', 30, 60, 'coulant', null, 'pluie'],
+    ['parapluie', 'Méduse-parapluie', 'peu_commun', 'meduse', '#e84a5a', '#ffe0e0', 'rayures', 15, 30, 'flotteur', null, 'pluie'],
+    ['tortue_mousse', 'Tortue moussue', 'peu_commun', 'tortue', '#4a6a3a', '#8aaa6a', 'ecailles', 25, 50, 'coulant', null, 'pluie'],
+    ['truite_arc_pluie', 'Truite arc-en-pluie', 'rare', 'poisson', '#8ab8d8', '#ff8ad8', 'degrade', 40, 80, 'vif', null, 'pluie'],
+    ['poisson_nuage', 'Poisson-nuage', 'rare', 'globe', '#e8eef8', '#a8b8d0', 'uni', 30, 60, 'flotteur', null, 'pluie'],
+    ['hippocampe_perle', 'Hippocampe perlé', 'rare', 'hippocampe', '#a8d8ff', '#ffffff', 'points', 10, 18, 'calme', null, 'pluie'],
+    ['poulpe_averse', 'Poulpe des averses', 'rare', 'poulpe', '#5a6a9a', '#b8c8f8', 'points', 40, 90, 'mixte', null, 'pluie'],
+    ['carpe_mousson', 'Carpe de la mousson', 'epique', 'poisson', '#3a6a8a', '#8ae8ff', 'ecailles', 80, 150, 'mixte', null, 'pluie'],
+    ['serpent_pluie', 'Serpent de pluie', 'epique', 'anguille', '#2a4a7a', '#6ad8ff', 'degrade', 150, 280, 'vif', null, 'pluie'],
+    ['roi_averses', 'Roi des Averses', 'legendaire', 'requin', '#3a5a8a', '#c8e8ff', 'ecailles', 500, 1000, 'mixte', null, 'pluie'],
+    // Météo : brume (20)
+    ['ablette_voilee', 'Ablette voilée', 'commun', 'poisson', '#d0d4dc', '#f0f2f6', 'uni', 8, 15, 'vif', null, 'brume'],
+    ['poisson_fantome', 'Poisson-fantôme', 'commun', 'poisson', '#e8ecf4', '#b8c0d8', 'degrade', 10, 20, 'calme', null, 'brume'],
+    ['meduse_vapeur', 'Méduse vaporeuse', 'commun', 'meduse', '#d8dce8', '#ffffff', 'uni', 8, 18, 'flotteur', null, 'brume'],
+    ['crevette_ombre', 'Crevette d\'ombre', 'commun', 'crevette', '#5a5a6a', '#9a9aa8', 'uni', 3, 6, 'flotteur', null, 'brume'],
+    ['lamproie_grise', 'Lamproie grisâtre', 'commun', 'anguille', '#7a7a82', '#b0b0b8', 'uni', 15, 30, 'coulant', null, 'brume'],
+    ['goujon_brume', 'Goujon des brumes', 'commun', 'long', '#9a9aa0', '#d0d0d8', 'points', 8, 14, 'coulant', null, 'brume'],
+    ['crabe_cendre', 'Crabe cendré', 'commun', 'crabe', '#6a6a70', '#a8a8b0', 'points', 6, 12, 'coulant', null, 'brume'],
+    ['lune_pale', 'Poisson-lune pâle', 'commun', 'lune', '#c8c8d0', '#f0f0f4', 'uni', 8, 16, 'calme', null, 'brume'],
+    ['sandre_spectral', 'Sandre spectral', 'peu_commun', 'long', '#a8b0c0', '#e0e8f8', 'rayures', 40, 80, 'mixte', null, 'brume'],
+    ['raie_voile', 'Raie-voile', 'peu_commun', 'raie', '#b8c0d0', '#f0f4ff', 'degrade', 40, 80, 'flotteur', null, 'brume'],
+    ['axolotl_brume', 'Axolotl des brumes', 'peu_commun', 'axolotl', '#d8d8e8', '#b0a8d8', 'uni', 15, 25, 'calme', null, 'brume'],
+    ['calmar_fumee', 'Calmar de fumée', 'peu_commun', 'calmar', '#8a8a98', '#d8d8e8', 'points', 15, 35, 'vif', null, 'brume'],
+    ['tortue_lanterne', 'Tortue-lanterne', 'peu_commun', 'tortue', '#5a5a6a', '#ffe08a', 'points', 30, 60, 'coulant', null, 'brume'],
+    ['brochet_fantome', 'Brochet fantôme', 'rare', 'long', '#c8d0e0', '#ffffff', 'degrade', 60, 130, 'vif', null, 'brume'],
+    ['hippocampe_voile', 'Hippocampe voilé', 'rare', 'hippocampe', '#c8c8e0', '#f8f8ff', 'rayures', 10, 20, 'calme', null, 'brume'],
+    ['poulpe_murmure', 'Poulpe murmurant', 'rare', 'poulpe', '#8a80a8', '#d8d0f8', 'points', 50, 100, 'mixte', null, 'brume'],
+    ['ange_brume', 'Ange des brumes', 'rare', 'ange', '#e0e4f0', '#a8b0d8', 'rayures', 15, 30, 'calme', null, 'brume'],
+    ['banshee', 'Banshee des eaux', 'epique', 'meduse', '#e8f0ff', '#b8a8ff', 'degrade', 50, 100, 'flotteur', null, 'brume'],
+    ['nautile_brume', 'Nautile des brumes', 'epique', 'calmar', '#c8c0b0', '#8a8aa8', 'rayures', 20, 40, 'coulant', null, 'brume'],
+    ['leviathan_fantome', 'Léviathan fantôme', 'legendaire', 'requin', '#d8e0f0', '#8890b8', 'degrade', 700, 1400, 'vif', null, 'brume'],
+    // Météo : tempete (20)
+    ['ablette_eclair', 'Ablette-éclair', 'commun', 'poisson', '#e8e070', '#ffffff', 'rayures', 6, 12, 'vif', null, 'tempete'],
+    ['gobie_tonnerre', 'Gobie du tonnerre', 'commun', 'poisson', '#5a5a7a', '#ffe03a', 'points', 6, 12, 'vif', null, 'tempete'],
+    ['crabe_rafale', 'Crabe des rafales', 'commun', 'crabe', '#7a6a5a', '#c8b090', 'uni', 8, 15, 'coulant', null, 'tempete'],
+    ['meduse_orage', 'Méduse d\'orage', 'commun', 'meduse', '#8a7ad8', '#ffe86a', 'uni', 10, 22, 'flotteur', null, 'tempete'],
+    ['anchois_vent', 'Anchois des vents', 'commun', 'long', '#a8b0c0', '#e0e8f0', 'degrade', 8, 14, 'vif', null, 'tempete'],
+    ['crevette_ecume', 'Crevette d\'écume', 'commun', 'crevette', '#e8e8f0', '#ffffff', 'uni', 3, 6, 'flotteur', null, 'tempete'],
+    ['mulet_houle', 'Mulet de la houle', 'commun', 'poisson', '#6a7888', '#c8d0d8', 'rayures', 25, 50, 'mixte', null, 'tempete'],
+    ['etoile_tempete', 'Étoile des tempêtes', 'commun', 'etoile', '#5a6a8a', '#ffd040', 'points', 8, 16, 'coulant', null, 'tempete'],
+    ['barracuda_foudre', 'Barracuda foudroyant', 'peu_commun', 'long', '#4a5a7a', '#ffe03a', 'rayures', 50, 110, 'vif', null, 'tempete'],
+    ['raie_tonnerre', 'Raie-tonnerre', 'peu_commun', 'raie', '#3a3a5a', '#8ad8ff', 'points', 50, 100, 'mixte', null, 'tempete'],
+    ['calmar_ouragan', 'Calmar ouragan', 'peu_commun', 'calmar', '#6a5a9a', '#e8d8ff', 'points', 20, 45, 'vif', null, 'tempete'],
+    ['globe_orage', 'Globe d\'orage', 'peu_commun', 'globe', '#4a4a6a', '#ffe86a', 'points', 15, 30, 'flotteur', null, 'tempete'],
+    ['tortue_recif', 'Tortue des récifs', 'peu_commun', 'tortue', '#4a4a50', '#8a8a90', 'ecailles', 40, 80, 'coulant', null, 'tempete'],
+    ['espadon_tempete', 'Espadon des tempêtes', 'rare', 'long', '#2a3a5a', '#8ae8ff', 'degrade', 180, 320, 'vif', null, 'tempete'],
+    ['anguille_foudre', 'Anguille-foudre', 'rare', 'anguille', '#2a2a4a', '#fff06a', 'points', 120, 220, 'vif', null, 'tempete'],
+    ['requin_houle', 'Requin de la houle', 'rare', 'requin', '#4a5a6a', '#c8d0d8', 'uni', 150, 280, 'mixte', null, 'tempete'],
+    ['poulpe_tourbillon', 'Poulpe tourbillon', 'rare', 'poulpe', '#3a4a7a', '#8ab8ff', 'rayures', 60, 130, 'mixte', null, 'tempete'],
+    ['dragon_mers', 'Dragon des mers', 'epique', 'anguille', '#1a3a5a', '#3affc8', 'ecailles', 300, 600, 'vif', null, 'tempete'],
+    ['kraken_orage', 'Kraken d\'orage', 'epique', 'poulpe', '#2a2a5a', '#c8a8ff', 'points', 300, 700, 'mixte', null, 'tempete'],
+    ['thalassa', 'Thalassa, l\'Œil du cyclone', 'legendaire', 'raie', '#1a2a4a', '#6ae8ff', 'degrade', 800, 1600, 'mixte', null, 'tempete'],
+    // Météo : neige (20)
+    ['poisson_flocon', 'Poisson-flocon', 'commun', 'poisson', '#e8f4ff', '#a8d0f0', 'points', 5, 10, 'calme', null, 'neige'],
+    ['omble_givre', 'Omble givré', 'commun', 'poisson', '#a8c0d0', '#f0a8a8', 'points', 15, 35, 'mixte', null, 'neige'],
+    ['crevette_glace', 'Crevette de glace', 'commun', 'crevette', '#d8f0ff', '#ffffff', 'uni', 3, 6, 'flotteur', null, 'neige'],
+    ['meduse_flocon', 'Méduse-flocon', 'commun', 'meduse', '#e8f8ff', '#b8e0ff', 'points', 6, 14, 'flotteur', null, 'neige'],
+    ['crabe_neige', 'Crabe des neiges', 'commun', 'crabe', '#e8d8d0', '#c88a7a', 'uni', 10, 20, 'coulant', null, 'neige'],
+    ['lotte_glace', 'Lotte des glaces', 'commun', 'long', '#8a98a8', '#e0e8f0', 'points', 20, 40, 'coulant', null, 'neige'],
+    ['etoile_givre', 'Étoile de givre', 'commun', 'etoile', '#c8e8ff', '#ffffff', 'points', 6, 12, 'coulant', null, 'neige'],
+    ['ablette_neige', 'Ablette des neiges', 'commun', 'poisson', '#f0f4f8', '#c8d8e8', 'uni', 6, 12, 'vif', null, 'neige'],
+    ['truite_glacier', 'Truite des glaciers', 'peu_commun', 'poisson', '#8ab0c8', '#e8f4ff', 'points', 30, 60, 'vif', null, 'neige'],
+    ['poisson_beluga', 'Poisson-béluga', 'peu_commun', 'lune', '#e8eef4', '#c8d8e8', 'uni', 40, 80, 'calme', null, 'neige'],
+    ['raie_givre', 'Raie givrée', 'peu_commun', 'raie', '#a8c8e0', '#ffffff', 'points', 40, 80, 'coulant', null, 'neige'],
+    ['calmar_banquise', 'Calmar de la banquise', 'peu_commun', 'calmar', '#d8e8f8', '#8ab8e8', 'uni', 20, 40, 'mixte', null, 'neige'],
+    ['axolotl_neige', 'Axolotl des neiges', 'peu_commun', 'axolotl', '#ffffff', '#a8d8ff', 'uni', 15, 25, 'calme', null, 'neige'],
+    ['poisson_narval', 'Poisson-narval', 'rare', 'long', '#c8d4e0', '#f8f8ff', 'points', 150, 300, 'mixte', null, 'neige'],
+    ['hippocampe_cristal', 'Hippocampe de cristal', 'rare', 'hippocampe', '#d8f8ff', '#ffffff', 'degrade', 12, 22, 'calme', null, 'neige'],
+    ['tortue_banquise', 'Tortue de la banquise', 'rare', 'tortue', '#8aa8c0', '#e8f4ff', 'ecailles', 50, 100, 'coulant', null, 'neige'],
+    ['poulpe_givre', 'Poulpe givré', 'rare', 'poulpe', '#a8c8f0', '#ffffff', 'points', 50, 100, 'mixte', null, 'neige'],
+    ['brochet_yeti', 'Brochet du Yéti', 'epique', 'long', '#e8f0f8', '#8aa8c8', 'ecailles', 120, 220, 'vif', null, 'neige'],
+    ['reine_glaces', 'Reine des glaces', 'epique', 'ange', '#c8f0ff', '#ffffff', 'degrade', 30, 60, 'calme', null, 'neige'],
+    ['serpent_hiver', 'Serpent de l\'Hiver éternel', 'legendaire', 'anguille', '#c8e8ff', '#ffffff', 'ecailles', 1000, 2000, 'mixte', null, 'neige'],
+    // Météo : aurore (20)
+    ['poisson_lueur', 'Poisson-lueur', 'commun', 'poisson', '#6affc8', '#c8a8ff', 'degrade', 6, 12, 'vif', null, 'aurore'],
+    ['meduse_boreale', 'Méduse boréale', 'commun', 'meduse', '#8affd8', '#d8a8ff', 'degrade', 8, 18, 'flotteur', null, 'aurore'],
+    ['crevette_prisme', 'Crevette prisme', 'commun', 'crevette', '#ff8ad8', '#8affff', 'degrade', 3, 6, 'flotteur', null, 'aurore'],
+    ['gobie_etoile', 'Gobie étoilé', 'commun', 'poisson', '#2a2a5a', '#ffffff', 'points', 5, 10, 'calme', null, 'aurore'],
+    ['etoile_polaire', 'Étoile polaire', 'commun', 'etoile', '#ffe8a8', '#ffffff', 'points', 6, 12, 'coulant', null, 'aurore'],
+    ['ablette_irisee', 'Ablette irisée', 'commun', 'poisson', '#a8f0e8', '#e8a8ff', 'degrade', 7, 13, 'vif', null, 'aurore'],
+    ['crabe_luciole', 'Crabe-luciole', 'commun', 'crabe', '#3a3a6a', '#aaff6a', 'points', 6, 12, 'coulant', null, 'aurore'],
+    ['lune_boreale', 'Lune boréale', 'commun', 'lune', '#6ad8c8', '#c8a8ff', 'degrade', 10, 20, 'calme', null, 'aurore'],
+    ['calmar_aurore', 'Calmar aurore', 'peu_commun', 'calmar', '#8affd8', '#ff8ae8', 'degrade', 15, 35, 'vif', null, 'aurore'],
+    ['raie_celeste', 'Raie céleste', 'peu_commun', 'raie', '#3a3a8a', '#8affd8', 'points', 40, 90, 'flotteur', null, 'aurore'],
+    ['axolotl_cosmique', 'Axolotl cosmique', 'peu_commun', 'axolotl', '#4a2a8a', '#8affff', 'points', 15, 25, 'calme', null, 'aurore'],
+    ['ange_prisme', 'Ange prismatique', 'peu_commun', 'ange', '#ff8ad8', '#8affd8', 'rayures', 12, 25, 'calme', null, 'aurore'],
+    ['anguille_lactee', 'Anguille lactée', 'peu_commun', 'anguille', '#1a1a4a', '#ffffff', 'points', 40, 90, 'mixte', null, 'aurore'],
+    ['carpe_cosmique', 'Carpe cosmique', 'rare', 'poisson', '#2a1a5a', '#c8a8ff', 'points', 50, 100, 'calme', null, 'aurore'],
+    ['poulpe_nebuleuse', 'Poulpe nébuleuse', 'rare', 'poulpe', '#6a2a9a', '#ff8ae8', 'degrade', 50, 110, 'mixte', null, 'aurore'],
+    ['hippocampe_astral', 'Hippocampe astral', 'rare', 'hippocampe', '#8affd8', '#ffffff', 'points', 10, 20, 'calme', null, 'aurore'],
+    ['requin_boreal', 'Requin boréal', 'rare', 'requin', '#2a4a6a', '#8affd8', 'degrade', 150, 280, 'vif', null, 'aurore'],
+    ['phenix_eaux', 'Phénix des eaux', 'epique', 'poisson', '#ff6a3a', '#ffe86a', 'degrade', 60, 120, 'vif', null, 'aurore'],
+    ['baleine_etoiles', 'Baleine des étoiles', 'epique', 'lune', '#1a1a4a', '#8affff', 'points', 300, 600, 'calme', null, 'aurore'],
+    ['gardien_aurore', 'Gardien de l\'Aurore', 'legendaire', 'meduse', '#8affd8', '#ff8ae8', 'degrade', 100, 200, 'flotteur', null, 'aurore'],
   ];
   const FISH = {};
-  for (const [id, name, rarity, shape, color, accent, pattern, min, max, move, when] of FISH_TABLE) FISH[id] = { id, name, rarity, shape, color, accent, pattern, min, max, move, when };
+  for (const [id, name, rarity, shape, color, accent, pattern, min, max, move, when, weather] of FISH_TABLE) FISH[id] = { id, name, rarity, shape, color, accent, pattern, min, max, move, when, weather: weather || null };
   const FISH_IDS = Object.keys(FISH);
+  const FISH_BASE_IDS = FISH_IDS.filter((id) => !FISH[id].weather); // les 100 espèces de toujours
   // Moment de la journée pour la pêche (heure de Paris, mêmes horaires que le ciel du jeu) : 'jour' ou 'nuit'.
   function fishTime(ts) {
     const p = parisParts(ts);
     const h = p.h + p.min / 60;
     return h < 6 || h >= 20.5 ? 'nuit' : 'jour';
   }
-  // Espèces qui peuvent mordre à ce moment-là, rangées par rareté.
-  function fishPool(time) {
+  // Espèces qui peuvent mordre à ce moment-là, rangées par rareté : les espèces de toujours (selon le jour ou la nuit),
+  // ou, avec `weather`, seulement celles de cette météo.
+  function fishPool(time, weather = null) {
     const pool = {};
-    for (const f of Object.values(FISH)) if (!f.when || f.when === time) (pool[f.rarity] = pool[f.rarity] || []).push(f.id);
+    for (const f of Object.values(FISH)) {
+      const ok = weather ? f.weather === weather : !f.weather && (!f.when || f.when === time);
+      if (ok) (pool[f.rarity] = pool[f.rarity] || []).push(f.id);
+    }
     return pool;
   }
+
+  // ---------- Météo de la pêche ----------
+  // Créneaux de 2 h (heure de Paris) ; chacun a sa météo, la même pour tous et connue d'avance (planning) : temps normal
+  // 3 fois sur 4, sinon une météo spéciale au hasard. Pendant une météo spéciale, la moitié des prises (`share`) sont tirées
+  // parmi ses 20 espèces.
+  const FISH_WEATHER = {
+    slot: 2, // heures par créneau
+    normal: 0.75,
+    share: 0.5,
+    kinds: {
+      normal: { label: 'Temps calme', icon: '⛅', desc: 'Les espèces de toujours' },
+      pluie: { label: 'Pluie', icon: '🌧️', desc: 'Averse sur le lac : 20 espèces des averses' },
+      brume: { label: 'Brume', icon: '🌫️', desc: 'Un brouillard épais : 20 espèces fantomatiques' },
+      tempete: { label: 'Tempête', icon: '⛈️', desc: 'Vent, éclairs et houle : 20 espèces des tempêtes' },
+      neige: { label: 'Neige', icon: '❄️', desc: 'Il neige sur le lac : 20 espèces des glaces' },
+      aurore: { label: 'Aurore boréale', icon: '🌌', desc: 'Le ciel s\'illumine : 20 espèces célestes' },
+    },
+  };
+  const FISH_WEATHER_SPECIAL = ['pluie', 'brume', 'tempete', 'neige', 'aurore'];
+  // Tirage déterministe d'un créneau (« AAAA-M-J#créneau ») : deux nombres dans [0, 1)
+  function weatherHash(key, salt) {
+    let h = 2166136261 ^ salt;
+    for (const ch of String(key)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function weatherOfSlot(y, m, d, k) {
+    const key = `${y}-${m}-${d}#${k}`;
+    if (weatherHash(key, 7) < FISH_WEATHER.normal) return 'normal';
+    return FISH_WEATHER_SPECIAL[Math.floor(weatherHash(key, 31) * FISH_WEATHER_SPECIAL.length)];
+  }
+  // Météo à un instant donné.
+  function fishWeather(ts) {
+    const p = parisParts(ts);
+    return weatherOfSlot(p.y, p.m, p.d, Math.floor(p.h / FISH_WEATHER.slot));
+  }
+  // Planning : les créneaux d'aujourd'hui et de demain (heure de Paris), avec leur début, leur fin et leur météo.
+  function fishWeatherPlan(ts, days = 2) {
+    const out = [];
+    const p0 = parisParts(ts);
+    let base = parisToTs(p0.y, p0.m, p0.d, 12, 0);
+    for (let day = 0; day < days; day++) {
+      const p = parisParts(base);
+      for (let k = 0; k < 24 / FISH_WEATHER.slot; k++) {
+        const start = parisToTs(p.y, p.m, p.d, k * FISH_WEATHER.slot, 0);
+        const end = k + 1 < 24 / FISH_WEATHER.slot ? parisToTs(p.y, p.m, p.d, (k + 1) * FISH_WEATHER.slot, 0) : parisToTs(p.y, p.m, p.d, 23, 59) + 60000;
+        out.push({ day: `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`, h: k * FISH_WEATHER.slot, start, end, weather: weatherOfSlot(p.y, p.m, p.d, k) });
+      }
+      base += 24 * 3600e3;
+    }
+    return out;
+  }
+
+  // ---------- Appâts (boutique du ponton) ----------
+  // À usage unique : l'appât choisi est consommé à chaque lancer (s'il en reste). Effets : `rarity` (points ajoutés au poids
+  // d'une rareté, sur 100), `shapes` (espèces de ces formes ×2,5 dans leur rareté), `weather` (part des espèces de la météo
+  // en plus), `treasure` (chance de trésor en plus), `zone` (zone verte ×), `speed` (nage du poisson ×), `wait` (attente).
+  const FISH_BAITS = {
+    ver: { label: 'Ver de terre', icon: '🪱', price: 25, desc: 'Poissons peu communs plus fréquents (+8 points)', rarity: { peu_commun: 8 } },
+    asticot: { label: 'Asticot doré', icon: '🐛', price: 60, desc: 'Poissons rares plus fréquents (+5 points)', rarity: { rare: 5 } },
+    calmar: { label: 'Lamelle de calmar', icon: '🦑', price: 120, desc: 'Poissons épiques plus fréquents (+3 points)', rarity: { epique: 3 } },
+    larme: { label: 'Larme de sirène', icon: '💧', price: 200, desc: 'Poissons légendaires plus fréquents (+2 points)', rarity: { legendaire: 2 } },
+    crustaces: { label: 'Pâté de crustacés', icon: '🦀', price: 40, desc: 'Crabes, écrevisses et crevettes plus fréquents', shapes: ['crabe', 'crevette'] },
+    lumineux: { label: 'Appât lumineux', icon: '✨', price: 40, desc: 'Méduses, calmars et poulpes plus fréquents', shapes: ['meduse', 'calmar', 'poulpe'] },
+    fond: { label: 'Boulette de fond', icon: '🪨', price: 40, desc: 'Raies, soles, tortues, étoiles et poissons-globes plus fréquents', shapes: ['raie', 'plat', 'tortue', 'etoile', 'globe'] },
+    exotique: { label: 'Appât exotique', icon: '🌺', price: 40, desc: 'Hippocampes, axolotls et anguilles plus fréquents', shapes: ['hippocampe', 'axolotl', 'anguille'] },
+    intemperies: { label: 'Appât des intempéries', icon: '🌩️', price: 60, desc: 'Par météo spéciale : 75 % des prises parmi ses espèces (au lieu de 50 %)', weather: 0.25 },
+    aimant: { label: 'Aimant à trésors', icon: '🧲', price: 150, desc: 'Trésors plus fréquents (+2 points)', treasure: 0.02 },
+    collant: { label: 'Appât collant', icon: '🍯', price: 50, desc: 'Zone verte 15 % plus grande pendant la remontée', zone: 1.15 },
+    apaisant: { label: 'Appât apaisant', icon: '🌿', price: 50, desc: 'Le poisson nage 12 % moins vite pendant la remontée', speed: 0.88 },
+    parfume: { label: 'Appât parfumé', icon: '🌸', price: 20, desc: 'Ça mord plus vite (2 à 8 s au lieu de 3 à 15 s)', wait: [2, 8] },
+  };
+  const FISH_BAIT_PACKS = [1, 5, 10];
+
+  // ---------- Barque (boutique du ponton) ----------
+  // Pièces de la barque, achetées une fois en golds puis choisies librement ; la première option de chaque pièce est offerte.
+  const BOAT_PARTS = {
+    coque: { label: 'Coque', icon: '🛶', options: {
+      bois: { label: 'Bois naturel', price: 0, hull: ['#a8703e', '#6a4020'], rim: '#c8905a', line: '#4a2a10' },
+      rouge: { label: 'Peinture rouge', price: 2000, hull: ['#d84a3a', '#8a2018'], rim: '#f0e0c8', line: '#5a1008' },
+      nuit: { label: 'Bleu nuit', price: 2000, hull: ['#3a4a8a', '#1a2050'], rim: '#e8c860', line: '#101438' },
+      menthe: { label: 'Vert menthe', price: 2000, hull: ['#6ad0a8', '#2a8a68'], rim: '#ffffff', line: '#1a5a40' },
+      pirate: { label: 'Coque pirate', price: 6000, hull: ['#3a3038', '#18141a'], rim: '#c8a050', line: '#000000', skull: true },
+      glace: { label: 'Coque de glace', price: 8000, hull: ['#c8f0ff', '#6ab0e0'], rim: '#ffffff', line: '#3a7ab0', shine: true },
+      dragon: { label: 'Écailles de dragon', price: 12000, hull: ['#c83a2a', '#5a1010'], rim: '#ffcc44', line: '#3a0808', scales: true },
+      or: { label: 'Coque en or', price: 20000, hull: ['#ffe070', '#c89020'], rim: '#fff4c0', line: '#7a5008', shine: true },
+    } },
+    lanterne: { label: 'Lanterne', icon: '🏮', options: {
+      classique: { label: 'Lanterne classique', price: 0, glow: '255,210,120', glass: '#ffe9a8' },
+      lampion: { label: 'Lampion de papier', price: 2500, glow: '255,90,70', glass: '#ff6a5a', paper: true },
+      citrouille: { label: 'Citrouille', price: 3000, glow: '255,150,40', glass: '#ff9a2a', pumpkin: true },
+      cristal: { label: 'Lanterne de cristal', price: 5000, glow: '120,220,255', glass: '#9ae8ff' },
+      follet: { label: 'Feu follet', price: 8000, glow: '120,255,160', glass: '#8affb0', wisp: true },
+    } },
+    ancre: { label: 'Ancre', icon: '⚓', options: {
+      aucune: { label: 'Pas d\'ancre', price: 0 },
+      fer: { label: 'Ancre de fer', price: 1500, color: '#5a5a66' },
+      cuivre: { label: 'Ancre de cuivre', price: 3000, color: '#c87a3a' },
+      doree: { label: 'Ancre dorée', price: 6000, color: '#ffcc44' },
+    } },
+    fanion: { label: 'Fanion', icon: '🚩', options: {
+      aucun: { label: 'Pas de fanion', price: 0 },
+      zer0loot: { label: 'Fanion Zer0Loot', price: 1500, colors: ['#b83cff', '#29e7ff'], text: 'Z' },
+      rouge: { label: 'Fanion rouge', price: 1500, colors: ['#e33', '#ff8a7a'] },
+      bleu: { label: 'Fanion bleu', price: 1500, colors: ['#2a6ae8', '#8ab8ff'] },
+      pirate: { label: 'Pavillon pirate', price: 3000, colors: ['#18141a', '#ffffff'], skull: true },
+      arcenciel: { label: 'Fanion arc-en-ciel', price: 4000, rainbow: true },
+    } },
+    proue: { label: 'Figure de proue', icon: '🦆', options: {
+      aucune: { label: 'Pas de figure', price: 0 },
+      canard: { label: 'Canard en plastique', price: 2500 },
+      licorne: { label: 'Tête de licorne', price: 5000 },
+      dragon: { label: 'Tête de dragon', price: 8000 },
+      sirene: { label: 'Sirène dorée', price: 10000 },
+    } },
+  };
+  const BOAT_DEFAULT = Object.fromEntries(Object.entries(BOAT_PARTS).map(([k, P]) => [k, Object.keys(P.options)[0]]));
   // Espèce du concours du jour (« AAAA-MM-JJ ») : la même pour tous, tirée d'après la date parmi les espèces communes et
   // peu communes qui mordent à toute heure.
   function fishContestSpecies(day) {
-    const list = Object.values(FISH).filter((f) => !f.when && FISHING.contest.rarities.includes(f.rarity)).map((f) => f.id);
+    const list = Object.values(FISH).filter((f) => !f.when && !f.weather && FISHING.contest.rarities.includes(f.rarity)).map((f) => f.id);
     let h = 2166136261;
     for (const ch of String(day)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
     return list[h % list.length];
@@ -3540,10 +3775,10 @@
     ceinture_tresor: { slot: 'belt', label: 'Ceinture du chasseur de trésors', price: 0, legend: true, color: '#8a5a1e', trim: '#ffd34a', unlock: { metric: 'chests', goal: 5000, desc: 'Ouvrir 5 000 coffres' } },
     // Pêche : la canne légendaire se pêche dans un trésor (2 % des trésors) ; la panoplie du pêcheur s'achète une fois le Pêchédex complet.
     canne_legendaire: { slot: 'weapon', label: 'Canne à pêche légendaire', price: 0, legend: true, color: '#ffd34a', trim: '#7fe8ff', unlock: { metric: 'fishRod', goal: 1, desc: 'Pêcher la Canne légendaire dans un trésor (très rare)' } },
-    chapeau_pecheur: { slot: 'hat', label: 'Bob du pêcheur', price: 2500, color: '#c8b06a', trim: '#5a7a3a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
-    gilet_pecheur: { slot: 'chest', label: 'Gilet du pêcheur', price: 2500, color: '#5a7a3a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
-    salopette_pecheur: { slot: 'pants', label: 'Salopette du pêcheur', price: 2500, color: '#3a5a8a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
-    bottes_pecheur: { slot: 'shoes', label: 'Bottes du pêcheur', price: 2500, color: '#e8c030', trim: '#7a5a10', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Compléter le Pêchédex (100 espèces)' } },
+    chapeau_pecheur: { slot: 'hat', label: 'Bob du pêcheur', price: 2500, color: '#c8b06a', trim: '#5a7a3a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Inscrire 100 espèces au Pêchédex' } },
+    gilet_pecheur: { slot: 'chest', label: 'Gilet du pêcheur', price: 2500, color: '#5a7a3a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Inscrire 100 espèces au Pêchédex' } },
+    salopette_pecheur: { slot: 'pants', label: 'Salopette du pêcheur', price: 2500, color: '#3a5a8a', trim: '#c8b06a', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Inscrire 100 espèces au Pêchédex' } },
+    bottes_pecheur: { slot: 'shoes', label: 'Bottes du pêcheur', price: 2500, color: '#e8c030', trim: '#7a5a10', unlock: { metric: 'fishSpecies', goal: 100, desc: 'Inscrire 100 espèces au Pêchédex' } },
     lunettes_flambeur: { slot: 'face', label: 'Lunettes du flambeur', price: 0, legend: true, color: '#ffd34a', unlock: { metric: 'jackpots', goal: 25, desc: 'Décrocher 25 jackpots au casino' } },
     chaussons_palais: { slot: 'shoes', label: 'Chaussons du palais', price: 0, legend: true, color: '#7a1f6a', trim: '#ffd34a', unlock: { metric: 'decoLevel', goal: 20, desc: 'Atteindre le niveau de décoration 20 (le maximum) dans sa maison' } },
   };
@@ -3751,7 +3986,7 @@
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
     CHAT, CHAT_ROOMS, CHAT_ROOM_IDS, CHAT_EMOTES, chatTokens,
-    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishContestSpecies, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
+    FISHING, FISH, FISH_IDS, FISH_BASE_IDS, fishTime, fishPool, fishContestSpecies, FISH_WEATHER, FISH_WEATHER_SPECIAL, fishWeather, fishWeatherPlan, FISH_BAITS, FISH_BAIT_PACKS, BOAT_PARTS, BOAT_DEFAULT, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
     CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,

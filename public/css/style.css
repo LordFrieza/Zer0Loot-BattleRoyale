@@ -1769,6 +1769,46 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .fish-reacts { display: flex; gap: 4px; flex-wrap: wrap; }
 .fish-reacts button { min-height: 34px; width: 40px; padding: 0; justify-content: center; font-size: 19px; background: rgba(34, 24, 82, .6); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; }
 .fish-reacts button:hover { transform: translateY(-2px) scale(1.08); background: rgba(80, 50, 160, .7); }
+/* Météo de la pêche et planning */
+.fish-weather { font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.fw-plan summary { cursor: pointer; font-weight: 700; margin-top: 4px; }
+.fw-day { margin-top: 6px; }
+.fw-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; margin-top: 2px; }
+.fw-cell { display: flex; flex-direction: column; align-items: center; padding: 3px 0; border-radius: 8px; background: rgba(0, 0, 0, .22); border: 1px solid transparent; line-height: 1.1; }
+.fw-cell b { font-size: 16px; }
+.fw-cell small { font-size: 10px; color: var(--muted); }
+.fw-cell.special { background: rgba(90, 140, 220, .22); }
+.fw-cell.now { border-color: #ffd34a; box-shadow: 0 0 8px rgba(255, 211, 74, .45); }
+.fw-cell.past { opacity: .38; }
+/* Boutique du ponton */
+.fish-shop { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(180deg, rgba(122, 90, 50, .22), rgba(20, 14, 40, .5)); border: 1px solid rgba(200, 150, 90, .4); }
+.fish-shop h3 { margin: 0 0 8px; }
+.fs-tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.fs-tabs button { min-height: 34px; padding: 4px 14px; background: rgba(34, 24, 82, .55); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; font-weight: 800; }
+.fs-tabs button.active { background: linear-gradient(180deg, #c8954a, #8a5a2a); border-color: #ffd08a; }
+.fs-gold { font-weight: 900; color: #ffd34a; }
+.fs-note { font-size: 13px; margin: 0 0 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 8px; }
+.fs-card { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); font-size: 13px; }
+.fs-card.used { border-color: #3ddc5a; box-shadow: 0 0 10px rgba(61, 220, 90, .25); }
+.fs-card-top { display: flex; gap: 8px; align-items: flex-start; }
+.fs-card-top div { display: flex; flex-direction: column; min-width: 0; }
+.fs-ico { font-size: 26px; line-height: 1; }
+.fs-card-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.fs-used { color: #3ddc5a; font-weight: 800; }
+.fs-buy { display: flex; gap: 4px; flex-wrap: wrap; }
+.fs-buy button { flex: 1 1 0; min-width: 0; padding: 4px 6px; font-size: 12px; }
+.fs-boat { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.fs-preview { flex: 0 1 340px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fs-preview canvas { width: 100%; max-width: 340px; height: auto; aspect-ratio: 340 / 200; border-radius: 12px; border: 2px solid #7a5a32; }
+.fs-parts { flex: 1 1 360px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fs-part { font-size: 13px; }
+.fs-opts { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+.fs-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 0; padding: 5px 9px; font-size: 12px; background: rgba(34, 24, 82, .5); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; }
+.fs-opt small { font-size: 11px; color: var(--muted); }
+.fs-opt.on { border-color: #3ddc5a; background: rgba(61, 220, 90, .15); }
+.fs-opt.try { border-color: #ffd34a; background: rgba(255, 211, 74, .15); }
+.fs-try { margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .fish-pond, .fish-contest { font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .fish-anglers { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 .fish-angler { display: flex; align-items: center; gap: 6px; }

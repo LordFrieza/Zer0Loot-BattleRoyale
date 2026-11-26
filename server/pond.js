@@ -162,4 +162,4 @@ function reset() {
   nextId = 1;
 }
 
-module.exports = { init, join, leave, act, react, tick, view, pondOf, memberOf, schoolOf, startSchool: (id, now = Date.now()) => startSchool(ponds.get(id), now), ponds, reset };
+module.exports = { init, join, leave, act, react, tick, view, pondOf, memberOf, schoolOf, describe: (user) => describe(user), startSchool: (id, now = Date.now()) => startSchool(ponds.get(id), now), ponds, reset };

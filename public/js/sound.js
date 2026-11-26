@@ -680,6 +680,8 @@
     fishPlop(v = 1) { tone(520, 0.12, { type: 'sine', vol: 0.09 * v, to: 180 }); noise(0.12, { freq: 900, vol: 0.08 * v }); },
     fishNibble() { tone(700, 0.05, { type: 'sine', vol: 0.06, to: 420 }); },
     fishSink() { tone(320, 0.3, { type: 'sine', vol: 0.12, to: 90 }); noise(0.35, { freq: 1200, sweep: 300, vol: 0.18 }); },
+    // Tonnerre de la tempête (pêche) : grondement grave, puis roulement
+    fishThunder() { noise(1.6, { freq: 220, sweep: 60, vol: 0.32 }); noise(0.25, { freq: 1800, filter: 'highpass', vol: 0.12 }); },
     fishHook() { noise(0.2, { freq: 3000, filter: 'highpass', vol: 0.12 }); tone(880, 0.1, { type: 'triangle', vol: 0.06 }); },
     fishReel() { tone(1500 + Math.random() * 300, 0.025, { type: 'square', vol: 0.02 }); },
     fishCatch(rarity = 'commun') {

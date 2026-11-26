@@ -592,6 +592,22 @@ de la file, confirme les `!join` et annonce le vainqueur.
   trésors mordent deux fois plus. **Concours du jour** : une espèce commune ou peu commune, tirée d'après la date. La plus
   grande prise de cette espèce l'emporte. À minuit (heure de Paris), les 3 premiers reçoivent leur lot par courrier :
   600 golds + 3 coffres, 300 + 2, 150 + 1. Succès « Roi de l'étang » (1 victoire) et « Légende du ponton » (10).
+  **Météo** : la journée est découpée en créneaux de 2 h (heure de Paris), chacun avec sa météo, la même pour tous. C'est un
+  temps calme 3 fois sur 4, sinon pluie, brume, tempête, neige ou aurore boréale, chacune animée sur le lac (averse, nappes de
+  brouillard, éclairs et houle, flocons, rubans de l'aurore). Un planning montre la météo d'aujourd'hui et de demain. Chaque
+  météo spéciale amène **20 espèces** qu'on ne pêche que par ce temps, soit **100 espèces des intempéries** : le Pêchédex en
+  compte 200. Par météo spéciale, la moitié des prises viennent de ses espèces.
+  **Boutique du ponton** (sous l'étang) : 13 **appâts** à usage unique, consommés à chaque lancer :
+  - rareté plus fréquente, de 25 à 200 golds (Larme de sirène : +2 points de légendaire) ;
+  - certaines formes de poissons plus fréquentes ;
+  - plus d'espèces de la météo ou plus de trésors ;
+  - remontée facilitée (zone verte plus grande, poisson plus lent) ou touche plus rapide.
+
+  On y personnalise aussi sa **barque** en golds : coque, lanterne, ancre, fanion et figure de proue. On essaie une pièce
+  avant de l'acheter, et les autres pêcheurs la voient.
+  **Série** 🔥 : chaque poisson pêché d'affilée la fait grimper, un poisson raté ou perdu la remet à zéro. Il y a un classement
+  « Pêche streak » et les succès « Main sûre » (25) et « Imperturbable » (100). Après une prise, 1 s de pause : un clic de
+  trop ne fait plus disparaître la carte du poisson.
 - **Maison** (onglet Maison) : sa propre maison, achetée et décorée en émeraudes. **47 meubles** (assises, tables, lits,
   rangements, lumières, plantes, tapis, décoration murale, loisirs, prestige ; de 250 à 75 000 émeraudes) à placer soi-même
   dans la pièce (glisser-déposer, clic droit pour retourner, double-clic pour ranger), façade (murs, toit, fenêtres, porte,

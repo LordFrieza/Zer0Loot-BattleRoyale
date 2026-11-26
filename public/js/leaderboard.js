@@ -2,13 +2,14 @@
    avec podium pour le top 3. Utilisé par la page perso et la page admin. */
 (function () {
   const BOARDS = [
-    { key: 'wins', label: 'Victoires', icon: '🏆', unit: 'victoire', note: 'Battle Royale, Roi de la Colline et Guerre des clans' },
-    { key: 'kills', label: 'Kills', icon: '⚔️', unit: 'kill', note: 'Battle Royale uniquement' },
+    { key: 'wins', label: 'Victoires', icon: '🏆', unit: 'victoire', note: 'Battle Royale, Tournoi, Roi de la Colline et Guerre des clans' },
+    { key: 'kills', label: 'Kills', icon: '⚔️', unit: 'kill', note: 'Joueurs tués : Battle Royale, Tournoi, Roi de la Colline et Guerre des clans' },
     { key: 'battles', label: 'Batailles jouées', icon: '🎖️', unit: 'bataille', note: 'Tous les modes du stream' },
     { key: 'expedition', label: 'Expédition', icon: '🕳️', unit: 'profondeur', fmt: (n) => `profondeur ${n}`, note: 'Record de profondeur en mode Solo' },
     { key: 'dungeon', label: 'Raid de Donjon', icon: '🏰', unit: 'salle', fmt: (n) => `salle ${n}`, note: 'Salle la plus lointaine atteinte' },
     { key: 'survivor', label: 'Survivor', icon: '🧟', unit: 'vague', fmt: (n) => `vague ${n}`, note: 'Vague la plus lointaine atteinte' },
     { key: 'fish', label: 'Pêcheurs', icon: '🎣', unit: 'poisson', fmt: (n) => `${fmtN(n)} poisson${n > 1 ? 's' : ''}`, note: 'Nombre de poissons pêchés' },
+    { key: 'fishStreak', label: 'Pêche streak', icon: '🔥', unit: 'poisson', fmt: (n) => `${fmtN(n)} d'affilée`, note: 'Record de poissons pêchés d\'affilée sans en rater un' },
     { key: 'chests', label: 'Coffres ouverts', icon: '🎁', unit: 'coffre', fmt: (n) => `${fmtN(n)} coffre${n > 1 ? 's' : ''}`, note: 'Depuis la création du personnage' },
     { key: 'legendary', label: 'Légendaires', icon: '🌟', unit: 'légendaire', fmt: (n) => `${fmtN(n)} légendaire${n > 1 ? 's' : ''}`, note: 'Objets légendaires sortis des coffres' },
     { key: 'jackpots', label: 'Chanceux du casino', icon: '🎰', unit: 'jackpot', fmt: (n) => `${fmtN(n)} jackpot${n > 1 ? 's' : ''}`, note: 'Jackpots décrochés au casino' },

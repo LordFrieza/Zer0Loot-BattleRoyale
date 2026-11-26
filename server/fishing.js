@@ -15,6 +15,10 @@
  * Banc de poissons de l'étang partagé (server/pond.js) : un lancer pendant le passage d'un banc tire avec les
  * multiplicateurs de FISHING.school. Concours du jour (db.state.fishContest) : la plus grande prise de l'espèce du jour
  * (`Rules.fishContestSpecies`) ; au changement de jour (`contestRollover`), les 3 premiers reçoivent leur lot par courrier.
+ * Météo (`Rules.fishWeather`) : par météo spéciale, la moitié des prises viennent de ses 20 espèces. Appâts
+ * (`Rules.FISH_BAITS`, boutique du ponton) : l'appât choisi est consommé au lancer et change le tirage ou la remontée.
+ * Série (`fishing.streak`) : prises de poissons d'affilée ; une prise vue puis laissée (FISH-9) ou perdue la remet à 0.
+ * Barque : pièces achetées en golds (`Rules.BOAT_PARTS`, `character.boat`).
  */
 const crypto = require('crypto');
 const Rules = require('../shared/rules');
@@ -43,16 +47,22 @@ let notify = null;
 function setNotify(fn) { notify = fn; }
 
 // Ce qui mord : un trésor (5 %) ou un poisson qui peut mordre à cette heure-là (rareté pondérée, puis espèce au hasard).
-// La taille penche vers le bas de la fourchette (les grands spécimens sont plus rares). `school` : un banc de poissons
-// passe (FISHING.school : raretés hautes et trésors plus fréquents).
-function rollTarget(now, school = false) {
+// La taille penche vers le bas de la fourchette (les grands spécimens sont plus rares). Options : `school` (un banc de
+// poissons passe : raretés hautes et trésors plus fréquents), `weather` (météo, par défaut celle de l'instant : par météo
+// spéciale, la moitié des prises sont tirées parmi ses espèces), `bait` (appât : FISH_BAITS).
+function rollTarget(now, opts = {}) {
+  const o = typeof opts === 'boolean' ? { school: opts } : opts || {};
   const SC = F.school;
-  if (random() < F.treasureChance * (school ? SC.treasureMult : 1)) return { kind: 'treasure' };
-  const pool = Rules.fishPool(Rules.fishTime(now));
-  const rarities = Object.entries(F.rarities).filter(([r]) => pool[r] && pool[r].length).map(([r, R]) => ({ id: r, weight: R.weight * (school ? SC.mult[r] || 1 : 1) }));
+  const B = (o.bait && Rules.FISH_BAITS[o.bait]) || {};
+  if (random() < F.treasureChance * (o.school ? SC.treasureMult : 1) + (B.treasure || 0)) return { kind: 'treasure' };
+  const weather = o.weather !== undefined ? o.weather : Rules.fishWeather(now);
+  const fromWeather = !!weather && weather !== 'normal' && random() < Rules.FISH_WEATHER.share + (B.weather || 0);
+  const pool = Rules.fishPool(Rules.fishTime(now), fromWeather ? weather : null);
+  const rarities = Object.entries(F.rarities).filter(([r]) => pool[r] && pool[r].length)
+    .map(([r, R]) => ({ id: r, weight: R.weight * (o.school ? SC.mult[r] || 1 : 1) + ((B.rarity && B.rarity[r]) || 0) }));
   const rarity = weighted(rarities).id;
-  const ids = pool[rarity];
-  const fish = Rules.FISH[ids[randInt(0, ids.length - 1)]];
+  // Appât de forme : les espèces de ces formes ×2,5 dans la rareté tirée
+  const fish = Rules.FISH[weighted(pool[rarity].map((id) => ({ id, weight: B.shapes && B.shapes.includes(Rules.FISH[id].shape) ? 2.5 : 1 }))).id];
   const size = Math.round((fish.min + (fish.max - fish.min) * random() ** 1.6) * 10) / 10;
   return { kind: 'fish', id: fish.id, size };
 }
@@ -68,11 +78,17 @@ function clearTimers(s) {
   s.timers = [];
 }
 // Fin d'une partie sans prise : si la silhouette était déjà visible, les poissons se méfient un moment.
+// La série de prises (fishing.streak) repart de zéro : une prise vue puis laissée, ou perdue.
+function breakStreak(user) {
+  const fz = user.character && user.character.fishing;
+  if (fz && fz.streak) { fz.streak = 0; db.save(); }
+}
 function endSession(user, s, now) {
   clearTimers(s);
   if (sessions.get(user.id) === s) sessions.delete(user.id);
   if (!s.hookedAt && now >= s.castAt + s.appear * 1000) {
     calm.set(user.id, now + F.scare * 1000);
+    breakStreak(user);
     return F.scare;
   }
   return 0;
@@ -104,11 +120,25 @@ function cast(user, now = Date.now()) {
     // Un nouveau lancer remplace le précédent : laisser filer une prise déjà vue effraie les poissons
     if (endSession(user, prev, now)) throw new Error(`Les poissons se méfient encore… relance dans ${F.scare} s`);
   }
-  game.upgrade(user.character);
+  const c = user.character;
+  game.upgrade(c);
   const school = pond.schoolOf(user.id, now);
-  const target = module.exports.rollTarget(now, school); // remplaçable dans les tests
+  // L'appât choisi est consommé à chaque lancer (s'il en reste)
+  const fz = c.fishing;
+  let bait = null;
+  if (fz.bait && (fz.baits[fz.bait] || 0) > 0) {
+    bait = fz.bait;
+    fz.baits[bait] -= 1;
+    db.save();
+  }
+  const B = (bait && Rules.FISH_BAITS[bait]) || {};
+  const weather = Rules.fishWeather(now);
+  const target = module.exports.rollTarget(now, { school, bait, weather }); // remplaçable dans les tests
   const diff = Rules.fishDifficulty(target);
-  const appear = round2(between(F.wait[0], F.wait[1]));
+  if (B.zone) diff.zone = Math.min(0.5, diff.zone * B.zone);
+  if (B.speed) { diff.vmax *= B.speed; diff.dart *= B.speed; }
+  const wait = B.wait || F.wait;
+  const appear = round2(between(wait[0], wait[1]));
   let t = appear + F.approach;
   const nibbles = [];
   for (let i = randInt(diff.nibbles[0], diff.nibbles[1]); i > 0; i--) {
@@ -123,7 +153,7 @@ function cast(user, now = Date.now()) {
   sessions.set(user.id, s);
   schedule(user, s);
   // Rien de ce qui va se passer n'est révélé : ni les temps, ni la fenêtre (qui trahirait la rareté), ni la silhouette
-  return { id: s.id, approach: F.approach, school };
+  return { id: s.id, approach: F.approach, school, bait: bait ? { id: bait, left: fz.baits[bait] } : null };
 }
 
 function current(user, id) {
@@ -184,10 +214,13 @@ function land(user, id, toggles, now = Date.now()) {
   const elapsed = (now - s.hookedAt) / 1000;
   if (elapsed < simulated * F.realTimeRatio - 0.25) throw new Error('Remontée trop rapide');
   // Perdue en pleine remontée : on apprend après coup ce que c'était (sa rareté, ou un trésor)
-  if (!R.won) return { escaped: true, reason: 'ligne', lost: s.target.kind === 'treasure' ? 'tresor' : Rules.FISH[s.target.id].rarity };
+  if (!R.won) {
+    breakStreak(user);
+    return { escaped: true, reason: 'ligne', lost: s.target.kind === 'treasure' ? 'tresor' : Rules.FISH[s.target.id].rarity };
+  }
   const c = user.character;
   game.upgrade(c);
-  if (s.target.kind === 'treasure') return { caught: true, kind: 'treasure', lot: rollTreasure(c) };
+  if (s.target.kind === 'treasure') return { caught: true, kind: 'treasure', lot: rollTreasure(c), streak: c.fishing.streak };
   const fish = Rules.FISH[s.target.id];
   const dex = c.fishing.dex;
   const before = dex[fish.id];
@@ -199,8 +232,65 @@ function land(user, id, toggles, now = Date.now()) {
   game.bump(c, 'fishCaught');
   c.counters.fishSpecies = Object.keys(dex).length;
   if (fish.rarity === 'legendaire') game.bump(c, 'fishLegend');
+  // Série : une prise de plus ; le record de série (`fishStreak`) fait le classement et le succès « Imperturbable »
+  c.fishing.streak += 1;
+  c.counters.fishStreak = Math.max(c.counters.fishStreak || 0, c.fishing.streak);
   const contest = contestCatch(user, fish.id, s.target.size, now);
-  return { caught: true, kind: 'fish', id: fish.id, size: s.target.size, isNew: !before, record, n: entry.n, best: entry.best, species: c.counters.fishSpecies, school: s.school, contest };
+  return { caught: true, kind: 'fish', id: fish.id, size: s.target.size, isNew: !before, record, n: entry.n, best: entry.best, species: c.counters.fishSpecies, school: s.school, contest, streak: c.fishing.streak, bestStreak: c.counters.fishStreak };
+}
+
+// ---------- Boutique du ponton : appâts et barque ----------
+function buyBait(user, id, n = 1) {
+  const B = Rules.FISH_BAITS[id];
+  if (!B) throw new Error('Appât inconnu');
+  n = Number(n);
+  if (!Rules.FISH_BAIT_PACKS.includes(n)) throw new Error('Quantité invalide');
+  const c = user.character;
+  game.upgrade(c);
+  const cost = B.price * n;
+  if (c.gold < cost) throw new Error(`Il te faut ${cost} golds`);
+  c.gold -= cost;
+  c.fishing.baits[id] = (c.fishing.baits[id] || 0) + n;
+  if (!c.fishing.bait) c.fishing.bait = id; // premier appât acheté : choisi d'office
+  return { bait: id, count: c.fishing.baits[id], cost };
+}
+// Appât utilisé aux prochains lancers (null : sans appât)
+function useBait(user, id) {
+  const c = user.character;
+  game.upgrade(c);
+  if (id == null || id === '') { c.fishing.bait = null; return { bait: null }; }
+  if (!Rules.FISH_BAITS[id]) throw new Error('Appât inconnu');
+  if (!(c.fishing.baits[id] > 0)) throw new Error('Tu n\'as plus cet appât');
+  c.fishing.bait = id;
+  return { bait: id };
+}
+function boatOption(part, id) {
+  const P = Rules.BOAT_PARTS[part];
+  if (!P) throw new Error('Pièce inconnue');
+  const O = P.options[id];
+  if (!O) throw new Error('Option inconnue');
+  return O;
+}
+// Achète une pièce de barque (et la pose)
+function buyBoatPart(user, part, id) {
+  const O = boatOption(part, id);
+  const c = user.character;
+  game.upgrade(c);
+  const key = `${part}:${id}`;
+  if (!O.price || c.boat.owned.includes(key)) throw new Error('Tu l\'as déjà');
+  if (c.gold < O.price) throw new Error(`Il te faut ${O.price} golds`);
+  c.gold -= O.price;
+  c.boat.owned.push(key);
+  c.boat.equip[part] = id;
+  return { part, id, cost: O.price };
+}
+function equipBoatPart(user, part, id) {
+  const O = boatOption(part, id);
+  const c = user.character;
+  game.upgrade(c);
+  if (O.price && !c.boat.owned.includes(`${part}:${id}`)) throw new Error('Achète d\'abord cette pièce');
+  c.boat.equip[part] = id;
+  return { part, id };
 }
 
 // ---------- Concours du jour ----------
@@ -268,4 +358,4 @@ function stop(user, now = Date.now()) {
   return { stopped: true, wait };
 }
 
-module.exports = { cast, hook, land, stop, sessions, calm, rollTarget, setNotify, contestView, contestCatch, contestRollover, timer: (fn, ms) => setTimeout(fn, ms) };
+module.exports = { cast, hook, land, stop, sessions, calm, rollTarget, setNotify, contestView, contestCatch, contestRollover, buyBait, useBait, buyBoatPart, equipBoatPart, timer: (fn, ms) => setTimeout(fn, ms) };
