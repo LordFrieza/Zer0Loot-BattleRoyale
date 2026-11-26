@@ -270,14 +270,19 @@ test('[SV-6] survivor : émeraudes, récompense du jour à la vague 30, record, 
 });
 
 test('[SV-7] survivor : méta-progression, déblocages, arme de départ', () => {
-  assert.strictEqual(Rules.survivorMetaCost('vitalite', 0), 120);
-  assert.strictEqual(Rules.survivorMetaCost('vitalite', 1), 210);
+  // Méta-progression à −60 % : (base × hausse^L) × 0,4, arrondi à la dizaine
+  assert.strictEqual(Rules.survivorMetaCost('vitalite', 0), 50);
+  assert.strictEqual(Rules.survivorMetaCost('vitalite', 1), 80);
+  assert.strictEqual(Rules.survivorMetaCost('resurrection', 0), 16000);
+  assert.deepStrictEqual([Rules.SURVIVOR_UNLOCKS.weapons.aura.price, Rules.SURVIVOR_UNLOCKS.weapons.aura.starter, Rules.SURVIVOR_UNLOCKS.weapons.dagues.starter], [1200, 3200, 1000]);
+  assert.deepStrictEqual([Rules.SURVIVOR_UNLOCKS.passives.armure, Rules.SURVIVOR_UNLOCKS.passives.duplicateur, Rules.SURVIVOR_UNLOCKS.passives.coeur], [600, 12000, 0]);
+  assert.strictEqual(Rules.SURVIVOR_UNLOCKS.weapons.boomerang.price, null, 'les armes secrètes restent à débloquer par objectif');
   assert.strictEqual(Rules.survivorMetaCost('resurrection', 1), null);
   const u = player();
   const c = u.character;
-  assert.throws(() => sv.buyMeta(c, 'vitalite'), /120 émeraudes/);
+  assert.throws(() => sv.buyMeta(c, 'vitalite'), /50 émeraudes/);
   c.emeralds = 100000;
-  assert.deepStrictEqual(sv.buyMeta(c, 'vitalite'), { id: 'vitalite', level: 1, cost: 120 });
+  assert.deepStrictEqual(sv.buyMeta(c, 'vitalite'), { id: 'vitalite', level: 1, cost: 50 });
   assert.throws(() => sv.buyMeta(c, 'pouvoir'), /inconnue/);
   assert.deepStrictEqual(sv.unlockedWeapons(c), ['epee', 'dagues', 'baguette']);
   assert.deepStrictEqual(sv.starters(c), ['epee']);
@@ -437,7 +442,7 @@ test('[SV-12] survivor : 25 objets, nouveaux effets (esquive, bouclier, épines,
   const P = Rules.SURVIVOR_PASSIVES;
   assert.strictEqual(Object.keys(P).length, 25);
   assert.ok(Object.keys(P).every((id) => id in Rules.SURVIVOR_UNLOCKS.passives), 'chaque objet a un prix de déblocage');
-  assert.ok(['cape', 'epines', 'croc', 'sablier', 'plume', 'oeil', 'bouclier', 'bourse', 'boussole', 'cor', 'gourde', 'talisman', 'givre', 'tome'].every((id) => Rules.SURVIVOR_UNLOCKS.passives[id] >= 6000));
+  assert.ok(['cape', 'epines', 'croc', 'sablier', 'plume', 'oeil', 'bouclier', 'bourse', 'boussole', 'cor', 'gourde', 'talisman', 'givre', 'tome'].every((id) => Rules.SURVIVOR_UNLOCKS.passives[id] >= 2400));
   assert.strictEqual(Rules.survivorStats({}, { cape: 20 }).dodge, 0.4, 'esquive plafonnée à 40 %');
   const mk = (passives) => { const r = new sv.SurvivorRun({ random: () => 0.5 }); r.passives = passives; r.recompute(); r.enemies = []; return r; };
   // Esquive

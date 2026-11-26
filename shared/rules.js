@@ -3020,10 +3020,12 @@
     relance: { label: 'Relance', icon: '🎲', max: 3, add: { rerolls: 1 }, desc: '+1 relance des choix par partie', base: 2500, growth: 3 },
     resurrection: { label: 'Seconde vie', icon: '👼', max: 1, add: { revivals: 1 }, desc: 'Une résurrection par partie (50 % de vie)', base: 40000, growth: 1 },
   };
+  // Méta-progression à −60 % : tous les prix (améliorations, déblocages, armes de départ) × 0,4
+  const SURVIVOR_PRICE_MULT = 0.4;
   function survivorMetaCost(id, level) {
     const M = SURVIVOR_META[id];
     if (!M || level >= M.max) return null;
-    return Math.round((M.base * Math.pow(M.growth, level)) / 10) * 10;
+    return Math.round((M.base * Math.pow(M.growth, level) * SURVIVOR_PRICE_MULT) / 10) * 10;
   }
   // Armes et objets à débloquer (émeraudes). Sans déblocage, ils ne sortent pas dans les choix de montée de niveau.
   // `starter` : prix pour pouvoir commencer la partie avec cette arme (une fois débloquée).
@@ -3049,6 +3051,12 @@
       cor: 13000, oeil: 15000, bouclier: 17000, givre: 19000, bourse: 22000, tome: 26000,
     },
   };
+  // Prix ci-dessus avant la baisse : × SURVIVOR_PRICE_MULT, arrondis à 50 émeraudes (les gratuits restent gratuits)
+  {
+    const cut = (v) => (v ? Math.round((v * SURVIVOR_PRICE_MULT) / 50) * 50 : v);
+    for (const w of Object.values(SURVIVOR_UNLOCKS.weapons)) { w.price = cut(w.price); w.starter = cut(w.starter); }
+    for (const id of Object.keys(SURVIVOR_UNLOCKS.passives)) SURVIVOR_UNLOCKS.passives[id] = cut(SURVIVOR_UNLOCKS.passives[id]);
+  }
   // Stats d'une partie : base + méta-progression + objets ramassés.
   function survivorStats(meta = {}, passives = {}) {
     const s = { ...SURVIVOR.player };

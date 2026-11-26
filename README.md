@@ -541,9 +541,11 @@ de la file, confirme les `!join` et annonce le vainqueur.
   - Fin de partie : **émeraudes** selon la vague (⌊(v − 1)(v + 8) / 4⌋ + 10 par boss + 1 par 100 monstres, × sanctuaires), une fois par
     jour **10 coffres + 3 Clés de boss** si la **vague 30** est atteinte, score = 10 × secondes + monstres + 1 000 par boss
     (classement des meilleurs scores).
-  - **Méta-progression** (émeraudes, prix très élevés) : 13 améliorations des stats de départ (Vitalité, Puissance,
+  - **Méta-progression** (émeraudes) : 13 améliorations des stats de départ (Vitalité, Puissance,
     Carapace, Hâte, Célérité, Envergure, Attraction, Croissance, Récupération, Fortune, Avidité, Relance, Seconde vie),
-    déblocage des armes et objets dans les tirages, armes de départ (l'Épée est la seule au début).
+    déblocage des armes et objets dans les tirages, armes de départ (l'Épée est la seule au début). Tous ces prix ont
+    été baissés de 60 % (×0,4, `SURVIVOR_PRICE_MULT`) : Vitalité 1 à 50 émeraudes, Seconde vie 16 000, objets de 600 à
+    12 000, Aura 1 200 (3 200 pour commencer avec).
 - **Pêche** (onglet Pêche, gratuit) : un petit mode tranquille, en musique lo-fi (4 morceaux qui s'enchaînent en boucle). Le
   personnage et son familier sont dans une barque sur un lac (ciel selon l'heure réelle, chalet sur pilotis, nénuphars, famille
   de canards, avion et montgolfière aux banderoles drôles, libellules le jour, lucioles et lanterne la nuit). Un seul bouton
