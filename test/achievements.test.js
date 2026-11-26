@@ -75,3 +75,15 @@ test('[ACH-4] succès « Technicien » : acquis même si on retire la technique'
   game.upgrade(old);
   assert.strictEqual(old.counters.techs, 1);
 });
+
+test('[ACH-5] succès : noms uniques (ce sont aussi les titres)', () => {
+  const names = Rules.ACHIEVEMENTS.map((a) => a.name);
+  const dup = names.filter((n, i) => names.indexOf(n) !== i);
+  assert.deepStrictEqual(dup, [], 'noms en double : ' + dup.join(', '));
+  assert.strictEqual(Rules.achievementById('divin1').name, 'Tueur de Dieu');
+  assert.strictEqual(Rules.achievementById('legendary10').name, 'Divin');
+  // Un joueur qui portait ce titre le garde, avec son nouveau nom
+  const c = game.newCharacter();
+  c.title = 'divin1';
+  assert.strictEqual(game.titleOf(c), 'Tueur de Dieu');
+});
