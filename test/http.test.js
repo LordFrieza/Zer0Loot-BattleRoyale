@@ -515,6 +515,27 @@ test('[TRN-1, TRN-6, TRN-7, TRN-8, BET-1] Tournoi : tableau complet, gains par t
   await admin.post('/api/admin/battle/reset');
 });
 
+test('[BOSS-13] Combat de Boss : vote de la difficulté par le site et le chat, difficulté imposée par l\'admin', async () => {
+  await admin.post('/api/admin/battle/reset');
+  const v = client();
+  await register(v, 'pl_diff_v');
+  await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'troll' });
+  assert.strictEqual((await v.post('/api/boss/difficulty', { difficulty: 'legendaire' })).data.difficulty, 'legendaire');
+  assert.strictEqual((await v.post('/api/boss/difficulty', { difficulty: 'cauchemar' })).status, 400);
+  chatCommand('!mythique', { login: 'diff_viewer', displayName: 'Diff_Viewer' });
+  chatCommand('!légendaire', { login: 'diff_viewer2', displayName: 'Diff_Viewer2' });
+  const q = (await v.get('/api/queue')).data;
+  assert.strictEqual(q.diffVote.leading, 'legendaire');
+  assert.deepStrictEqual(q.diffVote.options.filter((o) => o.votes).map((o) => [o.id, o.votes]), [['legendaire', 2], ['mythique', 1]]);
+  // Difficulté imposée : le vote est refusé
+  const r = await admin.post('/api/admin/queue/open', { seconds: 600, mode: 'boss', boss: 'troll', difficulty: 'heroique' });
+  assert.strictEqual(r.data.difficulty, 'heroique');
+  const refused = await v.post('/api/boss/difficulty', { difficulty: 'divin' });
+  assert.strictEqual(refused.status, 400);
+  assert.match(refused.data.error, /imposée/);
+  await admin.post('/api/admin/battle/reset');
+});
+
 test('[CLAN-1, CLAN-8, CLAN-9, ACH-4] Guerre des clans : !rouge / !bleu, changement de camp, récompenses, kills et paris d\'équipe', async () => {
   await admin.post('/api/admin/battle/reset');
   const a = client();

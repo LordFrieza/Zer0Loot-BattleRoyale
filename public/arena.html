@@ -42,7 +42,7 @@
         me = data;
         if (params.get('hud') !== '0') view.meKey = 'u' + me.id;
         view.voteEnabled = true;
-        view.onVote = (choice) => api('/api/poll/vote', { choice });
+        view.onVote = (choice, kind) => (kind === 'diff' ? api('/api/boss/difficulty', { difficulty: choice }) : api('/api/poll/vote', { choice }));
       }
       if (params.get('tchat') !== '0') {
         Chat.mount(document.getElementById('arena-chat'), 'overlay', { input: !!me });

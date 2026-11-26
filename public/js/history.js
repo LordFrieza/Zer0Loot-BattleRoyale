@@ -40,7 +40,10 @@
       case 'koth': return `${e.rank ? `${e.rank}ᵉ sur ${e.total} · ` : ''}${d.score || 0} points · ${fmtDur(d.hillTime)} sur la colline`;
       case 'clans': return `${d.clan ? Rules.CLANS.teams[d.clan].icon + ' ' + Rules.CLANS.teams[d.clan].label : ''}${d.mvp ? ' · 🌟 MVP' : ''}`;
       case 'gold': return `🪙 ${d.gold || 0} golds ramassés · 🎁 ${d.chests || 0}${d.best ? ' · 👑 Roi du butin' : ''}`;
-      case 'boss': return boss ? `${boss.icon} ${boss.short}${e.outcome === 'win' ? ' vaincu' : ` : il lui restait ${d.bossHp} % de vie`}` : '';
+      case 'boss': {
+        const RD = d.difficulty && Rules.BOSS_RAID_DIFF[d.difficulty];
+        return boss ? `${boss.icon} ${boss.short}${RD ? ` (${RD.label})` : ''}${e.outcome === 'win' ? ' vaincu' : ` : il lui restait ${d.bossHp} % de vie`}` : '';
+      }
       case 'dungeon': return `🏰 Salle ${d.room || 0} atteinte`;
       case 'rush': return `💀 ${d.killed || 0} boss vaincu${d.killed > 1 ? 's' : ''} ${(d.defeated || []).map((id) => (Rules.BOSSES[id] || {}).icon || '').join('')}`;
       case 'expedition': return `🕳️ Profondeur ${d.depth || 0}${d.relics ? ` · 🔮 ${d.relics} relique${d.relics > 1 ? 's' : ''}` : ''}${d.abandoned ? ' · remonté' : ''}`;

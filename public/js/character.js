@@ -2686,9 +2686,11 @@ function renderQueue() {
       <span class="countdown" id="cd"></span><span class="muted">${n} combattant(s) inscrit(s)</span><span class="spacer"></span>
       ${inQueue ? '<b class="up">✅ Tu es inscrit !</b>' : '<span class="muted">Tape <b>!join</b> sur le stream ou</span> <button id="join">Rejoindre</button>'}</div>`;
     if ($('join')) $('join').onclick = () => act('/api/queue/join', {}, 'join');
+    if (queue.diffVote) renderDiffVote(box);
     tickCountdown();
   } else if (queue.phase === 'ready') {
     box.innerHTML = `<b>⏳ File fermée — ${n} combattant(s). Le streamer va lancer la bataille !</b> ${inQueue ? '<span class="up">Tu en fais partie.</span>' : ''}`;
+    if (queue.diffVote) renderDiffVote(box);
   } else if (queue.phase === 'battle') {
     const ev = queue.event && Rules.BATTLE_EVENTS[queue.event];
     const QB = Rules.BOSSES[queue.boss];
@@ -2710,6 +2712,32 @@ function renderQueue() {
   // Mode de jeu de la file en cours
   const m = Rules.GAME_MODES[queue.mode];
   if (m && queue.phase !== 'ended') box.insertAdjacentHTML('afterbegin', `<span class="mode-tag" style="--c:${m.color};margin-right:8px" title="${esc(m.desc)}">${m.icon} ${m.label}</span>`);
+}
+
+// Combat de Boss : vote de la difficulté pendant la file (une voix par personne ; plus c'est dur, plus ça rapporte)
+let diffVoteMine = null; // { key, id }
+function renderDiffVote(box) {
+  const dv = queue.diffVote;
+  const key = `${queue.boss}:${queue.queueEndsAt || 'ready'}`;
+  const mine = diffVoteMine && diffVoteMine.key === key ? diffVoteMine.id : null;
+  if (dv.fixed) {
+    const D = Rules.BOSS_RAID_DIFF[dv.fixed];
+    box.insertAdjacentHTML('beforeend', `<div class="poll-vote"><b>${D.icon} Difficulté imposée par le streamer : ${D.label}</b> <span class="muted">(récompense ×${String(D.reward).replace('.', ',')})</span></div>`);
+    return;
+  }
+  box.insertAdjacentHTML('beforeend', `<div class="poll-vote diff-vote">
+    <div class="row"><b>🗳️ Vote de la difficulté du boss</b><span class="muted" style="font-size:13px">Plus c'est dur, plus ça rapporte · en tête : ${Rules.BOSS_RAID_DIFF[dv.leading].icon} ${Rules.BOSS_RAID_DIFF[dv.leading].label}</span></div>
+    <div class="diff-options">${dv.options.map((o) => {
+      const D = Rules.BOSS_RAID_DIFF[o.id];
+      return `<button class="diff-option ${mine === o.id ? 'mine' : ''} ${dv.total && dv.leading === o.id ? 'lead' : ''}" data-diff="${o.id}">
+        <b>${D.icon} ${D.label}</b><small>×${String(D.reward).replace('.', ',')} · <code>${D.cmd}</code></small><span>${o.votes} voix${mine === o.id ? ' · ✅' : ''}</span></button>`;
+    }).join('')}</div></div>`);
+  box.querySelectorAll('[data-diff]').forEach((btn) => {
+    btn.onclick = async () => {
+      const r = await act('/api/boss/difficulty', { difficulty: btn.dataset.diff }, 'equip');
+      if (r) { diffVoteMine = { key, id: r.difficulty }; renderQueue(); }
+    };
+  });
 }
 
 // Sondage du donjon : tout le monde vote (une voix par personne, le dernier vote compte).

@@ -46,6 +46,10 @@ class Battle extends EventEmitter {
     this.phase = 'idle'; // idle | queue | ready | battle | ended
     this.mode = 'br';
     this.bossId = 'troll'; // boss choisi par l'admin pour le Combat de Boss (voir Rules.BOSSES)
+    // Combat de Boss multijoueur : difficulté votée pendant la file (Rules.BOSS_RAID_DIFF), ou imposée par l'admin
+    this.bossDiff = 'normal';
+    this.bossDiffFixed = null;
+    this.diffVotes = new Map(); // votant (« t:login » / « u:id ») → difficulté
     this.event = null; // événement de la bataille en cours (voir Rules.BATTLE_EVENTS)
     this.fogs = [];
     this.meteors = [];
@@ -80,6 +84,8 @@ class Battle extends EventEmitter {
       poll: this.publicPoll(),
       solo: this.soloInfo(),
       tourney: this.publicTourney(),
+      diffVote: this.publicDiffVote(),
+      bossDiff: this.mode === 'boss' && !this.solo && (this.phase === 'battle' || this.phase === 'ended') ? this.bossDiff : undefined,
     };
   }
 
@@ -87,10 +93,14 @@ class Battle extends EventEmitter {
     this.emit('queue', this.publicQueue());
   }
 
-  openQueue(seconds, mode = 'br', bossId = 'troll') {
+  openQueue(seconds, mode = 'br', bossId = 'troll', difficulty = null) {
     if (this.phase === 'battle') throw new Error('Une bataille est en cours');
     if (!Rules.GAME_MODES[mode]) throw new Error('Mode de jeu inconnu');
     if (mode === 'boss' && !Rules.BOSSES[bossId]) throw new Error('Boss inconnu');
+    if (difficulty && difficulty !== 'vote' && !Rules.BOSS_RAID_DIFF[difficulty]) throw new Error('Difficulté inconnue');
+    this.diffVotes = new Map();
+    this.bossDiffFixed = mode === 'boss' && difficulty && difficulty !== 'vote' ? difficulty : null;
+    this.bossDiff = this.bossDiffFixed || 'normal';
     this.bossId = mode === 'boss' ? bossId : 'troll';
     this.rush = null;
     this.stopLoop();
@@ -160,6 +170,40 @@ class Battle extends EventEmitter {
     for (const p of this.participants.values()) if (n[p.clan] !== undefined) n[p.clan] += 1;
     if (n.rouge === n.bleu) return Math.random() < 0.5 ? 'rouge' : 'bleu';
     return n.rouge < n.bleu ? 'rouge' : 'bleu';
+  }
+
+  // ---------- Vote de la difficulté (Combat de Boss multijoueur) ----------
+
+  // Une voix par personne pendant la file (ouverte ou fermée), la dernière compte. `choice` : identifiant ou commande.
+  voteDifficulty(voter, choice) {
+    if (this.mode !== 'boss' || this.solo || this.bossDiffFixed || (this.phase !== 'queue' && this.phase !== 'ready')) return null;
+    const id = Rules.BOSS_RAID_DIFF[choice] ? choice : Rules.raidDiffFromCommand(choice);
+    if (!id) return null;
+    this.diffVotes.set(voter, id);
+    this.changed();
+    return id;
+  }
+
+  diffCounts() {
+    const counts = Object.fromEntries(Rules.BOSS_RAID_ORDER.map((d) => [d, 0]));
+    for (const d of this.diffVotes.values()) counts[d] += 1;
+    return counts;
+  }
+
+  // Difficulté en tête (égalité : tirée au sort parmi les ex aequo ; sans vote : Normal)
+  leadingDiff(random = false) {
+    if (this.bossDiffFixed) return this.bossDiffFixed;
+    const counts = this.diffCounts();
+    const best = Math.max(...Object.values(counts));
+    if (!best) return 'normal';
+    const top = Rules.BOSS_RAID_ORDER.filter((d) => counts[d] === best);
+    return random ? top[Math.floor(Math.random() * top.length)] : top[top.length - 1];
+  }
+
+  publicDiffVote() {
+    if (this.mode !== 'boss' || this.solo || (this.phase !== 'queue' && this.phase !== 'ready')) return undefined;
+    const counts = this.diffCounts();
+    return { fixed: this.bossDiffFixed || undefined, leading: this.leadingDiff(), total: this.diffVotes.size, options: Rules.BOSS_RAID_ORDER.map((id) => ({ id, votes: counts[id] })) };
   }
 
   // Changer d'équipe tant que la file est ouverte ou fermée (pas pendant la bataille).
@@ -242,6 +286,7 @@ class Battle extends EventEmitter {
     } else if (this.mode === 'clans') {
       this.setupClans();
     } else if (this.mode === 'boss') {
+      if (!this.solo) this.bossDiff = this.leadingDiff(true); // difficulté votée pendant la file
       this.setupBoss();
     } else if (this.mode === 'rush') {
       this.setupRush();
@@ -368,8 +413,18 @@ class Battle extends EventEmitter {
   spawnBoss(bossId, scale = { hp: 1, damage: 1 }) {
     const B = Rules.BOSSES[bossId];
     const avgLevel = this.players.reduce((a, p) => a + (p.level || 1), 0) / Math.max(1, this.players.length);
-    const st = Rules.bossStats(this.players.length, B.id, avgLevel);
-    const addScale = { hp: Rules.bossLevelScale(avgLevel) * scale.hp, damage: scale.damage }; // copies du Mimic
+    let st = Rules.bossStats(this.players.length, B.id, avgLevel);
+    let addScale = { hp: Rules.bossLevelScale(avgLevel) * scale.hp, damage: scale.damage }; // copies du Mimic
+    const raid = !this.solo ? Rules.BOSS_RAID_DIFF[this.mode === 'boss' ? this.bossDiff : 'normal'] : null;
+    if (raid) {
+      // Multijoueur : selon la puissance du groupe et la difficulté votée (Boss Rush : toujours « Normal », puis sa montée)
+      const avgPower = this.players.reduce((a, p) => a + (p.power || 1), 0) / Math.max(1, this.players.length);
+      const pw = Rules.raidPowerScale(avgPower);
+      st = Rules.raidBossStats(this.players.length, B.id, avgPower, this.mode === 'boss' ? this.bossDiff : 'normal', avgLevel);
+      const T = Rules.BOSS_RAID.boss[B.id] || { hp: 1, damage: 1 }; // correctif du boss, aussi pour ses créatures
+      addScale = { hp: Rules.raidHpScale(avgPower, avgLevel) * Math.sqrt(raid.hp) * T.hp * scale.hp, damage: Math.pow(pw, Rules.BOSS_RAID.dmgExp) * Math.pow(raid.damage, 0.8) * T.damage * scale.damage };
+      this.healTaken = raid.healTaken || 1;
+    }
     if (this.solo) { // Défi des boss : renforcé selon la difficulté choisie
       const D = Rules.BOSS_CHALLENGE[this.solo.difficulty] || Rules.BOSS_CHALLENGE.normal;
       const sc = Rules.BOSS_SOLO_SCALE[B.id];
@@ -429,10 +484,10 @@ class Battle extends EventEmitter {
     });
     const b = this.boss;
     // Défis ultimes : attaques spéciales plus fréquentes, coups plus rapides, rage finale plus tôt
-    const DC = this.solo && Rules.BOSS_CHALLENGE[this.solo.difficulty];
+    const DC = this.solo ? Rules.BOSS_CHALLENGE[this.solo.difficulty] : raid;
     if (DC && DC.special) { b.slamEvery /= DC.special; b.slamIn = b.slamEvery * 0.7; }
     if (DC && DC.attackSpeed) b.cooldown /= DC.attackSpeed;
-    b.enrageAt = (DC && DC.enrageAt) || B.enrageAt;
+    b.enrageAt = (this.solo && DC && DC.enrageAt) || B.enrageAt;
     if (B.flight) for (const at of B.flight.at) b.script.push({ at, kind: 'flight' });
     if (B.nest) b.script.push({ at: B.nest.at, kind: 'nest' });
     if (B.shield) for (const at of B.shield.at) b.script.push({ at, kind: 'shield' });
@@ -3368,7 +3423,8 @@ class Battle extends EventEmitter {
       this.result.reward = Rules.rushReward(r.killed);
     } else if (this.mode === 'boss') {
       this.result.boss = { id: this.boss.bossId, name: this.boss.name, hp: Math.max(0, Math.round(this.boss.hp)), maxHp: this.boss.maxHp };
-      this.result.reward = victory ? { ...Rules.BOSSES[this.boss.bossId].reward } : null;
+      this.result.reward = victory ? Rules.raidReward(this.boss.bossId, this.bossDiff) : null;
+      if (!this.solo) this.result.difficulty = this.bossDiff;
       if (this.solo) {
         const D = Rules.BOSS_CHALLENGE[this.solo.difficulty] || Rules.BOSS_CHALLENGE.normal;
         this.result.difficulty = this.solo.difficulty;
@@ -3406,6 +3462,7 @@ class Battle extends EventEmitter {
       fogs: (this.fogs || []).map((z) => ({ x: Math.round(z.x), y: Math.round(z.y), r: Math.round(z.r), a: Math.round(z.a * 100) / 100 })),
       meteors: (this.meteors || []).map((m) => ({ x: Math.round(m.x), y: Math.round(m.y), r: m.r, p: Math.round((1 - m.t / METEOR_FALL) * 100) / 100 })),
       boss: b ? {
+        diff: this.mode === 'boss' && !this.solo ? this.bossDiff : undefined, // difficulté votée (Combat de Boss multijoueur)
         key: b.key, id: b.bossId, name: b.name, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, phase: b.phase, enraged: b.enraged, alive: b.alive,
         flying: b.flying || undefined, away: b.away || undefined, shielded: b.shielded || undefined,
         guarded: b.guarded || undefined, leaping: b.leaping || undefined,

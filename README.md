@@ -341,6 +341,24 @@ de la file, confirme les `!join` et annonce le vainqueur.
     Grignotor le Mimic, Givrenoire la Liche de glace, Maexxna la Veuve noire, Ether le Fantôme, Lilith le Chat ou Daedra
     la Succube. Même récompense pour tous, même rage
     finale à 2 min 30. Chaque boss vaincu a 5 % de chance de laisser son **familier** à chaque héros (voir plus bas).
+    **Le boss suit la puissance du groupe** (niveau + équipement) et son nombre de joueurs : vie × (puissance moyenne ÷ 10)^1,3
+    et dégâts × (puissance ÷ 10)^0,8 (jamais moins que l'ancien bonus de niveau) ; Ether, Daedra et Lilith ont un petit
+    correctif. **Pendant la file, le chat vote la difficulté** (`!normal`, `!heroique`, `!legendaire`, `!fabuleux`,
+    `!mythique`, `!divin`, ou en cliquant sur les cartes de l'arène et les boutons de la fiche) ; l'admin peut aussi
+    l'imposer. Bien plus dures qu'en solo :
+
+    | Difficulté | Vie | Dégâts | Extra | Récompense |
+    |---|---|---|---|---|
+    | ⭐ Normal | ×1 | ×1 | | ×1 (500 XP, 500 golds, 3 coffres) |
+    | ⭐⭐ Héroïque | ×2,4 | ×1,7 | | ×1,6 |
+    | ⭐⭐⭐ Légendaire | ×3,6 | ×2,3 | | ×2,4 |
+    | 🌟 Fabuleux | ×4,4 | ×2,65 | spéciales ×1,3, coups ×1,15 | ×3,5 |
+    | 🌟🌟 Mythique | ×5,2 | ×3,1 | spéciales ×1,5, coups ×1,25, soins ×0,65 | ×5 |
+    | 👑 Divin | ×5,6 | ×3,4 | spéciales ×1,7, coups ×1,35, soins ×0,5 | ×7,5 |
+
+    Simulation, groupe de 6 joueurs niveau 50 très bien équipés : Normal et Héroïque gagnés presque à coup sûr,
+    Légendaire ~3 fois sur 4, Fabuleux ~6 fois sur 10, Mythique ~1 fois sur 5, Divin : un exploit. Le Boss Rush suit
+    aussi la puissance du groupe (en Normal), puis sa propre montée.
   - **Grokk le Troll** : vie et dégâts selon le nombre
     de combattants au lancement (200 PV + 300 PV par combattant, puis +6 % par niveau moyen des joueurs au-delà du 1, ×2,5 au plus). Coup de massue qui touche les voisins, attaques
     spéciales annoncées au sol (onde de choc, rocher sur le plus gros groupe). Grosse barre de vie avec coches à 66 % et

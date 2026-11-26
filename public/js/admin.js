@@ -24,6 +24,7 @@ async function run(url, body = {}) {
 // ---------- Mode de jeu ----------
 let selectedMode = 'br';
 let selectedBoss = 'troll';
+let selectedDiff = 'vote'; // difficulté du Combat de Boss : votée par le chat, ou imposée
 try { if (Rules.GAME_MODES[localStorage.getItem('zl_admin_mode')]) selectedMode = localStorage.getItem('zl_admin_mode'); } catch (e) { /* ignore */ }
 try { if (Rules.BOSSES[localStorage.getItem('zl_admin_boss')]) selectedBoss = localStorage.getItem('zl_admin_boss'); } catch (e) { /* ignore */ }
 
@@ -41,6 +42,9 @@ function renderModes() {
   $('boss-pick').style.display = selectedMode === 'boss' ? '' : 'none';
   $('boss-pick').innerHTML = '<div class="boss-pick-title">Boss à affronter</div>' + Object.values(Rules.BOSSES).map((B) =>
     `<button class="${selectedBoss === B.id ? 'active' : ''}" data-boss="${B.id}" style="--c:${B.color}" title="${esc(B.desc)}">${B.icon} ${esc(B.name)}</button>`).join('');
+  $('boss-pick').insertAdjacentHTML('beforeend', '<div class="boss-pick-title">Difficulté</div>' + [['vote', '🗳️', 'Vote du chat']].concat(Rules.BOSS_RAID_ORDER.map((d) => [d, Rules.BOSS_RAID_DIFF[d].icon, Rules.BOSS_RAID_DIFF[d].label])).map(([d, ic, label]) =>
+    `<button class="${selectedDiff === d ? 'active' : ''}" data-diff="${d}" title="${d === 'vote' ? 'Les spectateurs votent pendant la file (!normal, !heroique…)' : `Récompense ×${String(Rules.BOSS_RAID_DIFF[d].reward).replace('.', ',')}`}">${ic} ${label}</button>`).join(''));
+  $('boss-pick').querySelectorAll('[data-diff]').forEach((b) => { b.onclick = () => { selectedDiff = b.dataset.diff; renderModes(); }; });
   $('boss-pick').querySelectorAll('[data-boss]').forEach((b) => {
     b.onclick = () => {
       selectedBoss = b.dataset.boss;
@@ -51,6 +55,11 @@ function renderModes() {
   const m = Rules.GAME_MODES[selectedMode];
   let desc = `<b style="color:${m.color}">${m.icon} ${m.label}</b> — ${m.desc}`;
   if (selectedMode === 'boss') desc += `<br><b style="color:${Rules.BOSSES[selectedBoss].color}">${Rules.BOSSES[selectedBoss].name}</b> : ${Rules.BOSSES[selectedBoss].desc}`;
+  const dv = queue && queue.diffVote;
+  if (dv) {
+    const L = Rules.BOSS_RAID_DIFF[dv.leading];
+    desc += dv.fixed ? `<br>🎚️ Difficulté imposée : <b>${L.icon} ${L.label}</b>` : `<br>🗳️ Vote de la difficulté (${dv.total} voix) : en tête <b>${L.icon} ${L.label}</b> — ${dv.options.filter((o) => o.votes).map((o) => `${Rules.BOSS_RAID_DIFF[o.id].label} ${o.votes}`).join(' · ') || 'aucune voix'}`;
+  }
   if (queue && ['queue', 'ready'].includes(queue.phase) && queue.mode === 'boss' && selectedMode === 'boss' && queue.boss !== selectedBoss) {
     desc += `<br>⚠️ La file ouverte est contre <b>${Rules.BOSSES[queue.boss].name}</b> : rouvre la file pour changer de boss.`;
   }
@@ -65,7 +74,7 @@ function renderModes() {
   $('start').textContent = live === 'boss' ? `${liveBoss.icon} LANCER LE COMBAT CONTRE ${liveBoss.short.toUpperCase()}` : live === 'dungeon' ? '🏰 LANCER LE RAID' : live === 'koth' ? '👑 LANCER LE ROI DE LA COLLINE' : live === 'clans' ? '⚔️ LANCER LA GUERRE DES CLANS' : live === 'gold' ? '🪙 LANCER LA RUÉE VERS L\'OR' : live === 'rush' ? '💀 LANCER LE BOSS RUSH' : live === 'tourney' ? '🏆 LANCER LE TOURNOI' : '⚔️ LANCER LA BATAILLE';
 }
 
-$('open').onclick = async () => (queue && queue.participants.length && queue.phase !== 'ended' && !await confirmBox('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss });
+$('open').onclick = async () => (queue && queue.participants.length && queue.phase !== 'ended' && !await confirmBox('Rouvrir la file ? Les inscrits actuels seront retirés.')) || run('/api/admin/queue/open', { seconds: Math.round(Number($('duration').value) * 60), mode: selectedMode, boss: selectedBoss, difficulty: selectedMode === 'boss' ? selectedDiff : undefined });
 $('close').onclick = () => run('/api/admin/queue/close');
 $('reset').onclick = async () => {
   if (queue && queue.phase === 'battle' && !await confirmBox('Annuler la bataille en cours ? Aucune récompense de victoire ne sera donnée.')) return;

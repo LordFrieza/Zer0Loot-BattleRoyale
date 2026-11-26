@@ -645,7 +645,7 @@ test('[ETH-1, ETH-2] Ether : esquive et riposte ; hurlement, chaînes spectrales
   const E = Rules.BOSSES.ether;
   assert.deepStrictEqual([b.boss.dodge, b.boss.counter], [E.dodge, E.counter]);
   freeze(b);
-  assert.strictEqual(b.boss.maxHp, E.hpBase + E.hpPerPlayer * 6);
+  assert.strictEqual(b.boss.maxHp, Math.round((E.hpBase + E.hpPerPlayer * 6) * Rules.BOSS_RAID.boss.ether.hp), 'correctif multijoueur d\'Ether (BOSS-12)');
   // Esquive (précision nulle, esquive totale) puis riposte immédiate
   const h = b.players[0];
   h.precision = 0;
@@ -730,7 +730,7 @@ test('[LIL-1, LIL-2] Lilith : bond, cartes qui font saigner, disparition puis gr
   const b = fight('lilith', 5);
   freeze(b);
   const L = Rules.BOSSES.lilith;
-  assert.strictEqual(b.boss.maxHp, L.hpBase + L.hpPerPlayer * 5);
+  assert.strictEqual(b.boss.maxHp, Math.round((L.hpBase + L.hpPerPlayer * 5) * Rules.BOSS_RAID.boss.lilith.hp), 'correctif multijoueur de Lilith (BOSS-12)');
   b.boss.slamIn = 0; b.bossSpecials(0.05, L);
   assert.ok(b.slams.some((s) => s.leap && s.r === L.pounce.radius));
   b.boss.slamIn = 0; b.bossSpecials(0.05, L);
@@ -795,7 +795,7 @@ test('[DAE-1, DAE-2] Daedra : fouet de feu à longue portée, colonnes de feu in
   const b = fight('daedra', 6);
   freeze(b);
   const D = Rules.BOSSES.daedra;
-  assert.strictEqual(b.boss.maxHp, D.hpBase + D.hpPerPlayer * 6);
+  assert.strictEqual(b.boss.maxHp, Math.round((D.hpBase + D.hpPerPlayer * 6) * Rules.BOSS_RAID.boss.daedra.hp), 'correctif multijoueur de Daedra (BOSS-12)');
   assert.strictEqual(b.boss.range, D.range);
   // Colonne de feu : annoncée, puis elle reste au sol
   b.boss.slamIn = 0; b.bossSpecials(0.05, D);
@@ -864,4 +864,100 @@ test('[DAE-3, DAE-4] Daedra : démons de feu réguliers, portails qui la protèg
   // Boss Rush : les murs de feu s'éteignent au boss suivant
   b.firewalls.push({ id: 99, x1: 0, y1: 0, x2: 10, y2: 10, w: 10, until: b.time + 99, burn: 0 });
   assert.ok(b.firewalls.length);
+});
+
+// ---------- Combat de Boss multijoueur : puissance du groupe et difficulté votée ----------
+
+function raidQueue(bossId, n, power, level = 50) {
+  const b = new Battle();
+  b.openQueue(60, 'boss', bossId);
+  clearTimeout(b.queueTimer);
+  for (let i = 0; i < n; i++) b.join({ key: 'p' + i, name: 'P' + i, level, power, cls: 'guerrier', stats: Rules.derive({}, {}, 'guerrier'), look: {} });
+  return b;
+}
+
+test('[BOSS-11, BOSS-12] boss multijoueur : suit la puissance du groupe et la difficulté', () => {
+  const RD = Rules.BOSS_RAID_DIFF;
+  assert.deepStrictEqual(Rules.BOSS_RAID_ORDER, ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin']);
+  assert.deepStrictEqual(Rules.BOSS_RAID_ORDER.map((d) => [RD[d].hp, RD[d].damage, RD[d].reward]),
+    [[1, 1, 1], [2.4, 1.7, 1.6], [3.6, 2.3, 2.4], [4.4, 2.65, 3.5], [5.2, 3.1, 5], [5.6, 3.4, 7.5]]);
+  // Plus dur que la même difficulté en solo… et de plus en plus dur
+  for (let i = 1; i < 6; i++) assert.ok(RD[Rules.BOSS_RAID_ORDER[i]].hp > RD[Rules.BOSS_RAID_ORDER[i - 1]].hp);
+  const T = Rules.BOSSES.troll;
+  // Groupe de 6, puissance 150 : vie × 15^1,3, dégâts × 15^0,8
+  const st = Rules.raidBossStats(6, 'troll', 150, 'normal', 50);
+  assert.strictEqual(st.maxHp, Math.round((T.hpBase + T.hpPerPlayer * 6) * Math.pow(15, 1.3)));
+  assert.strictEqual(st.damage, Math.round((T.damageBase + T.damagePerPlayer * 6) * Math.pow(15, 0.8) * 10) / 10);
+  const leg = Rules.raidBossStats(6, 'troll', 150, 'legendaire', 50);
+  assert.strictEqual(leg.maxHp, Math.round((T.hpBase + T.hpPerPlayer * 6) * Math.pow(15, 1.3) * 3.6));
+  // Petit groupe faible : jamais moins que l'ancien bonus de niveau (BOSS-10)
+  assert.strictEqual(Rules.raidBossStats(4, 'troll', 11, 'normal', 11).maxHp, Math.round((T.hpBase + T.hpPerPlayer * 4) * 1.6));
+  // Correctif d'Ether
+  const E = Rules.BOSSES.ether;
+  assert.strictEqual(Rules.raidBossStats(6, 'ether', 150, 'normal', 50).maxHp, Math.round((E.hpBase + E.hpPerPlayer * 6) * Math.pow(15, 1.3) * 0.6));
+  // En partie : le boss a ces stats, et la difficulté se lit sur la barre du boss
+  const b = raidQueue('troll', 6, 150);
+  b.bossDiffFixed = 'mythique';
+  b.start(null, null);
+  b.stopLoop();
+  assert.strictEqual(b.bossDiff, 'mythique');
+  assert.strictEqual(b.boss.maxHp, Rules.raidBossStats(6, 'troll', 150, 'mythique', 50).maxHp);
+  assert.strictEqual(b.healTaken, 0.65, 'Mythique : soins des héros réduits');
+  assert.strictEqual(b.frame().boss.diff, 'mythique');
+  // Défi des boss (solo) : inchangé, sans ce bonus
+  const solo = new Battle({ solo: { kind: 'boss', level: 50, difficulty: 'heroique' } });
+  solo.openQueue(60, 'boss', 'troll'); clearTimeout(solo.queueTimer);
+  solo.join({ key: 'u1', userId: 1, name: 'Solo', level: 50, power: 150, cls: 'guerrier', stats: Rules.derive({}, {}, 'guerrier'), look: {} });
+  solo.start(null, null); solo.stopLoop();
+  const D = Rules.BOSS_CHALLENGE.heroique;
+  assert.strictEqual(solo.boss.maxHp, Math.round(Math.round(Rules.bossStats(1, 'troll', 50).maxHp * Rules.BOSS_SOLO_SCALE.troll.hp * D.hp)));
+});
+
+test('[BOSS-13] boss multijoueur : vote de la difficulté pendant la file, difficulté imposée, récompense', () => {
+  const b = raidQueue('dragon', 3, 100);
+  assert.deepStrictEqual(b.publicQueue().diffVote.options.map((o) => o.id), Rules.BOSS_RAID_ORDER);
+  assert.strictEqual(b.publicQueue().diffVote.leading, 'normal');
+  assert.strictEqual(b.voteDifficulty('t:a', '!heroique'), 'heroique');
+  assert.strictEqual(b.voteDifficulty('t:b', '!héroïque'), 'heroique', 'accents acceptés');
+  assert.strictEqual(b.voteDifficulty('u:3', 'divin'), 'divin');
+  assert.strictEqual(b.voteDifficulty('u:3', '!divin'), 'divin');
+  assert.strictEqual(b.voteDifficulty('t:c', '!facile'), null);
+  b.voteDifficulty('t:a', '!legendaire'); // la dernière voix compte
+  assert.deepStrictEqual(b.publicQueue().diffVote.options.filter((o) => o.votes).map((o) => [o.id, o.votes]), [['heroique', 1], ['legendaire', 1], ['divin', 1]]);
+  b.voteDifficulty('t:c', '!legendaire');
+  assert.strictEqual(b.publicQueue().diffVote.leading, 'legendaire');
+  b.closeQueue();
+  assert.strictEqual(b.voteDifficulty('t:d', '!mythique'), 'mythique', 'file fermée : on vote encore');
+  b.voteDifficulty('t:d', '!legendaire');
+  b.start(null, null);
+  b.stopLoop();
+  assert.strictEqual(b.bossDiff, 'legendaire');
+  assert.strictEqual(b.voteDifficulty('t:e', '!divin'), null, 'plus de vote pendant le combat');
+  assert.strictEqual(b.publicQueue().bossDiff, 'legendaire');
+  // Victoire : récompense × celle de la difficulté
+  let res = null;
+  b.on('coopEnd', (r) => { res = r; });
+  b.boss.hp = 0; b.kill(null, b.boss); b.tick(0.05);
+  assert.strictEqual(res.difficulty, 'legendaire');
+  assert.deepStrictEqual(res.reward, Rules.raidReward('dragon', 'legendaire'));
+  assert.deepStrictEqual(Rules.raidReward('dragon', 'legendaire'), { xp: 1200, gold: 1200, chests: 7 });
+  // Égalité : tirée au sort parmi les ex aequo ; aucune voix : Normal
+  const t = raidQueue('troll', 2, 50);
+  t.voteDifficulty('a', 'normal'); t.voteDifficulty('b', 'divin');
+  t.start(null, null); t.stopLoop();
+  assert.ok(['normal', 'divin'].includes(t.bossDiff));
+  const none = raidQueue('troll', 2, 50);
+  none.start(null, null); none.stopLoop();
+  assert.strictEqual(none.bossDiff, 'normal');
+  // Difficulté imposée par l'admin : pas de vote
+  const f = new Battle();
+  f.openQueue(60, 'boss', 'troll', 'fabuleux'); clearTimeout(f.queueTimer);
+  assert.strictEqual(f.publicQueue().diffVote.fixed, 'fabuleux');
+  assert.strictEqual(f.voteDifficulty('t:a', '!normal'), null);
+  assert.throws(() => f.openQueue(60, 'boss', 'troll', 'cauchemar'), /Difficulté inconnue/);
+  // Autres modes : pas de vote
+  const br = new Battle();
+  br.openQueue(60, 'br'); clearTimeout(br.queueTimer);
+  assert.strictEqual(br.publicQueue().diffVote, undefined);
+  assert.strictEqual(br.voteDifficulty('t:a', '!divin'), null);
 });

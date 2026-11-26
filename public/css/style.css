@@ -2052,3 +2052,11 @@ body.sidenav-closed main.container { margin-left: max(calc(var(--sn-w-closed) + 
   .side-nav { display: none; }
   body.sidenav-open main.container, body.sidenav-closed main.container { margin-left: auto; }
 }
+
+/* Combat de Boss : vote de la difficulté (fiche joueur) */
+.diff-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(130px, 100%), 1fr)); gap: 8px; margin-top: 8px; }
+.diff-option { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; min-height: 0; background: rgba(34, 24, 82, .6); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; color: var(--text); }
+.diff-option small { color: var(--muted); font-size: 11px; }
+.diff-option span { font-size: 12px; font-weight: 700; }
+.diff-option.lead { border-color: #ffd23f; box-shadow: 0 0 10px rgba(255, 210, 63, .35); }
+.diff-option.mine { border-color: #fff; background: rgba(184, 60, 255, .25); }

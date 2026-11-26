@@ -1107,6 +1107,53 @@
   }
 
   /*
+   * Combat de Boss multijoueur (et Boss Rush) : le boss suit la PUISSANCE moyenne du groupe (niveau + équipement, PWR-1)
+   * et son nombre de joueurs, puis la difficulté votée pendant la file (bien plus dure que la même difficulté en solo).
+   * Vie = (base + par joueur × n) × (puissance / ref)^hpExp × difficulté ; dégâts = (base + par joueur × n) ×
+   * (puissance / ref)^dmgExp × difficulté (puissance / ref au moins 1). Les créatures du boss suivent en plus doux.
+   */
+  // boss : correctif par boss (ceux dont les attaques de zone et les phases d'invulnérabilité pèsent plus en groupe)
+  const BOSS_RAID = { ref: 10, hpExp: 1.3, dmgExp: 0.8, boss: { ether: { hp: 0.6, damage: 0.75 }, daedra: { hp: 0.8, damage: 0.75 }, lilith: { hp: 0.85, damage: 0.9 } } };
+  const BOSS_RAID_DIFF = {
+    normal: { label: 'Normal', icon: '⭐', cmd: '!normal', hp: 1, damage: 1, reward: 1 },
+    heroique: { label: 'Héroïque', icon: '⭐⭐', cmd: '!heroique', hp: 2.4, damage: 1.7, reward: 1.6 },
+    legendaire: { label: 'Légendaire', icon: '⭐⭐⭐', cmd: '!legendaire', hp: 3.6, damage: 2.3, reward: 2.4 },
+    fabuleux: { label: 'Fabuleux', icon: '🌟', cmd: '!fabuleux', hp: 4.4, damage: 2.65, special: 1.3, attackSpeed: 1.15, reward: 3.5 },
+    mythique: { label: 'Mythique', icon: '🌟🌟', cmd: '!mythique', hp: 5.2, damage: 3.1, special: 1.5, attackSpeed: 1.25, healTaken: 0.65, reward: 5 },
+    divin: { label: 'Divin', icon: '👑', cmd: '!divin', hp: 5.6, damage: 3.4, special: 1.7, attackSpeed: 1.35, healTaken: 0.5, reward: 7.5 },
+  };
+  const BOSS_RAID_ORDER = ['normal', 'heroique', 'legendaire', 'fabuleux', 'mythique', 'divin'];
+  function raidPowerScale(avgPower) {
+    return Math.max(1, (avgPower || 1) / BOSS_RAID.ref);
+  }
+  // Bonus de vie : celui de la puissance, jamais moins que l'ancien bonus de niveau (les petits groupes ne sont pas avantagés)
+  function raidHpScale(avgPower, avgLevel) {
+    return Math.max(Math.pow(raidPowerScale(avgPower), BOSS_RAID.hpExp), bossLevelScale(avgLevel || 1));
+  }
+  function raidBossStats(players, id, avgPower, diff = 'normal', avgLevel = 1) {
+    const B = BOSSES[id] || BOSS;
+    const D = BOSS_RAID_DIFF[diff] || BOSS_RAID_DIFF.normal;
+    const n = Math.max(1, players);
+    const pw = raidPowerScale(avgPower);
+    const T = BOSS_RAID.boss[B.id] || { hp: 1, damage: 1 };
+    return {
+      maxHp: Math.round((B.hpBase + B.hpPerPlayer * n) * raidHpScale(avgPower, avgLevel) * D.hp * T.hp),
+      damage: Math.round((B.damageBase + B.damagePerPlayer * n) * Math.pow(pw, BOSS_RAID.dmgExp) * D.damage * T.damage * 10) / 10,
+    };
+  }
+  // Récompense d'un boss multijoueur vaincu : celle du boss × la difficulté (arrondie)
+  function raidReward(id, diff = 'normal') {
+    const r = (BOSSES[id] || BOSS).reward;
+    const m = (BOSS_RAID_DIFF[diff] || BOSS_RAID_DIFF.normal).reward;
+    return { xp: Math.round(r.xp * m), gold: Math.round(r.gold * m), chests: Math.round(r.chests * m) };
+  }
+  // Commande de chat → difficulté (« !heroique », « !héroïque », « !legendaire »…)
+  function raidDiffFromCommand(command) {
+    const c = String(command || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return BOSS_RAID_ORDER.find((d) => BOSS_RAID_DIFF[d].cmd === c) || null;
+  }
+
+  /*
    * Boss Rush : les boss s'enchaînent au hasard (jamais deux fois le même d'affilée), de plus en plus forts.
    * Après chaque boss vaincu, le chat vote (40 s) : un bonus aléatoire pour la suite de la run, ressusciter un héros
    * au hasard (ou un grand soin si personne n'est tombé), ou « Quitte ou double » (boss suivants +25 % de puissance,
@@ -3671,7 +3718,7 @@
     xpToNext, MAX_LEVEL, emptyStats, derive, describeDerived, statUnit, formatLine,
     SETS, SET_TIERS, SET_DROP_CHANCE, setTiers, setTier, setBonus,
     ACHIEVEMENTS, COUNTERS, MAX_COUNTERS, SOLO_BOSS_COUNTER, BOSS_WIN_COUNTER, HERO_BOSS_COUNTER, LEGEND_BOSS_COUNTER, achievementValue, achievementState, achievementById,
-    SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, TOURNEY, tourneyBracket, tourneyReward, tourneyRoundName, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
+    SCHEDULE, parisParts, parisToTs, scheduleTimeValid, scheduleUpcoming, BATTLE_EVENTS, GAME_MODES, KOTH, TOURNEY, tourneyBracket, tourneyReward, tourneyRoundName, CLANS, GOLD, goldPickup, clanUnderdog, clanRespawnDelay, BOSS, BOSSES, BOSS_SCALE, bossLevelScale, bossStats, BOSS_RAID, BOSS_RAID_DIFF, BOSS_RAID_ORDER, raidPowerScale, raidHpScale, raidBossStats, raidReward, raidDiffFromCommand, MONSTERS, ELITES, ELITE, DUNGEON, DUNGEON_TIERS,
     dungeonRoom, dungeonMultipliers, dungeonReward, DUNGEON_POLL, DUNGEON_BOONS, boonFromCommand, SUB_REWARD_GOLD, APPEARANCE,
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,

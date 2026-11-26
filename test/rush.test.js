@@ -52,7 +52,7 @@ test('[RUSH-1] Boss Rush : boss tirés au hasard (tous avant de revenir, jamais 
     b.closePoll();
     seen.push(b.bossId);
     const sc = Rules.rushScale(k, b.rush.mult);
-    assert.strictEqual(b.boss.maxHp, Math.round(Rules.bossStats(3, b.bossId, 1).maxHp * sc.hp), `boss n°${k} renforcé`);
+    assert.strictEqual(b.boss.maxHp, Math.round(Rules.raidBossStats(3, b.bossId, 1, 'normal', 1).maxHp * sc.hp), `boss n°${k} renforcé`);
     assert.strictEqual(b.rush.round, k);
   }
   assert.strictEqual(new Set(seen.slice(0, 6)).size, 6);

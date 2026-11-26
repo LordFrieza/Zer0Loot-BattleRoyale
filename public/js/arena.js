@@ -432,7 +432,8 @@
         }
         if (q.mode === 'boss') {
           const B = Rules.BOSSES[q.boss] || Rules.BOSS;
-          this.announces.push({ text: `${B.icon} COMBAT DE BOSS !`, sub: `Tous ensemble contre ${B.name} !`, subSize: 26, color: B.color, life: 3.5, age: 0 });
+          const RD = q.bossDiff && Rules.BOSS_RAID_DIFF[q.bossDiff];
+          this.announces.push({ text: `${B.icon} COMBAT DE BOSS !`, sub: `${RD ? `${RD.icon} ${RD.label} · ` : ''}Tous ensemble contre ${B.name} !`, subSize: 26, color: B.color, life: 3.5, age: 0 });
           setTimeout(() => Sound.play('roar', true), Math.max(0, fanfare * 1000 - 300));
         }
       } else if (prev.phase === 'battle' && q.phase !== 'battle') {
@@ -982,22 +983,81 @@
         this.title(`${n} / ${Rules.TOURNEY.maxPlayers} combattants${n >= Rules.TOURNEY.maxPlayers ? ' (complet)' : ''}${pot}`, 240, 24, '#cfc6ff');
       } else this.title(`${n} ${who}${n > 1 ? 's' : ''}${pot}`, 240, 24, '#cfc6ff');
 
+      // Combat de Boss : vote de la difficulté (cartes cliquables) au-dessus des inscrits
+      const gridTop = q.diffVote ? this.drawDiffVote(q, t) : 310;
       // Grille des inscrits
       const cols = n > 40 ? 12 : 10;
       const cellW = W / (cols + 1);
       const scale = n > 40 ? 0.9 : 1.2;
       const cellH = 70 * scale;
-      const maxRows = Math.floor((H - 290) / cellH);
+      const maxRows = Math.max(1, Math.floor((H - gridTop + 20) / cellH));
       const shown = q.participants.slice(-cols * maxRows);
       shown.forEach((p, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
         const x = cellW * (col + 1);
-        const y = 310 + row * cellH;
+        const y = gridTop + row * cellH;
         drawFighter(this.ctx, x, y, p, { scale, bob: Math.sin(t / 300 + i) * 2 });
         this.label((p.clan ? Rules.CLANS.teams[p.clan].icon + ' ' : '') + classIcon(p.cls) + p.name, x, y + 32 * scale, 13, p.clan ? shade(Rules.CLANS.teams[p.clan].color, 0.45) : '#fff');
         if (p.title) this.label(p.title, x, y + 32 * scale + 14, 11, '#ffcf5a');
       });
+    }
+
+    /*
+     * Vote de la difficulté du Combat de Boss pendant la file : 6 cartes (icône, nom, récompense, voix), la difficulté
+     * en tête entourée d'or, la sienne en blanc ; cliquables pour un joueur connecté. Renvoie le haut de la grille des inscrits.
+     */
+    drawDiffVote(q, t) {
+      const ctx = this.ctx;
+      const dv = q.diffVote;
+      const y0 = 262;
+      if (dv.fixed) {
+        const D = Rules.BOSS_RAID_DIFF[dv.fixed];
+        this.title(`${D.icon} DIFFICULTÉ ${D.label.toUpperCase()} · récompense ×${String(D.reward).replace('.', ',')}`, y0 + 14, 22, '#ffd98a', '#ff9a00');
+        return 330;
+      }
+      this.label(this.voteEnabled ? '🗳️ Votez la difficulté : clique sur une carte, ou tape la commande dans le chat Twitch' : '🗳️ Votez la difficulté dans le chat Twitch : plus c\'est dur, plus ça rapporte !', W / 2, y0, 16, '#fff');
+      const ids = Rules.BOSS_RAID_ORDER;
+      const cw = 182;
+      const ch = 84;
+      const gap = 12;
+      const x0 = W / 2 - (ids.length * cw + (ids.length - 1) * gap) / 2;
+      const top = y0 + 16;
+      const key = `diff:${q.boss}:${q.queueEndsAt || 'ready'}`;
+      this.pollHit = { key, kind: 'diff', rects: [] };
+      const mine = this.myVote && this.myVote.key === key ? this.myVote.id : null;
+      const counts = Object.fromEntries(dv.options.map((o) => [o.id, o.votes]));
+      ids.forEach((id, i) => {
+        const D = Rules.BOSS_RAID_DIFF[id];
+        const x = x0 + i * (cw + gap);
+        const lead = dv.total > 0 && dv.leading === id;
+        const hover = this.voteEnabled && this.pollHover === id;
+        this.pollHit.rects.push({ x, y: top, w: cw, h: ch, id });
+        ctx.save();
+        this.rr(x, top, cw, ch, 12);
+        ctx.fillStyle = hover ? 'rgba(40, 28, 90, .95)' : 'rgba(14, 10, 38, .9)';
+        ctx.fill();
+        const col = i < 3 ? '#ffc21a' : i < 5 ? '#ff7ad9' : '#ff4d6d';
+        ctx.strokeStyle = id === mine ? '#ffffff' : lead ? '#ffd23f' : 'rgba(170,150,255,.45)';
+        ctx.lineWidth = id === mine ? 4 : lead ? 3.5 : 1.5;
+        if (lead) { ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 14 + Math.sin(t / 200) * 6; }
+        ctx.stroke();
+        ctx.restore();
+        ctx.save();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '800 15px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = col;
+        ctx.fillText(`${D.icon} ${D.label}`, x + cw / 2, top + 20);
+        ctx.font = '700 12px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#cfc6ff';
+        ctx.fillText(`récompense ×${String(D.reward).replace('.', ',')} · ${D.cmd}`, x + cw / 2, top + 42);
+        ctx.font = '800 14px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`${counts[id] || 0} voix${id === mine ? ' · ✓ toi' : ''}`, x + cw / 2, top + 65);
+        ctx.restore();
+      });
+      if (this.voteNotice && this.voteNotice.until > performance.now()) this.label(this.voteNotice.text, W / 2, top + ch + 14, 15, this.voteNotice.color || '#ffd98a');
+      return top + ch + 52;
     }
 
     label(text, x, y, size, color) {
@@ -2363,7 +2423,8 @@
       ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(0,0,0,.85)';
       const B = Rules.BOSSES[boss.id] || Rules.BOSS;
-      const title = `${B.icon} ${boss.name}${boss.enraged ? ' — RAGE FINALE' : boss.phase ? ` — PHASE ${boss.phase + 1}` : ''}`;
+      const RD = boss.diff && Rules.BOSS_RAID_DIFF[boss.diff];
+      const title = `${B.icon} ${boss.name}${RD ? `  ${RD.icon} ${RD.label}` : ''}${boss.enraged ? ' — RAGE FINALE' : boss.phase ? ` — PHASE ${boss.phase + 1}` : ''}`;
       ctx.strokeText(title, W / 2, y - 16);
       ctx.fillStyle = boss.enraged ? '#ff6b4a' : '#fff';
       ctx.fillText(title, W / 2, y - 16);
@@ -2927,7 +2988,7 @@
       }
       this.myVote = { key, id: c.id };
       if (window.Sound) Sound.play('reward');
-      Promise.resolve(this.onVote(c.id)).then(() => {
+      Promise.resolve(this.onVote(c.id, this.pollHit.kind || 'poll')).then(() => {
         this.voteNotice = { text: '✅ Vote enregistré ! Tu peux changer d\'avis jusqu\'à la fin', until: performance.now() + 2500, color: '#9fffb0' };
       }).catch((err) => {
         this.myVote = null;
@@ -3488,6 +3549,8 @@
         this.title(`💀 FIN DU BOSS RUSH : ${k} BOSS VAINCU${k > 1 ? 'S' : ''}`, 130, 50, k ? '#ffc21a' : '#ff4d6d', k ? '#ff9a00' : '#ff2a2a');
       } else if (r.mode === 'boss') {
         const short = (Rules.BOSSES[r.boss.id] || Rules.BOSS).short.toUpperCase();
+        const RD = r.difficulty && Rules.BOSS_RAID_DIFF[r.difficulty];
+        if (RD) this.label(`${RD.icon} ${RD.label.toUpperCase()}${r.victory ? ` · récompense ×${String(RD.reward).replace('.', ',')}` : ''}`, W / 2, 182, 20, '#ffd98a');
         if (r.victory) this.title(`🏆 ${short} EST VAINCU ! 🏆`, 130, 54, '#ffc21a', '#ff9a00');
         else this.title(`💀 ${short} A GAGNÉ…`, 130, 54, '#ff4d6d', '#ff2a2a');
       } else {

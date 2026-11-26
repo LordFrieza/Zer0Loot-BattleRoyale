@@ -858,6 +858,7 @@ function chatCommand(command, from) {
   const login = String(from.login || '').toLowerCase();
   const user = login && db.findUserByTwitch(login);
   if (user && user.banned) return;
+  if (battle.mode === 'boss' && Rules.raidDiffFromCommand(command)) { battle.voteDifficulty('t:' + login, command); return; }
   battle.vote('t:' + login, command);
 }
 
@@ -881,6 +882,14 @@ app.post('/api/queue/join', requirePlayer, (req, res) => {
 });
 
 app.get('/api/queue', (req, res) => res.json(queueView()));
+
+// Vote de la difficulté du Combat de Boss pendant la file (une voix par personne, partagée avec le chat si le Twitch est lié)
+app.post('/api/boss/difficulty', requirePlayer, (req, res) => {
+  const voter = req.user.twitchLogin ? 't:' + req.user.twitchLogin : 'u:' + req.user.id;
+  const id = battle.voteDifficulty(voter, String(req.body.difficulty || ''));
+  if (!id) return res.status(400).json({ error: battle.bossDiffFixed ? 'La difficulté est imposée par le streamer' : 'Aucun vote de difficulté en cours' });
+  res.json({ ok: true, difficulty: id });
+});
 
 // Vote au sondage du donjon depuis le site : une seule voix par personne, partagée avec le chat si le Twitch est lié.
 app.post('/api/poll/vote', requirePlayer, (req, res) => {
@@ -927,19 +936,24 @@ function announce(text) {
   io.to('chat').emit('chat', { add: chat.system(text) });
 }
 
-function openQueueFor(seconds, mode, boss) {
-  battle.openQueue(seconds, mode, boss || 'troll');
+function openQueueFor(seconds, mode, boss, difficulty = null) {
+  battle.openQueue(seconds, mode, boss || 'troll', difficulty);
   const m = Rules.GAME_MODES[mode];
   const against = mode === 'boss' ? ` contre ${Rules.BOSSES[battle.bossId].icon} ${Rules.BOSSES[battle.bossId].name}`
     : mode === 'rush' ? ' (les boss s\'enchaînent, de plus en plus forts !)' : '';
   announce(`${m.icon} La file du ${m.label}${against} est ouverte pour ${Math.round(seconds / 60 * 10) / 10} min ! Tapez !join pour participer.`);
-  return { boss: mode === 'boss' ? battle.bossId : null };
+  if (mode === 'boss') {
+    const D = battle.bossDiffFixed && Rules.BOSS_RAID_DIFF[battle.bossDiffFixed];
+    announce(D ? `${D.icon} Difficulté imposée : ${D.label} (récompense ×${String(D.reward).replace('.', ',')}).`
+      : `🗳️ Votez la difficulté : ${Rules.BOSS_RAID_ORDER.map((d) => Rules.BOSS_RAID_DIFF[d].cmd).join(' ')} — plus c'est dur, plus ça rapporte !`);
+  }
+  return { boss: mode === 'boss' ? battle.bossId : null, difficulty: mode === 'boss' ? battle.bossDiffFixed || 'vote' : undefined };
 }
 
 app.post('/api/admin/queue/open', requireAdmin, action((req) => {
   const seconds = Math.max(10, Math.min(3600, Number(req.body.seconds) || 180));
   scheduleCtl.forget(); // l'admin reprend la main : plus de lancement automatique
-  return openQueueFor(seconds, req.body.mode || 'br', req.body.boss || 'troll');
+  return openQueueFor(seconds, req.body.mode || 'br', req.body.boss || 'troll', req.body.difficulty || null);
 }));
 
 app.post('/api/admin/queue/close', requireAdmin, action(() => battle.closeQueue()));
@@ -978,7 +992,8 @@ function startBattle() {
     // Les événements ne concernent que le Battle Royale : celui choisi attend la prochaine bataille royale.
     battle.start(refreshParticipant, null);
     const B = Rules.BOSSES[battle.bossId];
-    announce(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque ! Tous ensemble contre lui !`
+    const RD = Rules.BOSS_RAID_DIFF[battle.bossDiff];
+    announce(battle.mode === 'boss' ? `${B.icon} ${B.name} débarque en ${RD.icon} ${RD.label} ! Tous ensemble contre lui ! (récompense ×${String(RD.reward).replace('.', ',')})`
       : battle.mode === 'rush' ? `💀 BOSS RUSH ! Premier boss : ${B.icon} ${B.name}. Entre chaque boss, le chat vote : !1, !2 ou !3 !`
       : battle.mode === 'gold' ? `🪙 RUÉE VERS L'OR ! Il pleut des pièces et des coffres pendant ${Rules.GOLD.duration} s : chacun garde ce qu'il ramasse !`
       : battle.mode === 'clans' ? '⚔️ Guerre des clans : détruisez le cristal adverse ! 🔴 Rouges contre 🔵 Bleus !'
@@ -1145,7 +1160,7 @@ battle.on('coopEnd', (result, fighters) => {
     }
     const details = result.mode === 'dungeon' ? { room: result.room }
       : result.mode === 'rush' ? { killed: result.rush.killed, defeated: result.rush.defeated, boss: result.boss.id }
-        : { boss: result.boss.id, bossHp: Math.round((result.boss.hp / result.boss.maxHp) * 100) };
+        : { boss: result.boss.id, bossHp: Math.round((result.boss.hp / result.boss.maxHp) * 100), difficulty: result.difficulty };
     recordBattle(f, user, result.mode === 'dungeon' ? 'end' : result.victory ? 'win' : 'loss', details);
     pushMe(user);
   }
@@ -1155,7 +1170,7 @@ battle.on('coopEnd', (result, fighters) => {
     announce(`💀 Fin du Boss Rush : ${result.rush.killed} boss vaincu${result.rush.killed > 1 ? 's' : ''} !${r ? ` Tous les héros gagnent ${r.chests} coffres, ${r.xp} XP et ${r.gold} golds.` : ' Aucun boss vaincu cette fois…'}`);
   } else if (result.mode === 'boss') {
     announce(result.victory
-      ? `🏆 ${result.boss.name} est vaincu ! Tous les participants gagnent ${result.reward.chests} coffres, ${result.reward.xp} XP et ${result.reward.gold} golds !`
+      ? `🏆 ${result.boss.name} est vaincu en ${Rules.BOSS_RAID_DIFF[result.difficulty || 'normal'].label} ! Tous les participants gagnent ${result.reward.chests} coffres, ${result.reward.xp} XP et ${result.reward.gold} golds !`
       : `💀 ${result.boss.name} a écrasé tout le monde… Retentez votre chance !`);
   } else {
     const r = result.reward;
