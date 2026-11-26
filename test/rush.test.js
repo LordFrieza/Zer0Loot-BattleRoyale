@@ -45,7 +45,7 @@ test('[RUSH-1] Boss Rush : boss tirés au hasard (tous avant de revenir, jamais 
   assert.strictEqual(b.rush.stage, 'fight');
   // Six boss différents sur les six premiers combats, puis le cycle reprend sans répétition immédiate
   const seen = [b.bossId];
-  const first = Rules.bossStats(3, b.bossId, 1).maxHp;
+  const first = Rules.raidBossStats(3, b.bossId, 1, 'normal', 1).maxHp;
   assert.strictEqual(b.boss.maxHp, first);
   for (let k = 2; k <= 9; k++) {
     downBoss(b);

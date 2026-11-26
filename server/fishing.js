@@ -12,10 +12,16 @@
  * Une prise vue puis laissée (ligne rentrée ou relancée, ferrage trop tôt ou raté) effraie les poissons : il faut
  * attendre `FISHING.scare` s avant de relancer (sinon on relancerait en boucle jusqu'à voir passer un trésor).
  * Les parties en cours restent en mémoire (rien n'est misé : un redémarrage les oublie simplement).
+ * Banc de poissons de l'étang partagé (server/pond.js) : un lancer pendant le passage d'un banc tire avec les
+ * multiplicateurs de FISHING.school. Concours du jour (db.state.fishContest) : la plus grande prise de l'espèce du jour
+ * (`Rules.fishContestSpecies`) ; au changement de jour (`contestRollover`), les 3 premiers reçoivent leur lot par courrier.
  */
 const crypto = require('crypto');
 const Rules = require('../shared/rules');
 const game = require('./game');
+const db = require('./db');
+const pond = require('./pond');
+const market = require('./market');
 
 const F = Rules.FISHING;
 const sessions = new Map(); // userId → partie en cours
@@ -37,11 +43,13 @@ let notify = null;
 function setNotify(fn) { notify = fn; }
 
 // Ce qui mord : un trésor (5 %) ou un poisson qui peut mordre à cette heure-là (rareté pondérée, puis espèce au hasard).
-// La taille penche vers le bas de la fourchette (les grands spécimens sont plus rares).
-function rollTarget(now) {
-  if (random() < F.treasureChance) return { kind: 'treasure' };
+// La taille penche vers le bas de la fourchette (les grands spécimens sont plus rares). `school` : un banc de poissons
+// passe (FISHING.school : raretés hautes et trésors plus fréquents).
+function rollTarget(now, school = false) {
+  const SC = F.school;
+  if (random() < F.treasureChance * (school ? SC.treasureMult : 1)) return { kind: 'treasure' };
   const pool = Rules.fishPool(Rules.fishTime(now));
-  const rarities = Object.entries(F.rarities).filter(([r]) => pool[r] && pool[r].length).map(([r, R]) => ({ id: r, weight: R.weight }));
+  const rarities = Object.entries(F.rarities).filter(([r]) => pool[r] && pool[r].length).map(([r, R]) => ({ id: r, weight: R.weight * (school ? SC.mult[r] || 1 : 1) }));
   const rarity = weighted(rarities).id;
   const ids = pool[rarity];
   const fish = Rules.FISH[ids[randInt(0, ids.length - 1)]];
@@ -97,7 +105,8 @@ function cast(user, now = Date.now()) {
     if (endSession(user, prev, now)) throw new Error(`Les poissons se méfient encore… relance dans ${F.scare} s`);
   }
   game.upgrade(user.character);
-  const target = module.exports.rollTarget(now); // remplaçable dans les tests
+  const school = pond.schoolOf(user.id, now);
+  const target = module.exports.rollTarget(now, school); // remplaçable dans les tests
   const diff = Rules.fishDifficulty(target);
   const appear = round2(between(F.wait[0], F.wait[1]));
   let t = appear + F.approach;
@@ -109,12 +118,12 @@ function cast(user, now = Date.now()) {
   const sink = round2(t);
   const s = {
     id: crypto.randomBytes(6).toString('hex'), castAt: now, appear, nibbles, sink, window: diff.window, target, diff, hookedAt: null, timers: [],
-    shape: target.kind === 'treasure' ? 'tresor' : Rules.FISH[target.id].shape, big: sizeClass(target),
+    shape: target.kind === 'treasure' ? 'tresor' : Rules.FISH[target.id].shape, big: sizeClass(target), school,
   };
   sessions.set(user.id, s);
   schedule(user, s);
   // Rien de ce qui va se passer n'est révélé : ni les temps, ni la fenêtre (qui trahirait la rareté), ni la silhouette
-  return { id: s.id, approach: F.approach };
+  return { id: s.id, approach: F.approach, school };
 }
 
 function current(user, id) {
@@ -174,7 +183,8 @@ function land(user, id, toggles, now = Date.now()) {
   const simulated = R.step * F.reelDt;
   const elapsed = (now - s.hookedAt) / 1000;
   if (elapsed < simulated * F.realTimeRatio - 0.25) throw new Error('Remontée trop rapide');
-  if (!R.won) return { escaped: true, reason: 'ligne' };
+  // Perdue en pleine remontée : on apprend après coup ce que c'était (sa rareté, ou un trésor)
+  if (!R.won) return { escaped: true, reason: 'ligne', lost: s.target.kind === 'treasure' ? 'tresor' : Rules.FISH[s.target.id].rarity };
   const c = user.character;
   game.upgrade(c);
   if (s.target.kind === 'treasure') return { caught: true, kind: 'treasure', lot: rollTreasure(c) };
@@ -189,7 +199,66 @@ function land(user, id, toggles, now = Date.now()) {
   game.bump(c, 'fishCaught');
   c.counters.fishSpecies = Object.keys(dex).length;
   if (fish.rarity === 'legendaire') game.bump(c, 'fishLegend');
-  return { caught: true, kind: 'fish', id: fish.id, size: s.target.size, isNew: !before, record, n: entry.n, best: entry.best, species: c.counters.fishSpecies };
+  const contest = contestCatch(user, fish.id, s.target.size, now);
+  return { caught: true, kind: 'fish', id: fish.id, size: s.target.size, isNew: !before, record, n: entry.n, best: entry.best, species: c.counters.fishSpecies, school: s.school, contest };
+}
+
+// ---------- Concours du jour ----------
+function contestState(now = Date.now()) {
+  const day = Rules.parisDay(now);
+  if (!db.state.fishContest) db.state.fishContest = { day, species: Rules.fishContestSpecies(day), entries: {} };
+  return db.state.fishContest;
+}
+function ranking(st) {
+  return Object.entries(st.entries).map(([uid, e]) => ({ uid, ...e })).sort((a, b) => b.size - a.size || a.at - b.at);
+}
+// Concours en cours : l'espèce du jour et le classement (10 premiers), avec la place de `userId` s'il y participe.
+function contestView(now = Date.now(), userId = null) {
+  contestRollover(now);
+  const st = contestState(now);
+  const list = ranking(st);
+  const mine = userId ? list.findIndex((e) => e.uid === userId) : -1;
+  return { day: st.day, species: st.species, top: list.slice(0, 10), me: mine >= 0 ? { rank: mine + 1, ...list[mine] } : null, rewards: F.contest.rewards };
+}
+// Une prise de l'espèce du jour : on garde le plus grand spécimen de chacun. Renvoie sa place (et s'il prend la tête).
+function contestCatch(user, fishId, size, now = Date.now()) {
+  contestRollover(now);
+  const st = contestState(now);
+  if (fishId !== st.species) return null;
+  const before = ranking(st);
+  const prev = st.entries[user.id];
+  if (prev && prev.size >= size) return { rank: before.findIndex((e) => e.uid === user.id) + 1, size: prev.size, improved: false };
+  st.entries[user.id] = { name: user.twitchDisplayName || user.username, size, at: now };
+  db.save();
+  const after = ranking(st);
+  const rank = after.findIndex((e) => e.uid === user.id) + 1;
+  return { rank, size, improved: true, lead: rank === 1 && (!before[0] || before[0].uid !== user.id) };
+}
+// Changement de jour : les 3 premiers du concours de la veille reçoivent leur lot (golds, coffres) et un courrier ;
+// le 1er compte une victoire (`fishContest`). Renvoie le palmarès (null si le jour n'a pas changé).
+function contestRollover(now = Date.now()) {
+  const st = contestState(now);
+  const day = Rules.parisDay(now);
+  if (st.day === day) return null;
+  const fish = Rules.FISH[st.species];
+  const winners = [];
+  ranking(st).slice(0, F.contest.rewards.length).forEach((e, i) => {
+    const user = db.state.users[e.uid];
+    const reward = F.contest.rewards[i];
+    winners.push({ uid: e.uid, name: e.name, size: e.size, rank: i + 1, reward });
+    if (!user || !user.character) return;
+    const c = user.character;
+    game.upgrade(c);
+    c.gold += reward.gold;
+    game.addStat(c, 'goldEarned', reward.gold);
+    c.chests += reward.chests;
+    if (i === 0) game.bump(c, 'fishContest');
+    market.mail(user, `🏆 Concours de pêche du ${st.day} : ${i + 1}${i ? 'ᵉ' : 'ʳᵉ'} place avec ${fish ? fish.name : 'ta prise'} de ${String(e.size).replace('.', ',')} cm ! +${reward.gold} golds, +${reward.chests} coffre${reward.chests > 1 ? 's' : ''}.`, { at: now, kind: 'contest', gold: reward.gold });
+  });
+  const result = { day: st.day, species: st.species, winners };
+  db.state.fishContest = { day, species: Rules.fishContestSpecies(day), entries: {}, last: result };
+  db.save();
+  return result;
 }
 
 // Quitter l'onglet ou rentrer la ligne. Si la silhouette était déjà visible, les poissons se méfient (`wait` s).
@@ -199,4 +268,4 @@ function stop(user, now = Date.now()) {
   return { stopped: true, wait };
 }
 
-module.exports = { cast, hook, land, stop, sessions, calm, rollTarget, setNotify, timer: (fn, ms) => setTimeout(fn, ms) };
+module.exports = { cast, hook, land, stop, sessions, calm, rollTarget, setNotify, contestView, contestCatch, contestRollover, timer: (fn, ms) => setTimeout(fn, ms) };

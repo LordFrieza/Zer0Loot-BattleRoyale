@@ -7,15 +7,32 @@
  *    poisson remplit la jauge, sinon elle se vide ; pleine = prise, vide = il s'échappe.
  * Le serveur décide de ce qui mord et vérifie le ferrage et la durée de la remontée (/api/fishing/*).
  * Le Pêchédex (100 espèces, silhouettes noires pour celles qui manquent) s'ouvre à tout moment.
- * Utilise les globales : me, api, toast, esc, refresh, skyPhase, Rules, Sound, drawFighter, drawPet, drawFish, drawTreasure.
+ * Étang partagé (serveur : server/pond.js) : les autres pêcheurs du même étang apparaissent dans leur barque autour de la
+ * sienne (skins, familier, canne), arrivent et repartent en ramant, et on voit leur ligne, leurs remontées et leurs prises.
+ * Le tchat (salon Pêche par défaut) est sous l'étang ; un message du salon Pêche s'affiche aussi en bulle au-dessus de la
+ * barque de son auteur, et les réactions rapides (👋 🎉…) flottent au-dessus de la sienne.
+ * Utilise les globales : me, api, toast, esc, refresh, skyPhase, Rules, Sound, drawFighter, drawPet, drawFish, drawTreasure,
+ * Chat, Emotes.
  */
 (function () {
   const F = Rules.FISHING;
   const W = 960;
-  const H = 460;
+  const H = 520;
   const WATER = 236; // ligne d'horizon de l'eau
-  const BOAT = { x: 300, y: 318 };
-  const BOBBER = { x: 650, y: 352 };
+  // Sa barque au premier plan (vue un peu dézoomée pour laisser la place aux autres) ; échelle de la barque
+  const BOAT = { x: 290, y: 410, s: 0.85 };
+  const BOBBER = { x: 590, y: 450 };
+  // Places des autres pêcheurs (les 7 autres places de l'étang), du plus proche au plus lointain : plus c'est loin, plus
+  // c'est petit ; `dir` : sens de la barque (vers le milieu du lac).
+  const SPOTS = [
+    { x: 800, y: 386, s: 0.6, dir: -1 },
+    { x: 118, y: 318, s: 0.5, dir: 1 },
+    { x: 585, y: 322, s: 0.5, dir: -1 },
+    { x: 365, y: 274, s: 0.4, dir: 1 },
+    { x: 720, y: 280, s: 0.4, dir: -1 },
+    { x: 905, y: 266, s: 0.36, dir: -1 },
+    { x: 198, y: 266, s: 0.36, dir: 1 },
+  ];
   const $ = (id) => document.getElementById(id);
   const RCOL = { commun: '#a8acb4', peu_commun: '#3ddc5a', rare: '#3b8bff', epique: '#b14dff', legendaire: '#ff9a1f' };
   const RLAB = Object.fromEntries(Object.entries(Rules.RARITY_INFO).map(([k, v]) => [k, v.label]));
@@ -29,13 +46,15 @@
     reel: null, reelAcc: 0, reelHold: false, toggles: [], calmUntil: 0, result: null, msg: null, auto: false, nextAt: 0,
     ripples: [], splashes: [], hearts: [], jumps: [], jumpAt: 0, petHop: 0,
     session: [], // dernières prises de la séance
+    // Étang partagé : liste reçue du serveur, barques des autres (uid → barque), barques qui repartent, sa bulle, ses réactions
+    pond: null, boats: new Map(), leaving: [], mine: { bubble: null, floats: [] }, socket: null, chat: null, contest: null, schoolEnd: 0,
   };
   try { S.auto = localStorage.getItem('zl_fish_auto') === '1'; } catch (e) { /* ignore */ }
 
   // ---------- Décor ----------
   const CLOUDS = Array.from({ length: 6 }, (_, i) => ({ x: i * 190 + Math.random() * 80, y: 30 + Math.random() * 90, s: 0.6 + Math.random() * 0.7 }));
-  const PADS = [[90, 400, 24], [150, 430, 18], [820, 300, 20], [880, 420, 26], [520, 440, 16], [760, 445, 22]];
-  const REEDS = [...Array.from({ length: 9 }, (_, i) => [10 + i * 12, 460]), ...Array.from({ length: 8 }, (_, i) => [870 + i * 11, 300])];
+  const PADS = [[60, 478, 24], [140, 505, 18], [455, 500, 16], [690, 492, 22], [930, 470, 26], [470, 300, 14]];
+  const REEDS = [...Array.from({ length: 9 }, (_, i) => [10 + i * 12, 520]), ...Array.from({ length: 7 }, (_, i) => [888 + i * 11, 520])];
   const BUGS = Array.from({ length: 14 }, (_, i) => ({ x: Math.random() * W, y: WATER - 40 + Math.random() * 200, p: Math.random() * 10, i }));
 
   function drawSky(ctx, t, ph) {
@@ -220,48 +239,394 @@
     for (const [slot, item] of Object.entries(me.character.equipment || {})) if (item) look[slot] = item.rarity;
     return look;
   }
-  const rodTip = (t) => ({ x: BOAT.x + 110 + (S.phase === 'reel' ? Math.sin(t / 60) * 4 - 8 : 0), y: BOAT.y - 112 + (S.phase === 'reel' ? 14 : 0) });
+  // Bout de la canne, dans le repère de la barque (origine : milieu du bord, qui tangue)
+  const tipLocal = (t, reeling) => ({ x: 110 + (reeling ? Math.sin(t / 60) * 4 - 8 : 0), y: -112 + (reeling ? 14 : 0) });
 
-  function drawBoat(ctx, t, ph) {
-    const bob = Math.sin(t / 800) * 3;
-    const c = me.character;
-    const y = BOAT.y + bob;
+  // Une barque, n'importe laquelle : B = { x, y, s (échelle), dir (1 : vers la droite), phase (tangage), fighter
+  // ({ name, cls, look, app }), pet (espèce), legend (canne légendaire), reeling, hop }. Renvoie le bout de la canne et
+  // le haut de la tête (repère de l'écran).
+  function drawBoatAt(ctx, t, ph, B) {
+    const bob = Math.sin(t / 800 + (B.phase || 0)) * 3;
+    const by = B.y + bob * B.s;
+    ctx.save();
+    ctx.translate(B.x, by);
+    ctx.scale(B.s * B.dir, B.s);
     // reflet sombre
-    ctx.fillStyle = 'rgba(0,20,40,.25)'; ctx.beginPath(); ctx.ellipse(BOAT.x, y + 30, 120, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,20,40,.25)'; ctx.beginPath(); ctx.ellipse(0, 30, 120, 12, 0, 0, Math.PI * 2); ctx.fill();
     // personnage debout dans la barque (on cache son arme habituelle : il tient la canne)
     // (pieds sous le bord de la coque : on ne voit que le haut du corps, il est vraiment DANS la barque)
     // (le pseudo donne la couleur de peau « automatique », comme partout ailleurs)
-    drawFighter(ctx, BOAT.x - 10, y - 27, { name: me.twitchDisplayName || me.username, cls: c.cls, look: lookOf(), app: { ...c.look, weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: S.phase === 'reel' ? Math.sin(t / 70) * 1.5 : 0 });
+    drawFighter(ctx, -10, -27, { ...B.fighter, app: { ...(B.fighter.app || {}), weapon: 'vide_weapon' } }, { scale: 1.45, facing: 1, bob: B.reeling ? Math.sin(t / 70) * 1.5 : 0 });
     // familier principal à la proue
-    const P = c.pets;
-    const pet = P && P.list && P.list.find((p) => p.id === P.active);
-    if (pet && window.drawPet) {
-      const hop = S.petHop > 0 ? -Math.abs(Math.sin(S.petHop * 12)) * 14 : 0;
-      drawPet(ctx, BOAT.x + 64, y + 6 + hop, pet.species, { t, size: 0.95, facing: 1 });
+    if (B.pet && window.drawPet) {
+      const hop = B.hop > 0 ? -Math.abs(Math.sin(B.hop * 12)) * 14 : 0;
+      drawPet(ctx, 64, 6 + hop, B.pet, { t, size: 0.95, facing: 1 });
     }
     // coque
-    const hull = ctx.createLinearGradient(0, y - 4, 0, y + 30);
+    const hull = ctx.createLinearGradient(0, -4, 0, 30);
     hull.addColorStop(0, '#a8703e'); hull.addColorStop(1, '#6a4020');
     ctx.fillStyle = hull;
-    ctx.beginPath(); ctx.moveTo(BOAT.x - 118, y - 6); ctx.lineTo(BOAT.x + 118, y - 6); ctx.quadraticCurveTo(BOAT.x + 100, y + 28, BOAT.x + 60, y + 30); ctx.lineTo(BOAT.x - 70, y + 30); ctx.quadraticCurveTo(BOAT.x - 106, y + 26, BOAT.x - 118, y - 6); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-118, -6); ctx.lineTo(118, -6); ctx.quadraticCurveTo(100, 28, 60, 30); ctx.lineTo(-70, 30); ctx.quadraticCurveTo(-106, 26, -118, -6); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#4a2a10'; ctx.lineWidth = 2; ctx.stroke();
     ctx.strokeStyle = 'rgba(255,220,170,.25)'; ctx.lineWidth = 1.5;
-    for (const k of [6, 15]) { ctx.beginPath(); ctx.moveTo(BOAT.x - 110 + k * 0.6, y + k - 6); ctx.lineTo(BOAT.x + 108 - k * 0.6, y + k - 6); ctx.stroke(); }
-    ctx.fillStyle = '#c8905a'; ctx.fillRect(BOAT.x - 118, y - 9, 236, 5);
+    for (const k of [6, 15]) { ctx.beginPath(); ctx.moveTo(-110 + k * 0.6, k - 6); ctx.lineTo(108 - k * 0.6, k - 6); ctx.stroke(); }
+    ctx.fillStyle = '#c8905a'; ctx.fillRect(-118, -9, 236, 5);
     // lanterne sur la poupe (allumée le soir et la nuit)
-    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(BOAT.x - 108, y - 8); ctx.lineTo(BOAT.x - 108, y - 46); ctx.lineTo(BOAT.x - 96, y - 46); ctx.stroke();
-    if (ph.night || ph.dusk) { const gl = ctx.createRadialGradient(BOAT.x - 96, y - 38, 2, BOAT.x - 96, y - 38, 50); gl.addColorStop(0, 'rgba(255,210,120,.6)'); gl.addColorStop(1, 'rgba(255,210,120,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(BOAT.x - 96, y - 38, 50, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-108, -8); ctx.lineTo(-108, -46); ctx.lineTo(-96, -46); ctx.stroke();
+    if (ph.night || ph.dusk) { const gl = ctx.createRadialGradient(-96, -38, 2, -96, -38, 50); gl.addColorStop(0, 'rgba(255,210,120,.6)'); gl.addColorStop(1, 'rgba(255,210,120,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(-96, -38, 50, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = ph.night || ph.dusk ? '#ffe9a8' : '#e8e0c8'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1.5;
-    ctx.fillRect(BOAT.x - 101, y - 44, 10, 12); ctx.strokeRect(BOAT.x - 101, y - 44, 10, 12);
+    ctx.fillRect(-101, -44, 10, 12); ctx.strokeRect(-101, -44, 10, 12);
     // canne (dorée avec la canne légendaire)
-    const legend = c.look && c.look.weapon === 'canne_legendaire';
-    const hand = { x: BOAT.x + 8, y: y - 43 };
-    const tip = rodTip(t);
-    ctx.strokeStyle = legend ? '#ffd34a' : '#8a5a2a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(hand.x - 10, hand.y + 10); ctx.quadraticCurveTo((hand.x + tip.x) / 2, Math.min(hand.y, tip.y) - 10, tip.x, tip.y + bob); ctx.stroke();
-    if (legend) { ctx.save(); ctx.shadowColor = '#7fe8ff'; ctx.shadowBlur = 12; ctx.fillStyle = '#7fe8ff'; ctx.beginPath(); ctx.arc(tip.x, tip.y + bob, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    const hand = { x: 8, y: -43 };
+    const tip = tipLocal(t, B.reeling);
+    ctx.strokeStyle = B.legend ? '#ffd34a' : '#8a5a2a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hand.x - 10, hand.y + 10); ctx.quadraticCurveTo((hand.x + tip.x) / 2, Math.min(hand.y, tip.y) - 10, tip.x, tip.y); ctx.stroke();
+    if (B.legend) { ctx.save(); ctx.shadowColor = '#7fe8ff'; ctx.shadowBlur = 12; ctx.fillStyle = '#7fe8ff'; ctx.beginPath(); ctx.arc(tip.x, tip.y, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
     ctx.fillStyle = '#3a3a42'; ctx.beginPath(); ctx.arc(hand.x - 2, hand.y + 4, 5, 0, Math.PI * 2); ctx.fill(); // moulinet
-    return { tip: { x: tip.x, y: tip.y + bob } };
+    ctx.restore();
+    return {
+      tip: { x: B.x + B.dir * B.s * tip.x, y: by + B.s * tip.y },
+      head: { x: B.x - B.dir * B.s * 10, y: by - B.s * 132 },
+      y: by,
+    };
+  }
+
+  function myBoat() {
+    const c = me.character;
+    const P = c.pets;
+    const pet = P && P.list && P.list.find((p) => p.id === P.active);
+    return {
+      x: BOAT.x, y: BOAT.y, s: BOAT.s, dir: 1, phase: 0,
+      fighter: { name: me.twitchDisplayName || me.username, cls: c.cls, look: lookOf(), app: c.look },
+      pet: pet && pet.species, legend: c.look && c.look.weapon === 'canne_legendaire', reeling: S.phase === 'reel', hop: S.petHop,
+    };
+  }
+  // ---------- Les autres pêcheurs de l'étang ----------
+  // Une place de l'étang (0 à 7) → une position autour de sa barque : on saute sa propre place.
+  function spotPos(spot) {
+    const mine = S.pond && S.pond.members.find((m) => m.uid === me.id);
+    const ms = mine ? mine.spot : 0;
+    return SPOTS[Math.max(0, Math.min(SPOTS.length - 1, spot < ms ? spot : spot - 1))];
+  }
+  const easeOut = (k) => 1 - (1 - k) ** 3;
+  const easeIn = (k) => k ** 2.2;
+  // Arrivée (ou départ) en ramant depuis le bord du lac le plus proche
+  function entryAnim(pos, kind) {
+    const edge = pos.x < W / 2 ? -170 : W + 170;
+    return kind === 'in' ? { kind, from: edge, to: pos.x, t0: performance.now(), dur: 3600 } : { kind, from: pos.x, to: edge, t0: performance.now(), dur: 3200 };
+  }
+  // Liste des pêcheurs reçue du serveur : nouvelles barques (qui arrivent en ramant, sauf à sa propre arrivée), barques
+  // qui repartent, et état de chacun.
+  function applyPond(v) {
+    const first = !S.pond || S.pond.id !== v.id;
+    S.pond = v;
+    S.schoolEnd = v.school ? Date.now() + (v.school.until - v.now) : 0;
+    const seen = new Set();
+    for (const m of v.members) {
+      if (m.uid === me.id) continue;
+      seen.add(m.uid);
+      let b = S.boats.get(m.uid);
+      const pos = spotPos(m.spot);
+      if (!b) {
+        b = { uid: m.uid, m, pos, state: m.state, castAt: 0, show: null, bubble: null, floats: [], phase: Math.random() * 6, hop: 0, anim: first ? null : entryAnim(pos, 'in') };
+        S.boats.set(m.uid, b);
+        if (!first) Sound.play('fishPlop', 0.25);
+      }
+      b.m = m;
+      b.pos = pos;
+      if (b.state !== m.state && !(b.state === 'wait' && m.state === 'wait')) b.state = m.state;
+    }
+    for (const [uid, b] of S.boats) {
+      if (seen.has(uid)) continue;
+      S.boats.delete(uid);
+      if (!first) { b.anim = entryAnim(b.pos, 'out'); b.state = 'idle'; S.leaving.push(b); }
+    }
+    renderSide();
+  }
+  // Action d'un autre pêcheur, en direct : lancer, remontée, prise brandie au-dessus de sa tête, poisson perdu, réaction.
+  function onPondAct(e) {
+    if (!S.active) return;
+    const now = performance.now();
+    if (e.uid === me.id) {
+      if (e.k === 'react') S.mine.floats.push({ e: e.e, at: now });
+      return;
+    }
+    const b = S.boats.get(e.uid);
+    if (!b) return;
+    if (e.k === 'react') { b.floats.push({ e: e.e, at: now }); return; }
+    if (e.k === 'cast') { b.state = 'wait'; b.castAt = now; b.show = null; }
+    else if (e.k === 'reel') b.state = 'reel';
+    else if (e.k === 'catch') {
+      b.state = 'idle';
+      b.hop = 0.8;
+      b.show = { fish: e.fish, treasure: e.treasure, at: now };
+      const R = e.fish && Rules.FISH[e.fish.id];
+      if (R && (R.rarity === 'epique' || R.rarity === 'legendaire' || e.treasure)) Sound.play('fishTreasure', 0.5);
+    } else if (e.k === 'escape' || e.k === 'miss') { b.state = 'idle'; b.floats.push({ e: e.k === 'miss' ? '💤' : '💨', at: now }); }
+    else if (e.k === 'stop') b.state = 'idle';
+  }
+  // Barque d'un autre pêcheur (avec son arrivée ou son départ en ramant)
+  function otherBoat(b, t) {
+    const m = b.m;
+    let x = b.pos.x;
+    let dir = b.pos.dir;
+    let rowing = false;
+    if (b.anim) {
+      const k = Math.min(1, (performance.now() - b.anim.t0) / b.anim.dur);
+      x = b.anim.from + (b.anim.to - b.anim.from) * (b.anim.kind === 'in' ? easeOut(k) : easeIn(k));
+      dir = Math.sign(b.anim.to - b.anim.from) || dir;
+      rowing = k < 1;
+      if (k >= 1 && b.anim.kind === 'in') b.anim = null;
+      if (k >= 1 && b.anim && b.anim.kind === 'out') b.gone = true;
+    }
+    return {
+      x, y: b.pos.y, s: b.pos.s, dir, phase: b.phase, rowing,
+      fighter: { name: m.name, cls: m.cls, look: m.look, app: m.app }, pet: m.pet,
+      legend: m.app && m.app.weapon === 'canne_legendaire', reeling: b.state === 'reel' && !rowing, hop: b.hop,
+    };
+  }
+  // Sillage et rames d'une barque qui arrive ou repart
+  function drawWake(ctx, t, B) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5;
+    for (let i = 1; i <= 4; i++) {
+      const x = B.x - B.dir * (90 + i * 26) * B.s;
+      const w = (14 + i * 6) * B.s;
+      ctx.globalAlpha = 0.6 - i * 0.12;
+      ctx.beginPath(); ctx.moveTo(x, B.y + 26 * B.s - w * 0.3); ctx.quadraticCurveTo(x - B.dir * 8 * B.s, B.y + 26 * B.s, x, B.y + 26 * B.s + w * 0.3); ctx.stroke();
+    }
+    // rames qui battent l'eau
+    const a = Math.sin(t / 160) * 0.6;
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#6a4020'; ctx.lineWidth = 3 * B.s + 1;
+    for (const side of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(B.x - B.dir * 20 * B.s, B.y - 6 * B.s);
+      ctx.lineTo(B.x - B.dir * (20 + Math.cos(a) * 70) * B.s, B.y + (14 + side * 6 + Math.sin(a) * 10) * B.s); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Ligne et bouchon d'un autre pêcheur (lancée, à l'eau, ou en pleine remontée)
+  function drawOtherLine(ctx, t, b, B, boat) {
+    if (b.state !== 'wait' && b.state !== 'reel') return;
+    const tip = boat.tip;
+    const bx = B.x + B.dir * 255 * B.s;
+    const byy = B.y + 34 * B.s;
+    const p = Math.min(1, (performance.now() - (b.castAt || 0)) / 600);
+    const x = tip.x + (bx - tip.x) * p;
+    const y = tip.y + (byy - tip.y) * p - Math.sin(p * Math.PI) * 50 * B.s;
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tip.x, tip.y); ctx.quadraticCurveTo((tip.x + x) / 2, Math.max(tip.y, y) + (b.state === 'reel' ? 0 : 30 * B.s), x, y); ctx.stroke();
+    if (b.state === 'reel') {
+      ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
+      const r = (8 + (t / 40) % 12) * B.s;
+      ctx.beginPath(); ctx.ellipse(bx + Math.sin(t / 90) * 4 * B.s, byy + 3, r, r * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+      if (Math.random() < 0.15) S.splashes.push({ x: bx, y: byy, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 50, life: 0.5 });
+      return;
+    }
+    if (p < 1) return;
+    const dip = Math.sin(t / 500 + b.phase) * 1.5;
+    ctx.save(); ctx.translate(x, y + dip); ctx.scale(B.s * 1.3, B.s * 1.3);
+    ctx.fillStyle = '#e8343a'; ctx.beginPath(); ctx.arc(0, -4, 7, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, -4, 7, 0, Math.PI); ctx.fill();
+    ctx.restore();
+  }
+  // Prise brandie au-dessus de la tête (3,5 s), avec un halo de la couleur de la rareté
+  function drawShow(ctx, t, b, boat, B) {
+    const sh = b.show;
+    if (!sh) return;
+    const age = (performance.now() - sh.at) / 1000;
+    if (age > 3.5) { b.show = null; return; }
+    const x = boat.head.x;
+    const y = boat.head.y - 34 - 34 * B.s - Math.min(1, age * 3) * 10;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, age * 4, (3.5 - age) * 2);
+    const R = sh.fish && Rules.FISH[sh.fish.id];
+    const col = R ? RCOL[R.rarity] : '#ffd34a';
+    const g = ctx.createRadialGradient(x, y, 2, x, y, 46 * B.s + 14);
+    g.addColorStop(0, col + 'aa'); g.addColorStop(1, col + '00');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 46 * B.s + 14, 0, Math.PI * 2); ctx.fill();
+    if (R) drawFish(ctx, x, y, R, { size: 64 * B.s + 18, t, facing: B.dir });
+    else drawTreasure(ctx, x, y + 4, 50 * B.s + 14, { t });
+    ctx.font = `800 ${Math.round(9 + 5 * B.s)}px system-ui`; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.fillStyle = col;
+    const label = R ? `${R.name} · ${cm(sh.fish.size)}` : `${sh.treasure.icon} ${sh.treasure.label}`;
+    ctx.strokeText(label, x, y - 30 * B.s - 10); ctx.fillText(label, x, y - 30 * B.s - 10);
+    ctx.restore();
+  }
+  // Pseudo au-dessus des autres barques
+  function drawNameTag(ctx, x, y, name, s) {
+    ctx.save();
+    ctx.font = `800 ${Math.round(9 + 5 * s)}px system-ui`; ctx.textAlign = 'center';
+    const w = ctx.measureText(name).width + 12;
+    ctx.fillStyle = 'rgba(12, 8, 30, .55)';
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 12, w, 16, 8); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(name, x, y);
+    ctx.restore();
+  }
+  // Réactions et petits nuages (💨) qui montent au-dessus d'une tête
+  function drawFloats(ctx, list, x, y) {
+    const now = performance.now();
+    for (let i = list.length - 1; i >= 0; i--) {
+      const f = list[i];
+      const age = (now - f.at) / 1000;
+      if (age > 2.8) { list.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, age * 5, (2.8 - age) * 2);
+      ctx.font = `${Math.round(22 + Math.min(1, age * 4) * 6)}px system-ui`; ctx.textAlign = 'center';
+      ctx.fillText(f.e, x + Math.sin(age * 5 + i) * 6, y - age * 24);
+      ctx.restore();
+    }
+  }
+
+  // ---------- Bulles du salon Pêche ----------
+  const emoteImgs = {};
+  function emoteImg(id) {
+    if (!emoteImgs[id]) { const im = new Image(); im.src = Emotes.url(id); emoteImgs[id] = im; }
+    return emoteImgs[id];
+  }
+  // Texte d'une bulle (avec les émotes), coupé en lignes de 170 px au plus
+  function bubbleLines(ctx, text) {
+    const words = [];
+    for (const tk of Rules.chatTokens(text)) {
+      if (tk.t === 'emote') words.push({ emote: tk.id, w: 18 });
+      else for (const w of tk.v.split(/\s+/).filter(Boolean)) words.push({ text: w, w: ctx.measureText(w).width });
+    }
+    const lines = [[]];
+    let lw = 0;
+    const space = ctx.measureText(' ').width;
+    for (const w of words) {
+      const line = lines[lines.length - 1];
+      if (line.length && lw + space + w.w > 170) { lines.push([w]); lw = w.w; continue; }
+      lw += (line.length ? space : 0) + w.w;
+      line.push(w);
+    }
+    return lines.slice(0, 4).map((l) => ({ items: l, w: l.reduce((a, w, i) => a + w.w + (i ? space : 0), 0) }));
+  }
+  function bubbleOf(m) {
+    const text = m.roll ? `🎲 ${m.roll.n} (1-${m.roll.max})` : m.flip ? `🪙 ${m.flip} !` : m.me ? `* ${m.text} *` : m.text;
+    return { text, at: performance.now(), until: performance.now() + 4500 + Math.min(6000, text.length * 60) };
+  }
+  // Une bulle au-dessus de la tête ; `placed` évite que deux bulles se chevauchent
+  function drawBubble(ctx, bub, x, y, placed, mine) {
+    const now = performance.now();
+    if (!bub || bub.until <= now) return;
+    ctx.save();
+    ctx.font = '600 12px system-ui, sans-serif';
+    const lines = bubbleLines(ctx, bub.text);
+    const lw = Math.max(30, ...lines.map((l) => l.w)) + 16;
+    const lh = lines.length * 16 + 8;
+    const bx = Math.max(4, Math.min(W - lw - 4, x - lw / 2));
+    let by = Math.max(4, y - lh - 10);
+    for (let k = 0; k < 4; k++) {
+      const hit = placed.find((r) => bx < r.x + r.w && bx + lw > r.x && by < r.y + r.h && by + lh + 8 > r.y);
+      if (!hit) break;
+      by = Math.max(2, hit.y - lh - 10);
+    }
+    placed.push({ x: bx, y: by, w: lw, h: lh + 8 });
+    const pop = Math.min(1, (now - bub.at) / 160);
+    ctx.globalAlpha = Math.max(0, Math.min(1, (now - bub.at) / 160, (bub.until - now) / 400));
+    ctx.translate(x, by + lh); ctx.scale(0.7 + pop * 0.3, 0.7 + pop * 0.3); ctx.translate(-x, -(by + lh));
+    ctx.fillStyle = mine ? '#fff6d0' : '#ffffff';
+    ctx.strokeStyle = mine ? '#ffd34a' : 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(bx, by, lw, lh, 9); ctx.fill(); ctx.stroke();
+    const tx = Math.max(bx + 10, Math.min(bx + lw - 10, x));
+    ctx.beginPath(); ctx.moveTo(tx - 6, by + lh - 1); ctx.lineTo(tx + 6, by + lh - 1); ctx.lineTo(tx, by + lh + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2a2040'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const space = ctx.measureText(' ').width;
+    lines.forEach((l, i) => {
+      let cx = bx + 8;
+      const cy = by + 12 + i * 16;
+      for (const w of l.items) {
+        if (w.emote) { const im = emoteImg(w.emote); if (im.complete && im.naturalWidth) ctx.drawImage(im, cx, cy - 9, 18, 18); }
+        else ctx.fillText(w.text, cx, cy);
+        cx += w.w + space;
+      }
+    });
+    ctx.restore();
+  }
+  // Message du salon Pêche : en bulle au-dessus de la barque de son auteur (s'il pêche sur le même étang)
+  function onChatMessage(m) {
+    if (!S.active || m.room !== 'peche') return;
+    if (m.kind === 'contest') loadContest(); // (le classement du concours du jour a changé)
+    if (m.sys || !m.uid) return;
+    if (m.uid === me.id) { S.mine.bubble = bubbleOf(m); return; }
+    const b = S.boats.get(m.uid);
+    if (b) b.bubble = bubbleOf(m);
+  }
+
+  // ---------- Banc de poissons ----------
+  function drawSchool(ctx, t) {
+    if (!S.pond || !S.pond.school || Date.now() >= S.schoolEnd) return;
+    const cx = S.pond.school.x * W;
+    const cy = WATER + 96;
+    ctx.save();
+    for (let i = 0; i < 16; i++) {
+      const a = t / 1400 + i * 0.39;
+      const r = 40 + (i % 4) * 22;
+      const x = cx + Math.cos(a) * r * 1.8;
+      const y = cy + Math.sin(a) * r * 0.45;
+      drawFish(ctx, x, y, { shape: 'poisson', id: '', color: '#000', accent: '#000', pattern: 'uni' }, { size: 16 + (i % 3) * 4, t, shadow: true, facing: Math.sin(a) > 0 ? -1 : 1, alpha: 0.32 });
+    }
+    for (let i = 0; i < 10; i++) {
+      const p = ((t / 900) + i / 10) % 1;
+      ctx.fillStyle = `rgba(255, 240, 150, ${0.8 * (1 - p)})`;
+      const x = cx + Math.sin(i * 7.3 + t / 700) * 140;
+      ctx.fillRect(x, cy - 10 - p * 26, 2.5, 2.5);
+    }
+    ctx.restore();
+  }
+  // En haut : nombre de pêcheurs de l'étang et banc de poissons en cours
+  function drawPondBadge(ctx) {
+    if (!S.pond) return;
+    const n = S.pond.members.length;
+    let text = `🛶 ${n} pêcheur${n > 1 ? 's' : ''} sur l'étang${S.pond.ponds > 1 ? ` n°${S.pond.id}` : ''}`;
+    const left = Math.ceil((S.schoolEnd - Date.now()) / 1000);
+    if (S.pond.school && left > 0) text = `🐟✨ Banc de poissons ! Les rares mordent ×2 — ${left} s`;
+    ctx.save();
+    ctx.font = '800 13px system-ui'; ctx.textAlign = 'left';
+    const w = ctx.measureText(text).width + 20;
+    ctx.fillStyle = left > 0 && S.pond.school ? 'rgba(255, 200, 40, .9)' : 'rgba(15, 10, 30, .55)';
+    ctx.beginPath(); ctx.roundRect(10, 10, w, 24, 12); ctx.fill();
+    ctx.fillStyle = left > 0 && S.pond.school ? '#2a1a00' : '#fff';
+    ctx.fillText(text, 20, 27);
+    ctx.restore();
+  }
+
+  // Toutes les barques, des plus lointaines aux plus proches (la sienne comprise)
+  function drawBoats(ctx, t, ph, dt) {
+    const placed = [];
+    const list = [...S.boats.values(), ...S.leaving].map((b) => ({ b, B: otherBoat(b, t) }));
+    S.leaving = S.leaving.filter((b) => !b.gone);
+    list.push({ mine: true, B: myBoat() });
+    list.sort((a, b) => a.B.y - b.B.y);
+    const tops = [];
+    let myTip = null;
+    for (const it of list) {
+      if (it.mine) {
+        const boat = drawBoatAt(ctx, t, ph, it.B);
+        myTip = boat.tip;
+        drawLine(ctx, t, boat.tip, bobberState(t));
+        tops.push({ mine: true, head: boat.head });
+        continue;
+      }
+      const { b, B } = it;
+      if (B.rowing) drawWake(ctx, t, B);
+      b.hop = Math.max(0, b.hop - dt);
+      const boat = drawBoatAt(ctx, t, ph, B);
+      drawOtherLine(ctx, t, b, B, boat);
+      tops.push({ b, B, boat });
+    }
+    // Par-dessus : pseudos, prises brandies, réactions, puis bulles (les plus proches d'abord pour la place)
+    for (const it of tops) {
+      if (it.mine) { drawFloats(ctx, S.mine.floats, it.head.x, it.head.y - 10); continue; }
+      const { b, B, boat } = it;
+      drawNameTag(ctx, boat.head.x, boat.head.y - 8, b.m.name, B.s);
+      drawShow(ctx, t, b, boat, B);
+      drawFloats(ctx, b.floats, boat.head.x, boat.head.y - 24);
+    }
+    for (const it of [...tops].reverse()) {
+      if (it.mine) drawBubble(ctx, S.mine.bubble, it.head.x, it.head.y - 4, placed, true);
+      else drawBubble(ctx, it.b.bubble, it.boat.head.x, it.boat.head.y - 22, placed, false);
+    }
+    return { tip: myTip };
   }
 
   // ---------- Ligne, bouchon, forme dans l'eau ----------
@@ -483,15 +848,16 @@
     // ronds dans l'eau
     for (const r of S.ripples) { r.r += dt * 30; r.life -= dt * 0.8; ctx.strokeStyle = `rgba(255,255,255,${Math.max(0, r.life) * 0.7})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r, r.r * 0.35, 0, 0, Math.PI * 2); ctx.stroke(); }
     S.ripples = S.ripples.filter((r) => r.life > 0);
+    drawSchool(ctx, t);
     drawPads(ctx, t, ph);
-    const boat = drawBoat(ctx, t, ph);
-    drawLine(ctx, t, boat.tip, bobberState(t));
+    drawBoats(ctx, t, ph, dt);
     for (const s of S.splashes) { s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 400 * dt; s.life -= dt; ctx.fillStyle = `rgba(220,240,255,${Math.max(0, s.life)})`; ctx.fillRect(s.x, s.y, 3, 3); }
     S.splashes = S.splashes.filter((s) => s.life > 0);
     for (const h of S.hearts) { h.y -= 30 * dt; h.life -= dt; ctx.globalAlpha = Math.max(0, h.life); ctx.font = '18px system-ui'; ctx.fillText(h.e, h.x, h.y); ctx.globalAlpha = 1; }
     S.hearts = S.hearts.filter((h) => h.life > 0);
     drawBugs(ctx, t, ph);
     if (ph.night) { ctx.fillStyle = 'rgba(10, 14, 50, .18)'; ctx.fillRect(0, 0, W, H); }
+    drawPondBadge(ctx);
     drawReel(ctx, t);
     drawResult(ctx, t);
     drawMessage(ctx, t);
@@ -604,6 +970,10 @@
         } else {
           Sound.play('fishCatch', Rules.FISH[r.id].rarity);
           S.session.unshift({ id: r.id, size: r.size, isNew: r.isNew, record: r.record });
+          if (r.contest) {
+            loadContest();
+            if (r.contest.improved) toast(r.contest.rank === 1 ? `🏆 Tu prends la tête du concours du jour (${cm(r.size)}) !` : `🏆 Concours du jour : te voilà ${r.contest.rank}ᵉ (${cm(r.size)}) !`, 5000);
+          }
           S.session = S.session.slice(0, 8);
         }
         refresh().then(renderSide).catch(() => {});
@@ -642,11 +1012,47 @@
         <div><span class="muted">Légendaires</span><b>${fmt(k.fishLegend || 0)}</b></div>
       </div>
       <div class="fish-time">${time === 'nuit' ? '🌙 C\'est la nuit (heure de Paris) : les poissons de nuit mordent.' : '☀️ C\'est le jour (heure de Paris) : les poissons de jour mordent.'}</div>
+      ${pondHtml()}
+      ${contestHtml()}
       <label class="fish-auto"><input type="checkbox" id="fish-auto" ${S.auto ? 'checked' : ''}> Relancer la ligne toute seule</label>
       <div class="fish-session"><b>🐟 Dernières prises</b>${S.session.length ? S.session.map((s) => { const f = Rules.FISH[s.id]; return `<div><span style="color:${RCOL[f.rarity]}">${esc(f.name)}</span> <span class="muted">${cm(s.size)}</span>${s.isNew ? ' <b class="fish-new">Nouveau</b>' : s.record ? ' <b class="fish-new">Record</b>' : ''}</div>`; }).join('') : '<div class="muted">Rien encore… patience !</div>'}</div>
       <div class="fish-reward muted">${n >= total ? '🎉 Pêchédex complet : la <b>panoplie du pêcheur</b> t\'attend à la boutique !' : `Complète le Pêchédex pour débloquer la <b>panoplie du pêcheur</b> à la boutique.`}</div>`;
     $('fish-dex-btn').onclick = openDex;
+    const cf = $('fish-side').querySelector('[data-contest-fish]');
+    if (cf && S.contest) { const f = Rules.FISH[S.contest.species]; drawFish(cf.getContext('2d'), 42, 24, f, { size: f.shape === 'anguille' || f.shape === 'long' ? 64 : 48, t: 600 }); }
     $('fish-auto').onchange = (e) => { S.auto = e.target.checked; try { localStorage.setItem('zl_fish_auto', S.auto ? '1' : '0'); } catch (er) { /* ignore */ } if (S.auto && (S.phase === 'result' || S.phase === 'escape')) S.nextAt = performance.now() + 800; };
+  }
+
+  // Les pêcheurs de l'étang (soi compris), avec ce qu'ils font
+  function pondHtml() {
+    if (!S.pond) return '<div class="fish-pond muted">🛶 Connexion à l\'étang…</div>';
+    const icon = { idle: '🪑', wait: '🎣', reel: '💪' };
+    const label = { idle: 'au repos', wait: 'ligne à l\'eau', reel: 'remonte une prise !' };
+    const list = S.pond.members.map((m) => {
+      const mine = m.uid === me.id;
+      const st = mine ? (S.phase === 'reel' ? 'reel' : S.phase === 'wait' || S.phase === 'bite' || S.phase === 'casting' ? 'wait' : 'idle') : m.state;
+      const ci = m.cls && Rules.CLASS_INFO[m.cls];
+      return `<div class="fish-angler${mine ? ' me' : ''}" title="${label[st]}"><span>${icon[st] || '🎣'}</span><b>${ci ? ci.icon + ' ' : ''}${esc(m.name)}</b>${mine ? ' <small class="muted">(toi)</small>' : ''}<small class="muted">niv. ${m.level || 1}</small></div>`;
+    }).join('');
+    return `<div class="fish-pond"><b>🛶 Sur l'étang${S.pond.ponds > 1 ? ` n°${S.pond.id}` : ''}</b> <span class="muted">${S.pond.members.length} / ${S.pond.spots}</span>
+      <div class="fish-anglers">${list}</div>
+      ${S.pond.members.length < 2 ? '<small class="muted">Seul pour l\'instant… à plusieurs, des <b>bancs de poissons</b> passent de temps en temps (rares ×2) !</small>' : ''}</div>`;
+  }
+  // Concours du jour : l'espèce, le podium, sa place et les lots
+  function contestHtml() {
+    const C = S.contest;
+    if (!C) return '';
+    const f = Rules.FISH[C.species];
+    const medal = ['🥇', '🥈', '🥉'];
+    const top = C.top.slice(0, 5).map((e, i) => `<div class="fish-contest-row${e.uid === me.id ? ' me' : ''}"><span>${medal[i] || `${i + 1}.`}</span><b>${esc(e.name)}</b><span>${cm(e.size)}</span></div>`).join('');
+    const mine = C.me && C.me.rank > 5 ? `<div class="fish-contest-row me"><span>${C.me.rank}.</span><b>Toi</b><span>${cm(C.me.size)}</span></div>` : '';
+    return `<div class="fish-contest"><b>🏆 Concours du jour</b>
+      <div class="fish-contest-fish"><canvas width="84" height="44" data-contest-fish></canvas><div>La plus grande <b style="color:${RCOL[f.rarity]}">${esc(f.name)}</b><br><small class="muted">${cm(f.min)} – ${cm(f.max)} · fin à minuit (heure de Paris)</small></div></div>
+      ${top || '<small class="muted">Personne encore… à toi de jouer !</small>'}${mine}
+      <small class="muted">Lots : 🥇 ${C.rewards[0].gold} golds + ${C.rewards[0].chests} coffres · 🥈 ${C.rewards[1].gold} + ${C.rewards[1].chests} · 🥉 ${C.rewards[2].gold} + ${C.rewards[2].chests}</small></div>`;
+  }
+  async function loadContest() {
+    try { S.contest = await api('/api/fishing/contest'); renderSide(); } catch (e) { /* ignore */ }
   }
 
   let dexFilter = 'all';
@@ -718,6 +1124,20 @@
     });
     document.addEventListener('keyup', (e) => { if (e.code === 'Space') release(); });
     S.jumpAt = performance.now() + 4000;
+    // Tchat sous l'étang (salon Pêche par défaut) ; ses messages s'affichent aussi en bulles au-dessus des barques
+    S.chat = Chat.mount($('fish-chat'), 'pond', { room: 'peche' });
+    Chat.listen(onChatMessage);
+    // Réactions rapides
+    $('fish-reacts').innerHTML = F.pond.reactions.map((e) => `<button type="button" data-react="${e}" title="Réagir : ${e}">${e}</button>`).join('');
+    $('fish-reacts').querySelectorAll('[data-react]').forEach((btn) => { btn.onclick = () => { if (S.socket) S.socket.emit('fish:react', btn.dataset.react); }; });
+  }
+  // Branché par character.js : l'étang partagé passe par le socket de la page
+  function bind(socket) {
+    S.socket = socket;
+    socket.on('pond', (v) => { if (S.active) applyPond(v); });
+    socket.on('pondAct', onPondAct);
+    socket.on('pondError', (msg) => { if (S.active) toast('⚠️ ' + msg); });
+    socket.on('connect', () => { if (S.active) socket.emit('fish:join'); });
   }
 
   function enter() {
@@ -730,6 +1150,13 @@
     S.phase = 'idle';
     S.duckAt = performance.now() + 12000;
     S.raf = requestAnimationFrame(frame);
+    // On prend sa place sur l'étang partagé ; le tchat rouvre le salon Pêche
+    S.pond = null;
+    S.boats.clear();
+    S.leaving = [];
+    if (S.socket) S.socket.emit('fish:join');
+    if (S.chat) S.chat.setRoom('peche');
+    loadContest();
     // Musique chill : les 4 morceaux lo-fi s'enchaînent en boucle
     Sound.music.stop(0.2);
     setTimeout(() => { if (S.active) Sound.music.start(0, 'peche'); }, 250);
@@ -742,6 +1169,10 @@
     cancelAnimationFrame(S.raf);
     if (Sound.music.state && /peche/.test(Sound.music.state.src || '')) Sound.music.stop();
     if (S.phase !== 'idle') api('/api/fishing/stop', {}).then((r) => scared(r.wait)).catch(() => {});
+    if (S.socket) S.socket.emit('fish:leave');
+    S.pond = null;
+    S.boats.clear();
+    S.leaving = [];
     S.phase = 'idle';
     S.cast = null;
     S.reel = null;
@@ -751,6 +1182,6 @@
   }
 
   // peek() : état en lecture seule (étape, barre de remontée), pour les tests automatiques du navigateur
-  const peek = () => ({ phase: S.phase, sink: S.cast && S.cast.sink, appear: S.cast && S.cast.appear, t: S.cast ? castT() : 0, calm: Math.max(0, S.calmUntil - performance.now()), reel: S.reel && { pos: S.reel.pos, vel: S.reel.vel, zone: S.reel.zone, fy: S.reel.fy, progress: S.reel.progress } });
-  window.Fishing = { enter, leave, renderSide, openDex, peek, onEvent, get active() { return S.active; } };
+  const peek = () => ({ pond: S.pond && { id: S.pond.id, n: S.pond.members.length, boats: [...S.boats.values()].map((b) => ({ uid: b.uid, name: b.m.name, state: b.state, bubble: !!(b.bubble && b.bubble.until > performance.now()), anim: b.anim && b.anim.kind })), leaving: S.leaving.length, school: !!(S.pond.school && Date.now() < S.schoolEnd) }, phase: S.phase, sink: S.cast && S.cast.sink, appear: S.cast && S.cast.appear, t: S.cast ? castT() : 0, calm: Math.max(0, S.calmUntil - performance.now()), reel: S.reel && { pos: S.reel.pos, vel: S.reel.vel, zone: S.reel.zone, fy: S.reel.fy, progress: S.reel.progress } });
+  window.Fishing = { enter, leave, renderSide, openDex, peek, onEvent, bind, get active() { return S.active; } };
 })();

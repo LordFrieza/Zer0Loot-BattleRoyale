@@ -1764,7 +1764,22 @@ tr.stat-changed td { background: rgba(255,210,63,.07); }
 .hv-side .ice-mult [data-win] { display: block; min-height: 1.35em; } /* pas de saut du bouton quand le gain apparaît */
 /* ---------- Pêche ---------- */
 .fish-wrap { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
-.fish-scene { position: relative; flex: 1 1 640px; border-radius: 14px; overflow: hidden; border: 2px solid #7a5a32; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); user-select: none; }
+.fish-main { flex: 1 1 640px; min-width: 0; display: flex; flex-direction: column; }
+.fish-reacts-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; font-size: 13px; }
+.fish-reacts { display: flex; gap: 4px; flex-wrap: wrap; }
+.fish-reacts button { min-height: 34px; width: 40px; padding: 0; justify-content: center; font-size: 19px; background: rgba(34, 24, 82, .6); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; }
+.fish-reacts button:hover { transform: translateY(-2px) scale(1.08); background: rgba(80, 50, 160, .7); }
+.fish-pond, .fish-contest { font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.fish-anglers { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.fish-angler { display: flex; align-items: center; gap: 6px; }
+.fish-angler b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fish-angler.me b { color: #ffd34a; }
+.fish-contest-fish { display: flex; align-items: center; gap: 8px; }
+.fish-contest-fish canvas { width: 84px; height: 44px; flex: 0 0 auto; background: radial-gradient(ellipse at center, rgba(120, 190, 230, .3), rgba(120, 190, 230, 0) 70%); border-radius: 8px; }
+.fish-contest-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 6px; }
+.fish-contest-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fish-contest-row.me b { color: #ffd34a; }
+.fish-scene { position: relative; flex: 0 0 auto; border-radius: 14px; overflow: hidden; border: 2px solid #7a5a32; box-shadow: 0 8px 30px rgba(0, 0, 0, .35); user-select: none; }
 .fish-scene canvas { display: block; width: 100%; height: auto; cursor: pointer; touch-action: none; }
 .fish-side { flex: 0 1 270px; min-width: 230px; display: flex; flex-direction: column; gap: 10px; }
 .fish-side > div, .fish-auto { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
@@ -1878,6 +1893,32 @@ body.fs-lock { overflow: hidden; }
 }
 .ct-full .ct-list { height: min(62vh, 560px); }
 .ct-admin .ct-list { height: 340px; }
+/* Salons : onglets au-dessus des messages */
+.ct-tabs { display: flex; gap: 4px; margin-bottom: 6px; overflow-x: auto; scrollbar-width: none; flex: 0 0 auto; }
+.ct-tabs::-webkit-scrollbar { display: none; }
+.ct-tab { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 11px; border-radius: 10px 10px 4px 4px; font-size: 13px; font-weight: 800;
+  background: rgba(34, 24, 82, .55); border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; color: #cfc6f0; }
+.ct-tab:hover { background: rgba(60, 40, 130, .7); }
+.ct-tab.active { background: linear-gradient(180deg, rgba(184, 60, 255, .55), rgba(122, 44, 255, .45)); border-color: rgba(200, 140, 255, .8); color: #fff; }
+.ct-tab-n:empty { display: none; }
+.ct-tab-n { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #ff4d6d; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+.ct-acts { flex: 0 0 auto; margin-left: auto; min-height: 32px; padding: 0 10px; background: transparent; border: 1px solid rgba(150, 100, 255, .3); box-shadow: none; font-size: 15px; }
+.ct-acts.off { opacity: .45; filter: grayscale(1); }
+.ct-bubble .ct-tab-l, .ct-pond .ct-tab-l { display: none; }
+.ct-bubble .ct-tab.active .ct-tab-l, .ct-pond .ct-tab.active .ct-tab-l { display: inline; }
+/* Actions des pêcheurs (salon Pêche) */
+.ct-act { color: #bfe6ff; background: rgba(41, 160, 255, .06); border-left: 3px solid rgba(41, 180, 255, .45); font-size: 13px; }
+.ct-act.ct-rar { border-left-color: var(--rc); }
+.ct-act.ct-rar .ct-text { color: var(--rc); }
+.ct-act.ct-k-fishmiss, .ct-act.ct-k-fishlost, .ct-act.ct-k-fishjoin { color: #9aa8c0; background: transparent; border-left-color: rgba(150, 170, 200, .3); }
+.ct-act.ct-k-fishlost.ct-rar .ct-text { color: #9aa8c0; }
+.ct-act.ct-k-fishtreasure .ct-text { color: #ffd34a; }
+.ct-who { font-weight: 800; cursor: pointer; }
+.ct-k-school, .ct-k-contest { color: #ffe08a; background: rgba(255, 210, 60, .09); border-left-color: rgba(255, 210, 60, .8); font-weight: 700; }
+/* Tchat sous l'étang de pêche */
+.fish-chat { margin-top: 12px; }
+.ct-pond .ct-list { height: 210px; }
+.ct-pond .ct-msg { font-size: 13px; }
 .ct-msg { position: relative; padding: 3px 4px; line-height: 1.45; font-size: 14px; border-radius: 6px; word-break: break-word; }
 .ct-msg:hover { background: rgba(255, 255, 255, .03); }
 .ct-time { color: #6f679c; font-size: 11px; margin-right: 6px; font-variant-numeric: tabular-nums; }
@@ -2060,3 +2101,8 @@ body.sidenav-closed main.container { margin-left: max(calc(var(--sn-w-closed) + 
 .diff-option span { font-size: 12px; font-weight: 700; }
 .diff-option.lead { border-color: #ffd23f; box-shadow: 0 0 10px rgba(255, 210, 63, .35); }
 .diff-option.mine { border-color: #fff; background: rgba(184, 60, 255, .25); }
+
+@media (max-width: 700px) {
+  .fish-reacts button { width: 36px; min-height: 32px; font-size: 17px; }
+  .ct-pond .ct-list { height: 180px; }
+}

@@ -152,4 +152,4 @@ function trades() {
   return state().trades || [];
 }
 
-module.exports = { state, sweep, list, ordersOf, sell, buy, cancel, readMail, trades };
+module.exports = { state, sweep, list, ordersOf, sell, buy, cancel, readMail, trades, mail };

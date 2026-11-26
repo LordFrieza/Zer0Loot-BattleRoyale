@@ -15,6 +15,7 @@ const market = require('./market');
 const casino = require('./casino');
 const fishing = require('./fishing');
 const chat = require('./chat');
+const pond = require('./pond');
 const mailer = require('./mailer');
 const account = require('./account');
 const survivor = require('./survivor');
@@ -434,10 +435,52 @@ function light(fn) {
   };
 }
 // Étapes du lancer (silhouette, touches, bouchon qui coule, prise ratée) envoyées en direct, jamais à l'avance.
-fishing.setNotify((userId, ev) => io.to('user:' + userId).emit('fishing', ev));
-app.post('/api/fishing/cast', requirePlayer, light((req) => fishing.cast(req.user)));
-app.post('/api/fishing/hook', requirePlayer, light((req) => fishing.hook(req.user, req.body.id)));
-app.post('/api/fishing/stop', requirePlayer, light((req) => fishing.stop(req.user)));
+// Étapes du lancer envoyées en direct au pêcheur ; une touche ratée se voit aussi sur l'étang et dans le salon Pêche.
+fishing.setNotify((userId, ev) => {
+  io.to('user:' + userId).emit('fishing', ev);
+  if (ev.k === 'miss' && db.state.users[userId]) {
+    pond.act(userId, 'miss');
+    fishLine(db.state.users[userId], 'a raté une touche… 💨', 'fishmiss');
+  }
+});
+// Étang partagé (server/pond.js) : liste des pêcheurs et actions, envoyées à la room socket de l'étang.
+pond.init({
+  emit: (id, event, data) => io.to('pond:' + id).emit(event, data),
+  describe: (user) => {
+    const c = user.character;
+    const P = c.pets;
+    const pet = P && P.list && P.list.find((x) => x.id === P.active);
+    return { name: user.twitchDisplayName || user.username, cls: c.cls || null, level: c.level, title: game.titleOf(c), look: lookOf(user), app: appOf(user), pet: pet ? pet.species : null };
+  },
+});
+const fishSize = (x) => (x >= 100 ? `${String(Math.round(x) / 100).replace('.', ',')} m` : `${String(Math.round(x * 10) / 10).replace('.', ',')} cm`);
+// Ligne d'action dans le salon Pêche (`keep` : gardée dans l'historique, sinon seulement diffusée).
+function fishLine(user, text, kind, keep = false, extra = {}) {
+  io.to('chat').emit('chat', { add: chat.activity(user, text, kind, 'peche', keep, extra) });
+}
+function fishSys(text, kind = 'fish') {
+  io.to('chat').emit('chat', { add: chat.system(text, kind, 'peche') });
+}
+app.post('/api/fishing/cast', requirePlayer, light((req) => {
+  const r = fishing.cast(req.user);
+  pond.act(req.user.id, 'cast');
+  return r;
+}));
+app.post('/api/fishing/hook', requirePlayer, light((req) => {
+  const r = fishing.hook(req.user, req.body.id);
+  if (r.hooked) pond.act(req.user.id, 'reel');
+  else {
+    pond.act(req.user.id, 'escape', { reason: r.reason });
+    fishLine(req.user, r.reason === 'tot' ? 'a ferré trop tôt, la prise a filé 💨' : 'a ferré trop tard… 💨', 'fishmiss');
+  }
+  return r;
+}));
+app.post('/api/fishing/stop', requirePlayer, light((req) => {
+  const r = fishing.stop(req.user);
+  pond.act(req.user.id, 'stop');
+  return r;
+}));
+app.get('/api/fishing/contest', requirePlayer, (req, res) => res.json(fishing.contestView(Date.now(), req.user.id)));
 // Une prise peut changer le classement des pêcheurs : diffusion au plus toutes les 10 s.
 let fishBoardAt = 0;
 let fishBoardTimer = null;
@@ -448,29 +491,64 @@ function fishBoard() {
   if (fishBoardTimer.unref) fishBoardTimer.unref();
 }
 app.post('/api/fishing/land', requirePlayer, action((req) => {
+  fishTick();
   const r = fishing.land(req.user, req.body.id, req.body.toggles);
-  if (r.caught && r.kind === 'fish') fishBoard();
-  // Les plus belles prises sont annoncées dans le tchat du site
   const who = req.user.twitchDisplayName || req.user.username;
   const F = r.kind === 'fish' && Rules.FISH[r.id];
+  if (r.escaped) {
+    pond.act(req.user.id, 'escape', { reason: r.reason, lost: r.lost });
+    const big = r.lost && r.lost !== 'commun';
+    fishLine(req.user, r.lost === 'tresor' ? 'a laissé filer un trésor en pleine remontée ! 😱' : big ? `a perdu un poisson ${Rules.RARITY_INFO[r.lost].label.toLowerCase()} en pleine remontée 😱` : 'a laissé filer un poisson 😩', 'fishlost', false, { rarity: r.lost });
+    return r;
+  }
+  if (r.kind === 'fish') {
+    fishBoard();
+    pond.act(req.user.id, 'catch', { fish: { id: r.id, size: r.size } });
+    const tags = `${r.isNew ? ' 🆕' : ''}${r.record ? ' 🏆 record' : ''}`;
+    fishLine(req.user, `a pêché ${F.name} (${fishSize(r.size)})${tags}`, 'fishcatch', ['rare', 'epique', 'legendaire'].includes(F.rarity), { fish: { id: r.id, size: r.size, rarity: F.rarity } });
+    if (r.contest && r.contest.lead) fishSys(`🏆 ${who} prend la tête du concours du jour : ${F.name} de ${fishSize(r.size)} !`, 'contest');
+  } else {
+    pond.act(req.user.id, 'catch', { treasure: { icon: r.lot.icon, label: r.lot.label } });
+    fishLine(req.user, `a remonté un trésor : ${r.lot.icon} ${r.lot.label} !`, 'fishtreasure', true);
+  }
+  // Les plus belles prises sont aussi annoncées dans le salon Général
   if (F && F.rarity === 'legendaire') io.to('chat').emit('chat', { add: chat.system(`🎣 ${who} a pêché ${F.name}, une créature légendaire de ${String(r.size).replace('.', ',')} cm !`, 'fish') });
   if (r.kind === 'treasure' && r.lot && r.lot.cosmetic) io.to('chat').emit('chat', { add: chat.system(`🎣 ${who} a remonté la Canne à pêche légendaire !`, 'fish') });
   return r;
 }));
+// Toutes les 5 s (start()) : bancs de poissons qui arrivent, concours du jour qui change de jour (lots par courrier).
+function fishTick(now = Date.now()) {
+  for (const s of pond.tick(now)) {
+    const multi = (pond.view(s.pond) || {}).ponds > 1;
+    fishSys(`🐟✨ Un banc de poissons passe sur l'étang${multi ? ` n°${s.pond}` : ''} ! Pendant ${Rules.FISHING.school.duration} s, les poissons rares et les trésors mordent deux fois plus.`, 'school');
+  }
+  const roll = fishing.contestRollover(now);
+  if (roll) {
+    const F = Rules.FISH[roll.species];
+    if (roll.winners.length) {
+      const text = `🏆 Concours de pêche du ${roll.day} (${F.name}) : ${roll.winners.map((w) => `${['🥇', '🥈', '🥉'][w.rank - 1]} ${w.name} (${fishSize(w.size)})`).join(', ')} !`;
+      announceSite(text, 'contest');
+      fishSys(text, 'contest');
+    }
+    for (const w of roll.winners) if (db.state.users[w.uid]) notifyMail(db.state.users[w.uid]);
+    fishSys(`🎣 Nouveau concours du jour : la plus grande ${F.name} l'emporte !`, 'contest');
+  }
+  return roll;
+}
 app.post('/api/casino/course', requirePlayer, casinoAction((req) => casino.course(req.user, req.body.bet, req.body.demon, !!req.body.ticket)));
 
 // ---------- Tchat ----------
 // Tout le monde lit (l'arène en direct aussi, sans compte) ; seuls les joueurs écrivent. Chaque message part à tous (`chat`).
-app.get('/api/chat', (req, res) => res.json({ messages: chat.history(), online: onlineView() }));
+app.get('/api/chat', (req, res) => res.json({ messages: chat.history(), rooms: chat.rooms(), online: onlineView() }));
 app.post('/api/chat', requirePlayer, (req, res) => {
   try {
-    const r = chat.send(req.user, req.body.text);
+    const r = chat.send(req.user, req.body.text, Date.now(), req.body.room || 'general');
     if (r.message) io.to('chat').emit('chat', { add: r.message });
     res.json({ ok: true, ...r });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 app.post('/api/admin/chat/delete', requireAdmin, action((req) => { const r = chat.remove(req.body.id); io.to('chat').emit('chat', { del: r.deleted }); return r; }));
-app.post('/api/admin/chat/clear', requireAdmin, action(() => { const r = chat.clear(); io.to('chat').emit('chat', { clear: true }); return r; }));
+app.post('/api/admin/chat/clear', requireAdmin, action((req) => { const r = chat.clear(req.body.room || null); io.to('chat').emit('chat', { clear: true, room: r.room }); return r; }));
 app.post('/api/admin/chat/mute', requireAdmin, action((req) => chat.mute(db.state.users[req.body.userId], req.body.minutes)));
 // Joueurs connectés (au moins un onglet du site ouvert) : nombre et pseudos, pour le tchat
 const online = new Map(); // userId → nombre de connexions
@@ -933,7 +1011,11 @@ battle.on('cleared', () => notifyBets(bets.refundAll()));
 // Annonce du jeu : dans le chat Twitch et dans le tchat du site (événement `chat`).
 function announce(text) {
   twitch.say(text);
-  io.to('chat').emit('chat', { add: chat.system(text) });
+  announceSite(text);
+}
+// Annonce dans le salon Général du tchat du site seulement
+function announceSite(text, kind = 'info') {
+  io.to('chat').emit('chat', { add: chat.system(text, kind) });
 }
 
 function openQueueFor(seconds, mode, boss, difficulty = null) {
@@ -1891,11 +1973,36 @@ io.on('connection', (socket) => {
       if (n > 0) online.set(user.id, n); else { online.delete(user.id); io.to('chat').emit('chatOnline', onlineView()); }
     });
   }
+  // Étang partagé de la Pêche : l'onglet Pêche s'inscrit (fish:join) et se désinscrit (fish:leave, ou déconnexion)
+  if (user && user.role === 'player') {
+    socket.on('fish:join', () => {
+      const u = db.state.users[user.id];
+      if (!u) return;
+      try {
+        const r = pond.join(u, socket.id);
+        socket.join('pond:' + r.pond);
+        socket.emit('pond', pond.view(r.pond));
+        if (r.arrived) fishLine(u, 'arrive sur le lac 🛶', 'fishjoin');
+      } catch (err) { socket.emit('pondError', err.message); }
+    });
+    socket.on('fish:leave', () => pondLeave(socket, user.id));
+    socket.on('fish:react', (e) => {
+      try { pond.react(user.id, String(e)); } catch (err) { socket.emit('pondError', err.message); }
+    });
+    socket.on('disconnect', () => pondLeave(socket, user.id));
+  }
   // Survivor : position du joueur (ZQSD), jusqu'à 30 fois par seconde
   if (user) socket.on('sv:pos', (msg) => survivor.input(user.id, msg));
   socket.emit('queue', queueView());
   socket.emit('frame', battle.frame());
 });
+
+function pondLeave(socket, userId) {
+  const id = pond.pondOf(userId);
+  const r = pond.leave(userId, socket.id);
+  if (id) socket.leave('pond:' + id);
+  if (r.left && db.state.users[userId]) fishLine(db.state.users[userId], 'rentre au port ⚓', 'fishjoin');
+}
 
 // ---------- Démarrage ----------
 
@@ -1910,6 +2017,7 @@ function start(port = PORT) {
   setInterval(survivorTick, 50);
   // Planification : ouvre la file à l'heure dite, lance la partie à la fin des 5 min de file.
   setInterval(() => scheduleTick(), 5000);
+  setInterval(() => fishTick(), 5000);
 
   // Nettoyage des sessions expirées.
   setInterval(() => {
@@ -1929,4 +2037,4 @@ function start(port = PORT) {
 if (require.main === module) start();
 
 module.exports = {
-  survivorTick, scheduleTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand, soloRewards, twitchAccount };
+  survivorTick, scheduleTick, fishTick, app, server, io, battle, bets, start, trainings, solos, refundSoloRuns, chatCommand, soloRewards, twitchAccount };

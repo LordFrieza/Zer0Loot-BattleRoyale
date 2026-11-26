@@ -234,8 +234,9 @@ de la file, confirme les `!join` et annonce le vainqueur.
   récupérer son compte, et changer de mot de passe. Sur la page d'accueil, **« Mot de passe oublié ? »** envoie un lien
   (1 h, une seule fois) à l'adresse confirmée ; **« Se connecter avec Twitch »** marche pour les comptes dont le Twitch
   est lié. Sans e-mail, l'admin peut créer un **lien de nouveau mot de passe** (48 h) depuis la liste des joueurs.
-- **Tchat (la Taverne)** : un salon commun à tous les joueurs, sur la carte (la Taverne) et dans une **bulle 💬** flottante
-  pour discuter sans quitter son activité. Le pseudo prend la couleur du personnage, avec l'icône de sa classe et son titre.
+- **Tchat (la Taverne)** : quatre **salons** en onglets : 🍺 Général (avec les annonces du jeu), 🎣 Pêche (aussi sous l'étang de
+  pêche, avec les prises en direct), ⚔️ Strat & builds et 💰 Commerce. On les trouve sur la carte (la Taverne) et dans une
+  **bulle 💬** flottante pour discuter sans quitter son activité ; une pastille compte les messages non lus des autres salons. Le pseudo prend la couleur du personnage, avec l'icône de sa classe et son titre.
   **Émotes** des boss dessinées dans le style du jeu (`:pyrax:` en colère, `:ether:` timide, `:snif:` en larmes, `:daedra:`
   coquine, `:lilith:` malicieuse, `:grokk:` mort de rire, `:malvorath:`, `:grignotor:`, `:givrenoire:`, `:maexxna:`,
   `:dodo:`) et du jeu (`:coffre:`, `:loot:`, `:gg:`, `:rip:`, `:poisson:`, `:coeur:`, `:potion:`). Commandes : `/me`, `/roll [max]`,
@@ -581,6 +582,16 @@ de la file, confirme les `!join` et annonce le vainqueur.
   Anti-triche : le serveur n'annonce rien d'avance (silhouette, touches et bouchon qui coule arrivent en direct par le
   socket), rejoue la remontée à partir des appuis du joueur pour décider de la prise, et une prise vue puis laissée
   (ligne rentrée ou relancée, ferrage raté) fait attendre 8 s avant de relancer.
+  **Pêche entre amis** : on pêche sur un **étang partagé** de 8 barques (un nouvel étang s'ouvre quand il est plein). Les
+  autres pêcheurs y apparaissent dans leur barque, avec leurs skins, leur familier et leur canne. Ils arrivent et repartent
+  en ramant, et on voit leur ligne, leurs remontées et la prise qu'ils brandissent au-dessus de leur tête. Le **tchat** est
+  sous l'étang, salon **Pêche** ouvert par défaut. Les actions des pêcheurs y défilent : poisson raté, prise, trésor,
+  légendaire… (bouton 📣 pour les masquer). Un message du salon Pêche s'affiche aussi **en bulle** au-dessus de la barque de
+  son auteur. Des **réactions rapides** (👋 🎉 😂…) flottent au-dessus de sa barque. À partir de 2 pêcheurs, un **banc de
+  poissons** passe de temps en temps (toutes les 6 à 14 min) : pendant 60 s, les poissons rares, épiques, légendaires et les
+  trésors mordent deux fois plus. **Concours du jour** : une espèce commune ou peu commune, tirée d'après la date. La plus
+  grande prise de cette espèce l'emporte. À minuit (heure de Paris), les 3 premiers reçoivent leur lot par courrier :
+  600 golds + 3 coffres, 300 + 2, 150 + 1. Succès « Roi de l'étang » (1 victoire) et « Légende du ponton » (10).
 - **Maison** (onglet Maison) : sa propre maison, achetée et décorée en émeraudes. **47 meubles** (assises, tables, lits,
   rangements, lumières, plantes, tapis, décoration murale, loisirs, prestige ; de 250 à 75 000 émeraudes) à placer soi-même
   dans la pièce (glisser-déposer, clic droit pour retourner, double-clic pour ranger), façade (murs, toit, fenêtres, porte,

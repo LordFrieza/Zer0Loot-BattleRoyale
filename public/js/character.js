@@ -2089,14 +2089,15 @@ function showTab(name) {
   if (name === 'survivor') Survivor.enter(); else Survivor.leave();
   if (name === 'maison') Housing.enter(); else Housing.leave();
   if (name === 'peche') Fishing.enter(); else Fishing.leave();
-  if (name === 'tchat') { closeChatPop(); Chat.markRead(); Chat.scrollDown(); }
-  $('chat-bubble').classList.toggle('hidden', name === 'tchat');
+  // (la Taverne et le Ponton de pêche ont leur propre tchat : pas de bulle flottante)
+  if (name === 'tchat' || name === 'peche') { closeChatPop(); Chat.markRead(); Chat.scrollDown(); }
+  $('chat-bubble').classList.toggle('hidden', name === 'tchat' || name === 'peche');
 }
 
 // ---------- Tchat ----------
 // Lieu Taverne (vue complète) et bulle flottante (vue compacte) ; pastilles : messages non lus et @mentions.
 function closeChatPop() { $('chat-pop').classList.remove('open'); }
-Chat.visible = () => currentTab === 'tchat' || $('chat-pop').classList.contains('open');
+Chat.visible = () => currentTab === 'tchat' || currentTab === 'peche' || $('chat-pop').classList.contains('open');
 Chat.onChange = () => {
   if (Chat.visible()) { if (Chat.unread) Chat.markRead(); return; }
   const n = Chat.unread;
@@ -2951,6 +2952,7 @@ socket.on('pet', (e) => { if (window.onPetEvent) onPetEvent(e); });
 socket.on('casino', (d) => Casino.onFeed(d.feed));
 socket.on('svFrame', (f) => Survivor.onFrame(f));
 socket.on('fishing', (e) => Fishing.onEvent(e)); // étapes du lancer de pêche, en direct
+Fishing.bind(socket); // étang partagé : les autres pêcheurs, leurs actions
 socket.on('svEnd', (r) => Survivor.onEnd(r));
 socket.on('svBoard', () => Survivor.onBoard());
 socket.on('reward', (r) => {

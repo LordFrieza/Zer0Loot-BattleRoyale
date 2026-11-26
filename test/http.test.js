@@ -1365,6 +1365,55 @@ test('[TCH-6] tchat par HTTP : lecture publique, écriture des joueurs, diffusio
   assert.deepStrictEqual((await anon.get('/api/chat')).data.messages, []);
 });
 
+test('[TCH-7, FISH-12, FISH-13] salons par HTTP, concours du jour, banc de poissons et palmarès annoncés dans le salon Pêche', async () => {
+  await admin.post('/api/login', { username: 'admin', password: 'test-admin-pass' });
+  const anon = client();
+  const p = client();
+  const me = await register(p, 'pl_salons');
+  const sent = await p.post('/api/chat', { text: 'des bancs par ici ?', room: 'peche' });
+  assert.strictEqual(sent.data.message.room, 'peche');
+  assert.match((await p.post('/api/chat', { text: 'x', room: 'nulle_part' })).data.error, /Salon inconnu/);
+  let list = (await anon.get('/api/chat')).data;
+  assert.deepStrictEqual(Object.keys(list.rooms), Rules.CHAT_ROOM_IDS);
+  assert.ok(list.rooms.peche.some((m) => m.id === sent.data.message.id));
+  assert.ok(!list.messages.some((m) => m.id === sent.data.message.id), 'messages = salon Général');
+  // L'admin vide un seul salon
+  const q = client();
+  await register(q, 'pl_salons_q');
+  await q.post('/api/chat', { text: 'bonjour à tous' });
+  assert.strictEqual((await admin.post('/api/admin/chat/clear', { room: 'peche' })).status, 200);
+  list = (await anon.get('/api/chat')).data;
+  assert.deepStrictEqual([list.rooms.peche.length > 0, list.rooms.general.some((m) => m.text === 'bonjour à tous')], [false, true]);
+  // Concours du jour
+  const { fishTick } = require('../server/index');
+  const pond = require('../server/pond');
+  const fishing = require('../server/fishing');
+  const db = require('../server/db');
+  assert.strictEqual((await anon.get('/api/fishing/contest')).status, 401);
+  const c = (await p.get('/api/fishing/contest')).data;
+  assert.strictEqual(c.species, Rules.fishContestSpecies(Rules.parisDay()));
+  fishing.contestCatch(db.state.users[me.id], c.species, 9.5);
+  assert.deepStrictEqual((await p.get('/api/fishing/contest')).data.me.rank, 1);
+  // Changement de jour : palmarès annoncé (Général et Pêche), lot par courrier
+  db.state.fishContest.day = '2000-01-01';
+  const gold = (await meOf(p)).character.gold;
+  const roll = fishTick();
+  assert.deepStrictEqual(roll.winners.map((w) => w.name), ['pl_salons']);
+  assert.strictEqual((await meOf(p)).character.gold, gold + Rules.FISHING.contest.rewards[0].gold);
+  list = (await anon.get('/api/chat')).data;
+  assert.ok(list.rooms.general.some((m) => /Concours de pêche du 2000-01-01/.test(m.text)));
+  assert.ok(list.rooms.peche.some((m) => /Nouveau concours du jour/.test(m.text)));
+  // Banc de poissons annoncé dans le salon Pêche
+  pond.reset();
+  const u2 = db.state.users[(await meOf(q)).id];
+  pond.join(db.state.users[me.id], 'a');
+  pond.join(u2, 'b');
+  pond.ponds.get(1).nextSchool = Date.now() - 1;
+  fishTick();
+  assert.ok((await anon.get('/api/chat')).data.rooms.peche.some((m) => m.kind === 'school' && /banc de poissons/.test(m.text)));
+  pond.reset();
+});
+
 test('[ACC-17, ACC-18, ACC-19, ACC-20, ACC-21] compte : e-mail confirmé par lien, mot de passe oublié, lien admin, changement de mot de passe, Twitch', async () => {
   const mailer = require('../server/mailer');
   const { twitchAccount } = require('../server/index');

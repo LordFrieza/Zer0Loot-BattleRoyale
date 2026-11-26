@@ -77,7 +77,7 @@ test('[FISH-2] lancer : poisson (95 %) ou trésor (5 %), selon l\'heure ; rien n
   assert.ok(kinds.treasure > 60 && kinds.treasure < 260, `≈ 5 % de trésors (${kinds.treasure})`);
   const u = angler();
   const { r, s } = castFor(u, { kind: 'fish', id: 'perche', size: 30 }, 1000);
-  assert.deepStrictEqual(Object.keys(r).sort(), ['approach', 'id'], 'ni temps, ni fenêtre, ni silhouette au lancer');
+  assert.deepStrictEqual(Object.keys(r).sort(), ['approach', 'id', 'school'], 'ni temps, ni fenêtre, ni silhouette au lancer (seulement le banc de poissons, visible de tous)');
   assert.strictEqual(r.id.length, 12);
   assert.ok(s.appear >= 3 && s.appear <= 15);
   assert.ok(s.nibbles.every((x) => x >= s.appear + Rules.FISHING.approach - 0.006), 'temps arrondis au centième');
@@ -187,7 +187,7 @@ test('[FISH-4] remontée rejouée par le serveur (appuis du joueur), poisson au 
   assert.deepStrictEqual([r3.record, r3.best], [false, 31.5]);
   assert.strictEqual(ch.fishing.dex.perche.n, 3);
   // Le navigateur ne peut plus annoncer « réussi » : c'est le rejeu de ses appuis qui décide
-  assert.deepStrictEqual(catchFish('gardon', 15, false), { escaped: true, reason: 'ligne' });
+  assert.deepStrictEqual(catchFish('gardon', 15, false), { escaped: true, reason: 'ligne', lost: 'commun' });
   assert.strictEqual(ch.fishing.dex.gardon, undefined);
   {
     let c;
@@ -198,7 +198,7 @@ test('[FISH-4] remontée rejouée par le serveur (appuis du joueur), poisson au 
       if (!Rules.fishReelReplay(h.reel, []).won) break;
       fishing.stop(u);
     }
-    assert.deepStrictEqual(fishing.land(u, c.id, [], (s.sink + 200) * 1000), { escaped: true, reason: 'ligne' }, 'sans rien faire, un légendaire s\'échappe');
+    assert.deepStrictEqual(fishing.land(u, c.id, [], (s.sink + 200) * 1000), { escaped: true, reason: 'ligne', lost: 'legendaire' }, 'sans rien faire, un légendaire s\'échappe');
   }
   // Appuis envoyés avant d'avoir eu le temps de jouer : refusés (90 % du temps simulé)
   assert.throws(() => catchFish('gardon', 15, true, -3), /trop rapide/);

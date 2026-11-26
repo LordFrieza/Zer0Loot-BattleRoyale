@@ -80,8 +80,51 @@ test('[TCH-5] historique limité, annonces du jeu, modération (suppression, sal
   for (let i = 0; i < Rules.CHAT.history + 10; i++) chat.system('annonce ' + i);
   assert.strictEqual(chat.history().length, Rules.CHAT.history);
   const last = chat.history().at(-1);
-  assert.deepStrictEqual(chat.remove(last.id), { deleted: last.id });
+  assert.deepStrictEqual(chat.remove(last.id), { deleted: last.id, room: 'general' });
   assert.throws(() => chat.remove(last.id), /introuvable/);
-  assert.deepStrictEqual(chat.clear(), { cleared: true });
+  assert.deepStrictEqual(chat.clear(), { cleared: true, room: null });
   assert.deepStrictEqual(chat.history(), []);
+});
+
+test('[TCH-7] salons : Général, Pêche, Strat & builds, Commerce ; historique par salon ; ancienne sauvegarde → Général', () => {
+  assert.deepStrictEqual(Rules.CHAT_ROOM_IDS, ['general', 'peche', 'strat', 'commerce']);
+  chat.clear();
+  const u = player();
+  let t = T0 + 1e9;
+  const m = chat.send(u, 'qui pêche ?', (t += 5000), 'peche').message;
+  assert.strictEqual(m.room, 'peche');
+  assert.strictEqual(chat.send(u, 'build archer ?', (t += 5000), 'strat').message.room, 'strat');
+  assert.strictEqual(chat.send(u, 'salut', (t += 5000)).message.room, 'general', 'Général par défaut');
+  assert.strictEqual(chat.send(u, '/me lance sa ligne', (t += 5000), 'peche').message.room, 'peche');
+  assert.throws(() => chat.send(u, 'hop', (t += 5000), 'secret'), /Salon inconnu/);
+  assert.deepStrictEqual(chat.history('peche').map((x) => x.text), ['qui pêche ?', 'lance sa ligne']);
+  assert.deepStrictEqual(chat.history().map((x) => x.text), ['salut']);
+  assert.deepStrictEqual(Object.keys(chat.rooms()), Rules.CHAT_ROOM_IDS);
+  // Chaque salon garde ses 120 derniers messages
+  for (let i = 0; i < Rules.CHAT.history + 5; i++) chat.system('annonce ' + i, 'info', 'commerce');
+  assert.strictEqual(chat.history('commerce').length, Rules.CHAT.history);
+  assert.strictEqual(chat.history('peche').length, 2, 'les autres salons ne bougent pas');
+  // Suppression (cherchée dans tous les salons) et salon vidé seul
+  assert.deepStrictEqual(chat.remove(m.id), { deleted: m.id, room: 'peche' });
+  assert.deepStrictEqual(chat.clear('commerce'), { cleared: true, room: 'commerce' });
+  assert.deepStrictEqual(chat.history('commerce'), []);
+  assert.strictEqual(chat.history().length, 1);
+  // Ancienne sauvegarde (un seul salon) : ses messages deviennent le salon Général
+  db.state.chat = { messages: [{ id: 1, at: 1, uid: 'x', name: 'Ancien', text: 'vieux message' }], nextId: 2 };
+  assert.deepStrictEqual(chat.history().map((x) => [x.text, x.room]), [['vieux message', 'general']]);
+  assert.strictEqual(db.state.chat.messages, undefined);
+  assert.deepStrictEqual(chat.history('peche'), []);
+  assert.strictEqual(chat.system('suite').id, 2, 'la numérotation continue');
+});
+
+test('[TCH-8] actions des pêcheurs dans le salon Pêche : pseudo de l\'auteur, gardées seulement si remarquables', () => {
+  chat.clear();
+  const u = player({ twitchDisplayName: 'Popeye' });
+  const eph = chat.activity(u, 'a raté une touche… 💨', 'fishmiss', 'peche');
+  assert.deepStrictEqual([eph.sys, eph.act, eph.who, eph.uid, eph.room, eph.eph, eph.kind], [true, true, 'Popeye', u.id, 'peche', true, 'fishmiss']);
+  assert.deepStrictEqual(chat.history('peche'), [], 'une action banale est seulement diffusée');
+  const keep = chat.activity(u, 'a pêché Kraken (8 m)', 'fishcatch', 'peche', true, { fish: { id: 'kraken', size: 800, rarity: 'legendaire' } });
+  assert.strictEqual(keep.eph, undefined);
+  assert.deepStrictEqual(chat.history('peche').map((x) => [x.text, x.fish.rarity]), [['a pêché Kraken (8 m)', 'legendaire']]);
+  assert.ok(eph.id < keep.id, 'numérotation commune');
 });

@@ -460,6 +460,8 @@
     { id: 'fishLegend1', metric: 'fishLegend', goal: 1, name: 'Prise légendaire', desc: 'Pêcher un poisson légendaire', gold: 1500 },
     { id: 'treasure1', metric: 'fishTreasures', goal: 1, name: 'Chasseur de trésor', desc: 'Pêcher un trésor', gold: 200 },
     { id: 'treasure10', metric: 'fishTreasures', goal: 10, name: 'Trésors engloutis', desc: 'Pêcher 10 trésors', gold: 1000 },
+    { id: 'contest1', metric: 'fishContest', goal: 1, name: 'Roi de l\'étang', desc: 'Gagner le concours de pêche du jour', gold: 500 },
+    { id: 'contest10', metric: 'fishContest', goal: 10, name: 'Légende du ponton', desc: 'Gagner 10 concours de pêche du jour', gold: 3000 },
   ];
   const COUNTERS = ['chests', 'legendary', 'recycled', 'fused', 'rerolled', 'betsWon', 'firstblood', 'double', 'massacre', 'subs', 'bossWins', 'dungeonBest', 'alchemy', 'soloTroll', 'soloDragon', 'soloSorcier', 'expeditionBest',
     'trollWins', 'dragonWins', 'sorcierWins', 'kothWins', 'clansWins', 'clansMvp', 'goldBest', 'relics', 'challengeWins', 'heroWins',
@@ -469,7 +471,7 @@
     'legendTroll', 'legendDragon', 'legendSorcier', 'legendMimic', 'legendLiche', 'legendMaexxna', 'goldPeak',
     'etherWins', 'lilithWins', 'daedraWins', 'soloEther', 'soloLilith', 'soloDaedra', 'heroEther', 'heroLilith', 'heroDaedra',
     'legendEther', 'legendLilith', 'legendDaedra', 'fabuleuxWins', 'mythiqueWins', 'divinWins',
-    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod', 'tourneyWins', 'tourneyBest'];
+    'fishCaught', 'fishSpecies', 'fishTreasures', 'fishLegend', 'fishRod', 'tourneyWins', 'tourneyBest', 'fishContest'];
   // Compteurs de record : la fusion d'un fantôme garde le maximum au lieu d'additionner.
   const MAX_COUNTERS = ['dungeonBest', 'expeditionBest', 'goldBest', 'techs', 'rushBest', 'pets', 'petFollowers', 'svBestWave', 'decoLevel', 'goldPeak', 'fishSpecies', 'fishRod', 'tourneyBest'];
   // Exploit « vaincre ce boss seul » : compteur incrémenté par boss.
@@ -2078,6 +2080,14 @@
       coulant: 'Coulant : file vers le fond',
     },
     shapes: ['poisson', 'long', 'plat', 'raie', 'anguille', 'meduse', 'poulpe', 'calmar', 'crabe', 'crevette', 'tortue', 'hippocampe', 'globe', 'requin', 'etoile', 'axolotl', 'lune', 'ange'],
+    // Étang partagé : 8 barques par étang (au-delà, un nouvel étang s'ouvre) ; réactions rapides (une toutes les 1,5 s).
+    pond: { spots: 8, reactions: ['👋', '🎉', '😂', '😮', '😭', '❤️', '🐟', '😴'], reactCooldown: 1.5 },
+    // Banc de poissons : quand au moins 2 joueurs pêchent sur le même étang, un banc passe de temps en temps (toutes les
+    // 6 à 14 min) pendant 60 s : les raretés rare, épique et légendaire mordent 2 fois plus souvent, et les trésors aussi.
+    school: { minFishers: 2, every: [360, 840], duration: 60, mult: { rare: 2, epique: 2, legendaire: 2 }, treasureMult: 2 },
+    // Concours du jour (heure de Paris) : une espèce commune ou peu commune, toujours de saison, tirée d'après la date ; la
+    // plus grande prise de cette espèce gagne. Les 3 premiers sont récompensés au changement de jour (par courrier).
+    contest: { rarities: ['commun', 'peu_commun'], rewards: [{ gold: 600, chests: 3 }, { gold: 300, chests: 2 }, { gold: 150, chests: 1 }] },
   };
   // Les 100 espèces du Pêchédex : [id, nom, rareté, forme, couleur, couleur secondaire, motif, taille min, max (cm), nage, moment]
   // Moment : null (toujours), 'jour' ou 'nuit' (heure de Paris : nuit de 20 h 30 à 6 h).
@@ -2203,6 +2213,14 @@
     for (const f of Object.values(FISH)) if (!f.when || f.when === time) (pool[f.rarity] = pool[f.rarity] || []).push(f.id);
     return pool;
   }
+  // Espèce du concours du jour (« AAAA-MM-JJ ») : la même pour tous, tirée d'après la date parmi les espèces communes et
+  // peu communes qui mordent à toute heure.
+  function fishContestSpecies(day) {
+    const list = Object.values(FISH).filter((f) => !f.when && FISHING.contest.rarities.includes(f.rarity)).map((f) => f.id);
+    let h = 2166136261;
+    for (const ch of String(day)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+    return list[h % list.length];
+  }
   // Paramètres du mini-jeu pour une prise (rareté du poisson ou trésor).
   function fishDifficulty(target) {
     if (target && target.kind === 'treasure') return { ...FISHING.treasure };
@@ -2274,6 +2292,15 @@
   // Messages de 200 caractères au plus ; les 120 derniers sont gardés (et sauvegardés) ; anti-spam : 1 message par seconde,
   // 5 par tranche de 10 s ; 8 émotes au plus par message. L'incrustation de l'arène garde un message 40 s.
   const CHAT = { maxLen: 200, history: 120, cooldown: 1, burst: 5, burstWindow: 10, maxEmotes: 8, overlayLife: 40, rollMax: 1000 };
+  // Salons du tchat : chacun garde ses 120 derniers messages. Les annonces du jeu vont dans « Général » (le seul salon de
+  // l'incrustation de l'arène) ; les actions des pêcheurs (prises, trésors, poissons ratés…) dans « Pêche ».
+  const CHAT_ROOMS = {
+    general: { label: 'Général', icon: '🍺', desc: 'Tout le monde, et les annonces du jeu' },
+    peche: { label: 'Pêche', icon: '🎣', desc: 'Entre pêcheurs, et les prises du lac en direct' },
+    strat: { label: 'Strat & builds', icon: '⚔️', desc: 'Classes, arbres, équipement, tactiques' },
+    commerce: { label: 'Commerce', icon: '💰', desc: 'Achats, ventes et échanges au marché' },
+  };
+  const CHAT_ROOM_IDS = Object.keys(CHAT_ROOMS);
   // Émotes du tchat (« :id: » dans le message) : les boss en petit format (dessin du familier) avec une humeur, et
   // quelques objets du jeu. Dessinées par public/js/emotes.js.
   const CHAT_EMOTES = {
@@ -3723,8 +3750,8 @@
     CONSUMABLES, CONSUMABLE_TRIGGERS, CONSUMABLE_STACK_MAX, PRESET_MAX, PRESET_NAME_MAX,
     STAMINA, TALENT_EVERY, TALENT_RESET_PRICE, STAT_RESET, statResetPrice, statPointsMoved, talentPoints, ULTS, TALENT_TIERS, TALENT_TREES,
     MIMIC, LICHE, MAEXXNA, ETHER, LILITH, DAEDRA, RUSH, RUSH_BOONS, RUSH_CHOICES, rushChoiceFromCommand, rushScale, rushBoonPool, rushReward, rushDefiReward,
-    CHAT, CHAT_EMOTES, chatTokens,
-    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
+    CHAT, CHAT_ROOMS, CHAT_ROOM_IDS, CHAT_EMOTES, chatTokens,
+    FISHING, FISH, FISH_IDS, fishTime, fishPool, fishContestSpecies, fishDifficulty, fishMinReel, fishRng, fishReelNew, fishReelStep, fishReelReplay,
     CASINO, heavenMult, heavenTime, heavenCrash, chatonMult, courseChances, slotsPayout, slotsRtp, rouletteColor, rouletteReturn, rouletteWins, bjValue, glaceMult,
     SURVIVOR, SURVIVOR_ZONES, SURVIVOR_EXPLORE, survivorZoneFx, SURVIVOR_CURSE, SURVIVOR_RING, SURVIVOR_CART, SURVIVOR_DAY, survivorDaylight, survivorZone, survivorZoneNear, survivorWarp, survivorMap, survivorWater, survivorRoad, survivorGround, survivorHash, SURVIVOR_ENEMIES, SURVIVOR_ENEMY_KINDS, SURVIVOR_BOSSES, SURVIVOR_BOSS_ORDER, survivorWallBlock, SURVIVOR_GUARDIAN, SURVIVOR_GUARDIANS, survivorWave, survivorBoss,
     survivorXpToNext, SURVIVOR_WEAPONS, SURVIVOR_WEAPON_MAX, survivorWeaponStats, survivorLevelText, SURVIVOR_PASSIVES, SURVIVOR_META, survivorMetaCost,

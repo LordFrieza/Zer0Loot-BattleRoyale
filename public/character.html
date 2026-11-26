@@ -514,9 +514,17 @@
         la zone verte (relâche pour la laisser retomber : elle a de l'élan) et garde-la sur le poisson jusqu'à remplir la jauge.
         Plus le poisson est rare, plus il est vif et long à remonter. Les poissons rejoignent ton <b>Pêchédex</b> (100 espèces, certaines
         seulement le jour ou la nuit, heure de Paris) ; 1 fois sur 20, c'est un <b>trésor</b> : coffres, golds, émeraudes, Clé de boss…
-        ou, très rarement, la Canne à pêche légendaire.</p>
+        ou, très rarement, la Canne à pêche légendaire.<br>Tu pêches avec les autres : leurs barques t'entourent sur l'étang (8 places ; un
+        nouvel étang s'ouvre quand il est plein), leurs prises s'affichent en direct et le tchat du salon <b>Pêche</b> est juste en dessous
+        (tes messages apparaissent aussi en bulle au-dessus de ta barque). À plusieurs, un <b>banc de poissons</b> passe de temps en temps :
+        pendant 60 s, les poissons rares et les trésors mordent deux fois plus. Chaque jour, un <b>concours</b> récompense les 3 plus grandes
+        prises de l'espèce du jour (lots envoyés par courrier à minuit).</p>
       <div class="fish-wrap">
-        <div class="fish-scene" id="fish-scene"><canvas id="fish-canvas" class="fs-canvas" width="960" height="460"></canvas><button type="button" class="fs-btn" id="fish-full" title="Plein écran (en paysage sur téléphone)">⛶</button></div>
+        <div class="fish-main">
+          <div class="fish-scene" id="fish-scene"><canvas id="fish-canvas" class="fs-canvas" width="960" height="520"></canvas><button type="button" class="fs-btn" id="fish-full" title="Plein écran (en paysage sur téléphone)">⛶</button></div>
+          <div class="fish-reacts-row"><span class="muted">Réagir :</span><div class="fish-reacts" id="fish-reacts"></div></div>
+          <div class="fish-chat" id="fish-chat"></div>
+        </div>
         <div class="fish-side" id="fish-side"></div>
       </div>
     </div>
