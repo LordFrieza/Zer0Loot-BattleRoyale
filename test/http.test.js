@@ -1164,6 +1164,7 @@ test('[HIST-1, HIST-4, LIFE-1, RUSH-5] historique et statistiques via l\'API, vu
   battle.stopLoop();
   const me = battle.players.find((p) => p.userId === id);
   const bot = battle.players.find((p) => p.key.startsWith('bot'));
+  bot.consumable = null; // (un bot a parfois une potion au hasard : une Plume de phénix le ferait renaître)
   battle.hit(bot, me, 30);
   battle.tick(0.05);
   battle.kill(me, bot);
