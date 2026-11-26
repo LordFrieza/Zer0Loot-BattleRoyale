@@ -30,14 +30,27 @@
   <script>
     const socket = io();
     const view = new ArenaView(document.getElementById('arena'), socket);
-    // Joueur connecté : encart personnel (vie, ultime) en bas à droite et repère « TOI » ; ?hud=0 pour les masquer
-    if (new URLSearchParams(location.search).get('hud') !== '0') {
-      fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((me) => { if (me && me.role === 'player' && me.id) view.meKey = 'u' + me.id; }).catch(() => {});
-    }
-    if (new URLSearchParams(location.search).get('tchat') !== '0') {
-      Chat.mount(document.getElementById('arena-chat'), 'overlay');
-      Chat.init(socket);
-    } else document.getElementById('arena-chat').remove();
+    const params = new URLSearchParams(location.search);
+    /*
+     * Joueur connecté : encart personnel (vie, ultime) en bas à droite et repère « TOI » (?hud=0 pour les masquer),
+     * vote au sondage en cliquant sur les cartes, et barre de saisie 💬 dans le tchat incrusté. Sans compte (OBS) :
+     * l'arène reste en lecture seule.
+     */
+    let me = null;
+    fetch('/api/me').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((data) => {
+      if (data && data.role === 'player' && data.id) {
+        me = data;
+        if (params.get('hud') !== '0') view.meKey = 'u' + me.id;
+        view.voteEnabled = true;
+        view.onVote = (choice) => api('/api/poll/vote', { choice });
+      }
+      if (params.get('tchat') !== '0') {
+        Chat.mount(document.getElementById('arena-chat'), 'overlay', { input: !!me });
+        Chat.init(socket, { name: () => me && (me.twitchDisplayName || me.username), id: () => me && me.id });
+      } else document.getElementById('arena-chat').remove();
+    });
+    // Sondage affiché : le tchat incrusté se fait discret pour laisser voir les cartes
+    setInterval(() => { const el = document.getElementById('arena-chat'); if (el) el.classList.toggle('poll-open', !!view.pollHit); }, 300);
     const unlockBtn = document.getElementById('sound-unlock');
     const refreshUnlock = () => { unlockBtn.style.display = Sound.blocked && !Sound.muted ? '' : 'none'; };
     unlockBtn.onclick = () => setTimeout(refreshUnlock, 100);

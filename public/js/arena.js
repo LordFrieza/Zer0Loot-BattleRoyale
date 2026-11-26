@@ -99,6 +99,13 @@
     constructor(canvas, socket, opts = {}) {
       this.opts = opts;
       this.meKey = null;
+      // Vote au sondage en cliquant sur les cartes (arena.html, joueur connecté) : onVote(id) → Promise
+      this.voteEnabled = false;
+      this.onVote = null;
+      this.pollHit = null;
+      this.myVote = null;
+      canvas.addEventListener('click', (e) => this.onCanvasClick(e));
+      canvas.addEventListener('mousemove', (e) => this.onCanvasMove(e));
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       canvas.width = W;
@@ -886,6 +893,7 @@
       ctx.save();
       if (this.shake > 0) ctx.translate((Math.random() - 0.5) * 14 * this.shake, (Math.random() - 0.5) * 14 * this.shake);
       const phase = (this.queue && this.queue.phase) || 'idle';
+      this.pollHit = null; // (zones cliquables du sondage, refaites par drawPoll)
       const dungeon = phase !== 'idle' && this.queue && this.queue.mode === 'dungeon';
       const theme = dungeon && this.frame && this.frame.dungeon ? Rules.dungeonTheme(this.frame.dungeon.room) : 0;
       // Décor du boss ou du mode (forêt de Grokk, colisée du Tournoi…), sinon le pré
@@ -1647,7 +1655,11 @@
       ctx.translate(W / 2, 92); ctx.scale(pulse, pulse); ctx.translate(-W / 2, -92);
       this.title(rush ? '🗳️ BOSS VAINCU : LE CHAT DÉCIDE !' : '🗳️ LE CHAT DÉCIDE !', 92, 48, '#ffc21a', '#ff9a00');
       ctx.restore();
-      this.title('Tapez la commande dans le chat Twitch (ou votez sur le site)', 140, 22, '#fff', '#b83cff');
+      this.title(this.voteEnabled ? '👆 Clique sur une carte pour voter (ou tape la commande dans le chat Twitch)' : 'Tapez la commande dans le chat Twitch (ou votez sur le site)', 140, 22, '#fff', '#b83cff');
+      const qp = this.queue && this.queue.poll;
+      const pollKey = qp ? `${qp.rush ? 'r' : 'd'}${qp.room}` : 'poll';
+      this.pollHit = { key: pollKey, rects: [] };
+      const mine = this.myVote && this.myVote.key === pollKey ? this.myVote.id : null;
 
       const n = poll.options.length;
       const cw = n > 2 ? 370 : 470;
@@ -1659,16 +1671,29 @@
         const x = W / 2 - (n * cw + (n - 1) * gap) / 2 + i * (cw + gap);
         const share = total ? o.votes / total : 0;
         const lead = total > 0 && o.votes === best;
+        this.pollHit.rects.push({ x, y: y0, w: cw, h: ch, id: o.id });
+        const hover = this.voteEnabled && this.pollHover === o.id;
         ctx.save();
         box(x, y0, cw, ch, 18);
-        ctx.fillStyle = 'rgba(14, 10, 38, .94)';
+        ctx.fillStyle = hover ? 'rgba(30, 22, 70, .96)' : 'rgba(14, 10, 38, .94)';
         ctx.fill();
-        ctx.strokeStyle = b.color;
-        ctx.lineWidth = lead ? 5 : 2.5;
+        ctx.strokeStyle = o.id === mine ? '#ffffff' : b.color;
+        ctx.lineWidth = o.id === mine ? 6 : lead ? 5 : hover ? 4 : 2.5;
         ctx.shadowColor = b.color;
-        ctx.shadowBlur = lead ? 26 + Math.sin(t / 180) * 8 : 12;
+        ctx.shadowBlur = lead || o.id === mine ? 26 + Math.sin(t / 180) * 8 : 12;
         ctx.stroke();
         ctx.restore();
+        if (o.id === mine) {
+          // Pastille « Ton vote » en haut de la carte
+          ctx.save();
+          ctx.font = '900 16px Orbitron, "Segoe UI", system-ui, sans-serif';
+          const tw = ctx.measureText('✓ TON VOTE').width + 28;
+          box(x + cw / 2 - tw / 2, y0 - 16, tw, 32, 16);
+          ctx.fillStyle = b.color; ctx.fill();
+          ctx.fillStyle = '#10081f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('✓ TON VOTE', x + cw / 2, y0 + 1);
+          ctx.restore();
+        }
         ctx.textAlign = 'center';
         ctx.font = '70px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
         ctx.fillText(b.icon, x + cw / 2, y0 + 92);
@@ -1716,6 +1741,7 @@
         ctx.shadowBlur = 0;
       });
       if (n === 2) this.title('OU', y0 + ch / 2 + 14, 40, '#fff', '#ff3fd8');
+      if (this.voteNotice && this.voteNotice.until > performance.now()) this.label(this.voteNotice.text, W / 2, y0 + ch + 14, 18, this.voteNotice.color || '#ffd98a');
 
       // Temps restant
       const bw = 700;
@@ -2869,6 +2895,44 @@
       const m = this.queue && this.queue.event === 'double' ? 2 : 1;
       const W = Rules.REWARDS.win;
       return `+${W.xp * m} XP · +${W.gold * m} golds · ${W.chests * m} coffres`;
+    }
+
+    // Position dans le repère de l'arène (1280 × 720) d'un clic, même si l'image est réduite ou bordée (object-fit)
+    toArena(e) {
+      const r = this.canvas.getBoundingClientRect();
+      const s = Math.min(r.width / W, r.height / H) || 1;
+      return { x: (e.clientX - r.left - (r.width - W * s) / 2) / s, y: (e.clientY - r.top - (r.height - H * s) / 2) / s };
+    }
+
+    pollCardAt(e) {
+      if (!this.pollHit) return null;
+      const p = this.toArena(e);
+      return this.pollHit.rects.find((c) => p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) || null;
+    }
+
+    onCanvasMove(e) {
+      const c = this.voteEnabled ? this.pollCardAt(e) : null;
+      this.pollHover = c ? c.id : null;
+      this.canvas.style.cursor = c ? 'pointer' : '';
+    }
+
+    // Clic (ou toucher) sur une carte du sondage : on vote sans quitter l'arène
+    onCanvasClick(e) {
+      const c = this.pollCardAt(e);
+      if (!c) return;
+      const key = this.pollHit.key;
+      if (!this.voteEnabled || !this.onVote) {
+        this.voteNotice = { text: '🔑 Connecte-toi sur le site pour voter ici en un clic', until: performance.now() + 3000 };
+        return;
+      }
+      this.myVote = { key, id: c.id };
+      if (window.Sound) Sound.play('reward');
+      Promise.resolve(this.onVote(c.id)).then(() => {
+        this.voteNotice = { text: '✅ Vote enregistré ! Tu peux changer d\'avis jusqu\'à la fin', until: performance.now() + 2500, color: '#9fffb0' };
+      }).catch((err) => {
+        this.myVote = null;
+        this.voteNotice = { text: '⚠️ ' + (err && err.message ? err.message : 'Vote impossible'), until: performance.now() + 3000, color: '#ff8fa3' };
+      });
     }
 
     myKey() {

@@ -1946,6 +1946,26 @@ img.emote.big { width: 56px; height: 56px; vertical-align: middle; }
 .arena-chat .ct-sys { color: #ffe9a8; border-left: 3px solid rgba(255, 194, 26, .8); }
 .arena-chat img.emote { width: 1.7em; height: 1.7em; vertical-align: -.5em; }
 .arena-chat img.emote.big { width: 2.6em; height: 2.6em; }
+/* Arène, joueur connecté : bouton 💬 qui ouvre une barre de saisie sous les messages (le reste reste transparent aux clics) */
+.arena-chat.ct-has-input { max-height: 70%; }
+.arena-chat .ct-list.ct-none { display: none; }
+.arena-chat .ct-ov-bar { pointer-events: auto; display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.arena-chat .ct-ov-open {
+  flex: 0 0 auto; width: clamp(34px, 3.2vw, 52px); height: clamp(34px, 3.2vw, 52px); padding: 0; justify-content: center; border-radius: 50%;
+  font-size: clamp(16px, 1.6vw, 26px); background: rgba(14, 9, 40, .78); border: 1px solid rgba(150, 100, 255, .6); box-shadow: 0 0 12px rgba(184, 60, 255, .45);
+}
+.arena-chat.typing .ct-ov-open { background: linear-gradient(135deg, rgba(200, 75, 255, .95), rgba(122, 44, 255, .95)); }
+.arena-chat .ct-ov-bar .ct-form { display: none; flex: 1 1 auto; margin: 0; padding: 4px; border-radius: 12px; background: rgba(10, 6, 30, .82); border: 1px solid rgba(150, 100, 255, .5); backdrop-filter: blur(4px); }
+.arena-chat.typing .ct-ov-bar .ct-form { display: flex; }
+.arena-chat .ct-ov-bar .ct-input { font-size: clamp(13px, 1.1vw, 18px); min-height: 36px; padding: 6px 10px; }
+.arena-chat .ct-ov-bar .ct-emo-btn, .arena-chat .ct-ov-bar .ct-send { width: 38px; min-height: 36px; }
+.arena-chat .ct-ov-bar .ct-picker { bottom: calc(100% + 6px); left: 0; }
+.arena-chat.typing .ct-list { pointer-events: auto; }
+.arena-chat.typing { overflow: visible; }
+/* Pendant un sondage, le tchat s'efface devant les cartes (3 derniers messages, transparents) sauf quand on écrit */
+.arena-chat.poll-open:not(.typing) .ct-list { opacity: .45; }
+.arena-chat.poll-open:not(.typing) .ct-ov:nth-last-child(n+4) { display: none; }
+.arena-chat.typing .ct-ov { animation: none; opacity: 1; }
 @media (max-width: 900px) { .ct-side { display: none; } }
 @media (max-width: 700px) {
   .ct-full .ct-list { height: 58vh; }

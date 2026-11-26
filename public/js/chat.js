@@ -63,21 +63,50 @@
     return pick;
   }
 
-  function makeView(root, mode) {
+  const formHtml = () => `<form class="ct-form" autocomplete="off"><button type="button" class="ct-emo-btn" title="Émotes">😀</button>
+          <input class="ct-input" maxlength="${C().maxLen}" placeholder="Écris un message… (:pyrax:, /roll, @pseudo)" enterkeyhint="send">
+          <button type="submit" class="ct-send" title="Envoyer">➤</button></form>`;
+
+  // Saisie : émotes, envoi, ↑ pour rappeler son dernier message, clic sur un pseudo pour l'interpeller
+  function wireForm(v, root) {
+    v.input = root.querySelector('.ct-input');
+    const picker = emotePicker(v);
+    root.querySelector('.ct-form').appendChild(picker);
+    root.querySelector('.ct-emo-btn').onclick = (e) => { e.stopPropagation(); picker.classList.toggle('open'); };
+    document.addEventListener('click', (e) => { if (!e.target.closest('.ct-picker') && !e.target.closest('.ct-emo-btn')) picker.classList.remove('open'); });
+    root.querySelector('.ct-form').onsubmit = (e) => { e.preventDefault(); send(v); };
+    v.input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' && !v.input.value && v.last.length) { v.input.value = v.last[v.last.length - 1]; e.preventDefault(); }
+      if (e.key === 'Escape') { if (picker.classList.contains('open')) picker.classList.remove('open'); else if (v.close) v.close(); }
+    });
+    v.list.addEventListener('click', (e) => {
+      const n = e.target.closest('.ct-name');
+      if (n && v.input) { v.input.value = (`@${n.dataset.name} ` + v.input.value).slice(0, C().maxLen); v.input.focus(); }
+    });
+  }
+
+  function makeView(root, mode, o = {}) {
     const v = { root, mode, list: null, input: null, last: [] };
     root.classList.add('ct', 'ct-' + mode);
     if (mode === 'overlay') {
-      root.innerHTML = '<div class="ct-list"></div>';
+      // Incrustation de l'arène ; o.input : un bouton 💬 ouvre une barre de saisie (joueur connecté)
+      root.innerHTML = '<div class="ct-list"></div>' + (o.input ? `<div class="ct-ov-bar"><button type="button" class="ct-ov-open" title="Écrire dans le tchat">💬</button>${formHtml()}</div>` : '');
       v.list = root.querySelector('.ct-list');
+      if (o.input) {
+        v.hasInput = true;
+        root.classList.add('ct-has-input');
+        wireForm(v, root);
+        v.open = () => { v.typing = true; root.classList.add('typing'); renderOverlay(v); setTimeout(() => v.input.focus(), 30); };
+        v.close = () => { v.typing = false; root.classList.remove('typing'); v.input.blur(); renderOverlay(v); };
+        root.querySelector('.ct-ov-open').onclick = () => (v.typing ? v.close() : v.open());
+      }
       return v;
     }
     const side = mode === 'full'
       ? `<aside class="ct-side"><div class="ct-online"><b>🟢 En ligne</b> <span class="ct-online-n">0</span><div class="ct-online-list"></div></div>
           <div class="ct-help"><b>💡 Commandes</b><code>/me</code> une action · <code>/roll</code> un dé · <code>/pile</code> pile ou face · <code>@pseudo</code> pour interpeller quelqu'un (clic sur un pseudo).</div></aside>` : '';
     const form = mode === 'admin' ? `<div class="row ct-admin-tools"><span class="muted">Clique 🗑 pour supprimer un message, 🔇 pour mettre son auteur en sourdine.</span><span class="spacer"></span><button type="button" class="secondary small danger" data-clear>Vider le salon</button></div>`
-      : `<form class="ct-form" autocomplete="off"><button type="button" class="ct-emo-btn" title="Émotes">😀</button>
-          <input class="ct-input" maxlength="${C().maxLen}" placeholder="Écris un message… (:pyrax:, /roll, @pseudo)" enterkeyhint="send">
-          <button type="submit" class="ct-send" title="Envoyer">➤</button></form>`;
+      : formHtml();
     root.innerHTML = `<div class="ct-main"><div class="ct-list" aria-live="polite"></div>${form}</div>${side}`;
     v.list = root.querySelector('.ct-list');
     if (mode === 'admin') {
@@ -93,21 +122,7 @@
       });
       return v;
     }
-    v.input = root.querySelector('.ct-input');
-    const picker = emotePicker(v);
-    root.querySelector('.ct-form').appendChild(picker);
-    root.querySelector('.ct-emo-btn').onclick = (e) => { e.stopPropagation(); picker.classList.toggle('open'); };
-    document.addEventListener('click', (e) => { if (!e.target.closest('.ct-picker') && !e.target.closest('.ct-emo-btn')) picker.classList.remove('open'); });
-    root.querySelector('.ct-form').onsubmit = (e) => { e.preventDefault(); send(v); };
-    v.input.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowUp' && !v.input.value && v.last.length) { v.input.value = v.last[v.last.length - 1]; e.preventDefault(); }
-      if (e.key === 'Escape') picker.classList.remove('open');
-    });
-    // Clic sur un pseudo : l'interpeller
-    v.list.addEventListener('click', (e) => {
-      const n = e.target.closest('.ct-name');
-      if (n && v.input) { v.input.value = (`@${n.dataset.name} ` + v.input.value).slice(0, C().maxLen); v.input.focus(); }
-    });
+    wireForm(v, root);
     return v;
   }
 
@@ -124,7 +139,7 @@
   }
   // Ligne pour soi seul (réponse à /aide)
   function addLocal(text) {
-    for (const v of S.views) if (v.mode !== 'overlay' && v.mode !== 'admin') {
+    for (const v of S.views) if ((v.mode !== 'overlay' || v.typing) && v.mode !== 'admin') {
       v.list.insertAdjacentHTML('beforeend', `<div class="ct-msg ct-sys ct-local"><span class="ct-text">${esc(text)}</span></div>`);
       v.list.scrollTop = v.list.scrollHeight;
     }
@@ -154,15 +169,14 @@
     if (atBottom || m.uid === S.id()) v.list.scrollTop = v.list.scrollHeight;
   }
   // Incrustation de l'arène : les derniers messages, qui s'effacent au bout de quelques dizaines de secondes
+  // (barre de saisie ouverte : les 8 derniers messages restent affichés, sans s'effacer)
   function renderOverlay(v) {
     const now = Date.now();
     const life = C().overlayLife * 1000;
-    const recent = S.messages.filter((m) => now - m.at < life).slice(-6);
-    v.list.innerHTML = recent.map((m) => {
-      const left = life - (now - m.at);
-      return `<div class="ct-ov" style="animation-delay:${-Math.max(0, (now - m.at)) / 1000}s;--life:${life / 1000}s">${msgHtml(m, { time: false, title: false })}</div>`;
-    }).join('');
-    v.root.classList.toggle('empty', !recent.length);
+    const recent = v.typing ? S.messages.slice(-8) : S.messages.filter((m) => now - m.at < life).slice(-6);
+    v.list.innerHTML = recent.map((m) => `<div class="ct-ov" style="animation-delay:${-Math.max(0, (now - m.at)) / 1000}s;--life:${life / 1000}s">${msgHtml(m, { time: false, title: false })}</div>`).join('');
+    v.root.classList.toggle('empty', !recent.length && !v.hasInput);
+    v.list.classList.toggle('ct-none', !recent.length);
   }
 
   function refreshAll(full) { for (const v of S.views) renderView(v, full); }
@@ -215,8 +229,8 @@
     setInterval(() => { for (const v of S.views) if (v.mode === 'overlay') renderOverlay(v); }, 2000);
   }
 
-  function mount(root, mode) {
-    const v = makeView(root, mode);
+  function mount(root, mode, o = {}) {
+    const v = makeView(root, mode, o);
     S.views.push(v);
     renderView(v, true);
     return v;
